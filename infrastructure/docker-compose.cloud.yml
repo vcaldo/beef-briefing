@@ -1,0 +1,78 @@
+# Cloud environment - VPS box
+# Services: telegram-bot, api-service, dashboard, postgres
+version: '3.8'
+
+services:
+  postgres:
+    build:
+      context: ../apps/postgres
+      dockerfile: Dockerfile
+    container_name: beef-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - beef-cloud-network
+    restart: unless-stopped
+
+  api-service:
+    build:
+      context: ../apps/api-service
+      dockerfile: Dockerfile
+    container_name: beef-api-service
+    environment:
+      DB_HOST: postgres
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_PORT: 5432
+      API_PORT: ${API_PORT}
+    ports:
+      - "${API_PORT}:${API_PORT}"
+    depends_on:
+      - postgres
+    networks:
+      - beef-cloud-network
+    restart: unless-stopped
+
+  telegram-bot:
+    build:
+      context: ../apps/telegram-bot
+      dockerfile: Dockerfile
+    container_name: beef-telegram-bot
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      API_SERVICE_URL: http://api-service:${API_PORT}
+    depends_on:
+      - api-service
+    networks:
+      - beef-cloud-network
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ../apps/dashboard
+      dockerfile: Dockerfile
+    container_name: beef-dashboard
+    environment:
+      API_SERVICE_URL: http://api-service:${API_PORT}
+      DASHBOARD_PORT: ${DASHBOARD_PORT}
+    ports:
+      - "${DASHBOARD_PORT}:${DASHBOARD_PORT}"
+    depends_on:
+      - api-service
+    networks:
+      - beef-cloud-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  beef-cloud-network:
+    driver: bridge

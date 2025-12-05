@@ -20,27 +20,27 @@ services:
       - beef-dev-network
     restart: unless-stopped
 
-  api-service:
-    build:
-      context: ../apps/api-service
-      dockerfile: Dockerfile
-    container_name: beef-api-service-dev
-    environment:
-      DB_HOST: postgres
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_PORT: 5432
-      API_PORT: ${API_PORT}
-      OLLAMA_API_HOST: ollama
-      OLLAMA_API_PORT: ${OLLAMA_PORT}
-    ports:
-      - "${API_PORT}:${API_PORT}"
-    depends_on:
-      - postgres
-    networks:
-      - beef-dev-network
-    restart: unless-stopped
+  # api-service:
+  #   build:
+  #     context: ../apps/api-service
+  #     dockerfile: Dockerfile
+  #   container_name: beef-api-service-dev
+  #   environment:
+  #     DB_HOST: postgres
+  #     DB_USER: ${DB_USER}
+  #     DB_PASSWORD: ${DB_PASSWORD}
+  #     DB_NAME: ${DB_NAME}
+  #     DB_PORT: 5432
+  #     API_PORT: ${API_PORT}
+  #     OLLAMA_API_HOST: ollama
+  #     OLLAMA_API_PORT: ${OLLAMA_PORT}
+  #   ports:
+  #     - "${API_PORT}:${API_PORT}"
+  #   depends_on:
+  #     - postgres
+  #   networks:
+  #     - beef-dev-network
+  #   restart: unless-stopped
 
   telegram-bot:
     build:
@@ -49,57 +49,70 @@ services:
     container_name: beef-telegram-bot-dev
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      API_SERVICE_URL: http://api-service:${API_PORT}
+      DB_HOST: postgres
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_PORT: 5432
+      DB_SSL_MODE: disable
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: telegram-media
+      MINIO_USE_SSL: false
+      ENVIRONMENT: development
+      LOG_LEVEL: info
     depends_on:
-      - api-service
+      - postgres
+      - minio
     networks:
       - beef-dev-network
     restart: unless-stopped
 
-  dashboard:
-    build:
-      context: ../apps/dashboard
-      dockerfile: Dockerfile
-    container_name: beef-dashboard-dev
-    environment:
-      API_SERVICE_URL: http://api-service:${API_PORT}
-      DASHBOARD_PORT: ${DASHBOARD_PORT}
-    ports:
-      - "${DASHBOARD_PORT}:${DASHBOARD_PORT}"
-    depends_on:
-      - api-service
-    networks:
-      - beef-dev-network
-    restart: unless-stopped
+  # dashboard:
+  #   build:
+  #     context: ../apps/dashboard
+  #     dockerfile: Dockerfile
+  #   container_name: beef-dashboard-dev
+  #   environment:
+  #     API_SERVICE_URL: http://api-service:${API_PORT}
+  #     DASHBOARD_PORT: ${DASHBOARD_PORT}
+  #   ports:
+  #     - "${DASHBOARD_PORT}:${DASHBOARD_PORT}"
+  #   depends_on:
+  #     - api-service
+  #   networks:
+  #     - beef-dev-network
+  #   restart: unless-stopped
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: beef-ollama-dev
-    environment:
-      OLLAMA_HOST: 0.0.0.0:${OLLAMA_PORT}
-    ports:
-      - "${OLLAMA_PORT}:${OLLAMA_PORT}"
-    volumes:
-      - ollama_models_dev:/root/.ollama
-    networks:
-      - beef-dev-network
-    restart: unless-stopped
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: beef-ollama-dev
+  #   environment:
+  #     OLLAMA_HOST: 0.0.0.0:${OLLAMA_PORT}
+  #   ports:
+  #     - "${OLLAMA_PORT}:${OLLAMA_PORT}"
+  #   volumes:
+  #     - ollama_models_dev:/root/.ollama
+  #   networks:
+  #     - beef-dev-network
+  #   restart: unless-stopped
 
-  llm-analyzer:
-    build:
-      context: ../apps/llm-analyzer
-      dockerfile: Dockerfile
-    container_name: beef-llm-analyzer-dev
-    environment:
-      OLLAMA_HOST: http://ollama:${OLLAMA_PORT}
+  # llm-analyzer:
+  #   build:
+  #     context: ../apps/llm-analyzer
+  #     dockerfile: Dockerfile
+  #   container_name: beef-llm-analyzer-dev
+  #   environment:
+  #     OLLAMA_HOST: http://ollama:${OLLAMA_PORT}
 
-      CLOUD_API_HOST: api-service
-      CLOUD_API_PORT: ${API_PORT}
-    depends_on:
-      - ollama
-    networks:
-      - beef-dev-network
-    restart: unless-stopped
+  #     CLOUD_API_HOST: api-service
+  #     CLOUD_API_PORT: ${API_PORT}
+  #   depends_on:
+  #     - ollama
+  #   networks:
+  #     - beef-dev-network
+  #   restart: unless-stopped
 
   minio:
     image: minio/minio:latest

@@ -103,6 +103,7 @@ yarn-error.log
 .github/workflows/*.log
 
 # Secrets
+.env.dev
 .env.prod
 secrets.json
 credentials/

@@ -1,2 +1,125 @@
+# .gitignore for beef-breefing monorepo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.cloud
+.env.llm
+.env.dev
+infrastructure/.env.dev
+infrastructure/.env.prod
+infrastructure/.env.llm
+
+# Go
+*.o
+*.a
+*.so
+.DS_Store
+vendor/
+go.sum.new
+*.mod.new
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+env/
+.venv
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.sublime-*
+.vim/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Databases
+*.sql.bak
+pgdata/
+postgres_data/
+postgres_data_dev/
+
+# Ollama
+ollama_models/
+ollama_models_dev/
+ollama_cache/
+
+# Build artifacts
+*.o
+*.a
+dist/
+build/
+bin/
+target/
+
+# Node (if added in future)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+*.temp
+
+# Git
+.git/
+.gitkeep
+
+# CI/CD
+.github/workflows/*.log
+
+# Secrets
+.env.dev
+.env.prod
+secrets.json
+credentials/
+private_keys/
+
+# Test coverage
+coverage/
+*.out
+coverage.html
+
+# Local development overrides
+docker-compose.override.yml
+.env.local.*
+
 # local imports dev
 local_imports/

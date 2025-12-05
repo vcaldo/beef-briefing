@@ -121,5 +121,5 @@ coverage.html
 docker-compose.override.yml
 .env.local.*
 
-# local imports dev
-local_imports/
+# local import dev
+local_import/

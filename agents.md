@@ -276,6 +276,253 @@ func main() {
 4. Close message queue connections
 5. Flush logs
 
+### Observability (New Relic)
+
+#### Configuration
+- Set via environment variables (never hardcode license keys):
+  - `NEW_RELIC_LICENSE_KEY` (required)
+  - `NEW_RELIC_APP_NAME` (required, use service name: `beef-briefing-api-service`)
+  - `NEW_RELIC_ENABLED` (optional, default: `true`)
+  - `NEW_RELIC_LOG_LEVEL` (optional: `debug`, `info`, `warn`, `error`)
+
+#### Go Agent Setup
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log/slog"
+    "net/http"
+    "os"
+
+    "github.com/newrelic/go-agent/v3/newrelic"
+)
+
+func initNewRelic(appName string) (*newrelic.Application, error) {
+    licenseKey := os.Getenv("NEW_RELIC_LICENSE_KEY")
+    if licenseKey == "" {
+        return nil, fmt.Errorf("NEW_RELIC_LICENSE_KEY is required")
+    }
+
+    app, err := newrelic.NewApplication(
+        newrelic.ConfigAppName(appName),
+        newrelic.ConfigLicense(licenseKey),
+        newrelic.ConfigDistributedTracerEnabled(true),
+        newrelic.ConfigAppLogForwardingEnabled(true),
+        // Enable code-level metrics for better function visibility
+        newrelic.ConfigCodeLevelMetricsEnabled(true),
+    )
+    if err != nil {
+        return nil, fmt.Errorf("failed to create New Relic app: %w", err)
+    }
+
+    return app, nil
+}
+```
+
+#### Context Propagation (Critical)
+Always propagate the New Relic transaction via context:
+```go
+// HTTP Handler - extract transaction and add to context
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+    // Transaction is automatically added by nrgorilla/nrhttp middleware
+    txn := newrelic.FromContext(r.Context())
+
+    // Add custom attributes for debugging
+    txn.AddAttribute("user_id", userID)
+
+    // Pass context with transaction to downstream calls
+    user, err := h.userService.GetUser(r.Context(), userID)
+    if err != nil {
+        txn.NoticeError(err)
+        // handle error...
+    }
+}
+
+// Service layer - use context to continue transaction
+func (s *UserService) GetUser(ctx context.Context, id string) (*User, error) {
+    // Create a segment for this operation
+    defer newrelic.FromContext(ctx).StartSegment("UserService.GetUser").End()
+
+    return s.repo.GetByID(ctx, id)
+}
+
+// Database layer - instrument queries
+func (r *PostgresUserRepo) GetByID(ctx context.Context, id string) (*User, error) {
+    // Use DatastoreSegment for database operations
+    segment := newrelic.DatastoreSegment{
+        StartTime:  newrelic.FromContext(ctx).StartSegmentNow(),
+        Product:    newrelic.DatastorePostgres,
+        Collection: "users",
+        Operation:  "SELECT",
+    }
+    defer segment.End()
+
+    row := r.db.QueryRowContext(ctx, "SELECT id, email FROM users WHERE id = $1", id)
+    // ...
+}
+```
+
+#### HTTP Middleware Integration
+```go
+// Using gorilla/mux with New Relic
+import (
+    "github.com/gorilla/mux"
+    "github.com/newrelic/go-agent/v3/integrations/nrgorilla"
+)
+
+func setupRouter(nrApp *newrelic.Application) *mux.Router {
+    r := mux.NewRouter()
+
+    // Apply New Relic middleware to all routes
+    r.Use(nrgorilla.Middleware(nrApp))
+
+    // Routes...
+    r.HandleFunc("/users/{id}", handler.GetUser).Methods("GET")
+
+    return r
+}
+
+// Using standard library net/http
+import "github.com/newrelic/go-agent/v3/newrelic"
+
+func setupRouter(nrApp *newrelic.Application) http.Handler {
+    mux := http.NewServeMux()
+
+    // Wrap each handler with New Relic
+    mux.HandleFunc(newrelic.WrapHandleFunc(nrApp, "/users", handler.GetUsers))
+
+    return mux
+}
+```
+
+#### External HTTP Calls
+```go
+import "github.com/newrelic/go-agent/v3/newrelic"
+
+func (c *ExternalClient) FetchData(ctx context.Context, url string) ([]byte, error) {
+    // Create request with context
+    req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+    if err != nil {
+        return nil, fmt.Errorf("creating request: %w", err)
+    }
+
+    // Wrap the transport to instrument external calls
+    txn := newrelic.FromContext(ctx)
+    client := &http.Client{
+        Transport: newrelic.NewRoundTripper(http.DefaultTransport),
+    }
+
+    // Add distributed tracing headers
+    req = newrelic.RequestWithTransactionContext(req, txn)
+
+    resp, err := client.Do(req)
+    // ...
+}
+```
+
+#### Custom Transactions (Background Jobs)
+```go
+func (w *Worker) ProcessMessage(ctx context.Context, msg Message) error {
+    // Start a background transaction for non-HTTP work
+    txn := w.nrApp.StartTransaction("ProcessMessage")
+    defer txn.End()
+
+    // Add context with transaction for downstream calls
+    ctx = newrelic.NewContext(ctx, txn)
+
+    txn.AddAttribute("message_id", msg.ID)
+    txn.AddAttribute("message_type", msg.Type)
+
+    if err := w.handler.Handle(ctx, msg); err != nil {
+        txn.NoticeError(err)
+        return err
+    }
+
+    return nil
+}
+```
+
+#### Error Tracking
+```go
+// Notice errors with context
+func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
+    txn := newrelic.FromContext(r.Context())
+
+    user, err := h.userService.Create(r.Context(), input)
+    if err != nil {
+        // Record error with attributes
+        txn.NoticeError(newrelic.Error{
+            Message: err.Error(),
+            Class:   "UserCreationError",
+            Attributes: map[string]interface{}{
+                "input_email": input.Email,
+            },
+        })
+        http.Error(w, "failed to create user", http.StatusInternalServerError)
+        return
+    }
+}
+```
+
+#### Custom Metrics
+```go
+// Record custom metrics for business KPIs
+func (s *BeefService) AnalyzeConflict(ctx context.Context, chatID string) (*Report, error) {
+    txn := newrelic.FromContext(ctx)
+    start := time.Now()
+
+    report, err := s.analyzer.Analyze(ctx, chatID)
+
+    // Record duration metric
+    duration := time.Since(start)
+    txn.Application().RecordCustomMetric("Custom/BeefAnalysis/Duration", duration.Seconds())
+
+    // Record count metric
+    if report != nil {
+        txn.Application().RecordCustomMetric("Custom/BeefAnalysis/ConflictScore", float64(report.Score))
+    }
+
+    return report, err
+}
+```
+
+#### Graceful Shutdown with New Relic
+```go
+func main() {
+    nrApp, err := initNewRelic("beef-briefing-api-service")
+    if err != nil {
+        slog.Error("failed to init New Relic", "error", err)
+        os.Exit(1)
+    }
+
+    // ... server setup ...
+
+    // Shutdown sequence
+    <-quit
+    slog.Info("shutting down...")
+
+    // Shutdown HTTP server first
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+    server.Shutdown(ctx)
+
+    // Shutdown New Relic last to flush remaining data
+    nrApp.Shutdown(10 * time.Second)
+
+    slog.Info("shutdown complete")
+}
+```
+
+#### Best Practices
+- **Always propagate context**: Every function that does I/O should accept `context.Context`
+- **Name transactions meaningfully**: Use `Controller/Action` pattern (e.g., `Users/Create`)
+- **Add relevant attributes**: Include IDs, types, and other debugging info
+- **Use segments for visibility**: Wrap significant operations in segments
+- **Don't over-instrument**: Focus on critical paths, not every function
+- **Handle nil transactions**: Check `if txn := newrelic.FromContext(ctx); txn != nil`
+
 ### Testing
 
 #### Test File Organization
@@ -503,7 +750,7 @@ pytest tests/ --cov=src       # Coverage
 ### Additional Context
 
 #### Go Version
-- **Minimum**: Go 1.23+
+- **Minimum**: Go 1.25+
 - All services use the same version for consistency
 - Specified in all `go.mod` files
 
@@ -533,7 +780,7 @@ pytest tests/ --cov=src       # Coverage
 #### Dockerfile Template (Go Services)
 ```dockerfile
 # Build stage
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 WORKDIR /app
 
 # Copy go mod files first for caching
@@ -545,7 +792,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd
 
 # Runtime stage
-FROM alpine:3.19
+FROM alpine:3.23
 RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /app/main .

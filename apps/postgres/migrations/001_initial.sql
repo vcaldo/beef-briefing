@@ -4,6 +4,9 @@
 -- Enable UUID extension for generating UUIDs
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Enable PostGIS extension for geographic data types
+CREATE EXTENSION IF NOT EXISTS postgis;
+
 -- Chats table: stores information about Telegram groups/channels
 CREATE TABLE chats (
     id BIGINT PRIMARY KEY,
@@ -47,14 +50,17 @@ CREATE TABLE messages (
     media_width INTEGER, -- for photo/video
     media_height INTEGER, -- for photo/video
 
+    -- Location data (for location and venue messages)
+    location GEOGRAPHY(POINT, 4326), -- PostGIS geography type for accurate distance calculations
+    venue_title VARCHAR(255), -- for venue messages
+    venue_address TEXT, -- for venue messages
+
     -- Metadata stored as JSON for flexibility
     entities JSONB, -- text entities (mentions, links, bold, etc.)
     metadata JSONB, -- additional message-specific data
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    UNIQUE(chat_id, telegram_message_id)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Service messages table: stores service events (joins, leaves, etc.)
@@ -91,6 +97,8 @@ CREATE INDEX idx_messages_user_id ON messages(user_id);
 CREATE INDEX idx_messages_message_date ON messages(message_date);
 CREATE INDEX idx_messages_telegram_message_id ON messages(telegram_message_id);
 CREATE INDEX idx_messages_media_sha256 ON messages(media_sha256) WHERE media_sha256 IS NOT NULL;
+CREATE INDEX idx_messages_location ON messages USING GIST(location) WHERE location IS NOT NULL;
+CREATE INDEX idx_messages_chat_telegram_date ON messages(chat_id, telegram_message_id, message_date DESC);
 
 CREATE INDEX idx_service_messages_chat_id ON service_messages(chat_id);
 CREATE INDEX idx_service_messages_actor_user_id ON service_messages(actor_user_id);

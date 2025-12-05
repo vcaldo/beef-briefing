@@ -64,12 +64,18 @@ func (h *Handler) HandleMessage(c tele.Context) error {
 
 	// Determine message type and handle media
 	messageType := "text"
+	shouldStore := true
 	var mediaFileName *string
 	var mediaFileSize *int64
 	var mediaMimeType *string
 	var mediaDuration *int
 	var mediaWidth *int
 	var mediaHeight *int
+	var latitude *float64
+	var longitude *float64
+	var venueTitle *string
+	var venueAddress *string
+	var additionalMetadata json.RawMessage
 
 	// Handle different media types
 	if msg.Photo != nil {
@@ -93,6 +99,17 @@ func (h *Handler) HandleMessage(c tele.Context) error {
 	} else if msg.VideoNote != nil {
 		messageType = "video_note"
 		h.handleVideoNote(msg.VideoNote, &mediaFileName, &mediaFileSize, &mediaMimeType, &mediaDuration)
+	} else if msg.Location != nil {
+		messageType = "location"
+		shouldStore = h.handleLocation(ctx, msg, &latitude, &longitude, &additionalMetadata)
+	} else if msg.Venue != nil {
+		messageType = "venue"
+		h.handleVenue(msg, &latitude, &longitude, &venueTitle, &venueAddress)
+	}
+
+	// Skip storing if location handler determined it's too close to previous location
+	if !shouldStore {
+		return nil
 	}
 
 	// Build entities JSON
@@ -101,6 +118,9 @@ func (h *Handler) HandleMessage(c tele.Context) error {
 		entitiesData, _ := json.Marshal(msg.Entities)
 		entities = entitiesData
 	}
+
+	// Use additional metadata if set (e.g., from location handler)
+	metadata := additionalMetadata
 
 	// Prepare message for storage
 	storeMsg := &store.Message{
@@ -115,6 +135,11 @@ func (h *Handler) HandleMessage(c tele.Context) error {
 		MediaWidth:        mediaWidth,
 		MediaHeight:       mediaHeight,
 		Entities:          entities,
+		Metadata:          metadata,
+		Latitude:          latitude,
+		Longitude:         longitude,
+		VenueTitle:        venueTitle,
+		VenueAddress:      venueAddress,
 	}
 
 	if msg.Sender != nil {
@@ -305,6 +330,72 @@ func (h *Handler) uploadFileToMinIO(file tele.File, contentType string) string {
 		"content_type", contentType)
 
 	return hash
+}
+
+// handleLocation processes location messages with 15m distance filtering
+// Returns true if the location should be stored, false if it's too close to previous location
+func (h *Handler) handleLocation(ctx context.Context, msg *tele.Message, lat, lng **float64, metadata *json.RawMessage) bool {
+	if msg.Location == nil {
+		return false
+	}
+
+	locationLat := float64(msg.Location.Lat)
+	locationLng := float64(msg.Location.Lng)
+	*lat = &locationLat
+	*lng = &locationLng
+
+	// Check if we should store this location update (15m distance threshold)
+	shouldStore, err := h.store.ShouldStoreLocationUpdate(ctx, msg.Chat.ID, int64(msg.ID), locationLat, locationLng)
+	if err != nil {
+		slog.Error("failed to check location distance",
+			"error", err,
+			"chat_id", msg.Chat.ID,
+			"telegram_message_id", msg.ID)
+		// On error, don't store to avoid duplicates
+		return false
+	}
+
+	if !shouldStore {
+		slog.Debug("location update skipped, within 15m of previous location",
+			"chat_id", msg.Chat.ID,
+			"telegram_message_id", msg.ID,
+			"lat", locationLat,
+			"lng", locationLng)
+		return false
+	}
+
+	// Build metadata with optional location fields
+	locationMeta := make(map[string]interface{})
+	if msg.Location.HorizontalAccuracy != nil {
+		locationMeta["horizontal_accuracy"] = *msg.Location.HorizontalAccuracy
+	}
+	if msg.Location.LivePeriod != 0 {
+		locationMeta["live_period"] = msg.Location.LivePeriod
+	}
+	if msg.Location.Heading != 0 {
+		locationMeta["heading"] = msg.Location.Heading
+	}
+
+	if len(locationMeta) > 0 {
+		metaJSON, _ := json.Marshal(locationMeta)
+		*metadata = metaJSON
+	}
+
+	return true
+}
+
+// handleVenue processes venue messages (location with title and address)
+func (h *Handler) handleVenue(msg *tele.Message, lat, lng **float64, venueTitle, venueAddress **string) {
+	if msg.Venue == nil {
+		return
+	}
+
+	locationLat := float64(msg.Venue.Location.Lat)
+	locationLng := float64(msg.Venue.Location.Lng)
+	*lat = &locationLat
+	*lng = &locationLng
+	*venueTitle = &msg.Venue.Title
+	*venueAddress = &msg.Venue.Address
 }
 
 func stringPtr(s string) *string {

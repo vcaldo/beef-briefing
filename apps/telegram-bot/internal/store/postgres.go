@@ -78,6 +78,10 @@ type Message struct {
 	MediaHeight         *int
 	Entities            json.RawMessage
 	Metadata            json.RawMessage
+	Latitude            *float64
+	Longitude           *float64
+	VenueTitle          *string
+	VenueAddress        *string
 }
 
 // ServiceMessage represents a service message (user joined, left, etc.)
@@ -150,20 +154,43 @@ func (s *PostgresStore) InsertMessage(ctx context.Context, msg *Message) (int64,
 		metadata = json.RawMessage("{}")
 	}
 
+	// Build location point if coordinates are provided
+	var args []interface{}
+
+	if msg.Latitude != nil && msg.Longitude != nil {
+		query := `
+			INSERT INTO messages (
+				telegram_message_id, chat_id, user_id, message_date, message_type,
+				text, reply_to_message_id, forwarded_from_user_id, forwarded_from_chat_id,
+				forwarded_date, edit_date, media_sha256, media_file_name, media_file_size,
+				media_mime_type, media_duration_seconds, media_width, media_height,
+				entities, metadata, location, venue_title, venue_address
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, ST_SetSRID(ST_MakePoint($21, $22), 4326)::geography, $23, $24)
+			RETURNING id
+		`
+		args = []interface{}{
+			msg.TelegramMessageID, msg.ChatID, msg.UserID, msg.MessageDate, msg.MessageType,
+			msg.Text, msg.ReplyToMessageID, msg.ForwardedFromUserID, msg.ForwardedFromChatID,
+			msg.ForwardedDate, msg.EditDate, msg.MediaSHA256, msg.MediaFileName, msg.MediaFileSize,
+			msg.MediaMimeType, msg.MediaDuration, msg.MediaWidth, msg.MediaHeight,
+			entities, metadata, *msg.Longitude, *msg.Latitude, msg.VenueTitle, msg.VenueAddress,
+		}
+		var id int64
+		err := s.db.QueryRowContext(ctx, query, args...).Scan(&id)
+		if err != nil {
+			return 0, fmt.Errorf("failed to insert message with location: %w", err)
+		}
+		return id, nil
+	}
+
 	query := `
 		INSERT INTO messages (
 			telegram_message_id, chat_id, user_id, message_date, message_type,
 			text, reply_to_message_id, forwarded_from_user_id, forwarded_from_chat_id,
 			forwarded_date, edit_date, media_sha256, media_file_name, media_file_size,
 			media_mime_type, media_duration_seconds, media_width, media_height,
-			entities, metadata
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-		ON CONFLICT (chat_id, telegram_message_id) DO UPDATE SET
-			edit_date = EXCLUDED.edit_date,
-			text = EXCLUDED.text,
-			entities = EXCLUDED.entities,
-			metadata = EXCLUDED.metadata,
-			updated_at = NOW()
+			entities, metadata, venue_title, venue_address
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
 		RETURNING id
 	`
 	var id int64
@@ -172,7 +199,7 @@ func (s *PostgresStore) InsertMessage(ctx context.Context, msg *Message) (int64,
 		msg.Text, msg.ReplyToMessageID, msg.ForwardedFromUserID, msg.ForwardedFromChatID,
 		msg.ForwardedDate, msg.EditDate, msg.MediaSHA256, msg.MediaFileName, msg.MediaFileSize,
 		msg.MediaMimeType, msg.MediaDuration, msg.MediaWidth, msg.MediaHeight,
-		entities, metadata,
+		entities, metadata, msg.VenueTitle, msg.VenueAddress,
 	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert message: %w", err)
@@ -200,6 +227,30 @@ func (s *PostgresStore) InsertServiceMessage(ctx context.Context, msg *ServiceMe
 		return fmt.Errorf("failed to insert service message: %w", err)
 	}
 	return nil
+}
+
+// ShouldStoreLocationUpdate checks if a location update should be stored
+// Returns true if there are no previous locations within 15 meters of the new location
+func (s *PostgresStore) ShouldStoreLocationUpdate(ctx context.Context, chatID, telegramMessageID int64, newLat, newLng float64) (bool, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM messages
+		WHERE chat_id = $1
+			AND telegram_message_id = $2
+			AND location IS NOT NULL
+			AND ST_Distance(
+				location,
+				ST_SetSRID(ST_MakePoint($4, $3), 4326)::geography
+			) < 15
+	`
+	var count int
+	err := s.db.QueryRowContext(ctx, query, chatID, telegramMessageID, newLat, newLng).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check location distance: %w", err)
+	}
+
+	// Store if no locations are within 15 meters
+	return count == 0, nil
 }
 
 // InsertReaction creates a new reaction

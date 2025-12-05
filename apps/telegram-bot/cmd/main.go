@@ -79,6 +79,8 @@ func main() {
 	bot.Handle(tele.OnSticker, h.HandleMessage)
 	bot.Handle(tele.OnAnimation, h.HandleMessage)
 	bot.Handle(tele.OnVideoNote, h.HandleMessage)
+	bot.Handle(tele.OnLocation, h.HandleMessage)
+	bot.Handle(tele.OnVenue, h.HandleMessage)
 	bot.Handle(tele.OnUserJoined, h.HandleUserJoined)
 	bot.Handle(tele.OnUserLeft, h.HandleUserLeft)
 

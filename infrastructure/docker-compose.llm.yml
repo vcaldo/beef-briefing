@@ -1,0 +1,47 @@
+# LLM environment - GPU box
+# Services: llm-analyzer, ollama
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: beef-ollama
+    environment:
+      OLLAMA_HOST: 0.0.0.0:${OLLAMA_PORT}
+    ports:
+      - "${OLLAMA_PORT}:${OLLAMA_PORT}"
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - beef-llm-network
+    restart: unless-stopped
+    # GPU support - uncomment if using NVIDIA GPU
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  llm-analyzer:
+    build:
+      context: ../apps/llm-analyzer
+      dockerfile: Dockerfile
+    container_name: beef-llm-analyzer
+    environment:
+      OLLAMA_HOST: http://ollama:${OLLAMA_PORT}
+      CLOUD_API_HOST: ${CLOUD_API_HOST}
+      CLOUD_API_PORT: ${CLOUD_API_PORT}
+    depends_on:
+      - ollama
+    networks:
+      - beef-llm-network
+    restart: unless-stopped
+
+volumes:
+  ollama_models:
+
+networks:
+  beef-llm-network:
+    driver: bridge

@@ -10,6 +10,7 @@ Cloud environment for VPS box. Services:
 - API Service (Golang)
 - Telegram Bot (Golang)
 - Dashboard (Python Streamlit)
+- MinIO (S3-compatible object storage)
 
 Deploy with:
 ```bash
@@ -34,6 +35,7 @@ Development environment for local machine. Includes all services:
 - Dashboard
 - Ollama
 - LLM Analyzer
+- MinIO (S3-compatible object storage)
 
 Deploy with:
 ```bash
@@ -64,6 +66,7 @@ Copy `.env.example` and fill in values for each environment.
 
 ### Cloud
 - `postgres_data` - PostgreSQL data persistence
+- `minio_data` - MinIO object storage persistence
 
 ### LLM
 - `ollama_models` - Ollama model storage (persistent)
@@ -71,6 +74,23 @@ Copy `.env.example` and fill in values for each environment.
 ### Dev
 - `postgres_data_dev` - Local PostgreSQL data
 - `ollama_models_dev` - Local Ollama models
+- `minio_data_dev` - Local MinIO object storage
+
+## MinIO Configuration
+
+### Default Credentials
+- Username: `minioadmin`
+- Password: `minioadmin`
+
+Override via environment variables in `.env` files:
+```bash
+MINIO_ROOT_USER=your_username
+MINIO_ROOT_PASSWORD=your_password
+```
+
+### Access
+- MinIO API: `http://localhost:9000` (dev) or configured port (cloud)
+- MinIO Console: `http://localhost:9001` (dev) or configured port (cloud)
 
 ## Networks
 

@@ -7,6 +7,9 @@
 .env.cloud
 .env.llm
 .env.dev
+infrastructure/.env.dev
+infrastructure/.env.prod
+infrastructure/.env.llm
 
 # Go
 *.o

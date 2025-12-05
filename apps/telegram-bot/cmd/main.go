@@ -9,6 +9,7 @@ import (
 
 	"beef-briefing/apps/telegram-bot/internal/config"
 	"beef-briefing/apps/telegram-bot/internal/handler"
+	"beef-briefing/apps/telegram-bot/internal/storage"
 	"beef-briefing/apps/telegram-bot/internal/store"
 
 	tele "gopkg.in/telebot.v4"
@@ -39,23 +40,20 @@ func main() {
 	slog.Info("database connection established")
 
 	// Initialize MinIO storage
-	// minioClient, err := storage.NewMinIOClient(
-	// 	cfg.MinIOEndpoint,
-	// 	cfg.MinIOAccessKey,
-	// 	cfg.MinIOSecretKey,
-	// 	cfg.MinIOBucket,
-	// 	cfg.MinIOUseSSL,
-	// )
+	minioClient, err := storage.NewMinIOClient(
+		cfg.MinIOEndpoint,
+		cfg.MinIOAccessKey,
+		cfg.MinIOSecretKey,
+		cfg.MinIOBucket,
+		cfg.MinIOUseSSL,
+	)
 	if err != nil {
 		slog.Error("failed to create MinIO client", "error", err)
 		os.Exit(1)
 	}
 	slog.Info("MinIO client initialized", "bucket", cfg.MinIOBucket)
 
-	// Initialize handler
-	h := handler.NewHandler(dbStore)
-
-	// Create bot
+	// Create bot (needed for file downloads)
 	pref := tele.Settings{
 		Token:  cfg.TelegramBotToken,
 		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
@@ -68,6 +66,9 @@ func main() {
 	}
 
 	slog.Info("bot created successfully")
+
+	// Initialize handler with MinIO client and bot
+	h := handler.NewHandler(dbStore, minioClient, bot)
 
 	// Register handlers
 	bot.Handle(tele.OnText, h.HandleMessage)

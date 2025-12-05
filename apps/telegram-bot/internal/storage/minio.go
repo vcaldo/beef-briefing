@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -84,7 +85,7 @@ func (m *MinIOClient) UploadFile(ctx context.Context, reader io.Reader, contentT
 
 	// Upload file with actual data
 	_, err = m.client.PutObject(ctx, m.bucketName, hash,
-		io.NopCloser(io.MultiReader(io.Reader(nil))),
+		bytes.NewReader(data),
 		int64(len(data)),
 		minio.PutObjectOptions{
 			ContentType: contentType,
@@ -108,7 +109,7 @@ func (m *MinIOClient) UploadFileWithHash(ctx context.Context, hash string, data 
 
 	// Upload file
 	_, err = m.client.PutObject(ctx, m.bucketName, hash,
-		io.NopCloser(io.MultiReader(io.Reader(nil))),
+		bytes.NewReader(data),
 		int64(len(data)),
 		minio.PutObjectOptions{
 			ContentType: contentType,

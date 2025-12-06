@@ -67,8 +67,8 @@ func main() {
 
 	slog.Info("bot created successfully")
 
-	// Initialize handler with MinIO client and bot
-	h := handler.NewHandler(dbStore, minioClient, bot)
+	// Initialize handler with MinIO client, bot, and config
+	h := handler.NewHandler(dbStore, minioClient, bot, cfg)
 
 	// Register handlers
 	bot.Handle(tele.OnText, h.HandleMessage)
@@ -83,6 +83,9 @@ func main() {
 	bot.Handle(tele.OnVenue, h.HandleMessage)
 	bot.Handle(tele.OnUserJoined, h.HandleUserJoined)
 	bot.Handle(tele.OnUserLeft, h.HandleUserLeft)
+
+	// Register import command
+	bot.Handle("/import", h.HandleImportCommand)
 
 	slog.Info("handlers registered")
 

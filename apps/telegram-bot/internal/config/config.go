@@ -41,6 +41,7 @@ type Config struct {
 	AdminUserIDs    string `envconfig:"ADMIN_USER_IDS" default:""`
 	MaxImportSizeMB int    `envconfig:"MAX_IMPORT_SIZE_MB" default:"4096"`
 	ImportChunkSize int    `envconfig:"IMPORT_CHUNK_SIZE" default:"5000"`
+	LocalImportPath string `envconfig:"LOCAL_IMPORT_PATH" default:"/app/local_import"`
 }
 
 func (c *Config) DSN() string {

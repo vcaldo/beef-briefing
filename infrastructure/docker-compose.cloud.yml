@@ -47,9 +47,26 @@ services:
     container_name: beef-telegram-bot
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      API_SERVICE_URL: http://api-service:${API_PORT}
+      DB_HOST: postgres
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_PORT: 5432
+      DB_SSL_MODE: disable
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: telegram-media
+      MINIO_USE_SSL: false
+      ENVIRONMENT: production
+      LOG_LEVEL: info
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS}
+      LOCAL_IMPORT_PATH: /app/local_import
+    volumes:
+      - ../local_import:/app/local_import
     depends_on:
-      - api-service
+      - postgres
+      - minio
     networks:
       - beef-cloud-network
     restart: unless-stopped

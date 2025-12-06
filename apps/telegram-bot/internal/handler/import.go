@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"beef-briefing/apps/telegram-bot/internal/importer"
@@ -13,6 +15,7 @@ import (
 )
 
 // HandleImportCommand handles the /import command for importing Telegram export files
+// This command scans the local import directory for ZIP files and processes them
 func (h *Handler) HandleImportCommand(c tele.Context) error {
 	// Check if user is admin
 	if !h.config.IsAdmin(c.Sender().ID) {
@@ -20,79 +23,150 @@ func (h *Handler) HandleImportCommand(c tele.Context) error {
 		return c.Send("❌ Unauthorized. Only administrators can use this command.")
 	}
 
-	msg := c.Message()
-	var doc *tele.Document
-
-	// Check if document is attached directly or in caption
-	if msg.Document != nil {
-		doc = msg.Document
-	} else if msg.ReplyTo != nil && msg.ReplyTo.Document != nil {
-		// Handle case where user replies to a file with /import
-		doc = msg.ReplyTo.Document
-	} else {
-		return c.Send("❌ Please attach or reply to a ZIP file containing the Telegram export.\n\nUsage: /import (attach ZIP file or reply to a file)")
-	}
-
 	chatID := c.Chat().ID
 
-	// Validate file size
-	maxSize := int64(h.config.MaxImportSizeMB) * 1024 * 1024
-	if doc.FileSize > maxSize {
-		return c.Send(fmt.Sprintf("❌ File too large. Maximum size: %d MB", h.config.MaxImportSizeMB))
-	}
-
-	// Validate file extension (check MIME type and filename)
-	isValidZip := doc.MIME == "application/zip" || doc.MIME == "application/x-zip-compressed"
-	if !isValidZip && doc.File.UniqueID != "" {
-		// Also accept if filename ends with .zip
-		if doc.FileName != "" {
-			isValidZip = len(doc.FileName) > 4 && doc.FileName[len(doc.FileName)-4:] == ".zip"
-		}
-	}
-	if !isValidZip {
-		return c.Send("❌ Invalid file type. Please upload a ZIP file.")
-	}
-
-	slog.Info("import started", "chat_id", chatID, "user_id", c.Sender().ID, "file_size", doc.FileSize, "filename", doc.FileName)
+	slog.Info("import triggered", "chat_id", chatID, "user_id", c.Sender().ID, "import_path", h.config.LocalImportPath)
 
 	// Send initial status
-	statusMsg, err := c.Bot().Send(c.Chat(), "⏳ Downloading export file...")
+	statusMsg, err := c.Bot().Send(c.Chat(), "🔍 Scanning for ZIP files in import directory...")
 	if err != nil {
 		slog.Error("failed to send status message", "error", err)
 	}
 
-	// Create temp file for ZIP
-	tempFile, err := os.CreateTemp("", "telegram-import-*.zip")
+	// Scan import directory for ZIP files
+	zipFiles, err := h.scanForZipFiles()
 	if err != nil {
-		slog.Error("failed to create temp file", "error", err)
-		return c.Send("❌ Failed to process file.")
-	}
-	defer os.Remove(tempFile.Name())
-	defer tempFile.Close()
-
-	// Download ZIP file using streaming (handles large files better)
-	err = h.downloadTelegramFile(h.bot, doc.FileID, tempFile)
-	if err != nil {
-		slog.Error("failed to download file", "error", err)
-		return c.Send("❌ Failed to download file.")
+		slog.Error("failed to scan import directory", "error", err)
+		return c.Send(fmt.Sprintf("❌ Failed to scan import directory: %v", err))
 	}
 
-	// Update status
+	if len(zipFiles) == 0 {
+		return c.Send("ℹ️ No ZIP files found in import directory.")
+	}
+
+	// Send list of files to be processed
+	fileList := "📋 <b>Found ZIP files:</b>\n\n"
+	for i, file := range zipFiles {
+		fileInfo, _ := os.Stat(file)
+		sizeMB := float64(fileInfo.Size()) / 1024 / 1024
+		fileList += fmt.Sprintf("%d. %s (%.2f MB)\n", i+1, filepath.Base(file), sizeMB)
+	}
+	fileList += fmt.Sprintf("\n🔄 Processing %d file(s)...", len(zipFiles))
+
 	if statusMsg != nil {
-		c.Bot().Edit(statusMsg, "📦 Extracting archive...")
+		c.Bot().Edit(statusMsg, fileList, &tele.SendOptions{ParseMode: tele.ModeHTML})
 	}
 
-	// Extract ZIP file
-	extractedDir, cleanup, err := importer.ExtractZIP(tempFile.Name())
+	// Process each ZIP file
+	successCount := 0
+	failedCount := 0
+
+	for idx, zipPath := range zipFiles {
+		slog.Info("processing zip file", "file", filepath.Base(zipPath), "index", idx+1, "total", len(zipFiles))
+
+		// Update status
+		if statusMsg != nil {
+			msg := fmt.Sprintf(
+				"📦 <b>Processing file %d/%d</b>\n\n"+
+					"File: %s\n"+
+					"Status: Extracting...",
+				idx+1,
+				len(zipFiles),
+				filepath.Base(zipPath),
+			)
+			c.Bot().Edit(statusMsg, msg, &tele.SendOptions{ParseMode: tele.ModeHTML})
+		}
+
+		// Process the ZIP file
+		if err := h.processZipFile(c, statusMsg, chatID, zipPath); err != nil {
+			slog.Error("failed to process zip file", "file", filepath.Base(zipPath), "error", err)
+			failedCount++
+			// Continue with next file even if this one failed
+			continue
+		}
+
+		// Delete ZIP file after successful processing
+		if err := os.Remove(zipPath); err != nil {
+			slog.Warn("failed to delete zip file after processing", "file", filepath.Base(zipPath), "error", err)
+		} else {
+			slog.Info("deleted processed zip file", "file", filepath.Base(zipPath))
+		}
+
+		successCount++
+	}
+
+	// Send final summary
+	summaryMsg := fmt.Sprintf(
+		"✅ <b>Batch Import Complete!</b>\n\n"+
+			"📊 <b>Summary:</b>\n"+
+			"• Total files: %d\n"+
+			"• Successful: %d\n"+
+			"• Failed: %d",
+		len(zipFiles),
+		successCount,
+		failedCount,
+	)
+
+	if statusMsg != nil {
+		c.Bot().Edit(statusMsg, summaryMsg, &tele.SendOptions{ParseMode: tele.ModeHTML})
+	}
+
+	slog.Info("batch import completed", "chat_id", chatID, "total", len(zipFiles), "success", successCount, "failed", failedCount)
+	return nil
+}
+
+// scanForZipFiles scans the local import directory for ZIP files
+func (h *Handler) scanForZipFiles() ([]string, error) {
+	// Check if directory exists
+	if _, err := os.Stat(h.config.LocalImportPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("import directory does not exist: %s", h.config.LocalImportPath)
+	}
+
+	var zipFiles []string
+
+	// Walk through directory
+	err := filepath.Walk(h.config.LocalImportPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip directories
+		if info.IsDir() {
+			return nil
+		}
+
+		// Check if file is a ZIP
+		if strings.HasSuffix(strings.ToLower(info.Name()), ".zip") {
+			zipFiles = append(zipFiles, path)
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		slog.Error("failed to extract ZIP", "error", err)
-		return c.Send(fmt.Sprintf("❌ Failed to extract archive: %v", err))
+		return nil, fmt.Errorf("failed to walk directory: %w", err)
+	}
+
+	return zipFiles, nil
+}
+
+// processZipFile processes a single ZIP file
+func (h *Handler) processZipFile(c tele.Context, statusMsg *tele.Message, chatID int64, zipPath string) error {
+	// Extract ZIP file
+	extractedDir, cleanup, err := importer.ExtractZIP(zipPath)
+	if err != nil {
+		return fmt.Errorf("failed to extract ZIP: %w", err)
 	}
 	defer cleanup()
 
 	// Update status
 	if statusMsg != nil {
-		c.Bot().Edit(statusMsg, "🔄 Starting import...")
+		msg := fmt.Sprintf(
+			"📦 <b>Processing:</b> %s\n\n"+
+				"Status: Starting import...",
+			filepath.Base(zipPath),
+		)
+		c.Bot().Edit(statusMsg, msg, &tele.SendOptions{ParseMode: tele.ModeHTML})
 	}
 
 	// Create importer
@@ -105,13 +179,12 @@ func (h *Handler) HandleImportCommand(c tele.Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go h.updateImportProgress(ctx, c, statusMsg, progressChan)
+	go h.updateImportProgress(ctx, c, statusMsg, progressChan, filepath.Base(zipPath))
 
 	// Run import
 	if err := imp.Import(context.Background(), chatID, extractedDir, progressChan); err != nil {
-		slog.Error("import failed", "error", err)
 		close(progressChan)
-		return c.Send(fmt.Sprintf("❌ Import failed: %v", err))
+		return fmt.Errorf("import failed: %w", err)
 	}
 
 	close(progressChan)
@@ -119,12 +192,11 @@ func (h *Handler) HandleImportCommand(c tele.Context) error {
 	// Wait a bit for final progress update
 	time.Sleep(500 * time.Millisecond)
 
-	slog.Info("import completed", "chat_id", chatID)
 	return nil
 }
 
 // updateImportProgress updates the import status message with throttling
-func (h *Handler) updateImportProgress(ctx context.Context, c tele.Context, statusMsg *tele.Message, progressChan <-chan importer.ImportProgress) {
+func (h *Handler) updateImportProgress(ctx context.Context, c tele.Context, statusMsg *tele.Message, progressChan <-chan importer.ImportProgress, fileName string) {
 	if statusMsg == nil {
 		return
 	}
@@ -144,7 +216,7 @@ func (h *Handler) updateImportProgress(ctx context.Context, c tele.Context, stat
 			if !ok {
 				// Channel closed, send final update
 				if needsUpdate {
-					h.sendProgressUpdate(c, statusMsg, lastProgress, true)
+					h.sendProgressUpdate(c, statusMsg, lastProgress, fileName, true)
 				}
 				return
 			}
@@ -153,7 +225,7 @@ func (h *Handler) updateImportProgress(ctx context.Context, c tele.Context, stat
 
 		case <-ticker.C:
 			if needsUpdate {
-				h.sendProgressUpdate(c, statusMsg, lastProgress, false)
+				h.sendProgressUpdate(c, statusMsg, lastProgress, fileName, false)
 				needsUpdate = false
 			}
 		}
@@ -161,19 +233,20 @@ func (h *Handler) updateImportProgress(ctx context.Context, c tele.Context, stat
 }
 
 // sendProgressUpdate sends a progress update to the user
-func (h *Handler) sendProgressUpdate(c tele.Context, statusMsg *tele.Message, progress importer.ImportProgress, isFinal bool) {
+func (h *Handler) sendProgressUpdate(c tele.Context, statusMsg *tele.Message, progress importer.ImportProgress, fileName string, isFinal bool) {
 	var message string
 
 	if isFinal {
 		// Final summary
 		message = fmt.Sprintf(
-			"✅ <b>Import Complete!</b>\n\n"+
+			"✅ <b>File Complete:</b> %s\n\n"+
 				"📊 <b>Summary:</b>\n"+
 				"• Total: %d\n"+
 				"• Inserted: %d\n"+
 				"• Skipped: %d\n"+
 				"• Media: %d\n"+
 				"• Errors: %d",
+			fileName,
 			progress.Total,
 			progress.Inserted,
 			progress.Skipped,
@@ -188,13 +261,14 @@ func (h *Handler) sendProgressUpdate(c tele.Context, statusMsg *tele.Message, pr
 		}
 
 		message = fmt.Sprintf(
-			"🔄 <b>Importing...</b>\n\n"+
+			"🔄 <b>Importing:</b> %s\n\n"+
 				"📦 Chunk %d/%d\n"+
 				"📈 Progress: %d/%d (%.1f%%)\n\n"+
 				"✅ Inserted: %d\n"+
 				"⏭️ Skipped: %d\n"+
 				"🖼️ Media: %d\n"+
 				"❌ Errors: %d",
+			fileName,
 			progress.CurrentChunk,
 			progress.TotalChunks,
 			progress.Processed,

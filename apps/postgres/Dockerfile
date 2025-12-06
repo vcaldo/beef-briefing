@@ -1,6 +1,6 @@
-# PostgreSQL Database Service
-# Placeholder Dockerfile for PostgreSQL with custom initialization
-FROM postgres:18.1-bookworm
+# PostgreSQL Database Service with PostGIS support
+# Uses official postgres image with PostGIS extension pre-installed
+FROM postgis/postgis:17-3.4
 
 COPY ./migrations /docker-entrypoint-initdb.d/
 COPY ./seeds /docker-entrypoint-initdb.d/

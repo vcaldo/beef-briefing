@@ -773,7 +773,7 @@ pytest tests/ --cov=src       # Coverage
 
 #### Build Standards
 - **Build type**: Static binaries with CGO disabled
-- Use multi-stage Docker builds: compile in `golang:1.23` image, run in minimal base
+- Use multi-stage Docker builds: compile in `golang:1.25` image, run in minimal base
 - Build command: `go build -a -installsuffix cgo -o {binary-name} ./cmd`
 - Environment: `CGO_ENABLED=0` to eliminate C dependencies
 

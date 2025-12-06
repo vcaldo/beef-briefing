@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"time"
@@ -62,20 +61,6 @@ func (h *Handler) HandleImportCommand(c tele.Context) error {
 		slog.Error("failed to send status message", "error", err)
 	}
 
-	// Download ZIP file
-	file, err := c.Bot().FileByID(doc.FileID)
-	if err != nil {
-		slog.Error("failed to get file", "error", err)
-		return c.Send("❌ Failed to download file.")
-	}
-
-	reader, err := c.Bot().File(&file)
-	if err != nil {
-		slog.Error("failed to open file reader", "error", err)
-		return c.Send("❌ Failed to download file.")
-	}
-	defer reader.Close()
-
 	// Create temp file for ZIP
 	tempFile, err := os.CreateTemp("", "telegram-import-*.zip")
 	if err != nil {
@@ -85,10 +70,11 @@ func (h *Handler) HandleImportCommand(c tele.Context) error {
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
-	// Copy downloaded file to temp location
-	if _, err := io.Copy(tempFile, reader); err != nil {
-		slog.Error("failed to save file", "error", err)
-		return c.Send("❌ Failed to save file.")
+	// Download ZIP file using streaming (handles large files better)
+	err = h.downloadTelegramFile(h.bot, doc.FileID, tempFile)
+	if err != nil {
+		slog.Error("failed to download file", "error", err)
+		return c.Send("❌ Failed to download file.")
 	}
 
 	// Update status

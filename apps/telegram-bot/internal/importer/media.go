@@ -37,24 +37,22 @@ func (mp *MediaProcessor) ProcessMedia(ctx context.Context, relativePath, mimeTy
 	// Read file
 	data, err := os.ReadFile(fullPath)
 	if err != nil {
-		slog.Error("failed to read media file", "path", relativePath, "error", err)
 		return "", fmt.Errorf("failed to read media file: %w", err)
 	}
 
-	// Upload to MinIO with deduplication
+	// Upload to MinIO (which handles SHA256 calculation and deduplication)
 	reader := bytes.NewReader(data)
 	hash, err = mp.minioClient.UploadFile(ctx, reader, mimeType)
 	if err != nil {
-		slog.Error("failed to upload media to MinIO", "path", relativePath, "error", err)
 		return "", fmt.Errorf("failed to upload media: %w", err)
 	}
 
-	slog.Debug("media uploaded", "path", relativePath, "hash", hash, "size", len(data))
+	slog.Debug("media processed", "path", relativePath, "hash", hash, "size", len(data))
 	return hash, nil
 }
 
 // DetermineMediaType extracts the message type from export message fields
-func DetermineMediaType(exportMsg *ExportMessage) string {
+func (mp *MediaProcessor) DetermineMediaType(exportMsg *ExportMessage) string {
 	if exportMsg.Photo != nil {
 		return "photo"
 	}
@@ -79,7 +77,7 @@ func DetermineMediaType(exportMsg *ExportMessage) string {
 }
 
 // GetMediaPath returns the relative path to the media file
-func GetMediaPath(exportMsg *ExportMessage) string {
+func (mp *MediaProcessor) GetMediaPath(exportMsg *ExportMessage) string {
 	if exportMsg.Photo != nil {
 		return *exportMsg.Photo
 	}

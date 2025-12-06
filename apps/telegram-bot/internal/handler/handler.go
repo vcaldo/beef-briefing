@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
+	"os"
 	"time"
 
 	"beef-briefing/apps/telegram-bot/internal/config"
@@ -403,4 +406,51 @@ func (h *Handler) handleVenue(msg *tele.Message, lat, lng **float64, venueTitle,
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+// downloadTelegramFile downloads a file from Telegram using streaming
+// This handles large files better than the File() method
+func (h *Handler) downloadTelegramFile(bot *tele.Bot, fileID string, destFile *os.File) error {
+	// Get file info from Telegram
+	file, err := bot.FileByID(fileID)
+	if err != nil {
+		return fmt.Errorf("failed to get file info: %w", err)
+	}
+
+	// Build file URL from the file path returned by Telegram API
+	// Format: https://api.telegram.org/file/bot{token}/{file_path}
+	url := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", bot.Token, file.FilePath)
+
+	// Create HTTP request with timeout for streaming download
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Execute request
+	client := &http.Client{Timeout: 30 * time.Minute}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	// Stream the response body to the file
+	if _, err := io.Copy(destFile, resp.Body); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	// Ensure file is flushed to disk
+	if err := destFile.Sync(); err != nil {
+		return fmt.Errorf("failed to sync file: %w", err)
+	}
+
+	return nil
 }

@@ -267,17 +267,39 @@ func (im *Importer) processRegularMessage(ctx context.Context, exportMsg *Export
 	}
 
 	// Determine message type
-	messageType := DetermineMediaType(exportMsg)
+	messageType := mediaProc.DetermineMediaType(exportMsg)
 
 	// Process media if present
 	var mediaSHA256 *string
 	var mediaFileName *string
 	var mediaMimeType *string
-	if mediaPath := GetMediaPath(exportMsg); mediaPath != "" {
+	if mediaPath := mediaProc.GetMediaPath(exportMsg); mediaPath != "" {
 		mimeType := stringValue(exportMsg.MimeType)
+		if mimeType == "" {
+			// Default MIME types based on message type
+			switch messageType {
+			case "photo":
+				mimeType = "image/jpeg"
+			case "video":
+				mimeType = "video/mp4"
+			case "voice":
+				mimeType = "audio/ogg"
+			case "animation":
+				mimeType = "video/mp4"
+			case "sticker":
+				mimeType = "image/webp"
+			default:
+				mimeType = "application/octet-stream"
+			}
+		}
+
 		hash, err := mediaProc.ProcessMedia(ctx, mediaPath, mimeType)
 		if err != nil {
-			slog.Warn("failed to process media, continuing without it", "path", mediaPath, "error", err)
+			slog.Warn("failed to process media, continuing without it",
+				"path", mediaPath,
+				"message_id", exportMsg.ID,
+				"error", err)
+			progress.ErrorCount++
 		} else {
 			mediaSHA256 = &hash
 			progress.MediaUploaded++

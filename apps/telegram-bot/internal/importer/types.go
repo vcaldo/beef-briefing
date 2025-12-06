@@ -62,8 +62,8 @@ type ImportProgress struct {
 	Processed     int
 	Inserted      int
 	Skipped       int
-	MediaUploaded int
 	ErrorCount    int
+	MediaUploaded int
 	CurrentChunk  int
 	TotalChunks   int
 }

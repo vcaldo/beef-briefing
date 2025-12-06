@@ -98,6 +98,20 @@ func (m *MinIOClient) UploadFile(ctx context.Context, reader io.Reader, contentT
 	return hash, nil
 }
 
+// FileExists checks if a file with the given hash exists in MinIO
+func (m *MinIOClient) FileExists(ctx context.Context, hash string) (bool, error) {
+	_, err := m.client.StatObject(ctx, m.bucketName, hash, minio.StatObjectOptions{})
+	if err != nil {
+		// Check if error is "object not found"
+		errResponse := minio.ToErrorResponse(err)
+		if errResponse.Code == "NoSuchKey" {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to check file existence: %w", err)
+	}
+	return true, nil
+}
+
 // UploadFileWithHash uploads a file using a pre-computed hash and data
 func (m *MinIOClient) UploadFileWithHash(ctx context.Context, hash string, data []byte, contentType string) error {
 	// Check if file already exists (deduplication)
@@ -123,21 +137,9 @@ func (m *MinIOClient) UploadFileWithHash(ctx context.Context, hash string, data 
 }
 
 // GetFileURL returns the URL to access a file
+// GetFileURL returns the URL to access a file
 func (m *MinIOClient) GetFileURL(ctx context.Context, hash string) (string, error) {
 	// For internal access, return the object path
 	// In production, you might want to generate a presigned URL
 	return fmt.Sprintf("/%s/%s", m.bucketName, hash), nil
-}
-
-// FileExists checks if a file with the given hash exists
-func (m *MinIOClient) FileExists(ctx context.Context, hash string) (bool, error) {
-	_, err := m.client.StatObject(ctx, m.bucketName, hash, minio.StatObjectOptions{})
-	if err != nil {
-		errResponse := minio.ToErrorResponse(err)
-		if errResponse.Code == "NoSuchKey" {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to check file existence: %w", err)
-	}
-	return true, nil
 }

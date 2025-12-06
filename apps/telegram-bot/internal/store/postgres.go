@@ -278,3 +278,34 @@ func (s *PostgresStore) GetMessageIDByTelegramID(ctx context.Context, chatID, te
 	}
 	return id, nil
 }
+
+// MessageExists checks if a message already exists in the database
+func (s *PostgresStore) MessageExists(ctx context.Context, chatID, telegramMessageID int64) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM messages WHERE chat_id = $1 AND telegram_message_id = $2)`
+	err := s.db.QueryRowContext(ctx, query, chatID, telegramMessageID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check message existence: %w", err)
+	}
+	return exists, nil
+}
+
+// ServiceMessageExists checks if a service message already exists in the database
+func (s *PostgresStore) ServiceMessageExists(ctx context.Context, chatID, telegramMessageID int64) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM service_messages WHERE chat_id = $1 AND telegram_message_id = $2)`
+	err := s.db.QueryRowContext(ctx, query, chatID, telegramMessageID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check service message existence: %w", err)
+	}
+	return exists, nil
+}
+
+// BeginTx starts a new database transaction
+func (s *PostgresStore) BeginTx(ctx context.Context) (*sql.Tx, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	return tx, nil
+}

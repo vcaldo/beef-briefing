@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
@@ -34,6 +36,12 @@ type Config struct {
 	NewRelicLicenseKey string `envconfig:"NEW_RELIC_LICENSE_KEY"`
 	NewRelicAppName    string `envconfig:"NEW_RELIC_APP_NAME" default:"beef-briefing-telegram-bot"`
 	NewRelicEnabled    bool   `envconfig:"NEW_RELIC_ENABLED" default:"false"`
+
+	// Import Configuration
+	AdminUserIDs    string `envconfig:"ADMIN_USER_IDS" default:""`
+	MaxImportSizeMB int    `envconfig:"MAX_IMPORT_SIZE_MB" default:"4096"`
+	ImportChunkSize int    `envconfig:"IMPORT_CHUNK_SIZE" default:"5000"`
+	LocalImportPath string `envconfig:"LOCAL_IMPORT_PATH" default:"/app/local_import"`
 }
 
 func (c *Config) DSN() string {
@@ -43,6 +51,21 @@ func (c *Config) DSN() string {
 
 func (c *Config) IsProduction() bool {
 	return c.Environment == "production"
+}
+
+func (c *Config) IsAdmin(userID int64) bool {
+	if c.AdminUserIDs == "" {
+		return false
+	}
+
+	adminIDs := strings.Split(c.AdminUserIDs, ",")
+	for _, idStr := range adminIDs {
+		idStr = strings.TrimSpace(idStr)
+		if id, err := strconv.ParseInt(idStr, 10, 64); err == nil && id == userID {
+			return true
+		}
+	}
+	return false
 }
 
 func LoadConfig() (*Config, error) {

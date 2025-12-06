@@ -62,6 +62,10 @@ services:
       MINIO_USE_SSL: false
       ENVIRONMENT: development
       LOG_LEVEL: info
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS}
+      LOCAL_IMPORT_PATH: /app/local_import
+    volumes:
+      - ../local_import:/app/local_import
     depends_on:
       - postgres
       - minio

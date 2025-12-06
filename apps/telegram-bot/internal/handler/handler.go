@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"beef-briefing/apps/telegram-bot/internal/config"
 	"beef-briefing/apps/telegram-bot/internal/storage"
 	"beef-briefing/apps/telegram-bot/internal/store"
 
@@ -18,13 +19,15 @@ type Handler struct {
 	store       *store.PostgresStore
 	minioClient *storage.MinIOClient
 	bot         *tele.Bot
+	config      *config.Config
 }
 
-func NewHandler(store *store.PostgresStore, minioClient *storage.MinIOClient, bot *tele.Bot) *Handler {
+func NewHandler(store *store.PostgresStore, minioClient *storage.MinIOClient, bot *tele.Bot, cfg *config.Config) *Handler {
 	return &Handler{
 		store:       store,
 		minioClient: minioClient,
 		bot:         bot,
+		config:      cfg,
 	}
 }
 

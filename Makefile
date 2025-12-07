@@ -27,6 +27,12 @@ help: ## Show this help message
 up: ## Start all services
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) up -d
 
+up-build: ## Rebuild images and start all services
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) up -d --build
+
+up-logs: ## Start all services and show logs in foreground
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) up
+
 down: ## Stop all services
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) down
 

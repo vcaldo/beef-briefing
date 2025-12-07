@@ -44,11 +44,31 @@ func main() {
 	// Initialize API client
 	apiClient := client.NewAPIClient(cfg.APIServiceURL)
 
-	// Create bot instance
+	// Create bot instance with allowed updates including reactions
 	opts := []bot.Option{
 		bot.WithDefaultHandler(func(ctx context.Context, b *bot.Bot, update *models.Update) {
 			handler := handlers.NewUpdateHandler(b, apiClient)
 			handler.Handle(ctx, b, update)
+		}),
+		bot.WithAllowedUpdates(bot.AllowedUpdates{
+			"message",
+			"edited_message",
+			"channel_post",
+			"edited_channel_post",
+			"message_reaction",
+			"message_reaction_count",
+			"inline_query",
+			"chosen_inline_result",
+			"callback_query",
+			"shipping_query",
+			"pre_checkout_query",
+			"poll",
+			"poll_answer",
+			"my_chat_member",
+			"chat_member",
+			"chat_join_request",
+			"chat_boost",
+			"removed_chat_boost",
 		}),
 	}
 

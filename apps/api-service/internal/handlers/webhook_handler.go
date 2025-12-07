@@ -211,10 +211,50 @@ func (h *IngestHandler) processMessage(ctx context.Context, tx *sql.Tx, msg *mod
 		return fmt.Errorf("failed to process media: %w", err)
 	}
 
-	// Process location
-	if msg.Location != nil {
+	// Process location (standalone, not part of venue)
+	if msg.Location != nil && msg.Venue == nil {
 		if err := h.mediaRepo.InsertLocation(ctx, tx, messageID, msg.Location); err != nil {
 			slog.Warn("failed to insert location", "error", err)
+		}
+	}
+
+	// Process venue (includes location)
+	if msg.Venue != nil {
+		locationID, err := h.mediaRepo.InsertLocationReturningID(ctx, tx, messageID, &msg.Venue.Location)
+		if err != nil {
+			slog.Warn("failed to insert venue location", "error", err)
+		} else {
+			if err := h.mediaRepo.InsertVenue(ctx, tx, messageID, locationID, msg.Venue); err != nil {
+				slog.Warn("failed to insert venue", "error", err)
+			}
+		}
+	}
+
+	// Process contact
+	if msg.Contact != nil {
+		if err := h.mediaRepo.InsertContact(ctx, tx, messageID, msg.Contact); err != nil {
+			slog.Warn("failed to insert contact", "error", err)
+		}
+	}
+
+	// Process poll
+	if msg.Poll != nil {
+		pollID, err := h.mediaRepo.InsertPoll(ctx, tx, messageID, msg.Poll)
+		if err != nil {
+			slog.Warn("failed to insert poll", "error", err)
+		} else {
+			for i, option := range msg.Poll.Options {
+				if err := h.mediaRepo.InsertPollOption(ctx, tx, pollID, i, &option); err != nil {
+					slog.Warn("failed to insert poll option", "error", err, "index", i)
+				}
+			}
+		}
+	}
+
+	// Process dice
+	if msg.Dice != nil {
+		if err := h.mediaRepo.InsertDice(ctx, tx, messageID, msg.Dice); err != nil {
+			slog.Warn("failed to insert dice", "error", err)
 		}
 	}
 
@@ -230,13 +270,29 @@ func (h *IngestHandler) processMedia(ctx context.Context, tx *sql.Tx, messageID 
 			continue
 		}
 
-		// Trust MIME type from metadata or default
-		mimeType := "image/jpeg"
+		// Compute hash for deduplication
+		fileHash := storage.ComputeFileHash(data)
 
-		objectKey, fileHash, err := h.storageClient.UploadMedia(ctx, photo.FileID, data, mimeType, "photo")
+		// Check if file already exists in database
+		existingKey, err := h.mediaRepo.GetObjectKeyByHash(ctx, tx, fileHash)
 		if err != nil {
-			slog.Error("failed to upload photo to MinIO", "file_id", photo.FileID, "error", err)
+			slog.Error("failed to check file hash", "file_id", photo.FileID, "error", err)
 			continue
+		}
+
+		var objectKey string
+		if existingKey != "" {
+			// File already exists, reuse existing object key
+			objectKey = existingKey
+			slog.Debug("photo already exists in storage, reusing", "file_id", photo.FileID, "object_key", objectKey)
+		} else {
+			// Upload new file to MinIO
+			mimeType := "image/jpeg"
+			objectKey, _, err = h.storageClient.UploadMedia(ctx, photo.FileID, data, mimeType, "photo")
+			if err != nil {
+				slog.Error("failed to upload photo to MinIO", "file_id", photo.FileID, "error", err)
+				continue
+			}
 		}
 
 		if err := h.mediaRepo.InsertPhoto(ctx, tx, messageID, &photo, objectKey, fileHash); err != nil {
@@ -298,6 +354,20 @@ func (h *IngestHandler) processMedia(ctx context.Context, tx *sql.Tx, messageID 
 		}
 	}
 
+	// Process sticker (stored as 'sticker' type in media_files with additional metadata in stickers table)
+	if msg.Sticker != nil {
+		if err := h.processSticker(ctx, tx, messageID, msg.Sticker, files); err != nil {
+			slog.Error("failed to process sticker", "error", err)
+		}
+	}
+
+	// Process game
+	if msg.Game != nil {
+		if err := h.processGame(ctx, tx, messageID, msg.Game, files); err != nil {
+			slog.Error("failed to process game", "error", err)
+		}
+	}
+
 	return nil
 }
 
@@ -317,15 +387,135 @@ func (h *IngestHandler) processMediaFile(ctx context.Context, tx *sql.Tx, messag
 		mimeType = "application/octet-stream"
 	}
 
-	// Upload to MinIO
-	objectKey, fileHash, err := h.storageClient.UploadMedia(ctx, fileID, data, mimeType, mediaType)
+	// Compute hash for deduplication
+	fileHash := storage.ComputeFileHash(data)
+
+	// Check if file already exists in database
+	existingKey, err := h.mediaRepo.GetObjectKeyByHash(ctx, tx, fileHash)
 	if err != nil {
-		return fmt.Errorf("failed to upload to MinIO: %w", err)
+		return fmt.Errorf("failed to check file hash: %w", err)
+	}
+
+	var objectKey string
+	if existingKey != "" {
+		// File already exists, reuse existing object key
+		objectKey = existingKey
+		slog.Debug("media already exists in storage, reusing",
+			"file_id", fileID,
+			"media_type", mediaType,
+			"object_key", objectKey,
+		)
+	} else {
+		// Upload new file to MinIO
+		objectKey, _, err = h.storageClient.UploadMedia(ctx, fileID, data, mimeType, mediaType)
+		if err != nil {
+			return fmt.Errorf("failed to upload to MinIO: %w", err)
+		}
 	}
 
 	// Insert media file record
 	return h.mediaRepo.InsertMediaFile(ctx, tx, messageID, mediaType, fileID, fileUniqueID, objectKey, fileHash,
 		fileSize, mimeType, fileName, duration, width, height, performer, title)
+}
+
+// processSticker handles sticker media - stores file in media_files as 'sticker' type and metadata in stickers table
+func (h *IngestHandler) processSticker(ctx context.Context, tx *sql.Tx, messageID int64, sticker *models.Sticker, files map[string][]byte) error {
+	data, ok := files[sticker.FileID]
+	if !ok {
+		slog.Warn("sticker file not found in request, skipping", "file_id", sticker.FileID)
+		return nil
+	}
+
+	// Determine MIME type based on sticker type
+	mimeType := "image/webp"
+	if sticker.IsAnimated {
+		mimeType = "application/x-tgsticker"
+	} else if sticker.IsVideo {
+		mimeType = "video/webm"
+	}
+
+	// Compute hash for deduplication
+	fileHash := storage.ComputeFileHash(data)
+
+	// Check if file already exists in database
+	existingKey, err := h.mediaRepo.GetObjectKeyByHash(ctx, tx, fileHash)
+	if err != nil {
+		return fmt.Errorf("failed to check file hash: %w", err)
+	}
+
+	var objectKey string
+	if existingKey != "" {
+		objectKey = existingKey
+		slog.Debug("sticker already exists in storage, reusing", "file_id", sticker.FileID, "object_key", objectKey)
+	} else {
+		objectKey, _, err = h.storageClient.UploadMedia(ctx, sticker.FileID, data, mimeType, "sticker")
+		if err != nil {
+			return fmt.Errorf("failed to upload sticker to MinIO: %w", err)
+		}
+	}
+
+	// Insert sticker into media_files table with type 'sticker'
+	mediaFileID, err := h.mediaRepo.InsertMediaFileReturningID(ctx, tx, messageID, "sticker",
+		sticker.FileID, sticker.FileUniqueID, objectKey, fileHash,
+		sticker.FileSize, mimeType, "",
+		nil, &sticker.Width, &sticker.Height, "", "")
+	if err != nil {
+		return fmt.Errorf("failed to insert sticker media file: %w", err)
+	}
+
+	// Insert sticker-specific metadata
+	if err := h.mediaRepo.InsertSticker(ctx, tx, messageID, mediaFileID, sticker); err != nil {
+		return fmt.Errorf("failed to insert sticker metadata: %w", err)
+	}
+
+	return nil
+}
+
+// processGame handles game messages - stores game info and photos
+func (h *IngestHandler) processGame(ctx context.Context, tx *sql.Tx, messageID int64, game *models.Game, files map[string][]byte) error {
+	// Insert game record
+	gameID, err := h.mediaRepo.InsertGame(ctx, tx, messageID, game)
+	if err != nil {
+		return fmt.Errorf("failed to insert game: %w", err)
+	}
+
+	// Process game photos
+	for _, photo := range game.Photo {
+		data, ok := files[photo.FileID]
+		if !ok {
+			slog.Warn("game photo file not found in request, skipping", "file_id", photo.FileID)
+			continue
+		}
+
+		// Compute hash for deduplication
+		fileHash := storage.ComputeFileHash(data)
+
+		// Check if file already exists in database
+		existingKey, err := h.mediaRepo.GetObjectKeyByHash(ctx, tx, fileHash)
+		if err != nil {
+			slog.Error("failed to check file hash", "file_id", photo.FileID, "error", err)
+			continue
+		}
+
+		var objectKey string
+		if existingKey != "" {
+			objectKey = existingKey
+			slog.Debug("game photo already exists in storage, reusing", "file_id", photo.FileID, "object_key", objectKey)
+		} else {
+			mimeType := "image/jpeg"
+			objectKey, _, err = h.storageClient.UploadMedia(ctx, photo.FileID, data, mimeType, "game_photo")
+			if err != nil {
+				slog.Error("failed to upload game photo to MinIO", "file_id", photo.FileID, "error", err)
+				continue
+			}
+		}
+
+		if err := h.mediaRepo.InsertGamePhoto(ctx, tx, gameID, &photo, objectKey, fileHash); err != nil {
+			slog.Warn("failed to insert game photo", "error", err)
+		}
+	}
+
+	return nil
 }
 
 func (h *IngestHandler) processMessageReaction(ctx context.Context, tx *sql.Tx, reaction *models.MessageReactionUpdated) error {

@@ -66,7 +66,13 @@ type Message struct {
 	Document            *Document       `json:"document,omitempty"`
 	Animation           *Animation      `json:"animation,omitempty"`
 	VideoNote           *VideoNote      `json:"video_note,omitempty"`
+	Sticker             *Sticker        `json:"sticker,omitempty"`
 	Location            *Location       `json:"location,omitempty"`
+	Venue               *Venue          `json:"venue,omitempty"`
+	Contact             *Contact        `json:"contact,omitempty"`
+	Poll                *Poll           `json:"poll,omitempty"`
+	Dice                *Dice           `json:"dice,omitempty"`
+	Game                *Game           `json:"game,omitempty"`
 	HasProtectedContent bool            `json:"has_protected_content,omitempty"`
 	IsAutomaticForward  bool            `json:"is_automatic_forward,omitempty"`
 	IsTopicMessage      bool            `json:"is_topic_message,omitempty"`
@@ -170,6 +176,81 @@ type Location struct {
 	ProximityAlertRadius *int     `json:"proximity_alert_radius,omitempty"`
 }
 
+// Sticker represents a sticker
+type Sticker struct {
+	FileID        string     `json:"file_id"`
+	FileUniqueID  string     `json:"file_unique_id"`
+	Type          string     `json:"type"`
+	Width         int        `json:"width"`
+	Height        int        `json:"height"`
+	IsAnimated    bool       `json:"is_animated"`
+	IsVideo       bool       `json:"is_video"`
+	Thumbnail     *PhotoSize `json:"thumbnail,omitempty"`
+	Emoji         string     `json:"emoji,omitempty"`
+	SetName       string     `json:"set_name,omitempty"`
+	MaskPosition  any        `json:"mask_position,omitempty"`
+	CustomEmojiID string     `json:"custom_emoji_id,omitempty"`
+	FileSize      *int64     `json:"file_size,omitempty"`
+}
+
+// Venue represents a venue
+type Venue struct {
+	Location        Location `json:"location"`
+	Title           string   `json:"title"`
+	Address         string   `json:"address"`
+	FoursquareID    string   `json:"foursquare_id,omitempty"`
+	FoursquareType  string   `json:"foursquare_type,omitempty"`
+	GooglePlaceID   string   `json:"google_place_id,omitempty"`
+	GooglePlaceType string   `json:"google_place_type,omitempty"`
+}
+
+// Contact represents a phone contact
+type Contact struct {
+	PhoneNumber string `json:"phone_number"`
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name,omitempty"`
+	UserID      *int64 `json:"user_id,omitempty"`
+	VCard       string `json:"vcard,omitempty"`
+}
+
+// Poll represents a poll
+type Poll struct {
+	ID                    string       `json:"id"`
+	Question              string       `json:"question"`
+	Options               []PollOption `json:"options"`
+	TotalVoterCount       int          `json:"total_voter_count"`
+	IsClosed              bool         `json:"is_closed"`
+	IsAnonymous           bool         `json:"is_anonymous"`
+	Type                  string       `json:"type"`
+	AllowsMultipleAnswers bool         `json:"allows_multiple_answers"`
+	CorrectOptionID       *int         `json:"correct_option_id,omitempty"`
+	Explanation           string       `json:"explanation,omitempty"`
+	OpenPeriod            *int         `json:"open_period,omitempty"`
+	CloseDate             *int64       `json:"close_date,omitempty"`
+}
+
+// PollOption represents one option in a poll
+type PollOption struct {
+	Text       string `json:"text"`
+	VoterCount int    `json:"voter_count"`
+}
+
+// Dice represents an animated emoji that displays a random value
+type Dice struct {
+	Emoji string `json:"emoji"`
+	Value int    `json:"value"`
+}
+
+// Game represents a game
+type Game struct {
+	Title        string          `json:"title"`
+	Description  string          `json:"description"`
+	Photo        []PhotoSize     `json:"photo"`
+	Text         string          `json:"text,omitempty"`
+	TextEntities []MessageEntity `json:"text_entities,omitempty"`
+	Animation    *Animation      `json:"animation,omitempty"`
+}
+
 // MessageReactionUpdated represents a change of reaction on a message performed by a user
 type MessageReactionUpdated struct {
 	Chat        Chat           `json:"chat"`
@@ -261,6 +342,7 @@ type DBMediaFile struct {
 	TelegramFileID       string
 	TelegramFileUniqueID string
 	MinIOObjectKey       string
+	FileHash             string
 	FileSize             sql.NullInt64
 	MimeType             sql.NullString
 	FileName             sql.NullString
@@ -279,6 +361,7 @@ type DBPhoto struct {
 	TelegramFileID       string
 	TelegramFileUniqueID string
 	MinIOObjectKey       string
+	FileHash             string
 	Width                int
 	Height               int
 	FileSize             sql.NullInt64
@@ -296,4 +379,106 @@ type DBLocation struct {
 	Heading              sql.NullInt32
 	ProximityAlertRadius sql.NullInt32
 	CreatedAt            time.Time
+}
+
+// DBSticker represents a sticker row in the database
+type DBSticker struct {
+	ID            int64
+	MessageID     int64
+	MediaFileID   int64
+	StickerType   string
+	Emoji         sql.NullString
+	SetName       sql.NullString
+	IsAnimated    bool
+	IsVideo       bool
+	CustomEmojiID sql.NullString
+	CreatedAt     time.Time
+}
+
+// DBGame represents a game row in the database
+type DBGame struct {
+	ID          int64
+	MessageID   int64
+	Title       string
+	Description string
+	Text        sql.NullString
+	CreatedAt   time.Time
+}
+
+// DBGamePhoto represents a game photo row in the database
+type DBGamePhoto struct {
+	ID                   int64
+	GameID               int64
+	TelegramFileID       string
+	TelegramFileUniqueID string
+	MinIOObjectKey       string
+	FileHash             string
+	Width                int
+	Height               int
+	FileSize             sql.NullInt64
+	CreatedAt            time.Time
+}
+
+// DBPoll represents a poll row in the database
+type DBPoll struct {
+	ID                    int64
+	MessageID             int64
+	TelegramPollID        string
+	Question              string
+	PollType              string
+	TotalVoterCount       int
+	IsClosed              bool
+	IsAnonymous           bool
+	AllowsMultipleAnswers bool
+	CorrectOptionID       sql.NullInt32
+	Explanation           sql.NullString
+	OpenPeriod            sql.NullInt32
+	CloseDate             sql.NullTime
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
+// DBPollOption represents a poll option row in the database
+type DBPollOption struct {
+	ID          int64
+	PollID      int64
+	OptionIndex int
+	OptionText  string
+	VoterCount  int
+	CreatedAt   time.Time
+}
+
+// DBContact represents a contact row in the database
+type DBContact struct {
+	ID          int64
+	MessageID   int64
+	PhoneNumber string
+	FirstName   string
+	LastName    sql.NullString
+	UserID      sql.NullInt64
+	VCard       sql.NullString
+	CreatedAt   time.Time
+}
+
+// DBVenue represents a venue row in the database
+type DBVenue struct {
+	ID              int64
+	MessageID       int64
+	LocationID      int64
+	Title           string
+	Address         string
+	FoursquareID    sql.NullString
+	FoursquareType  sql.NullString
+	GooglePlaceID   sql.NullString
+	GooglePlaceType sql.NullString
+	CreatedAt       time.Time
+}
+
+// DBDice represents a dice row in the database
+type DBDice struct {
+	ID        int64
+	MessageID int64
+	Emoji     string
+	DiceValue int
+	CreatedAt time.Time
 }

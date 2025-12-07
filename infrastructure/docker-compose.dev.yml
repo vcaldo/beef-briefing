@@ -28,13 +28,21 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
       DB_PORT: 5432
+      DB_SSL_MODE: disable
       API_PORT: ${API_PORT}
-      OLLAMA_API_HOST: ollama
-      OLLAMA_API_PORT: ${OLLAMA_PORT}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: telegram-media
+      MINIO_USE_SSL: false
+      ENVIRONMENT: development
+      LOG_LEVEL: debug
     ports:
       - "${API_PORT}:${API_PORT}"
     depends_on:
       - postgres
+      - minio
     networks:
       - beef-dev-network
     restart: unless-stopped

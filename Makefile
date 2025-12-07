@@ -1,6 +1,6 @@
 # Variables
-COMPOSE_FILE := infrastructure/docker-compose.dev.yml
-ENV_FILE := infrastructure/.env.dev
+COMPOSE_FILE ?= infrastructure/docker-compose.dev.yml
+ENV_FILE ?= infrastructure/.env.dev
 
 # Service names
 API_SERVICE := api-service

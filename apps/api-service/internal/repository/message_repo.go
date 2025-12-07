@@ -96,7 +96,7 @@ func (r *MessageRepository) InsertEntity(ctx context.Context, tx *sql.Tx, messag
 	}
 
 	query := `
-		INSERT INTO message_entities (message_id, entity_type, offset, length, url, user_id, language, custom_emoji_id)
+		INSERT INTO message_entities (message_id, entity_type, entity_offset, entity_length, url, user_id, language, custom_emoji_id)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 

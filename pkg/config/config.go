@@ -22,7 +22,7 @@ type Config struct {
 	APIServiceURL   string `envconfig:"API_SERVICE_URL" default:"http://api-service:8080"`
 
 	// Telegram Bot Configuration
-	TelegramBotToken string `envconfig:"TELEGRAM_BOT_TOKEN" default:""`
+	TelegramBotToken string `envconfig:"TELEGRAM_BOT_TOKEN" required:"true"`
 
 	// MinIO Configuration
 	MinIOEndpoint  string `envconfig:"MINIO_ENDPOINT" default:"localhost:9000"`

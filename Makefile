@@ -4,7 +4,9 @@
 # Variables
 GO_VERSION := 1.25
 PROJECT_NAME := beef-briefing
-DOCKER_COMPOSE := docker-compose -f infrastructure/docker-compose.dev.yml
+ENV ?= dev
+DOCKER_COMPOSE := docker-compose -f infrastructure/docker-compose.$(ENV).yml
+ENV_FILE := infrastructure/.env.$(ENV)
 SERVICES := api-service
 
 # Service paths
@@ -33,10 +35,16 @@ help: ## Display this help message
 
 ##@ Infrastructure
 
+.PHONY: dev
+dev: env-validate ## Start all services in development mode (alias for 'up')
+	@echo "$(COLOR_GREEN)Starting development environment...$(COLOR_RESET)"
+	$(DOCKER_COMPOSE) --env-file $(ENV_FILE) up -d
+	@echo "$(COLOR_GREEN)Development environment started successfully$(COLOR_RESET)"
+
 .PHONY: up
 up: env-validate ## Start all services with docker-compose
 	@echo "$(COLOR_GREEN)Starting all services...$(COLOR_RESET)"
-	$(DOCKER_COMPOSE) up -d
+	$(DOCKER_COMPOSE) --env-file $(ENV_FILE) up -d
 	@echo "$(COLOR_GREEN)Services started successfully$(COLOR_RESET)"
 
 .PHONY: down
@@ -101,14 +109,14 @@ docker-rebuild-api-service: docker-build-api-service ## Rebuild and restart api-
 .PHONY: env-validate
 env-validate: ## Validate .env file exists and contains required variables
 	@echo "$(COLOR_BLUE)Validating environment configuration...$(COLOR_RESET)"
-	@if [ ! -f .env ]; then \
-		echo "$(COLOR_YELLOW)Warning: .env file not found$(COLOR_RESET)"; \
-		if [ -f .env.example ]; then \
-			echo "$(COLOR_YELLOW)Please copy .env.example to .env and configure it$(COLOR_RESET)"; \
+	@if [ ! -f $(ENV_FILE) ]; then \
+		echo "$(COLOR_YELLOW)Warning: $(ENV_FILE) file not found$(COLOR_RESET)"; \
+		if [ -f infrastructure/.env.example ]; then \
+			echo "$(COLOR_YELLOW)Please copy infrastructure/.env.example to $(ENV_FILE) and configure it$(COLOR_RESET)"; \
 		fi; \
 		exit 1; \
 	fi
-	@echo "$(COLOR_GREEN)Environment file validated$(COLOR_RESET)"
+	@echo "$(COLOR_GREEN)Environment file ($(ENV_FILE)) validated$(COLOR_RESET)"
 
 ##@ Cleanup
 

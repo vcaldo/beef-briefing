@@ -183,9 +183,10 @@ CREATE TABLE media_files (
     id BIGSERIAL PRIMARY KEY,
     message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
     media_type media_type NOT NULL,
-    telegram_file_id TEXT NOT NULL UNIQUE,
+    telegram_file_id TEXT NOT NULL,
     telegram_file_unique_id TEXT NOT NULL,
     minio_object_key TEXT NOT NULL,
+    file_hash TEXT NOT NULL,
     file_size BIGINT,
     mime_type TEXT,
     file_name TEXT,
@@ -200,14 +201,16 @@ CREATE TABLE media_files (
 CREATE INDEX idx_media_message_id ON media_files(message_id);
 CREATE INDEX idx_media_file_id ON media_files(telegram_file_id);
 CREATE INDEX idx_media_type ON media_files(media_type);
+CREATE INDEX idx_media_file_hash ON media_files(file_hash);
 
 -- Photos table (multiple sizes per message)
 CREATE TABLE photos (
     id BIGSERIAL PRIMARY KEY,
     message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-    telegram_file_id TEXT NOT NULL UNIQUE,
+    telegram_file_id TEXT NOT NULL,
     telegram_file_unique_id TEXT NOT NULL,
     minio_object_key TEXT NOT NULL,
+    file_hash TEXT NOT NULL,
     width INT NOT NULL,
     height INT NOT NULL,
     file_size BIGINT,
@@ -216,6 +219,7 @@ CREATE TABLE photos (
 
 CREATE INDEX idx_photos_message_id ON photos(message_id);
 CREATE INDEX idx_photos_file_id ON photos(telegram_file_id);
+CREATE INDEX idx_photos_file_hash ON photos(file_hash);
 
 -- Locations table
 CREATE TABLE locations (

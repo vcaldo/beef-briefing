@@ -13,7 +13,6 @@ import (
 
 	"beef-briefing/apps/api-service/internal/handlers"
 	"beef-briefing/apps/api-service/internal/storage"
-	"beef-briefing/apps/api-service/internal/telegram"
 	"beef-briefing/pkg/config"
 
 	"github.com/gorilla/mux"
@@ -44,13 +43,6 @@ func main() {
 	}
 	defer db.Close()
 
-	// Initialize Telegram file client
-	fileClient, err := telegram.NewFileClient(cfg.TelegramBotToken)
-	if err != nil {
-		slog.Error("failed to initialize Telegram file client", "error", err)
-		os.Exit(1)
-	}
-
 	// Initialize MinIO client
 	minioClient, err := storage.NewMinIOClient(
 		cfg.MinIOEndpoint,
@@ -65,7 +57,7 @@ func main() {
 	}
 
 	// Setup HTTP router
-	router := setupRouter(db, fileClient, minioClient)
+	router := setupRouter(db, minioClient, cfg)
 
 	// Create HTTP server
 	server := &http.Server{
@@ -143,15 +135,15 @@ func initDatabase(cfg *config.Config) (*sql.DB, error) {
 	return db, nil
 }
 
-func setupRouter(db *sql.DB, fileClient *telegram.FileClient, minioClient *storage.MinIOClient) *mux.Router {
+func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Config) *mux.Router {
 	router := mux.NewRouter()
 
-	// Create webhook handler
-	webhookHandler := handlers.NewWebhookHandler(db, fileClient, minioClient)
+	// Create ingest handler
+	ingestHandler := handlers.NewIngestHandler(db, minioClient, cfg)
 
 	// API routes
 	api := router.PathPrefix("/api/v1").Subrouter()
-	api.HandleFunc("/updates", webhookHandler.HandleUpdate).Methods("POST")
+	api.HandleFunc("/ingest", ingestHandler.HandleIngest).Methods("POST")
 
 	// Health check endpoint
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

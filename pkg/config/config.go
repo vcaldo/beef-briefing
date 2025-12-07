@@ -17,7 +17,8 @@ type Config struct {
 	DBSSLMode  string `envconfig:"DB_SSL_MODE" default:"disable"`
 
 	// API Service Configuration
-	APIPort int `envconfig:"API_PORT" default:"8080"`
+	APIPort         int `envconfig:"API_PORT" default:"8080"`
+	MaxUploadSizeMB int `envconfig:"MAX_UPLOAD_SIZE_MB" default:"100"`
 
 	// Telegram Bot Configuration
 	TelegramBotToken string `envconfig:"TELEGRAM_BOT_TOKEN" required:"true"`
@@ -43,6 +44,11 @@ func (c *Config) DSN() string {
 // IsProduction returns true if running in production environment
 func (c *Config) IsProduction() bool {
 	return c.Environment == "production"
+}
+
+// MaxUploadSizeBytes returns the max upload size in bytes
+func (c *Config) MaxUploadSizeBytes() int64 {
+	return int64(c.MaxUploadSizeMB) * 1024 * 1024
 }
 
 // LoadConfig loads configuration from environment variables

@@ -3,10 +3,10 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"path"
-	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -57,15 +57,31 @@ func (mc *MinIOClient) ensureBucket(ctx context.Context) error {
 	return nil
 }
 
-// UploadMedia uploads media file to MinIO and returns the object key
-func (mc *MinIOClient) UploadMedia(ctx context.Context, fileID string, data []byte, mimeType string, mediaType string) (string, error) {
-	// Generate object key: {mediaType}/{date}/{fileID}
-	datePrefix := time.Now().Format("2006-01-02")
-	objectKey := path.Join(mediaType, datePrefix, fileID)
+// UploadMedia uploads media file to MinIO using content-addressable storage.
+// Returns the object key and file hash. Deduplicates files with same hash.
+func (mc *MinIOClient) UploadMedia(ctx context.Context, fileID string, data []byte, mimeType string, mediaType string) (string, string, error) {
+	// Compute SHA256 hash of file content
+	hashBytes := sha256.Sum256(data)
+	fileHash := hex.EncodeToString(hashBytes[:])
 
+	// Generate object key: {mediaType}/{hash[:2]}/{hash}
+	objectKey := fmt.Sprintf("%s/%s/%s", mediaType, fileHash[:2], fileHash)
+
+	// Check if object already exists (deduplication)
+	_, err := mc.client.StatObject(ctx, mc.bucket, objectKey, minio.StatObjectOptions{})
+	if err == nil {
+		// Object already exists, skip upload
+		slog.Debug("media already exists in MinIO, skipping upload",
+			"object_key", objectKey,
+			"file_hash", fileHash,
+		)
+		return objectKey, fileHash, nil
+	}
+
+	// Upload new object
 	reader := bytes.NewReader(data)
 
-	_, err := mc.client.PutObject(
+	_, err = mc.client.PutObject(
 		ctx,
 		mc.bucket,
 		objectKey,
@@ -76,16 +92,17 @@ func (mc *MinIOClient) UploadMedia(ctx context.Context, fileID string, data []by
 		},
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to upload to MinIO: %w", err)
+		return "", "", fmt.Errorf("failed to upload to MinIO: %w", err)
 	}
 
 	slog.Debug("uploaded media to MinIO",
 		"object_key", objectKey,
+		"file_hash", fileHash,
 		"size", len(data),
 		"mime_type", mimeType,
 	)
 
-	return objectKey, nil
+	return objectKey, fileHash, nil
 }
 
 // GetObjectURL returns the URL to access an object

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -12,13 +13,13 @@ import (
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/storage"
-	"beef-briefing/apps/api-service/internal/telegram"
+	"beef-briefing/pkg/config"
 )
 
-type WebhookHandler struct {
+type IngestHandler struct {
 	db            *sql.DB
-	fileClient    *telegram.FileClient
 	storageClient *storage.MinIOClient
+	config        *config.Config
 	updateRepo    *repository.UpdateRepository
 	chatRepo      *repository.ChatRepository
 	userRepo      *repository.UserRepository
@@ -27,15 +28,15 @@ type WebhookHandler struct {
 	mediaRepo     *repository.MediaRepository
 }
 
-func NewWebhookHandler(
+func NewIngestHandler(
 	db *sql.DB,
-	fileClient *telegram.FileClient,
 	storageClient *storage.MinIOClient,
-) *WebhookHandler {
-	return &WebhookHandler{
+	cfg *config.Config,
+) *IngestHandler {
+	return &IngestHandler{
 		db:            db,
-		fileClient:    fileClient,
 		storageClient: storageClient,
+		config:        cfg,
 		updateRepo:    repository.NewUpdateRepository(db),
 		chatRepo:      repository.NewChatRepository(db),
 		userRepo:      repository.NewUserRepository(db),
@@ -45,22 +46,62 @@ func NewWebhookHandler(
 	}
 }
 
-// HandleUpdate processes incoming Telegram updates
-func (h *WebhookHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
+// HandleIngest processes incoming multipart ingestion requests
+func (h *IngestHandler) HandleIngest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Decode update
+	// Parse multipart form with size limit
+	if err := r.ParseMultipartForm(h.config.MaxUploadSizeBytes()); err != nil {
+		slog.Error("failed to parse multipart form", "error", err)
+		http.Error(w, "invalid multipart request", http.StatusBadRequest)
+		return
+	}
+
+	// Extract update JSON from form field
+	updateJSON := r.FormValue("update")
+	if updateJSON == "" {
+		slog.Error("missing update field in request")
+		http.Error(w, "missing update field", http.StatusBadRequest)
+		return
+	}
+
 	var update models.Update
-	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
+	if err := json.Unmarshal([]byte(updateJSON), &update); err != nil {
 		slog.Error("failed to decode update", "error", err)
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		http.Error(w, "invalid update JSON", http.StatusBadRequest)
 		return
 	}
 
 	slog.Info("received update", "update_id", update.UpdateID)
 
-	// Process update based on type
-	if err := h.processUpdate(ctx, &update); err != nil {
+	// Extract files from multipart form
+	files := make(map[string][]byte)
+	if r.MultipartForm != nil && r.MultipartForm.File != nil {
+		for fileID, fileHeaders := range r.MultipartForm.File {
+			if len(fileHeaders) == 0 {
+				continue
+			}
+
+			file, err := fileHeaders[0].Open()
+			if err != nil {
+				slog.Warn("failed to open uploaded file", "file_id", fileID, "error", err)
+				continue
+			}
+
+			data, err := io.ReadAll(file)
+			file.Close()
+			if err != nil {
+				slog.Warn("failed to read uploaded file", "file_id", fileID, "error", err)
+				continue
+			}
+
+			files[fileID] = data
+			slog.Debug("extracted file from request", "file_id", fileID, "size", len(data))
+		}
+	}
+
+	// Process update with files
+	if err := h.processUpdate(ctx, &update, files); err != nil {
 		slog.Error("failed to process update",
 			"update_id", update.UpdateID,
 			"error", err,
@@ -73,7 +114,7 @@ func (h *WebhookHandler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
-func (h *WebhookHandler) processUpdate(ctx context.Context, update *models.Update) error {
+func (h *IngestHandler) processUpdate(ctx context.Context, update *models.Update, files map[string][]byte) error {
 	// Start transaction
 	tx, err := h.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -90,12 +131,12 @@ func (h *WebhookHandler) processUpdate(ctx context.Context, update *models.Updat
 	// Process based on update type
 	switch {
 	case update.Message != nil:
-		if err := h.processMessage(ctx, tx, update.Message, false); err != nil {
+		if err := h.processMessage(ctx, tx, update.Message, files, false); err != nil {
 			return fmt.Errorf("failed to process message: %w", err)
 		}
 
 	case update.EditedMessage != nil:
-		if err := h.processMessage(ctx, tx, update.EditedMessage, true); err != nil {
+		if err := h.processMessage(ctx, tx, update.EditedMessage, files, true); err != nil {
 			return fmt.Errorf("failed to process edited message: %w", err)
 		}
 
@@ -118,7 +159,7 @@ func (h *WebhookHandler) processUpdate(ctx context.Context, update *models.Updat
 	return nil
 }
 
-func (h *WebhookHandler) processMessage(ctx context.Context, tx *sql.Tx, msg *models.Message, isEdit bool) error {
+func (h *IngestHandler) processMessage(ctx context.Context, tx *sql.Tx, msg *models.Message, files map[string][]byte, isEdit bool) error {
 	// Upsert chat
 	if err := h.chatRepo.UpsertChat(ctx, tx, &msg.Chat); err != nil {
 		return fmt.Errorf("failed to upsert chat: %w", err)
@@ -165,8 +206,8 @@ func (h *WebhookHandler) processMessage(ctx context.Context, tx *sql.Tx, msg *mo
 		}
 	}
 
-	// Process media - download and upload to MinIO before committing transaction
-	if err := h.processMedia(ctx, tx, messageID, msg); err != nil {
+	// Process media with provided files
+	if err := h.processMedia(ctx, tx, messageID, msg, files); err != nil {
 		return fmt.Errorf("failed to process media: %w", err)
 	}
 
@@ -180,22 +221,25 @@ func (h *WebhookHandler) processMessage(ctx context.Context, tx *sql.Tx, msg *mo
 	return nil
 }
 
-func (h *WebhookHandler) processMedia(ctx context.Context, tx *sql.Tx, messageID int64, msg *models.Message) error {
+func (h *IngestHandler) processMedia(ctx context.Context, tx *sql.Tx, messageID int64, msg *models.Message, files map[string][]byte) error {
 	// Process photos (multiple sizes)
 	for _, photo := range msg.Photo {
-		data, mimeType, err := h.fileClient.DownloadFile(ctx, photo.FileID)
-		if err != nil {
-			slog.Error("failed to download photo", "file_id", photo.FileID, "error", err)
+		data, ok := files[photo.FileID]
+		if !ok {
+			slog.Warn("photo file not found in request, skipping", "file_id", photo.FileID)
 			continue
 		}
 
-		objectKey, err := h.storageClient.UploadMedia(ctx, photo.FileID, data, mimeType, "photo")
+		// Trust MIME type from metadata or default
+		mimeType := "image/jpeg"
+
+		objectKey, fileHash, err := h.storageClient.UploadMedia(ctx, photo.FileID, data, mimeType, "photo")
 		if err != nil {
 			slog.Error("failed to upload photo to MinIO", "file_id", photo.FileID, "error", err)
 			continue
 		}
 
-		if err := h.mediaRepo.InsertPhoto(ctx, tx, messageID, &photo, objectKey); err != nil {
+		if err := h.mediaRepo.InsertPhoto(ctx, tx, messageID, &photo, objectKey, fileHash); err != nil {
 			slog.Warn("failed to insert photo", "error", err)
 		}
 	}
@@ -204,7 +248,7 @@ func (h *WebhookHandler) processMedia(ctx context.Context, tx *sql.Tx, messageID
 	if msg.Video != nil {
 		if err := h.processMediaFile(ctx, tx, messageID, "video", msg.Video.FileID, msg.Video.FileUniqueID,
 			msg.Video.FileSize, msg.Video.MimeType, msg.Video.FileName,
-			&msg.Video.Duration, &msg.Video.Width, &msg.Video.Height, "", ""); err != nil {
+			&msg.Video.Duration, &msg.Video.Width, &msg.Video.Height, "", "", files); err != nil {
 			slog.Error("failed to process video", "error", err)
 		}
 	}
@@ -213,7 +257,7 @@ func (h *WebhookHandler) processMedia(ctx context.Context, tx *sql.Tx, messageID
 	if msg.Audio != nil {
 		if err := h.processMediaFile(ctx, tx, messageID, "audio", msg.Audio.FileID, msg.Audio.FileUniqueID,
 			msg.Audio.FileSize, msg.Audio.MimeType, msg.Audio.FileName,
-			&msg.Audio.Duration, nil, nil, msg.Audio.Performer, msg.Audio.Title); err != nil {
+			&msg.Audio.Duration, nil, nil, msg.Audio.Performer, msg.Audio.Title, files); err != nil {
 			slog.Error("failed to process audio", "error", err)
 		}
 	}
@@ -222,7 +266,7 @@ func (h *WebhookHandler) processMedia(ctx context.Context, tx *sql.Tx, messageID
 	if msg.Voice != nil {
 		if err := h.processMediaFile(ctx, tx, messageID, "voice", msg.Voice.FileID, msg.Voice.FileUniqueID,
 			msg.Voice.FileSize, msg.Voice.MimeType, "",
-			&msg.Voice.Duration, nil, nil, "", ""); err != nil {
+			&msg.Voice.Duration, nil, nil, "", "", files); err != nil {
 			slog.Error("failed to process voice", "error", err)
 		}
 	}
@@ -231,7 +275,7 @@ func (h *WebhookHandler) processMedia(ctx context.Context, tx *sql.Tx, messageID
 	if msg.Document != nil {
 		if err := h.processMediaFile(ctx, tx, messageID, "document", msg.Document.FileID, msg.Document.FileUniqueID,
 			msg.Document.FileSize, msg.Document.MimeType, msg.Document.FileName,
-			nil, nil, nil, "", ""); err != nil {
+			nil, nil, nil, "", "", files); err != nil {
 			slog.Error("failed to process document", "error", err)
 		}
 	}
@@ -240,7 +284,7 @@ func (h *WebhookHandler) processMedia(ctx context.Context, tx *sql.Tx, messageID
 	if msg.Animation != nil {
 		if err := h.processMediaFile(ctx, tx, messageID, "animation", msg.Animation.FileID, msg.Animation.FileUniqueID,
 			msg.Animation.FileSize, msg.Animation.MimeType, msg.Animation.FileName,
-			&msg.Animation.Duration, &msg.Animation.Width, &msg.Animation.Height, "", ""); err != nil {
+			&msg.Animation.Duration, &msg.Animation.Width, &msg.Animation.Height, "", "", files); err != nil {
 			slog.Error("failed to process animation", "error", err)
 		}
 	}
@@ -249,7 +293,7 @@ func (h *WebhookHandler) processMedia(ctx context.Context, tx *sql.Tx, messageID
 	if msg.VideoNote != nil {
 		if err := h.processMediaFile(ctx, tx, messageID, "video_note", msg.VideoNote.FileID, msg.VideoNote.FileUniqueID,
 			msg.VideoNote.FileSize, "", "",
-			&msg.VideoNote.Duration, &msg.VideoNote.Length, &msg.VideoNote.Length, "", ""); err != nil {
+			&msg.VideoNote.Duration, &msg.VideoNote.Length, &msg.VideoNote.Length, "", "", files); err != nil {
 			slog.Error("failed to process video note", "error", err)
 		}
 	}
@@ -257,30 +301,34 @@ func (h *WebhookHandler) processMedia(ctx context.Context, tx *sql.Tx, messageID
 	return nil
 }
 
-func (h *WebhookHandler) processMediaFile(ctx context.Context, tx *sql.Tx, messageID int64, mediaType, fileID, fileUniqueID string, fileSize *int64, mimeType, fileName string, duration, width, height *int, performer, title string) error {
-	// Download file from Telegram
-	data, detectedMimeType, err := h.fileClient.DownloadFile(ctx, fileID)
-	if err != nil {
-		return fmt.Errorf("failed to download file: %w", err)
+func (h *IngestHandler) processMediaFile(ctx context.Context, tx *sql.Tx, messageID int64, mediaType, fileID, fileUniqueID string, fileSize *int64, mimeType, fileName string, duration, width, height *int, performer, title string, files map[string][]byte) error {
+	// Get file from provided files map
+	data, ok := files[fileID]
+	if !ok {
+		slog.Warn("media file not found in request, skipping",
+			"file_id", fileID,
+			"media_type", mediaType,
+		)
+		return nil // Skip missing file, don't error
 	}
 
-	// Use detected mime type if not provided
+	// Use provided mime type or default
 	if mimeType == "" {
-		mimeType = detectedMimeType
+		mimeType = "application/octet-stream"
 	}
 
 	// Upload to MinIO
-	objectKey, err := h.storageClient.UploadMedia(ctx, fileID, data, mimeType, mediaType)
+	objectKey, fileHash, err := h.storageClient.UploadMedia(ctx, fileID, data, mimeType, mediaType)
 	if err != nil {
 		return fmt.Errorf("failed to upload to MinIO: %w", err)
 	}
 
 	// Insert media file record
-	return h.mediaRepo.InsertMediaFile(ctx, tx, messageID, mediaType, fileID, fileUniqueID, objectKey,
+	return h.mediaRepo.InsertMediaFile(ctx, tx, messageID, mediaType, fileID, fileUniqueID, objectKey, fileHash,
 		fileSize, mimeType, fileName, duration, width, height, performer, title)
 }
 
-func (h *WebhookHandler) processMessageReaction(ctx context.Context, tx *sql.Tx, reaction *models.MessageReactionUpdated) error {
+func (h *IngestHandler) processMessageReaction(ctx context.Context, tx *sql.Tx, reaction *models.MessageReactionUpdated) error {
 	// Upsert chat
 	if err := h.chatRepo.UpsertChat(ctx, tx, &reaction.Chat); err != nil {
 		return fmt.Errorf("failed to upsert chat: %w", err)
@@ -304,7 +352,7 @@ func (h *WebhookHandler) processMessageReaction(ctx context.Context, tx *sql.Tx,
 	return h.reactionRepo.InsertMessageReaction(ctx, tx, reaction)
 }
 
-func (h *WebhookHandler) processReactionCount(ctx context.Context, tx *sql.Tx, countUpdate *models.MessageReactionCountUpdate) error {
+func (h *IngestHandler) processReactionCount(ctx context.Context, tx *sql.Tx, countUpdate *models.MessageReactionCountUpdate) error {
 	// Upsert chat
 	if err := h.chatRepo.UpsertChat(ctx, tx, &countUpdate.Chat); err != nil {
 		return fmt.Errorf("failed to upsert chat: %w", err)
@@ -314,7 +362,7 @@ func (h *WebhookHandler) processReactionCount(ctx context.Context, tx *sql.Tx, c
 	return h.reactionRepo.UpsertReactionCount(ctx, tx, countUpdate)
 }
 
-func (h *WebhookHandler) getUpdateType(update *models.Update) string {
+func (h *IngestHandler) getUpdateType(update *models.Update) string {
 	switch {
 	case update.Message != nil:
 		return "message"

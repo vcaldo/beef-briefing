@@ -19,8 +19,8 @@ services:
 
   api-service:
     build:
-      context: ../apps/api-service
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/api-service/Dockerfile
     container_name: beef-api-service-dev
     environment:
       DB_HOST: postgres

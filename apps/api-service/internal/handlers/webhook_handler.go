@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/repository"
@@ -136,7 +137,8 @@ func (h *WebhookHandler) processMessage(ctx context.Context, tx *sql.Tx, msg *mo
 		prevMsg, err := h.messageRepo.GetMessageByID(ctx, tx, msg.Chat.ID, msg.MessageID)
 		if err == nil {
 			// Insert edit record
-			if err := h.messageRepo.InsertMessageEdit(ctx, tx, prevMsg.ID, *msg.EditDate,
+			editDate := time.Unix(*msg.EditDate, 0)
+			if err := h.messageRepo.InsertMessageEdit(ctx, tx, prevMsg.ID, editDate,
 				prevMsg.Text.String, msg.Text,
 				prevMsg.Caption.String, msg.Caption); err != nil {
 				slog.Warn("failed to insert message edit", "error", err)

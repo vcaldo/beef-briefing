@@ -31,12 +31,6 @@ func main() {
 		"api_service_url", cfg.APIServiceURL,
 	)
 
-	// Validate bot token
-	if cfg.TelegramBotToken == "" {
-		slog.Error("TELEGRAM_BOT_TOKEN is required")
-		os.Exit(1)
-	}
-
 	// Create context for graceful shutdown
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -44,11 +38,13 @@ func main() {
 	// Initialize API client
 	apiClient := client.NewAPIClient(cfg.APIServiceURL)
 
+	// Initialize update handler once (reused for all updates)
+	updateHandler := handlers.NewUpdateHandler(apiClient)
+
 	// Create bot instance with allowed updates including reactions
 	opts := []bot.Option{
 		bot.WithDefaultHandler(func(ctx context.Context, b *bot.Bot, update *models.Update) {
-			handler := handlers.NewUpdateHandler(b, apiClient)
-			handler.Handle(ctx, b, update)
+			updateHandler.Handle(ctx, b, update)
 		}),
 		bot.WithAllowedUpdates(bot.AllowedUpdates{
 			"message",

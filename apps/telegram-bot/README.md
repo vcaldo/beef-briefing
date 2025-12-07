@@ -5,29 +5,41 @@ A Go-based Telegram bot that listens to group messages and forwards all updates 
 ## Features
 
 - **Real-time Message Processing**: Listens to all updates in Telegram groups where the bot is an admin
-- **Media Download**: Automatically downloads photos, videos, audio, voice messages, documents, animations, and video notes
+- **Concurrent Media Download**: Downloads up to 5 files simultaneously with connection pooling for optimal performance
+- **Smart Photo Handling**: Downloads only the largest photo size instead of all variants to save bandwidth
+- **File Size Protection**: Enforces 100MB file size limit to prevent memory exhaustion
 - **Automatic Retry**: Exponential backoff retry logic (3 attempts: 1s, 2s, 4s delays) for API failures
 - **Graceful Shutdown**: Handles SIGINT/SIGTERM signals for clean shutdown
 - **Structured Logging**: Environment-based logging (JSON for production, text for development)
-- **Timeout Protection**: 2-minute timeout for media file downloads
+- **Timeout Protection**: 2-minute timeout per file download with context propagation
 
 ## Architecture
 
 ### Components
 
-- **Bot Handler** (`internal/handlers/update_handler.go`): Processes incoming updates and extracts media files
-- **API Client** (`internal/client/api_client.go`): Sends updates to API service with retry logic
+- **Update Handler** (`internal/handlers/update_handler.go`): Processes updates, extracts media, and downloads files concurrently
+- **API Client** (`internal/client/api_client.go`): Sends updates to API service with retry logic and shared HTTP client
+- **Constants** (`internal/constants.go`): Centralized timeout values, retry configuration, and file size limits
 - **Main** (`cmd/main.go`): Bot initialization, logger setup, and graceful shutdown
 
 ### Update Flow
 
 1. Bot receives update via long polling from Telegram
-2. Handler extracts file IDs from message/edited message
-3. Bot downloads each file with 2-minute timeout
-4. API client creates multipart form with JSON update + file attachments
-5. POST request to `{API_SERVICE_URL}/api/v1/ingest`
-6. Retry with exponential backoff on 5xx errors or network failures
-7. Log success/failure with structured fields
+2. Single shared handler instance processes the update (not recreated per request)
+3. Handler extracts file IDs from message/edited message (largest photo size only)
+4. Files download concurrently (max 5 simultaneous) with 2-minute timeout per file
+5. File size limited to 100MB via `io.LimitReader` to prevent memory exhaustion
+6. API client creates multipart form with JSON update + file attachments
+7. POST request to `{API_SERVICE_URL}/api/v1/ingest` with 30-second timeout
+8. Retry with exponential backoff on 5xx errors or network failures (no retry on 4xx)
+9. Log success/failure with structured fields
+
+### Performance Optimizations
+
+- **Shared HTTP Client**: Single client with connection pooling for all downloads
+- **Concurrent Downloads**: Up to 5 files downloaded simultaneously using goroutines with semaphore limiting
+- **Smart Photo Selection**: Only largest photo size downloaded (Telegram sends multiple sizes)
+- **Context Cancellation**: Proper context cleanup prevents resource leaks
 
 ## Configuration
 
@@ -42,6 +54,17 @@ All configuration via environment variables:
 - `API_SERVICE_URL` (default: `http://api-service:8080`) - URL of the API service ingest endpoint
 - `ENVIRONMENT` (default: `development`) - Set to `production` for JSON logging
 - `LOG_LEVEL` (default: `info`) - Log level: `debug`, `info`, `warn`, `error`
+
+### Configuration Constants
+
+Defined in `internal/constants.go`:
+
+- **File Download Timeout**: 2 minutes per file
+- **API Request Timeout**: 30 seconds
+- **Max Retry Attempts**: 3 attempts
+- **Retry Delays**: 1s, 2s, 4s (exponential backoff)
+- **Max Concurrent Downloads**: 5 simultaneous file downloads
+- **Max File Size**: 100MB per file
 
 ## Bot Setup
 
@@ -73,7 +96,7 @@ TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
 
 ### Prerequisites
 
-- Go 1.25+
+- Go 1.22+
 - Docker & Docker Compose
 - Running `api-service` (see `apps/api-service/README.md`)
 
@@ -126,7 +149,7 @@ The bot processes the following Telegram update types:
 ### Messages (`update.message`)
 
 - Text messages
-- Photos (all sizes)
+- Photos (largest size only - automatically selects highest quality)
 - Videos
 - Audio files
 - Voice messages
@@ -173,14 +196,16 @@ The bot retries failed API requests with exponential backoff:
 
 If a media file fails to download:
 - Error is logged with `file_id` and error details
-- Other files in the same update continue processing
-- Update is sent to API service without the failed file
+- Other files continue downloading concurrently (partial success)
+- Update is sent to API service with successfully downloaded files
 - API service will skip missing files (see `apps/api-service/README.md`)
+- Files exceeding 100MB are rejected with error logged
 
 ### Timeouts
 
-- **File download**: 2 minutes per file
-- **API request**: 30 seconds total (includes all retry attempts)
+- **File download**: 2 minutes per file (concurrent downloads allowed)
+- **API request**: 30 seconds per attempt
+- **Total retry duration**: Up to ~37 seconds (30s + 1s + 2s + 4s delays between attempts)
 
 ## Logging
 
@@ -227,8 +252,9 @@ apps/telegram-bot/
 ├── internal/
 │   ├── client/
 │   │   └── api_client.go          # API client with retry logic
-│   └── handlers/
-│       └── update_handler.go      # Update processing and file downloads
+│   ├── handlers/
+│   │   └── update_handler.go      # Concurrent update processing and file downloads
+│   └── constants.go               # Centralized timeouts, retry config, and limits
 ├── go.mod
 ├── Dockerfile
 └── README.md
@@ -291,8 +317,10 @@ The bot doesn't expose an HTTP endpoint. Monitor health via:
 
 ### High memory usage
 
-Large media files are downloaded to memory before sending to API. If processing many large videos:
-- Monitor container memory usage
-- Consider implementing file size limits
-- Add streaming upload support (future enhancement)
+**File size limits are now enforced (100MB per file)**. If you still encounter memory issues:
+- Monitor container memory usage with `docker stats`
+- Check for multiple large files being processed simultaneously (max 5 concurrent downloads)
+- Review logs for files approaching the 100MB limit
+- Consider reducing `MaxConcurrentDownloads` in `internal/constants.go` if needed
+- Consider reducing `MaxFileSize` for stricter limits
 

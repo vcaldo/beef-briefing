@@ -10,12 +10,9 @@ import (
 	"mime/multipart"
 	"net/http"
 	"time"
-)
 
-// Update represents a Telegram update (simplified interface)
-type Update interface {
-	GetUpdateID() int64
-}
+	"beef-briefing/apps/telegram-bot/internal"
+)
 
 type APIClient struct {
 	baseURL    string
@@ -26,29 +23,26 @@ func NewAPIClient(baseURL string) *APIClient {
 	return &APIClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: internal.DefaultHTTPTimeout,
 		},
 	}
 }
 
 // SendUpdate sends an update with optional media files to the API service
-// files map: file_id -> file data
 func (c *APIClient) SendUpdate(ctx context.Context, update interface{}, files map[string][]byte) error {
 	var lastErr error
 
-	// Retry logic: 3 attempts with exponential backoff (1s, 2s, 4s)
-	delays := []time.Duration{1 * time.Second, 2 * time.Second, 4 * time.Second}
-
-	for attempt := 0; attempt < 3; attempt++ {
+	for attempt := 0; attempt < internal.MaxRetryAttempts; attempt++ {
 		if attempt > 0 {
+			delay := internal.RetryDelays[attempt-1]
 			slog.Info("retrying API request",
 				"attempt", attempt+1,
-				"delay", delays[attempt-1],
+				"delay", delay,
 			)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(delays[attempt-1]):
+			case <-time.After(delay):
 			}
 		}
 
@@ -74,7 +68,7 @@ func (c *APIClient) SendUpdate(ctx context.Context, update interface{}, files ma
 		}
 	}
 
-	return fmt.Errorf("failed after 3 attempts: %w", lastErr)
+	return fmt.Errorf("failed after %d attempts: %w", internal.MaxRetryAttempts, lastErr)
 }
 
 func (c *APIClient) sendUpdateOnce(ctx context.Context, update interface{}, files map[string][]byte) error {
@@ -131,7 +125,11 @@ func (c *APIClient) sendUpdateOnce(ctx context.Context, update interface{}, file
 	defer resp.Body.Close()
 
 	// Read response body for error details
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		slog.Warn("failed to read response body", "error", err)
+		body = []byte("<unreadable>")
+	}
 
 	// Check response status
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

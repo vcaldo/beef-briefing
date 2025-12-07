@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"time"
+	"sync"
 
+	"beef-briefing/apps/telegram-bot/internal"
 	"beef-briefing/apps/telegram-bot/internal/client"
 
 	"github.com/go-telegram/bot"
@@ -16,14 +16,16 @@ import (
 )
 
 type UpdateHandler struct {
-	bot       *bot.Bot
-	apiClient *client.APIClient
+	apiClient  *client.APIClient
+	httpClient *http.Client
 }
 
-func NewUpdateHandler(b *bot.Bot, apiClient *client.APIClient) *UpdateHandler {
+func NewUpdateHandler(apiClient *client.APIClient) *UpdateHandler {
 	return &UpdateHandler{
-		bot:       b,
 		apiClient: apiClient,
+		httpClient: &http.Client{
+			Timeout: internal.FileDownloadTimeout,
+		},
 	}
 }
 
@@ -54,33 +56,8 @@ func (h *UpdateHandler) Handle(ctx context.Context, b *bot.Bot, update *models.U
 	// Extract file IDs from the update
 	fileIDs := h.extractFileIDs(update)
 
-	// Download all media files
-	files := make(map[string][]byte)
-	if len(fileIDs) > 0 {
-		slog.Info("downloading media files", "count", len(fileIDs))
-
-		for _, fileID := range fileIDs {
-			// Create context with 2-minute timeout for file download
-			downloadCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-			defer cancel()
-
-			fileData, err := h.downloadFile(downloadCtx, fileID)
-			if err != nil {
-				slog.Error("failed to download file",
-					"file_id", fileID,
-					"error", err,
-				)
-				// Continue processing other files
-				continue
-			}
-
-			files[fileID] = fileData
-			slog.Debug("downloaded file",
-				"file_id", fileID,
-				"size", len(fileData),
-			)
-		}
-	}
+	// Download all media files concurrently
+	files := h.downloadFiles(ctx, b, fileIDs)
 
 	// Send update to API service
 	if err := h.apiClient.SendUpdate(ctx, update, files); err != nil {
@@ -124,9 +101,10 @@ func (h *UpdateHandler) extractFileIDs(update *models.Update) []string {
 			return
 		}
 
-		// Photo (array of sizes)
-		for _, photo := range msg.Photo {
-			fileIDs = append(fileIDs, photo.FileID)
+		// Photo - get largest size only (last in array)
+		if len(msg.Photo) > 0 {
+			largest := msg.Photo[len(msg.Photo)-1]
+			fileIDs = append(fileIDs, largest.FileID)
 		}
 
 		// Video
@@ -164,11 +142,10 @@ func (h *UpdateHandler) extractFileIDs(update *models.Update) []string {
 			fileIDs = append(fileIDs, msg.Sticker.FileID)
 		}
 
-		// Game photos
-		if msg.Game != nil {
-			for _, photo := range msg.Game.Photo {
-				fileIDs = append(fileIDs, photo.FileID)
-			}
+		// Game photos - get largest size only
+		if msg.Game != nil && len(msg.Game.Photo) > 0 {
+			largest := msg.Game.Photo[len(msg.Game.Photo)-1]
+			fileIDs = append(fileIDs, largest.FileID)
 		}
 	}
 
@@ -179,30 +156,73 @@ func (h *UpdateHandler) extractFileIDs(update *models.Update) []string {
 	return fileIDs
 }
 
+// downloadFiles downloads multiple files concurrently with a semaphore limit
+func (h *UpdateHandler) downloadFiles(ctx context.Context, b *bot.Bot, fileIDs []string) map[string][]byte {
+	if len(fileIDs) == 0 {
+		return nil
+	}
+
+	slog.Info("downloading media files", "count", len(fileIDs))
+
+	files := make(map[string][]byte)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// Semaphore to limit concurrent downloads
+	sem := make(chan struct{}, internal.MaxConcurrentDownloads)
+
+	for _, fileID := range fileIDs {
+		wg.Add(1)
+		go func(fid string) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				slog.Warn("download cancelled", "file_id", fid, "error", ctx.Err())
+				return
+			}
+
+			downloadCtx, cancel := context.WithTimeout(ctx, internal.FileDownloadTimeout)
+			fileData, err := h.downloadFile(downloadCtx, b, fid)
+			cancel()
+
+			if err != nil {
+				slog.Error("failed to download file", "file_id", fid, "error", err)
+				return
+			}
+
+			mu.Lock()
+			files[fid] = fileData
+			mu.Unlock()
+
+			slog.Debug("downloaded file", "file_id", fid, "size", len(fileData))
+		}(fileID)
+	}
+
+	wg.Wait()
+	return files
+}
+
 // downloadFile downloads a file from Telegram
-func (h *UpdateHandler) downloadFile(ctx context.Context, fileID string) ([]byte, error) {
-	// Get file info from Telegram
-	file, err := h.bot.GetFile(ctx, &bot.GetFileParams{
+func (h *UpdateHandler) downloadFile(ctx context.Context, b *bot.Bot, fileID string) ([]byte, error) {
+	file, err := b.GetFile(ctx, &bot.GetFileParams{
 		FileID: fileID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file info: %w", err)
 	}
 
-	// Build file URL
-	fileURL := h.bot.FileDownloadLink(file)
+	fileURL := b.FileDownloadLink(file)
 
-	// Download file content
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create download request: %w", err)
 	}
 
-	httpClient := &http.Client{
-		Timeout: 2 * time.Minute,
-	}
-
-	resp, err := httpClient.Do(req)
+	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download file: %w", err)
 	}
@@ -212,24 +232,15 @@ func (h *UpdateHandler) downloadFile(ctx context.Context, fileID string) ([]byte
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// Read file data
-	data, err := io.ReadAll(resp.Body)
+	limitedReader := io.LimitReader(resp.Body, internal.MaxFileSize)
+	data, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file data: %w", err)
 	}
 
+	if int64(len(data)) >= internal.MaxFileSize {
+		return nil, fmt.Errorf("file exceeds maximum size limit of %d bytes", internal.MaxFileSize)
+	}
+
 	return data, nil
-}
-
-// TelegramUpdate wraps the bot's Update to implement our Update interface
-type TelegramUpdate struct {
-	*models.Update
-}
-
-func (t *TelegramUpdate) MarshalJSON() ([]byte, error) {
-	return json.Marshal(t.Update)
-}
-
-func (t *TelegramUpdate) GetUpdateID() int64 {
-	return t.ID
 }

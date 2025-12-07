@@ -1,0 +1,111 @@
+package storage
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"log/slog"
+
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+)
+
+type MinIOClient struct {
+	client *minio.Client
+	bucket string
+}
+
+func NewMinIOClient(endpoint, accessKey, secretKey, bucket string, useSSL bool) (*MinIOClient, error) {
+	client, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
+		Secure: useSSL,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create MinIO client: %w", err)
+	}
+
+	mc := &MinIOClient{
+		client: client,
+		bucket: bucket,
+	}
+
+	// Create bucket if it doesn't exist
+	if err := mc.ensureBucket(context.Background()); err != nil {
+		return nil, fmt.Errorf("failed to ensure bucket exists: %w", err)
+	}
+
+	return mc, nil
+}
+
+func (mc *MinIOClient) ensureBucket(ctx context.Context) error {
+	exists, err := mc.client.BucketExists(ctx, mc.bucket)
+	if err != nil {
+		return fmt.Errorf("failed to check bucket existence: %w", err)
+	}
+
+	if !exists {
+		slog.Info("creating MinIO bucket", "bucket", mc.bucket)
+		err = mc.client.MakeBucket(ctx, mc.bucket, minio.MakeBucketOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to create bucket: %w", err)
+		}
+		slog.Info("MinIO bucket created", "bucket", mc.bucket)
+	}
+
+	return nil
+}
+
+// UploadMedia uploads media file to MinIO using content-addressable storage.
+// Returns the object key and file hash. Deduplicates files with same hash.
+func (mc *MinIOClient) UploadMedia(ctx context.Context, fileID string, data []byte, mimeType string, mediaType string) (string, string, error) {
+	// Compute SHA256 hash of file content
+	hashBytes := sha256.Sum256(data)
+	fileHash := hex.EncodeToString(hashBytes[:])
+
+	// Generate object key: {mediaType}/{hash[:2]}/{hash}
+	objectKey := fmt.Sprintf("%s/%s/%s", mediaType, fileHash[:2], fileHash)
+
+	// Check if object already exists (deduplication)
+	_, err := mc.client.StatObject(ctx, mc.bucket, objectKey, minio.StatObjectOptions{})
+	if err == nil {
+		// Object already exists, skip upload
+		slog.Debug("media already exists in MinIO, skipping upload",
+			"object_key", objectKey,
+			"file_hash", fileHash,
+		)
+		return objectKey, fileHash, nil
+	}
+
+	// Upload new object
+	reader := bytes.NewReader(data)
+
+	_, err = mc.client.PutObject(
+		ctx,
+		mc.bucket,
+		objectKey,
+		reader,
+		int64(len(data)),
+		minio.PutObjectOptions{
+			ContentType: mimeType,
+		},
+	)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to upload to MinIO: %w", err)
+	}
+
+	slog.Debug("uploaded media to MinIO",
+		"object_key", objectKey,
+		"file_hash", fileHash,
+		"size", len(data),
+		"mime_type", mimeType,
+	)
+
+	return objectKey, fileHash, nil
+}
+
+// GetObjectURL returns the URL to access an object
+func (mc *MinIOClient) GetObjectURL(objectKey string) string {
+	return fmt.Sprintf("%s/%s/%s", mc.client.EndpointURL(), mc.bucket, objectKey)
+}

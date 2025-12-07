@@ -1,143 +1,107 @@
-# beef-briefing Makefile
-# Development and infrastructure management automation
-
 # Variables
-GO_VERSION := 1.25
-PROJECT_NAME := beef-briefing
-ENV ?= dev
-DOCKER_COMPOSE := docker-compose -f infrastructure/docker-compose.$(ENV).yml
-ENV_FILE := infrastructure/.env.$(ENV)
-SERVICES := api-service
+COMPOSE_FILE := infrastructure/docker-compose.dev.yml
+ENV_FILE := infrastructure/.env.dev
 
-# Service paths
-API_SERVICE_PATH := apps/api-service
+# Service names
+API_SERVICE := api-service
+POSTGRES_SERVICE := postgres
+MINIO_SERVICE := minio
 
-# Build variables
-CGO_ENABLED := 0
-GOOS := linux
-BUILD_FLAGS := -a -installsuffix cgo
+# Go directories
+API_DIR := apps/api-service
+PKG_DIR := pkg/config
 
-# Colors for output
-COLOR_RESET := \033[0m
-COLOR_BOLD := \033[1m
-COLOR_GREEN := \033[32m
-COLOR_YELLOW := \033[33m
-COLOR_BLUE := \033[34m
-
+# Default target
 .DEFAULT_GOAL := help
 
-##@ General
+# Help target
+help: ## Show this help message
+	@echo 'Usage: make [target]'
+	@echo ''
+	@echo 'Available targets:'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: help
-help: ## Display this help message
-	@echo "$(COLOR_BOLD)$(PROJECT_NAME) - Available targets:$(COLOR_RESET)"
-	@awk 'BEGIN {FS = ":.*##"; printf "\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  $(COLOR_BLUE)%-20s$(COLOR_RESET) %s\n", $$1, $$2 } /^##@/ { printf "\n$(COLOR_BOLD)%s$(COLOR_RESET)\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+# Docker lifecycle targets
+up: ## Start all services
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) up -d
 
-##@ Infrastructure
+down: ## Stop all services
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) down
 
-.PHONY: dev
-dev: env-validate ## Start all services in development mode (alias for 'up')
-	@echo "$(COLOR_GREEN)Starting development environment...$(COLOR_RESET)"
-	$(DOCKER_COMPOSE) --env-file $(ENV_FILE) up -d
-	@echo "$(COLOR_GREEN)Development environment started successfully$(COLOR_RESET)"
-
-.PHONY: up
-up: env-validate ## Start all services with docker-compose
-	@echo "$(COLOR_GREEN)Starting all services...$(COLOR_RESET)"
-	$(DOCKER_COMPOSE) --env-file $(ENV_FILE) up -d
-	@echo "$(COLOR_GREEN)Services started successfully$(COLOR_RESET)"
-
-.PHONY: down
-down: ## Stop and remove all containers
-	@echo "$(COLOR_YELLOW)Stopping all services...$(COLOR_RESET)"
-	$(DOCKER_COMPOSE) down
-	@echo "$(COLOR_GREEN)Services stopped$(COLOR_RESET)"
-
-.PHONY: restart
 restart: ## Restart all services
-	@echo "$(COLOR_YELLOW)Restarting all services...$(COLOR_RESET)"
-	$(DOCKER_COMPOSE) restart
-	@echo "$(COLOR_GREEN)Services restarted$(COLOR_RESET)"
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) restart
 
-.PHONY: logs
-logs: ## Show logs for all services (use SVC=service-name for specific service)
-	@if [ -n "$(SVC)" ]; then \
-		echo "$(COLOR_BLUE)Showing logs for $(SVC)...$(COLOR_RESET)"; \
-		$(DOCKER_COMPOSE) logs -f $(SVC); \
-	else \
-		echo "$(COLOR_BLUE)Showing logs for all services...$(COLOR_RESET)"; \
-		$(DOCKER_COMPOSE) logs -f; \
-	fi
+ps: ## Show running containers
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) ps
 
-.PHONY: ps
-ps: ## Show status of all services
-	@echo "$(COLOR_BLUE)Service status:$(COLOR_RESET)"
-	$(DOCKER_COMPOSE) ps
+clean: ## Stop services and remove volumes
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) down -v
 
-##@ Build
+prune: ## Remove all project containers, images, volumes, and networks
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) down -v --rmi all --remove-orphans
 
-.PHONY: build
-build: build-api-service ## Build all Go service binaries
+# Docker build targets
+build: ## Rebuild all images
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) build
 
-.PHONY: build-api-service
-build-api-service: ## Build api-service binary
-	@echo "$(COLOR_GREEN)Building api-service...$(COLOR_RESET)"
-	cd $(API_SERVICE_PATH) && \
-		CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) go build $(BUILD_FLAGS) -o bin/api-service ./cmd
-	@echo "$(COLOR_GREEN)api-service binary built successfully$(COLOR_RESET)"
+build-api: ## Rebuild api-service image
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) build $(API_SERVICE)
 
-.PHONY: docker-build
-docker-build: docker-build-api-service ## Build all Docker images
+build-postgres: ## Rebuild postgres image
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) build $(POSTGRES_SERVICE)
 
-.PHONY: docker-build-api-service
-docker-build-api-service: ## Build api-service Docker image
-	@echo "$(COLOR_GREEN)Building api-service Docker image...$(COLOR_RESET)"
-	docker build -t $(PROJECT_NAME)/api-service:latest -f $(API_SERVICE_PATH)/Dockerfile $(API_SERVICE_PATH)
-	@echo "$(COLOR_GREEN)api-service Docker image built successfully$(COLOR_RESET)"
+# Logging targets
+logs: ## Tail logs from all services
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f
 
-.PHONY: docker-rebuild
-docker-rebuild: docker-rebuild-api-service ## Rebuild and restart all services
+logs-api: ## Tail logs from api-service
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f $(API_SERVICE)
 
-.PHONY: docker-rebuild-api-service
-docker-rebuild-api-service: docker-build-api-service ## Rebuild and restart api-service
-	@echo "$(COLOR_YELLOW)Restarting api-service...$(COLOR_RESET)"
-	$(DOCKER_COMPOSE) up -d --no-deps --build api-service
-	@echo "$(COLOR_GREEN)api-service rebuilt and restarted$(COLOR_RESET)"
+logs-postgres: ## Tail logs from postgres
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f $(POSTGRES_SERVICE)
 
-##@ Environment
+logs-minio: ## Tail logs from minio
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f $(MINIO_SERVICE)
 
-.PHONY: env-validate
-env-validate: ## Validate .env file exists and contains required variables
-	@echo "$(COLOR_BLUE)Validating environment configuration...$(COLOR_RESET)"
-	@if [ ! -f $(ENV_FILE) ]; then \
-		echo "$(COLOR_YELLOW)Warning: $(ENV_FILE) file not found$(COLOR_RESET)"; \
-		if [ -f infrastructure/.env.example ]; then \
-			echo "$(COLOR_YELLOW)Please copy infrastructure/.env.example to $(ENV_FILE) and configure it$(COLOR_RESET)"; \
-		fi; \
-		exit 1; \
-	fi
-	@echo "$(COLOR_GREEN)Environment file ($(ENV_FILE)) validated$(COLOR_RESET)"
+# Shell targets
+shell-api: ## Open shell in api-service container
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec $(API_SERVICE) /bin/bash
 
-##@ Cleanup
+shell-postgres: ## Open shell in postgres container
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec $(POSTGRES_SERVICE) /bin/bash
 
-.PHONY: clean
-clean: ## Remove containers, volumes, and build artifacts
-	@echo "$(COLOR_YELLOW)Cleaning up...$(COLOR_RESET)"
-	$(DOCKER_COMPOSE) down -v
-	@if [ -d $(API_SERVICE_PATH)/bin ]; then \
-		rm -rf $(API_SERVICE_PATH)/bin; \
-		echo "$(COLOR_GREEN)Removed api-service build artifacts$(COLOR_RESET)"; \
-	fi
-	@echo "$(COLOR_GREEN)Cleanup complete$(COLOR_RESET)"
+shell-minio: ## Open shell in minio container
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec $(MINIO_SERVICE) /bin/sh
 
-.PHONY: clean-volumes
-clean-volumes: ## Remove all Docker volumes (WARNING: deletes all data)
-	@echo "$(COLOR_YELLOW)WARNING: This will delete all database and MinIO data$(COLOR_RESET)"
-	@read -p "Are you sure? [y/N] " -n 1 -r; \
-	echo; \
-	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		$(DOCKER_COMPOSE) down -v; \
-		echo "$(COLOR_GREEN)Volumes removed$(COLOR_RESET)"; \
-	else \
-		echo "$(COLOR_BLUE)Cancelled$(COLOR_RESET)"; \
-	fi
+# Go build targets
+go-build-api: ## Build api-service binary locally
+	@echo "Building api-service..."
+	cd $(API_DIR) && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/api-service ./cmd
+	@echo "Binary created at $(API_DIR)/bin/api-service"
+
+go-build: go-build-api ## Build all Go binaries locally
+
+go-clean: ## Remove Go build artifacts
+	@echo "Cleaning build artifacts..."
+	rm -rf $(API_DIR)/bin
+	@echo "Done!"
+
+# Go quality targets
+fmt: ## Format Go code
+	@echo "Formatting api-service..."
+	cd $(API_DIR) && gofmt -w -s .
+	@echo "Formatting pkg/config..."
+	cd $(PKG_DIR) && gofmt -w -s .
+	@echo "Done!"
+
+fmt-check: ## Check if Go code is formatted
+	@echo "Checking api-service formatting..."
+	@cd $(API_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(API_DIR):" && gofmt -l . && exit 1)
+	@echo "Checking pkg/config formatting..."
+	@cd $(PKG_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(PKG_DIR):" && gofmt -l . && exit 1)
+	@echo "All files properly formatted!"
+
+# Phony targets
+.PHONY: help up down restart ps clean prune build build-api build-postgres \
+	logs logs-api logs-postgres logs-minio shell-api shell-postgres shell-minio \
+	go-build-api go-build go-clean fmt fmt-check

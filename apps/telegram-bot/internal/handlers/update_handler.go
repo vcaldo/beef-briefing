@@ -158,6 +158,18 @@ func (h *UpdateHandler) extractFileIDs(update *models.Update) []string {
 		if msg.VideoNote != nil {
 			fileIDs = append(fileIDs, msg.VideoNote.FileID)
 		}
+
+		// Sticker
+		if msg.Sticker != nil {
+			fileIDs = append(fileIDs, msg.Sticker.FileID)
+		}
+
+		// Game photos
+		if msg.Game != nil {
+			for _, photo := range msg.Game.Photo {
+				fileIDs = append(fileIDs, photo.FileID)
+			}
+		}
 	}
 
 	// Process message or edited message

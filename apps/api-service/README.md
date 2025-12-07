@@ -648,7 +648,7 @@ apps/api-service/
 │   └── main.go                    # Application entry point
 ├── internal/
 │   ├── handlers/
-│   │   └── webhook_handler.go     # HTTP ingest handler
+│   │   └── ingest_handler.go      # HTTP request parsing and response
 │   ├── models/
 │   │   └── telegram.go            # Domain models
 │   ├── repository/
@@ -659,6 +659,8 @@ apps/api-service/
 │   │   ├── reaction_repo.go       # Reaction repository
 │   │   ├── update_repo.go         # Update repository
 │   │   └── user_repo.go           # User repository
+│   ├── services/
+│   │   └── ingest_service.go      # Business logic and transaction management
 │   └── storage/
 │       └── minio_client.go        # MinIO storage client
 ├── go.mod

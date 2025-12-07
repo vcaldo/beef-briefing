@@ -63,6 +63,22 @@ services:
       - beef-dev-network
     restart: unless-stopped
 
+  telegram-bot:
+    build:
+      context: ..
+      dockerfile: apps/telegram-bot/Dockerfile
+    container_name: beef-telegram-bot-dev
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      API_SERVICE_URL: http://api-service:${API_PORT}
+      ENVIRONMENT: development
+      LOG_LEVEL: debug
+    depends_on:
+      - api-service
+    networks:
+      - beef-dev-network
+    restart: unless-stopped
+
 volumes:
   postgres_data_dev:
   minio_data_dev:

@@ -51,7 +51,7 @@ func (r *MessageRepository) InsertMessage(ctx context.Context, tx *sql.Tx, msg *
 		NullInt64(msg.MessageThreadID),
 		replyToMessageID,
 		time.Unix(msg.Date, 0).UTC(),
-		nullTime(msg.EditDate),
+		NullTimeFromUnix(msg.EditDate),
 		NullString(msg.Text),
 		NullString(msg.Caption),
 		NullString(msg.MediaGroupID),
@@ -131,11 +131,4 @@ func (r *MessageRepository) GetMessageByID(ctx context.Context, tx *sql.Tx, chat
 	}
 
 	return &msg, nil
-}
-
-func nullTime(t *int64) sql.NullTime {
-	if t == nil {
-		return sql.NullTime{Valid: false}
-	}
-	return sql.NullTime{Time: time.Unix(*t, 0).UTC(), Valid: true}
 }

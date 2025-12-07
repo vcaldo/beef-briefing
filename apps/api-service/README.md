@@ -6,11 +6,11 @@ A Go-based REST API service for ingesting Telegram group chat data, including me
 
 - **Multipart Ingestion**: Accepts JSON metadata + binary file uploads in a single request
 - **Content-Addressable Storage**: Deduplicates media files using SHA256 hashing
-- **Message Tracking**: Captures text messages, media messages, voice messages, and locations
+- **Complete Message Support**: All Telegram message types including text, media, stickers, games, polls, contacts, venues, dice, and locations
 - **Reaction Tracking**: Tracks both individual reactions and aggregate reaction counts
 - **Edit History**: Maintains full audit trail of message edits
 - **Reply Threading**: Tracks message reply chains
-- **Database Deduplication**: Multiple messages can reference the same media file without storage duplication
+- **Cross-Table Deduplication**: Files are deduplicated across all media tables before MinIO upload
 
 ## Architecture
 
@@ -23,31 +23,43 @@ A Go-based REST API service for ingesting Telegram group chat data, including me
 
 ### Database Schema
 
-12 tables modeling the Telegram data structure:
+22 tables modeling the complete Telegram data structure:
 
-- `chats`, `users` - Core entities
+**Core Entities**:
+- `chats`, `users` - Chat and user profiles
 - `updates` - Raw webhook payloads with deduplication
-- `messages`, `message_entities`, `message_edits` - Message data and history
-- `message_reactions`, `reaction_counts` - Individual and aggregate reactions
-- `media_files`, `photos`, `locations` - Media and location data
 
-### Database Schema
+**Messages**:
+- `messages` - All message types
+- `message_entities` - Text formatting (bold, links, mentions, etc.)
+- `message_edits` - Edit history audit trail
 
-12 tables modeling the Telegram data structure:
+**Reactions** (denormalized - see design note below):
+- `message_reactions` - Individual user reactions
+- `reaction_counts` - Aggregate anonymous counts
 
-- `chats`, `users` - Core entities
-- `updates` - Raw webhook payloads with deduplication
-- `messages`, `message_entities`, `message_edits` - Message data and history
-- `message_reactions`, `reaction_counts` - Individual and aggregate reactions
-- `media_files`, `photos` - Media metadata with file hash tracking
-- `locations` - Location data
+**Media Files**:
+- `media_files` - Video, audio, voice, document, animation, video_note, sticker
+- `photos` - Photo sizes (multiple per message)
+- `stickers` - Sticker-specific metadata (linked to media_files)
+- `games`, `game_photos` - Game content and photos
+
+**Other Message Types**:
+- `polls`, `poll_options` - Poll questions and answers
+- `contacts` - Shared contact information
+- `locations` - Geographic coordinates
+- `venues` - Location with place info (linked to locations)
+- `dice` - Animated emoji results
 
 **Key Features**:
 - `file_hash` column in media tables enables content-addressable storage
-- Multiple messages can reference the same file via different `telegram_file_id` values
+- Cross-table deduplication: hash checked across `media_files`, `photos`, and `game_photos`
 - MinIO stores files once per unique hash at path: `{mediaType}/{hash[:2]}/{hash}`
 
-See [`apps/postgres/migrations/001_initial.sql`](../postgres/migrations/001_initial.sql) for full schema.
+**Design Note - Denormalized Reactions**:
+The `message_id` in reaction tables stores the Telegram message ID (not a FK to `messages.id`). This allows storing reactions for messages that may not have been captured (e.g., reactions to old messages before the bot joined).
+
+See [`apps/postgres/migrations/`](../postgres/migrations/) for full schema.
 
 ## API Endpoints
 
@@ -188,6 +200,127 @@ curl -X POST http://localhost:8080/api/v1/ingest \
   }'
 ```
 
+**Example: Sticker Message**
+
+```bash
+curl -X POST http://localhost:8080/api/v1/ingest \
+  -F 'update={
+    "update_id": 123456793,
+    "message": {
+      "message_id": 126,
+      "chat": {"id": -1001234567890, "type": "supergroup"},
+      "from": {"id": 987654321, "first_name": "John"},
+      "date": 1733611600,
+      "sticker": {
+        "file_id": "CAACAgIAAxkBAAIBDGZj...",
+        "file_unique_id": "AgADAgATstK3CV4",
+        "type": "regular",
+        "width": 512,
+        "height": 512,
+        "is_animated": false,
+        "is_video": false,
+        "emoji": "😀",
+        "set_name": "HotCherry",
+        "file_size": 15432
+      }
+    }
+  }' \
+  -F 'CAACAgIAAxkBAAIBDGZj...=@sticker.webp'
+```
+
+**Example: Poll Message**
+
+```bash
+curl -X POST http://localhost:8080/api/v1/ingest \
+  -F 'update={
+    "update_id": 123456794,
+    "message": {
+      "message_id": 127,
+      "chat": {"id": -1001234567890, "type": "supergroup"},
+      "from": {"id": 987654321, "first_name": "John"},
+      "date": 1733611700,
+      "poll": {
+        "id": "5678901234567890123",
+        "question": "What is your favorite color?",
+        "options": [
+          {"text": "Red", "voter_count": 0},
+          {"text": "Blue", "voter_count": 0},
+          {"text": "Green", "voter_count": 0}
+        ],
+        "total_voter_count": 0,
+        "is_closed": false,
+        "is_anonymous": true,
+        "type": "regular",
+        "allows_multiple_answers": false
+      }
+    }
+  }'
+```
+
+**Example: Contact Message**
+
+```bash
+curl -X POST http://localhost:8080/api/v1/ingest \
+  -F 'update={
+    "update_id": 123456795,
+    "message": {
+      "message_id": 128,
+      "chat": {"id": -1001234567890, "type": "supergroup"},
+      "from": {"id": 987654321, "first_name": "John"},
+      "date": 1733611800,
+      "contact": {
+        "phone_number": "+1234567890",
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "user_id": 123456789
+      }
+    }
+  }'
+```
+
+**Example: Venue Message**
+
+```bash
+curl -X POST http://localhost:8080/api/v1/ingest \
+  -F 'update={
+    "update_id": 123456796,
+    "message": {
+      "message_id": 129,
+      "chat": {"id": -1001234567890, "type": "supergroup"},
+      "from": {"id": 987654321, "first_name": "John"},
+      "date": 1733611900,
+      "venue": {
+        "location": {
+          "latitude": 40.7128,
+          "longitude": -74.0060
+        },
+        "title": "Empire State Building",
+        "address": "350 Fifth Avenue, New York, NY 10118",
+        "foursquare_id": "4b5b5c7ef964a520c8a228e3"
+      }
+    }
+  }'
+```
+
+**Example: Dice Message**
+
+```bash
+curl -X POST http://localhost:8080/api/v1/ingest \
+  -F 'update={
+    "update_id": 123456797,
+    "message": {
+      "message_id": 130,
+      "chat": {"id": -1001234567890, "type": "supergroup"},
+      "from": {"id": 987654321, "first_name": "John"},
+      "date": 1733612000,
+      "dice": {
+        "emoji": "🎲",
+        "value": 4
+      }
+    }
+  }'
+```
+
 **Response**: `200 OK`
 
 ```json
@@ -217,14 +350,25 @@ Multipart form field names **must match** the Telegram `file_id` exactly. For ex
 
 ### Supported Media Types
 
-The API handles all Telegram media types:
+The API handles all Telegram message types:
+
+**Media Files** (stored in MinIO):
 - **Photos**: Multiple sizes per message (array of `PhotoSize` objects)
 - **Videos**: Single video file with metadata
 - **Audio**: Music files with performer/title metadata
-- **Voice**: Voice messages (no metadata)
+- **Voice**: Voice messages
 - **Documents**: General files with filename and MIME type
 - **Animations**: GIF files
 - **Video Notes**: Circular video messages
+- **Stickers**: Static (WebP), animated (TGS), and video (WebM) stickers
+- **Games**: Game content with photos and optional animation
+
+**Metadata Only** (no file storage):
+- **Polls**: Questions with options (regular and quiz types)
+- **Contacts**: Shared phone contacts
+- **Locations**: Geographic coordinates
+- **Venues**: Location with place information
+- **Dice**: Animated emoji results (🎲, 🎯, 🏀, ⚽, 🎳, 🎰)
 
 ### Missing Files
 
@@ -238,26 +382,28 @@ This allows partial uploads if some files fail to download on the client side.
 
 ### Content-Addressable Storage
 
-Media files are stored in MinIO using SHA256 hashing:
+Media files are stored in MinIO using SHA256 hashing with database-level deduplication:
 
 1. **Hash Calculation**: SHA256 hash computed from file binary content
-2. **Object Key**: `{mediaType}/{hash[:2]}/{hash}` (e.g., `photo/ab/abc123...`)
-3. **Deduplication**: Before upload, API checks if hash exists in MinIO
-4. **Storage**: If hash exists, upload is skipped; if new, file is uploaded
-5. **Database**: Every message gets a record, even if file already exists in storage
+2. **Database Check**: Query `media_files`, `photos`, and `game_photos` tables for existing hash
+3. **Deduplication**: If hash found in DB, reuse existing MinIO object key (skip upload)
+4. **Upload**: If hash not found, upload to MinIO with key `{mediaType}/{hash[:2]}/{hash}`
+5. **Database**: Insert record with object key (either existing or new)
 
 **Benefits**:
 - Same file uploaded multiple times only stored once
-- Automatic deduplication across all messages and chats
+- Cross-table deduplication (photo shared between message and game)
+- No MinIO round-trip for duplicate detection (DB query only)
 - Storage cost reduced for commonly shared media
 
 **Example**:
 ```
-Message 1: Photo A (hash: abc123...) → Uploaded to MinIO
-Message 2: Photo A (hash: abc123...) → Skipped, references existing object
-Message 3: Photo B (hash: def456...) → Uploaded to MinIO
+Message 1: Photo A (hash: abc123...) → DB miss → Upload to MinIO → Insert record
+Message 2: Photo A (hash: abc123...) → DB hit → Skip upload → Insert record with same key
+Message 3: Game Photo A (hash: abc123...) → DB hit → Skip upload → Insert game_photos record
+Message 4: Photo B (hash: def456...) → DB miss → Upload to MinIO → Insert record
 
-Result: 2 files in MinIO, 3 records in database
+Result: 2 files in MinIO, 4 records in database (across tables)
 ```
 
 ## Configuration
@@ -389,9 +535,18 @@ telegram-media/
 ├── audio/
 │   └── de/
 │       └── def789ghi012...
-└── document/
-    └── 34/
-        └── 345678bcd901...
+├── document/
+│   └── 34/
+│       └── 345678bcd901...
+├── sticker/
+│   └── ef/
+│       └── efg456hij789...
+├── game_photo/
+│   └── 56/
+│       └── 567890abc123...
+├── voice/
+├── video_note/
+└── animation/
 ```
 
 **Benefits**:
@@ -443,7 +598,7 @@ The complete ingestion process:
 7. **For Each Media File**:
    - Lookup file content from files map by `file_id`
    - If not found: Log warning and skip
-   - If found: Compute SHA256 → Check MinIO existence → Upload if new → Insert database record
+   - If found: Compute SHA256 → Check DB for existing hash → Reuse object key or upload new → Insert database record
 8. **Commit Transaction**: All database changes persisted
 9. **Return Response**: 200 OK
 
@@ -493,7 +648,7 @@ apps/api-service/
 │   └── main.go                    # Application entry point
 ├── internal/
 │   ├── handlers/
-│   │   └── webhook_handler.go     # HTTP ingest handler
+│   │   └── ingest_handler.go      # HTTP request parsing and response
 │   ├── models/
 │   │   └── telegram.go            # Domain models
 │   ├── repository/
@@ -504,6 +659,8 @@ apps/api-service/
 │   │   ├── reaction_repo.go       # Reaction repository
 │   │   ├── update_repo.go         # Update repository
 │   │   └── user_repo.go           # User repository
+│   ├── services/
+│   │   └── ingest_service.go      # Business logic and transaction management
 │   └── storage/
 │       └── minio_client.go        # MinIO storage client
 ├── go.mod

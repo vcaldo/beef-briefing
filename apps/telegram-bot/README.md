@@ -143,13 +143,19 @@ The bot processes the following Telegram update types:
 
 ### Reactions (`update.message_reaction`)
 
-- Individual user reactions (requires admin permissions)
+- Individual user reactions
 - Emoji, custom emoji, and paid reactions
+- **⚠️ Requires bot to be admin in the chat** - Telegram only sends reaction updates to admin bots
+- Bot must explicitly request `message_reaction` in `allowed_updates` (configured in `cmd/main.go`)
 
 ### Reaction Counts (`update.message_reaction_count`)
 
-- Aggregate reaction counts
-- Anonymous reaction totals
+- Aggregate reaction counts for anonymous reactions
+- Used when individual user reactions are not available
+- **⚠️ Requires bot to be admin in the chat**
+- Bot must explicitly request `message_reaction_count` in `allowed_updates`
+
+> **Note**: By default, Telegram excludes `message_reaction`, `message_reaction_count`, and `chat_member` from the updates sent to bots. The bot explicitly configures `allowed_updates` to include all update types.
 
 ## Error Handling
 

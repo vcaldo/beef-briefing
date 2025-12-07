@@ -1,0 +1,2 @@
+-- Database initialization for Telegram Message Logging
+-- This file is run automatically when the PostgreSQL container starts

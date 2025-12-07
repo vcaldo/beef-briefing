@@ -31,6 +31,26 @@ func NewUpdateHandler(b *bot.Bot, apiClient *client.APIClient) *UpdateHandler {
 func (h *UpdateHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 	slog.Info("received update", "update_id", update.ID)
 
+	// Log reaction updates for debugging
+	if update.MessageReaction != nil {
+		slog.Info("received message reaction",
+			"update_id", update.ID,
+			"chat_id", update.MessageReaction.Chat.ID,
+			"message_id", update.MessageReaction.MessageID,
+			"user_id", update.MessageReaction.User.ID,
+			"new_reaction_count", len(update.MessageReaction.NewReaction),
+			"old_reaction_count", len(update.MessageReaction.OldReaction),
+		)
+	}
+	if update.MessageReactionCount != nil {
+		slog.Info("received message reaction count",
+			"update_id", update.ID,
+			"chat_id", update.MessageReactionCount.Chat.ID,
+			"message_id", update.MessageReactionCount.MessageID,
+			"reaction_count", len(update.MessageReactionCount.Reactions),
+		)
+	}
+
 	// Extract file IDs from the update
 	fileIDs := h.extractFileIDs(update)
 
@@ -137,6 +157,18 @@ func (h *UpdateHandler) extractFileIDs(update *models.Update) []string {
 		// VideoNote
 		if msg.VideoNote != nil {
 			fileIDs = append(fileIDs, msg.VideoNote.FileID)
+		}
+
+		// Sticker
+		if msg.Sticker != nil {
+			fileIDs = append(fileIDs, msg.Sticker.FileID)
+		}
+
+		// Game photos
+		if msg.Game != nil {
+			for _, photo := range msg.Game.Photo {
+				fileIDs = append(fileIDs, photo.FileID)
+			}
 		}
 	}
 

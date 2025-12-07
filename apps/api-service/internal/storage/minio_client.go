@@ -57,15 +57,27 @@ func (mc *MinIOClient) ensureBucket(ctx context.Context) error {
 	return nil
 }
 
+// ComputeFileHash computes the SHA256 hash of file data and returns it as a hex string.
+// This can be used for content-addressable storage and deduplication.
+func ComputeFileHash(data []byte) string {
+	hashBytes := sha256.Sum256(data)
+	return hex.EncodeToString(hashBytes[:])
+}
+
+// GenerateObjectKey generates a MinIO object key from media type and file hash.
+// Format: {mediaType}/{hash[:2]}/{hash}
+func GenerateObjectKey(mediaType, fileHash string) string {
+	return fmt.Sprintf("%s/%s/%s", mediaType, fileHash[:2], fileHash)
+}
+
 // UploadMedia uploads media file to MinIO using content-addressable storage.
 // Returns the object key and file hash. Deduplicates files with same hash.
 func (mc *MinIOClient) UploadMedia(ctx context.Context, fileID string, data []byte, mimeType string, mediaType string) (string, string, error) {
 	// Compute SHA256 hash of file content
-	hashBytes := sha256.Sum256(data)
-	fileHash := hex.EncodeToString(hashBytes[:])
+	fileHash := ComputeFileHash(data)
 
 	// Generate object key: {mediaType}/{hash[:2]}/{hash}
-	objectKey := fmt.Sprintf("%s/%s/%s", mediaType, fileHash[:2], fileHash)
+	objectKey := GenerateObjectKey(mediaType, fileHash)
 
 	// Check if object already exists (deduplication)
 	_, err := mc.client.StatObject(ctx, mc.bucket, objectKey, minio.StatObjectOptions{})

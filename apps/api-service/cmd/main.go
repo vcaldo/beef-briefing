@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"beef-briefing/apps/api-service/internal/handlers"
+	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/apps/api-service/internal/storage"
 	"beef-briefing/pkg/config"
 
@@ -138,8 +139,9 @@ func initDatabase(cfg *config.Config) (*sql.DB, error) {
 func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Config) *mux.Router {
 	router := mux.NewRouter()
 
-	// Create ingest handler
-	ingestHandler := handlers.NewIngestHandler(db, minioClient, cfg)
+	// Create service and handler
+	ingestService := services.NewIngestService(db, minioClient)
+	ingestHandler := handlers.NewIngestHandler(ingestService, cfg)
 
 	// API routes
 	api := router.PathPrefix("/api/v1").Subrouter()

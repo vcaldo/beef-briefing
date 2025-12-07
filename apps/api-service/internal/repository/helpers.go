@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"time"
 )
 
 // Helper functions for null types
@@ -32,4 +33,11 @@ func NullInt32(i *int) sql.NullInt32 {
 		return sql.NullInt32{Valid: false}
 	}
 	return sql.NullInt32{Int32: int32(*i), Valid: true}
+}
+
+func NullTimeFromUnix(unixTime *int64) sql.NullTime {
+	if unixTime == nil {
+		return sql.NullTime{Valid: false}
+	}
+	return sql.NullTime{Time: time.Unix(*unixTime, 0).UTC(), Valid: true}
 }

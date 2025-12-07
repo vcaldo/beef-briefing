@@ -135,11 +135,17 @@ CREATE INDEX idx_edits_edit_date ON message_edits(edit_date DESC);
 -- REACTIONS
 -- =====================================================
 
+-- DESIGN NOTE: Reactions are intentionally denormalized
+-- The message_id column stores the Telegram message ID (not a FK to messages.id).
+-- This allows storing reactions for messages that may not have been captured by the bot
+-- (e.g., reactions to old messages sent before the bot was added to the chat).
+-- To find the local message record, join using: (chat_id, message_id) -> messages(chat_id, message_id)
+
 -- Individual message reactions (from MessageReactionUpdated)
 CREATE TABLE message_reactions (
     id BIGSERIAL PRIMARY KEY,
     chat_id BIGINT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
-    message_id BIGINT NOT NULL,
+    message_id BIGINT NOT NULL,  -- Telegram message ID, not FK (see design note above)
     user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
     actor_chat_id BIGINT REFERENCES chats(id) ON DELETE SET NULL,
     reaction_type reaction_type NOT NULL,
@@ -157,10 +163,11 @@ CREATE INDEX idx_reactions_type ON message_reactions(reaction_type);
 CREATE INDEX idx_reactions_date ON message_reactions(date DESC);
 
 -- Aggregate reaction counts (from MessageReactionCountUpdated)
+-- Same denormalized design as message_reactions (see design note above)
 CREATE TABLE reaction_counts (
     id BIGSERIAL PRIMARY KEY,
     chat_id BIGINT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
-    message_id BIGINT NOT NULL,
+    message_id BIGINT NOT NULL,  -- Telegram message ID, not FK (see design note in message_reactions)
     reaction_type reaction_type NOT NULL,
     emoji_value TEXT,
     custom_emoji_id TEXT,

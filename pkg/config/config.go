@@ -17,8 +17,9 @@ type Config struct {
 	DBSSLMode  string `envconfig:"DB_SSL_MODE" default:"disable"`
 
 	// API Service Configuration
-	APIPort         int `envconfig:"API_PORT" default:"8080"`
-	MaxUploadSizeMB int `envconfig:"MAX_UPLOAD_SIZE_MB" default:"100"`
+	APIPort         int    `envconfig:"API_PORT" default:"8080"`
+	MaxUploadSizeMB int    `envconfig:"MAX_UPLOAD_SIZE_MB" default:"100"`
+	APIServiceURL   string `envconfig:"API_SERVICE_URL" default:"http://api-service:8080"`
 
 	// Telegram Bot Configuration
 	TelegramBotToken string `envconfig:"TELEGRAM_BOT_TOKEN" required:"true"`

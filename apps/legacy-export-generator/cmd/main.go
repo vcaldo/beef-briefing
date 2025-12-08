@@ -29,6 +29,7 @@ var (
 	startDate    string
 	endDate      string
 	sourceChatID int64
+	userID       int64
 
 	// Output flags
 	chatName string
@@ -68,7 +69,8 @@ func init() {
 	rootCmd.Flags().StringVar(&endDate, "end-date", "", "End date for export (format: YYYY-MM-DD)")
 
 	// Source filter flags
-	rootCmd.Flags().Int64Var(&sourceChatID, "source-chat-id", 0, "Filter by source chat ID (optional)")
+	rootCmd.Flags().Int64Var(&sourceChatID, "source-chat-id", 0, "Filter by source chat ID")
+	rootCmd.Flags().Int64Var(&userID, "user-id", 0, "Filter by user ID")
 
 	// Output metadata flags
 	rootCmd.Flags().StringVar(&chatName, "chat-name", "", "Chat name for export metadata")
@@ -87,6 +89,8 @@ func init() {
 	rootCmd.MarkFlagRequired("db-name")
 	rootCmd.MarkFlagRequired("start-date")
 	rootCmd.MarkFlagRequired("end-date")
+	rootCmd.MarkFlagRequired("source-chat-id")
+	rootCmd.MarkFlagRequired("user-id")
 	rootCmd.MarkFlagRequired("chat-name")
 	rootCmd.MarkFlagRequired("chat-id")
 }
@@ -133,20 +137,16 @@ func runExport(cmd *cobra.Command, args []string) error {
 		"start_date", start.Format("2006-01-02"),
 		"end_date", end.Format("2006-01-02"),
 		"source_chat_id", sourceChatID,
+		"user_id", userID,
 	)
 
 	// Query messages
-	var sourceChatIDPtr *int64
-	if sourceChatID != 0 {
-		sourceChatIDPtr = &sourceChatID
-	}
-
-	messages, err := repo.Query(ctx, start, end, sourceChatIDPtr)
+	messages, err := repo.Query(ctx, start, end, sourceChatID, userID)
 	if err != nil {
 		return fmt.Errorf("querying messages: %w", err)
 	}
 
-	slog.Info("retrieved messages", "count", len(messages))
+	slog.Info("retrieved messages from database", "count", len(messages), "source_chat_id", sourceChatID, "user_id", userID)
 
 	if len(messages) == 0 {
 		slog.Warn("no messages found in date range")

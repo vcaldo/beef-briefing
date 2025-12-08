@@ -126,3 +126,6 @@ local_docs/
 
 # Local import
 local_import/
+.import-state.json
+import-report.md
+result.json

@@ -47,8 +47,8 @@ func (r *Repository) Close() error {
 	return r.db.Close()
 }
 
-// Query retrieves messages within the specified date range and optional chat filter
-func (r *Repository) Query(ctx context.Context, startDate, endDate time.Time, sourceChatID *int64) ([]models.LegacyMessage, error) {
+// Query retrieves messages within the specified date range, chat, and user
+func (r *Repository) Query(ctx context.Context, startDate, endDate time.Time, sourceChatID, userID int64) ([]models.LegacyMessage, error) {
 	query := `
 		SELECT
 			id,
@@ -66,16 +66,12 @@ func (r *Repository) Query(ctx context.Context, startDate, endDate time.Time, so
 			moderated
 		FROM messages
 		WHERE timestamp >= $1 AND timestamp <= $2
+			AND chat_id = $3
+			AND user_id = $4
+		ORDER BY timestamp ASC, id ASC
 	`
 
-	args := []any{startDate, endDate}
-
-	if sourceChatID != nil {
-		query += " AND chat_id = $3"
-		args = append(args, *sourceChatID)
-	}
-
-	query += " ORDER BY timestamp ASC, id ASC"
+	args := []any{startDate, endDate, sourceChatID, userID}
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {

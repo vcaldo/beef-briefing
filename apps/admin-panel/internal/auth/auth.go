@@ -72,25 +72,16 @@ func (a *Auth) VerifyCredentials(username, password string) bool {
 
 // CreateSession creates a new authenticated session
 func (a *Auth) CreateSession(w http.ResponseWriter, r *http.Request) error {
-	session, err := a.store.Get(r, sessionName)
-	if err != nil {
-		// If we can't decode the existing session (wrong key, corrupted, etc.),
-		// create a new one instead of returning an error
-		session, err = a.store.New(r, sessionName)
-		if err != nil {
-			return err
-		}
-	}
+	// Always create a fresh session to avoid issues with stale/invalid cookies
+	session := sessions.NewSession(a.store, sessionName)
+	session.IsNew = true
+	session.Options = a.store.Options
 
 	session.Values[sessionKeyAuth] = true
-	if session.Values[sessionKeyTheme] == nil {
-		session.Values[sessionKeyTheme] = defaultTheme
-	}
+	session.Values[sessionKeyTheme] = defaultTheme
 
 	return session.Save(r, w)
-}
-
-// DestroySession removes the authenticated session
+}// DestroySession removes the authenticated session
 func (a *Auth) DestroySession(w http.ResponseWriter, r *http.Request) error {
 	session, err := a.store.Get(r, sessionName)
 	if err != nil {

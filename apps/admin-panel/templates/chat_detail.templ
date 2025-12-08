@@ -1,0 +1,321 @@
+package templates
+
+import (
+	"fmt"
+	"time"
+)
+
+// ChatDetail holds details for a single chat view
+type ChatDetail struct {
+	ID           int64
+	Title        string
+	Type         string
+	Username     string
+	FirstName    string
+	LastName     string
+	MessageCount int
+	UserCount    int
+	MediaCount   int
+	FirstMessage time.Time
+	LastMessage  time.Time
+}
+
+// UserStats holds per-user statistics
+type UserStats struct {
+	UserID            int64
+	Username          string
+	FirstName         string
+	LastName          string
+	MessageCount      int
+	ReactionsGiven    int
+	ReactionsReceived int
+	MediaShared       int
+	FirstActive       time.Time
+	LastActive        time.Time
+}
+
+// CalendarDay holds message count for a single day
+type CalendarDay struct {
+	Date  string // Format: YYYY-MM-DD
+	Count int
+}
+
+// FilterParams holds filter parameters for stats
+type FilterParams struct {
+	Month        int
+	Year         int
+	AvailableYears []int
+}
+
+templ ChatDetailPage(chat ChatDetail, stats []UserStats, filter FilterParams, theme string) {
+	@Layout(theme, chatDetailTitle(chat), chatDetailContent(chat, stats, filter))
+}
+
+templ chatDetailContent(chat ChatDetail, stats []UserStats, filter FilterParams) {
+	<div class="space-y-6">
+		<!-- Header -->
+		<div class="flex items-center gap-4">
+			<a href="/" class="btn btn-ghost btn-circle">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
+				</svg>
+			</a>
+			<div class="flex-1">
+				<h1 class="text-3xl font-bold font-heading flex items-center gap-2">
+					{ chatIcon(chat.Type) }
+					{ chatDetailTitle(chat) }
+				</h1>
+				if chat.Username != "" {
+					<p class="text-base-content/60 font-mono">{ "@" + chat.Username }</p>
+				}
+			</div>
+			<div class="badge badge-primary badge-lg">{ chat.Type }</div>
+		</div>
+		<!-- Summary Stats -->
+		<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+			@summaryStatCard("Messages", fmt.Sprintf("%d", chat.MessageCount), "📨")
+			@summaryStatCard("Users", fmt.Sprintf("%d", chat.UserCount), "👥")
+			@summaryStatCard("Media", fmt.Sprintf("%d", chat.MediaCount), "🖼️")
+			@summaryStatCard("Days Active", daysActive(chat.FirstMessage, chat.LastMessage), "📅")
+		</div>
+		<!-- Filter Controls -->
+		<div class="card glass-card">
+			<div class="card-body">
+				<div class="flex flex-wrap items-center gap-4">
+					<h2 class="card-title font-heading">User Statistics</h2>
+					<div class="flex-1"></div>
+					<div class="flex items-center gap-2">
+						<select
+							id="month-select"
+							name="month"
+							class="select select-bordered select-sm font-mono"
+							hx-get={ fmt.Sprintf("/chats/%d/stats-partial", chat.ID) }
+							hx-target="#stats-table"
+							hx-include="#year-select"
+							hx-trigger="change"
+						>
+							<option value="0" selected?={ filter.Month == 0 }>All Months</option>
+							@monthOptions(filter.Month)
+						</select>
+						<select
+							id="year-select"
+							name="year"
+							class="select select-bordered select-sm font-mono"
+							hx-get={ fmt.Sprintf("/chats/%d/stats-partial", chat.ID) }
+							hx-target="#stats-table"
+							hx-include="#month-select"
+							hx-trigger="change"
+						>
+							<option value="0" selected?={ filter.Year == 0 }>All Years</option>
+							@yearOptions(filter.AvailableYears, filter.Year)
+						</select>
+					</div>
+				</div>
+				<!-- Stats Table -->
+				<div id="stats-table" class="overflow-x-auto mt-4">
+					@StatsTable(stats)
+				</div>
+			</div>
+		</div>
+		<!-- Activity Calendar -->
+		<div class="card glass-card">
+			<div class="card-body">
+				<div class="flex flex-wrap items-center gap-4">
+					<h2 class="card-title font-heading">Activity Calendar</h2>
+					<div class="flex-1"></div>
+					<select
+						id="calendar-year-select"
+						name="year"
+						class="select select-bordered select-sm font-mono"
+						hx-get={ fmt.Sprintf("/chats/%d/calendar-data", chat.ID) }
+						hx-target="#calendar-container"
+						hx-trigger="change"
+					>
+						@yearOptions(filter.AvailableYears, time.Now().Year())
+					</select>
+				</div>
+				<div id="calendar-container" class="mt-4">
+					<div id="activity-calendar" class="w-full h-48" data-chat-id={ fmt.Sprintf("%d", chat.ID) } data-year={ fmt.Sprintf("%d", time.Now().Year()) }></div>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ summaryStatCard(label string, value string, icon string) {
+	<div class="stat-card glass-card p-4">
+		<div class="flex items-center gap-3">
+			<span class="text-2xl">{ icon }</span>
+			<div>
+				<div class="text-2xl font-bold font-mono">{ value }</div>
+				<div class="text-sm text-base-content/60">{ label }</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ StatsTable(stats []UserStats) {
+	if len(stats) == 0 {
+		<div class="text-center py-8 text-base-content/60">
+			<span class="text-3xl block mb-2">📊</span>
+			No data for selected period
+		</div>
+	} else {
+		<table class="table table-zebra w-full">
+			<thead>
+				<tr>
+					<th class="sticky left-0 bg-base-200 z-10">User</th>
+					<th class="text-right font-mono">Messages</th>
+					<th class="text-right font-mono">Reactions Given</th>
+					<th class="text-right font-mono">Reactions Received</th>
+					<th class="text-right font-mono">Media</th>
+					<th class="font-mono">First Active</th>
+					<th class="font-mono">Last Active</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, user := range stats {
+					<tr class="hover">
+						<td class="sticky left-0 bg-base-100 z-10">
+							<div class="flex items-center gap-2">
+								<div class="avatar placeholder">
+									<div class="bg-neutral text-neutral-content rounded-full w-8">
+										<span class="text-xs">{ userInitials(user.FirstName, user.LastName, user.Username) }</span>
+									</div>
+								</div>
+								<div>
+										<div class="font-medium">{ userDisplayName(user) }</div>
+										if user.Username != "" {
+											<div class="text-xs text-base-content/60 font-mono">{ "@" + user.Username }</div>
+										}
+									</div>
+							</div>
+						</td>
+						<td class="text-right font-mono">{ fmt.Sprintf("%d", user.MessageCount) }</td>
+						<td class="text-right font-mono">{ fmt.Sprintf("%d", user.ReactionsGiven) }</td>
+						<td class="text-right font-mono">{ fmt.Sprintf("%d", user.ReactionsReceived) }</td>
+						<td class="text-right font-mono">{ fmt.Sprintf("%d", user.MediaShared) }</td>
+						<td class="font-mono text-sm">{ formatDate(user.FirstActive) }</td>
+						<td class="font-mono text-sm">{ formatDate(user.LastActive) }</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+}
+
+templ CalendarPartial(data []CalendarDay, year int) {
+	<div
+		id="activity-calendar"
+		class="w-full h-48"
+		data-calendar-data={ calendarDataJSON(data) }
+		data-year={ fmt.Sprintf("%d", year) }
+	></div>
+	<script>
+		if (typeof initCalendar === 'function') {
+			initCalendar();
+		}
+	</script>
+}
+
+templ monthOptions(selectedMonth int) {
+	for m := 1; m <= 12; m++ {
+		<option value={ fmt.Sprintf("%d", m) } selected?={ selectedMonth == m }>
+			{ time.Month(m).String() }
+		</option>
+	}
+}
+
+templ yearOptions(years []int, selectedYear int) {
+	for _, y := range years {
+		<option value={ fmt.Sprintf("%d", y) } selected?={ selectedYear == y }>
+			{ fmt.Sprintf("%d", y) }
+		</option>
+	}
+}
+
+func chatDetailTitle(chat ChatDetail) string {
+	if chat.Title != "" {
+		return chat.Title
+	}
+	name := ""
+	if chat.FirstName != "" {
+		name = chat.FirstName
+	}
+	if chat.LastName != "" {
+		if name != "" {
+			name += " "
+		}
+		name += chat.LastName
+	}
+	if name != "" {
+		return name
+	}
+	if chat.Username != "" {
+		return "@" + chat.Username
+	}
+	return fmt.Sprintf("Chat %d", chat.ID)
+}
+
+func daysActive(first, last time.Time) string {
+	if first.IsZero() || last.IsZero() {
+		return "0"
+	}
+	days := int(last.Sub(first).Hours() / 24)
+	if days < 1 {
+		days = 1
+	}
+	return fmt.Sprintf("%d", days)
+}
+
+func userInitials(firstName, lastName, username string) string {
+	if firstName != "" && lastName != "" {
+		return string(firstName[0]) + string(lastName[0])
+	}
+	if firstName != "" {
+		return string(firstName[0])
+	}
+	if username != "" {
+		return string(username[0])
+	}
+	return "?"
+}
+
+func userDisplayName(user UserStats) string {
+	if user.FirstName != "" || user.LastName != "" {
+		name := user.FirstName
+		if user.LastName != "" {
+			if name != "" {
+				name += " "
+			}
+			name += user.LastName
+		}
+		return name
+	}
+	if user.Username != "" {
+		return "@" + user.Username
+	}
+	return fmt.Sprintf("User %d", user.UserID)
+}
+
+func formatDate(t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	return t.Format("Jan 2, 2006")
+}
+
+func calendarDataJSON(data []CalendarDay) string {
+	if len(data) == 0 {
+		return "[]"
+	}
+	result := "["
+	for i, d := range data {
+		if i > 0 {
+			result += ","
+		}
+		result += fmt.Sprintf(`["%s",%d]`, d.Date, d.Count)
+	}
+	result += "]"
+	return result
+}

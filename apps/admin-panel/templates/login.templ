@@ -1,0 +1,76 @@
+package templates
+
+templ Login(errorMsg string) {
+	<!DOCTYPE html>
+	<html lang="en" data-theme="dark">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Login | Beef Briefing Admin</title>
+			<!-- Preconnect for fonts -->
+			<link rel="preconnect" href="https://fonts.googleapis.com"/>
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+			<!-- Google Fonts -->
+			<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+			<!-- Tailwind CSS + DaisyUI -->
+			<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css"/>
+			<script src="https://cdn.tailwindcss.com"></script>
+			<!-- Custom CSS -->
+			<link href="/static/css/admin.css" rel="stylesheet" type="text/css"/>
+		</head>
+		<body class="min-h-screen bg-gradient flex items-center justify-center">
+			<div class="card glass-card w-full max-w-md">
+				<div class="card-body">
+					<div class="text-center mb-6">
+						<span class="text-5xl mb-4 block">🥩</span>
+						<h1 class="text-2xl font-bold font-heading">Beef Briefing</h1>
+						<p class="text-base-content/70 mt-1">Admin Panel</p>
+					</div>
+					if errorMsg != "" {
+						<div class="alert alert-error mb-4">
+							<svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+							</svg>
+							<span>{ errorMsg }</span>
+						</div>
+					}
+					<form action="/auth/login" method="POST" class="space-y-4">
+						<div class="form-control">
+							<label class="label" for="username">
+								<span class="label-text">Username</span>
+							</label>
+							<input
+								type="text"
+								id="username"
+								name="username"
+								placeholder="Enter username"
+								class="input input-bordered w-full font-mono"
+								required
+								autofocus
+							/>
+						</div>
+						<div class="form-control">
+							<label class="label" for="password">
+								<span class="label-text">Password</span>
+							</label>
+							<input
+								type="password"
+								id="password"
+								name="password"
+								placeholder="Enter password"
+								class="input input-bordered w-full font-mono"
+								required
+							/>
+						</div>
+						<button type="submit" class="btn btn-primary w-full login-btn">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
+							</svg>
+							Sign In
+						</button>
+					</form>
+				</div>
+			</div>
+		</body>
+	</html>
+}

@@ -81,7 +81,7 @@ func (a *Auth) CreateSession(w http.ResponseWriter, r *http.Request) error {
 	session.Values[sessionKeyTheme] = defaultTheme
 
 	return session.Save(r, w)
-}// DestroySession removes the authenticated session
+} // DestroySession removes the authenticated session
 func (a *Auth) DestroySession(w http.ResponseWriter, r *http.Request) error {
 	session, err := a.store.Get(r, sessionName)
 	if err != nil {

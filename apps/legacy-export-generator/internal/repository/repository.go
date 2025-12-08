@@ -50,7 +50,7 @@ func (r *Repository) Close() error {
 // Query retrieves messages within the specified date range and optional chat filter
 func (r *Repository) Query(ctx context.Context, startDate, endDate time.Time, sourceChatID *int64) ([]models.LegacyMessage, error) {
 	query := `
-		SELECT 
+		SELECT
 			id,
 			message_id,
 			message_type,

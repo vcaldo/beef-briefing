@@ -10,15 +10,15 @@ type ExportRoot struct {
 
 // ExportMessage represents a single message in Telegram export format
 type ExportMessage struct {
-	ID             int64          `json:"id"`
-	Type           string         `json:"type"`
-	Date           string         `json:"date"`
-	DateUnixtime   string         `json:"date_unixtime"`
-	From           string         `json:"from,omitempty"`
-	FromID         string         `json:"from_id,omitempty"`
-	ReplyToMsgID   *int64         `json:"reply_to_message_id,omitempty"`
-	Text           any            `json:"text"`
-	TextEntities   []ExportEntity `json:"text_entities"`
+	ID           int64          `json:"id"`
+	Type         string         `json:"type"`
+	Date         string         `json:"date"`
+	DateUnixtime string         `json:"date_unixtime"`
+	From         string         `json:"from,omitempty"`
+	FromID       string         `json:"from_id,omitempty"`
+	ReplyToMsgID *int64         `json:"reply_to_message_id,omitempty"`
+	Text         any            `json:"text"`
+	TextEntities []ExportEntity `json:"text_entities"`
 }
 
 // ExportEntity represents a text entity in the export

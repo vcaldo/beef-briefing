@@ -123,3 +123,6 @@ docker-compose.override.yml
 
 # Local docs
 local_docs/
+
+# Local import
+local_import/

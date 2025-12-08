@@ -69,9 +69,10 @@ resource "linode_firewall" "beef_briefing_firewall" {
 # Cloud-init script to install Docker and Docker Compose
 locals {
   cloud_init_script = templatefile("${path.module}/cloud-init.yaml", {
-    ssh_public_key        = linode_sshkey.beef_briefing_key.ssh_key
-    hostname              = var.hostname
-    new_relic_license_key = var.new_relic_license_key
+    ssh_public_key         = linode_sshkey.beef_briefing_key.ssh_key
+    hostname               = var.hostname
+    new_relic_license_key  = var.new_relic_license_key
+    new_relic_account_id   = var.new_relic_account_id
   })
 }
 

@@ -40,3 +40,10 @@ variable "new_relic_license_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "new_relic_account_id" {
+  description = "New Relic account ID for infrastructure monitoring"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

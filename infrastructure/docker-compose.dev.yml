@@ -111,14 +111,14 @@ services:
     image: postgis/postgis:17-3.4
     container_name: beef-postgres-export-dev
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mydb
     ports:
       - "5433:5432"
     volumes:
       - postgres_data_export_dev:/var/lib/postgresql/data
-      - ../local_import/backup_20251208_111119.sql:/docker-entrypoint-initdb.d/backup.sql:ro
+      - ../local_import/sql/backup_20251208_111119.sql:/docker-entrypoint-initdb.d/backup.sql:ro
     networks:
       - beef-dev-network
     restart: unless-stopped

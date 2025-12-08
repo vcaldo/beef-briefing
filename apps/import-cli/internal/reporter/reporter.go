@@ -1,0 +1,149 @@
+package reporter
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	"beef-briefing/apps/import-cli/internal/state"
+)
+
+const reportFileName = "import-report.md"
+
+// Reporter generates markdown import reports
+type Reporter struct {
+	exportPath string
+}
+
+// New creates a new Reporter
+func New(exportPath string) *Reporter {
+	return &Reporter{
+		exportPath: exportPath,
+	}
+}
+
+// Generate creates a markdown report from the import state
+func (r *Reporter) Generate(importState *state.ImportState, chatName string, duration time.Duration) error {
+	report := r.buildReport(importState, chatName, duration)
+
+	reportPath := filepath.Join(r.exportPath, reportFileName)
+	if err := os.WriteFile(reportPath, []byte(report), 0644); err != nil {
+		return fmt.Errorf("writing report file: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Reporter) buildReport(s *state.ImportState, chatName string, duration time.Duration) string {
+	var b strings.Builder
+
+	// Header
+	b.WriteString("# Telegram Import Report\n\n")
+	b.WriteString(fmt.Sprintf("**Generated:** %s\n\n", time.Now().Format(time.RFC3339)))
+
+	// Summary
+	b.WriteString("## Summary\n\n")
+	b.WriteString(fmt.Sprintf("| Metric | Value |\n"))
+	b.WriteString(fmt.Sprintf("|--------|-------|\n"))
+	b.WriteString(fmt.Sprintf("| Chat Name | %s |\n", chatName))
+	b.WriteString(fmt.Sprintf("| Chat ID | %d |\n", s.ChatID))
+	b.WriteString(fmt.Sprintf("| Total Messages | %d |\n", s.TotalMessages))
+	b.WriteString(fmt.Sprintf("| Imported | %d |\n", s.ImportedCount))
+	b.WriteString(fmt.Sprintf("| Skipped | %d |\n", s.SkippedCount))
+	b.WriteString(fmt.Sprintf("| Failed | %d |\n", s.FailedCount))
+	b.WriteString(fmt.Sprintf("| Reactions | %d |\n", s.ReactionsCount))
+	b.WriteString(fmt.Sprintf("| Duration | %s |\n", duration.Round(time.Second)))
+	b.WriteString(fmt.Sprintf("| Started At | %s |\n", s.StartedAt))
+	b.WriteString(fmt.Sprintf("| Completed At | %s |\n", s.LastUpdatedAt))
+	b.WriteString("\n")
+
+	// Success rate
+	if s.TotalMessages > 0 {
+		successRate := float64(s.ImportedCount) / float64(s.TotalMessages) * 100
+		b.WriteString(fmt.Sprintf("**Success Rate:** %.2f%%\n\n", successRate))
+	}
+
+	// Media Statistics
+	b.WriteString("## Media Statistics\n\n")
+	b.WriteString("| Type | Imported | Skipped | Failed |\n")
+	b.WriteString("|------|----------|---------|--------|\n")
+	b.WriteString(fmt.Sprintf("| Photos | %d | %d | %d |\n",
+		s.MediaStats.PhotosImported, s.MediaStats.PhotosSkipped, s.MediaStats.PhotosFailed))
+	b.WriteString(fmt.Sprintf("| Videos | %d | %d | %d |\n",
+		s.MediaStats.VideosImported, s.MediaStats.VideosSkipped, s.MediaStats.VideosFailed))
+	b.WriteString(fmt.Sprintf("| Animations | %d | %d | %d |\n",
+		s.MediaStats.AnimationsImported, s.MediaStats.AnimationsSkipped, s.MediaStats.AnimationsFailed))
+	b.WriteString(fmt.Sprintf("| Voice Messages | %d | %d | %d |\n",
+		s.MediaStats.VoicesImported, s.MediaStats.VoicesSkipped, s.MediaStats.VoicesFailed))
+	b.WriteString(fmt.Sprintf("| Documents | %d | %d | %d |\n",
+		s.MediaStats.DocumentsImported, s.MediaStats.DocumentsSkipped, s.MediaStats.DocumentsFailed))
+	b.WriteString("\n")
+
+	// Reaction Statistics
+	b.WriteString("## Reaction Statistics\n\n")
+	b.WriteString("| Type | Imported | Failed |\n")
+	b.WriteString("|------|----------|--------|\n")
+	b.WriteString(fmt.Sprintf("| User Reactions | %d | %d |\n",
+		s.ReactionStats.UserReactionsImported, s.ReactionStats.UserReactionsFailed))
+	b.WriteString(fmt.Sprintf("| Count Updates | %d | %d |\n",
+		s.ReactionStats.CountUpdatesImported, s.ReactionStats.CountUpdatesFailed))
+	b.WriteString("\n")
+
+	// User Mapping
+	if len(s.Users) > 0 {
+		b.WriteString("## User Mapping\n\n")
+		b.WriteString("| User ID | Display Name |\n")
+		b.WriteString("|---------|-------------|\n")
+
+		// Sort users by ID for consistent output
+		userIDs := make([]int64, 0, len(s.Users))
+		for id := range s.Users {
+			userIDs = append(userIDs, id)
+		}
+		sort.Slice(userIDs, func(i, j int) bool { return userIDs[i] < userIDs[j] })
+
+		for _, id := range userIDs {
+			name := s.Users[id]
+			// Escape pipe characters in names
+			name = strings.ReplaceAll(name, "|", "\\|")
+			b.WriteString(fmt.Sprintf("| %d | %s |\n", id, name))
+		}
+		b.WriteString("\n")
+	}
+
+	// Errors
+	if len(s.Errors) > 0 {
+		b.WriteString("## Errors\n\n")
+		b.WriteString(fmt.Sprintf("Showing last %d errors:\n\n", len(s.Errors)))
+		b.WriteString("| Message ID | Timestamp | Error |\n")
+		b.WriteString("|------------|-----------|-------|\n")
+
+		// Show errors in reverse order (most recent first)
+		for i := len(s.Errors) - 1; i >= 0 && i >= len(s.Errors)-50; i-- {
+			err := s.Errors[i]
+			// Escape pipe characters in error messages
+			errMsg := strings.ReplaceAll(err.Error, "|", "\\|")
+			errMsg = strings.ReplaceAll(errMsg, "\n", " ")
+			// Truncate long error messages
+			if len(errMsg) > 100 {
+				errMsg = errMsg[:97] + "..."
+			}
+			b.WriteString(fmt.Sprintf("| %d | %s | %s |\n", err.MessageID, err.Timestamp, errMsg))
+		}
+		b.WriteString("\n")
+	}
+
+	// Footer
+	b.WriteString("---\n\n")
+	b.WriteString("*Report generated by beef-briefing import-cli*\n")
+
+	return b.String()
+}
+
+// GetReportPath returns the path where the report will be saved
+func (r *Reporter) GetReportPath() string {
+	return filepath.Join(r.exportPath, reportFileName)
+}

@@ -98,6 +98,11 @@ func (s *IngestService) ProcessUpdate(ctx context.Context, update *models.Update
 		if err := s.processReactionCount(ctx, tx, update.MessageReactionCount); err != nil {
 			return fmt.Errorf("failed to process reaction count: %w", err)
 		}
+
+	case update.MyChatMember != nil:
+		if err := s.processMyChatMember(ctx, tx, update.MyChatMember); err != nil {
+			return fmt.Errorf("failed to process my_chat_member: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -433,6 +438,31 @@ func (s *IngestService) processReactionCount(ctx context.Context, tx *sql.Tx, co
 	return s.reactionRepo.UpsertReactionCount(ctx, tx, countUpdate)
 }
 
+func (s *IngestService) processMyChatMember(ctx context.Context, tx *sql.Tx, member *models.ChatMemberUpdated) error {
+	// Upsert the chat first
+	if err := s.chatRepo.UpsertChat(ctx, tx, &member.Chat); err != nil {
+		return fmt.Errorf("failed to upsert chat: %w", err)
+	}
+
+	// Upsert the user who performed the action
+	if err := s.userRepo.UpsertUser(ctx, tx, &member.From); err != nil {
+		return fmt.Errorf("failed to upsert user: %w", err)
+	}
+
+	// Handle group-to-supergroup migration
+	if member.Chat.MigrateFromChatID != nil {
+		slog.Info("detected group migration",
+			"old_chat_id", *member.Chat.MigrateFromChatID,
+			"new_chat_id", member.Chat.ID,
+		)
+		if err := s.chatRepo.LinkMigratedChat(ctx, tx, member.Chat.ID, *member.Chat.MigrateFromChatID); err != nil {
+			return fmt.Errorf("failed to link migrated chat: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func (s *IngestService) getUpdateType(update *models.Update) string {
 	switch {
 	case update.Message != nil:
@@ -443,6 +473,8 @@ func (s *IngestService) getUpdateType(update *models.Update) string {
 		return "message_reaction"
 	case update.MessageReactionCount != nil:
 		return "message_reaction_count"
+	case update.MyChatMember != nil:
+		return "my_chat_member"
 	default:
 		return "unknown"
 	}

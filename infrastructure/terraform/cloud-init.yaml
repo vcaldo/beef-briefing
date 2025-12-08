@@ -43,6 +43,7 @@ packages:
   - gnupg
   - lsb-release
   - wget
+  - make
 
 # Commands to run after package installation
 runcmd:

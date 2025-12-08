@@ -1,0 +1,24 @@
+# Terraform Variables Configuration Example
+# Copy this file to terraform.tfvars and fill in your actual values
+# terraform.tfvars is gitignored for security
+
+# Required: Your Linode API token
+# Get it from: https://cloud.linode.com/profile/tokens
+linode_token = "your-linode-api-token-here"
+
+# Optional: Override default region (default: es-mad - Madrid)
+# Available regions: eu-central, us-east, us-central, us-southeast, etc.
+region = "es-mad"
+
+# Optional: Override domain name (default: mydomain.example)
+# domain_name = "mydomain.example"
+
+# Optional: Override domain email (default: admin@mydomain.example)
+# domain_email = "admin@mydomain.example"
+
+# Optional: Override SSH public key path (default: ~/.ssh/id_rsa.pub)
+# ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# Optional: New Relic license key for infrastructure monitoring
+# new_relic_license_key = "your-new-relic-license-key"
+

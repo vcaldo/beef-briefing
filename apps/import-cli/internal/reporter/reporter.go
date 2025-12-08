@@ -54,6 +54,7 @@ func (r *Reporter) buildReport(s *state.ImportState, chatName string, duration t
 	b.WriteString(fmt.Sprintf("| Imported | %d |\n", s.ImportedCount))
 	b.WriteString(fmt.Sprintf("| Skipped | %d |\n", s.SkippedCount))
 	b.WriteString(fmt.Sprintf("| Failed | %d |\n", s.FailedCount))
+	b.WriteString(fmt.Sprintf("| Reactions | %d |\n", s.ReactionsCount))
 	b.WriteString(fmt.Sprintf("| Duration | %s |\n", duration.Round(time.Second)))
 	b.WriteString(fmt.Sprintf("| Started At | %s |\n", s.StartedAt))
 	b.WriteString(fmt.Sprintf("| Completed At | %s |\n", s.LastUpdatedAt))
@@ -79,6 +80,16 @@ func (r *Reporter) buildReport(s *state.ImportState, chatName string, duration t
 		s.MediaStats.VoicesImported, s.MediaStats.VoicesSkipped, s.MediaStats.VoicesFailed))
 	b.WriteString(fmt.Sprintf("| Documents | %d | %d | %d |\n",
 		s.MediaStats.DocumentsImported, s.MediaStats.DocumentsSkipped, s.MediaStats.DocumentsFailed))
+	b.WriteString("\n")
+
+	// Reaction Statistics
+	b.WriteString("## Reaction Statistics\n\n")
+	b.WriteString("| Type | Imported | Failed |\n")
+	b.WriteString("|------|----------|--------|\n")
+	b.WriteString(fmt.Sprintf("| User Reactions | %d | %d |\n",
+		s.ReactionStats.UserReactionsImported, s.ReactionStats.UserReactionsFailed))
+	b.WriteString(fmt.Sprintf("| Count Updates | %d | %d |\n",
+		s.ReactionStats.CountUpdatesImported, s.ReactionStats.CountUpdatesFailed))
 	b.WriteString("\n")
 
 	// User Mapping

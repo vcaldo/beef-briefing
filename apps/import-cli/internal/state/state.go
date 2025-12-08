@@ -17,11 +17,13 @@ type ImportState struct {
 	ImportedCount   int              `json:"imported_count"`
 	SkippedCount    int              `json:"skipped_count"`
 	FailedCount     int              `json:"failed_count"`
+	ReactionsCount  int              `json:"reactions_count"`
 	StartedAt       string           `json:"started_at"`
 	LastUpdatedAt   string           `json:"last_updated_at"`
 	Users           map[int64]string `json:"users"`            // userID -> displayName
 	Errors          []ImportError    `json:"errors,omitempty"` // Recent errors
 	MediaStats      MediaStats       `json:"media_stats"`
+	ReactionStats   ReactionStats    `json:"reaction_stats"`
 }
 
 // ImportError represents a single import error
@@ -48,6 +50,14 @@ type MediaStats struct {
 	DocumentsImported  int `json:"documents_imported"`
 	DocumentsSkipped   int `json:"documents_skipped"`
 	DocumentsFailed    int `json:"documents_failed"`
+}
+
+// ReactionStats tracks reaction import statistics
+type ReactionStats struct {
+	UserReactionsImported int `json:"user_reactions_imported"`
+	UserReactionsFailed   int `json:"user_reactions_failed"`
+	CountUpdatesImported  int `json:"count_updates_imported"`
+	CountUpdatesFailed    int `json:"count_updates_failed"`
 }
 
 // Manager handles state persistence
@@ -176,6 +186,16 @@ func (m *Manager) SetLastUpdatedAt(timestamp string) {
 // GetMediaStats returns a pointer to the media stats
 func (m *Manager) GetMediaStats() *MediaStats {
 	return &m.state.MediaStats
+}
+
+// GetReactionStats returns a pointer to the reaction stats
+func (m *Manager) GetReactionStats() *ReactionStats {
+	return &m.state.ReactionStats
+}
+
+// IncrementReaction increments the reaction count
+func (m *Manager) IncrementReaction() {
+	m.state.ReactionsCount++
 }
 
 // ShouldSkip returns true if the message has already been processed

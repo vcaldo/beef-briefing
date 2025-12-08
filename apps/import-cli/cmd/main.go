@@ -275,12 +275,35 @@ func runImport(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 
-		// Add to batch
+		// Add message to batch
 		batch = append(batch, update)
 		if includeMedia && msg.HasMedia() {
 			batchMediaPaths = append(batchMediaPaths, msg.GetMediaPath())
 		} else {
 			batchMediaPaths = append(batchMediaPaths, "")
+		}
+
+		// Generate reaction updates if message has reactions
+		if len(msg.Reactions) > 0 {
+			userReactions, countUpdate := m.ToReactionUpdates(msg)
+
+			// Add individual user reactions to batch
+			for _, reactionUpdate := range userReactions {
+				batch = append(batch, reactionUpdate)
+				batchMediaPaths = append(batchMediaPaths, "")
+				stateMgr.IncrementReaction()
+
+				// Record reactor user
+				if reactionUpdate.MessageReaction != nil && reactionUpdate.MessageReaction.User != nil {
+					stateMgr.AddUser(reactionUpdate.MessageReaction.User.ID, reactionUpdate.MessageReaction.User.FirstName)
+				}
+			}
+
+			// Add reaction count update to batch
+			if countUpdate != nil {
+				batch = append(batch, countUpdate)
+				batchMediaPaths = append(batchMediaPaths, "")
+			}
 		}
 
 		// Send batch when full
@@ -340,6 +363,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Imported: %d\n", state.ImportedCount)
 	fmt.Printf("Skipped: %d\n", state.SkippedCount)
 	fmt.Printf("Failed: %d\n", state.FailedCount)
+	fmt.Printf("Reactions: %d\n", state.ReactionsCount)
 	fmt.Printf("Report: %s\n", rep.GetReportPath())
 
 	return nil
@@ -356,12 +380,22 @@ func sendBatch(apiClient *client.Client, batch []*models.Update, mediaPaths []st
 			err = apiClient.SendUpdate(update)
 		}
 
-		if err != nil {
-			stateMgr.IncrementFailed()
-			stateMgr.AddError(update.Message.MessageID, err.Error(), time.Now().Format(time.RFC3339))
-			slog.Debug("message send failed", "message_id", update.Message.MessageID, "error", err)
-		} else {
-			stateMgr.IncrementImported()
+		// Handle different update types for stats
+		if update.MessageReaction != nil {
+			// Individual user reaction
+			updateReactionStats(stateMgr, update, err)
+		} else if update.MessageReactionCount != nil {
+			// Reaction count update
+			updateReactionCountStats(stateMgr, err)
+		} else if update.Message != nil {
+			// Regular message
+			if err != nil {
+				stateMgr.IncrementFailed()
+				stateMgr.AddError(update.Message.MessageID, err.Error(), time.Now().Format(time.RFC3339))
+				slog.Debug("message send failed", "message_id", update.Message.MessageID, "error", err)
+			} else {
+				stateMgr.IncrementImported()
+			}
 		}
 
 		// Add delay between messages
@@ -371,6 +405,24 @@ func sendBatch(apiClient *client.Client, batch []*models.Update, mediaPaths []st
 	}
 
 	return nil
+}
+
+func updateReactionStats(stateMgr *state.Manager, update *models.Update, err error) {
+	stats := stateMgr.GetReactionStats()
+	if err != nil {
+		stats.UserReactionsFailed++
+	} else {
+		stats.UserReactionsImported++
+	}
+}
+
+func updateReactionCountStats(stateMgr *state.Manager, err error) {
+	stats := stateMgr.GetReactionStats()
+	if err != nil {
+		stats.CountUpdatesFailed++
+	} else {
+		stats.CountUpdatesImported++
+	}
 }
 
 func updateMediaStats(stateMgr *state.Manager, update *models.Update, err error) {

@@ -339,3 +339,114 @@ func (m *Mapper) generateFileID(filePath string) string {
 	hash := sha256.Sum256([]byte(filePath))
 	return fmt.Sprintf("import_%x", hash[:16])
 }
+
+// ToReactionUpdates converts export reactions to API reaction updates
+// Returns both individual user reactions and aggregate count updates
+func (m *Mapper) ToReactionUpdates(msg *models.ExportMessage) ([]*models.Update, *models.Update) {
+	if len(msg.Reactions) == 0 {
+		return nil, nil
+	}
+
+	// Parse message timestamp for reactions without dates
+	msgTimestamp, _ := strconv.ParseInt(msg.DateUnixtime, 10, 64)
+
+	chat := models.Chat{
+		ID:    m.chatID,
+		Type:  m.mapChatType(m.chatType),
+		Title: m.chatName,
+	}
+
+	var userReactions []*models.Update
+	var reactionCounts []models.ReactionCount
+
+	for _, reaction := range msg.Reactions {
+		// Build reaction count
+		reactionCounts = append(reactionCounts, models.ReactionCount{
+			Type: models.ReactionInfo{
+				Type:  "emoji",
+				Emoji: reaction.Emoji,
+			},
+			TotalCount: reaction.Count,
+		})
+
+		// Build individual user reactions from Recent list
+		for _, user := range reaction.Recent {
+			userID, userName := m.parseUser(user.From, user.FromID)
+
+			// Parse reaction date if available
+			reactionDate := msgTimestamp
+			if user.Date != "" {
+				if parsed, err := strconv.ParseInt(user.Date, 10, 64); err == nil {
+					reactionDate = parsed
+				}
+			}
+
+			userReaction := &models.Update{
+				UpdateID: m.generateReactionUpdateID(msg.ID, userID, reaction.Emoji),
+				MessageReaction: &models.MessageReactionUpdated{
+					Chat:      chat,
+					MessageID: msg.ID,
+					User: &models.User{
+						ID:        userID,
+						IsBot:     false,
+						FirstName: userName,
+					},
+					Date:        reactionDate,
+					OldReaction: []models.ReactionInfo{},
+					NewReaction: []models.ReactionInfo{
+						{
+							Type:  "emoji",
+							Emoji: reaction.Emoji,
+						},
+					},
+				},
+			}
+			userReactions = append(userReactions, userReaction)
+		}
+	}
+
+	// Build reaction count update
+	var countUpdate *models.Update
+	if len(reactionCounts) > 0 {
+		countUpdate = &models.Update{
+			UpdateID: m.generateReactionCountUpdateID(msg.ID),
+			MessageReactionCount: &models.MessageReactionCountUpdate{
+				Chat:      chat,
+				MessageID: msg.ID,
+				Date:      msgTimestamp,
+				Reactions: reactionCounts,
+			},
+		}
+	}
+
+	return userReactions, countUpdate
+}
+
+// generateReactionUpdateID creates a unique update ID for a user reaction
+func (m *Mapper) generateReactionUpdateID(msgID, userID int64, emoji string) int64 {
+	// Create a deterministic ID based on message, user, and emoji
+	input := fmt.Sprintf("reaction:%d:%d:%s", msgID, userID, emoji)
+	hash := sha256.Sum256([]byte(input))
+	var id int64
+	for i := 0; i < 8; i++ {
+		id = (id << 8) | int64(hash[i])
+	}
+	if id < 0 {
+		id = -id
+	}
+	return id
+}
+
+// generateReactionCountUpdateID creates a unique update ID for reaction counts
+func (m *Mapper) generateReactionCountUpdateID(msgID int64) int64 {
+	input := fmt.Sprintf("reaction_count:%d", msgID)
+	hash := sha256.Sum256([]byte(input))
+	var id int64
+	for i := 0; i < 8; i++ {
+		id = (id << 8) | int64(hash[i])
+	}
+	if id < 0 {
+		id = -id
+	}
+	return id
+}

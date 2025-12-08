@@ -2,8 +2,10 @@ package models
 
 // Update represents a Telegram update for the API
 type Update struct {
-	UpdateID int64    `json:"update_id"`
-	Message  *Message `json:"message,omitempty"`
+	UpdateID             int64                       `json:"update_id"`
+	Message              *Message                    `json:"message,omitempty"`
+	MessageReaction      *MessageReactionUpdated     `json:"message_reaction,omitempty"`
+	MessageReactionCount *MessageReactionCountUpdate `json:"message_reaction_count,omitempty"`
 }
 
 // Chat represents a Telegram chat
@@ -122,4 +124,36 @@ type VideoNote struct {
 	Length       int    `json:"length"`
 	Duration     int    `json:"duration"`
 	FileSize     *int64 `json:"file_size,omitempty"`
+}
+
+// MessageReactionUpdated represents a change of reaction on a message performed by a user
+type MessageReactionUpdated struct {
+	Chat        Chat           `json:"chat"`
+	MessageID   int64          `json:"message_id"`
+	User        *User          `json:"user,omitempty"`
+	ActorChat   *Chat          `json:"actor_chat,omitempty"`
+	Date        int64          `json:"date"`
+	OldReaction []ReactionInfo `json:"old_reaction"`
+	NewReaction []ReactionInfo `json:"new_reaction"`
+}
+
+// MessageReactionCountUpdate represents reaction changes on a message with anonymous reactions
+type MessageReactionCountUpdate struct {
+	Chat      Chat            `json:"chat"`
+	MessageID int64           `json:"message_id"`
+	Date      int64           `json:"date"`
+	Reactions []ReactionCount `json:"reactions"`
+}
+
+// ReactionInfo represents the type of a reaction
+type ReactionInfo struct {
+	Type          string `json:"type"`
+	Emoji         string `json:"emoji,omitempty"`
+	CustomEmojiID string `json:"custom_emoji_id,omitempty"`
+}
+
+// ReactionCount represents a reaction added to a message along with the number of times it was added
+type ReactionCount struct {
+	Type       ReactionInfo `json:"type"`
+	TotalCount int          `json:"total_count"`
 }

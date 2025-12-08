@@ -261,6 +261,7 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 		LINODE_TOKEN=$$(grep '^LINODE_TOKEN=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		DOMAIN_NAME=$$(grep '^DOMAIN_NAME=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		NEW_RELIC_KEY=$$(grep '^NEW_RELIC_LICENSE_KEY=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		NEW_RELIC_ACCOUNT=$$(grep '^NEW_RELIC_ACCOUNT_ID=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		SSH_KEY_PATH=$$(grep '^SSH_PUBLIC_KEY_PATH=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		if [ -n "$$LINODE_TOKEN" ]; then \
 			sed -i "s|linode_token = \".*\"|linode_token = \"$$LINODE_TOKEN\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
@@ -273,6 +274,10 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 		if [ -n "$$NEW_RELIC_KEY" ]; then \
 			echo "new_relic_license_key = \"$$NEW_RELIC_KEY\"" >> $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated new_relic_license_key from $$ENV_FILE"; \
+		fi; \
+		if [ -n "$$NEW_RELIC_ACCOUNT" ]; then \
+			echo "new_relic_account_id = \"$$NEW_RELIC_ACCOUNT\"" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated new_relic_account_id from $$ENV_FILE"; \
 		fi; \
 		if [ -n "$$SSH_KEY_PATH" ]; then \
 			sed -i "s|# ssh_public_key_path = \".*\"|ssh_public_key_path = \"$$SSH_KEY_PATH\"|" $(TERRAFORM_DIR)/terraform.tfvars; \

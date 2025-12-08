@@ -44,18 +44,12 @@ packages:
   - lsb-release
   - wget
   - make
+  - vim
 
 # Commands to run after package installation
 runcmd:
   # Set hostname
   - hostnamectl set-hostname ${hostname}
-  # Install New Relic Infrastructure Agent (if license key provided)
-  - |
-    if [ -n "${new_relic_license_key}" ]; then
-      echo "Installing New Relic Infrastructure Agent..."
-      curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash
-      NEW_RELIC_API_KEY="${new_relic_license_key}" NEW_RELIC_ACCOUNT_ID="" NEW_RELIC_REGION="EU" /usr/local/bin/newrelic install -y
-    fi
   # Install Docker
   - install -m 0755 -d /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -76,6 +70,12 @@ runcmd:
   - /usr/local/go/bin/go version
   # Restart SSH to apply hardening configuration
   - systemctl restart sshd
+    # Install New Relic Infrastructure Agent (if license key provided)
+  - |
+    if [ -n "${new_relic_license_key}" ]; then
+      echo "Installing New Relic Infrastructure Agent..."
+      curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && sudo NEW_RELIC_API_KEY="${new_relic_license_key}" NEW_RELIC_ACCOUNT_ID="${new_relic_account_id}" NEW_RELIC_REGION="EU" /usr/local/bin/newrelic install -y
+    fi
   # Restart the system to apply all changes
   - shutdown -r +1 "System restarting to apply all configuration changes"
 

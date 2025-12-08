@@ -307,6 +307,8 @@ deploy: ## Deploy to production server with commit-tagged images
 	@sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=$(COMMIT_HASH)/' $(PROD_ENV_FILE)
 	@echo "🔨 Building Docker images..."
 	@docker compose -f $(PROD_COMPOSE_FILE) --env-file $(PROD_ENV_FILE) build
+	@echo "📋 Verifying built images..."
+	@docker images | grep "beef-briefing.*$(COMMIT_HASH)" || (echo "❌ Error: Images not built with tag $(COMMIT_HASH)" && exit 1)
 	@echo "💾 Saving images to /tmp/images-$(COMMIT_HASH).tar.gz..."
 	@docker save \
 		beef-briefing/postgres:$(COMMIT_HASH) \
@@ -314,6 +316,7 @@ deploy: ## Deploy to production server with commit-tagged images
 		beef-briefing/telegram-bot:$(COMMIT_HASH) \
 		beef-briefing/admin-panel:$(COMMIT_HASH) \
 		| gzip > /tmp/images-$(COMMIT_HASH).tar.gz
+	@echo "✓ Image archive created: $$(du -h /tmp/images-$(COMMIT_HASH).tar.gz | cut -f1)"
 	@echo "📤 Transferring files to server..."
 	@scp $(PROD_COMPOSE_FILE) $$($(MAKE) -s tf-ssh-user-host):/tmp/docker-compose.yml
 	@scp $(PROD_ENV_FILE) $$($(MAKE) -s tf-ssh-user-host):/tmp/.env

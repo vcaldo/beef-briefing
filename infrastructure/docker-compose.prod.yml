@@ -1,6 +1,9 @@
 # Production environment - Linode server
 services:
   postgres:
+    build:
+      context: ../apps/postgres
+      dockerfile: Dockerfile
     image: beef-briefing/postgres:${IMAGE_TAG}
     container_name: beef-postgres-prod
     environment:
@@ -16,6 +19,9 @@ services:
     restart: unless-stopped
 
   api-service:
+    build:
+      context: ..
+      dockerfile: apps/api-service/Dockerfile
     image: beef-briefing/api-service:${IMAGE_TAG}
     container_name: beef-api-service-prod
     environment:
@@ -60,6 +66,9 @@ services:
     restart: unless-stopped
 
   telegram-bot:
+    build:
+      context: ..
+      dockerfile: apps/telegram-bot/Dockerfile
     image: beef-briefing/telegram-bot:${IMAGE_TAG}
     container_name: beef-telegram-bot-prod
     environment:
@@ -74,6 +83,9 @@ services:
     restart: unless-stopped
 
   admin-panel:
+    build:
+      context: ..
+      dockerfile: apps/admin-panel/Dockerfile
     image: beef-briefing/admin-panel:${IMAGE_TAG}
     container_name: beef-admin-panel-prod
     environment:

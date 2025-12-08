@@ -73,6 +73,7 @@ locals {
     hostname               = var.hostname
     new_relic_license_key  = var.new_relic_license_key
     new_relic_account_id   = var.new_relic_account_id
+    new_relic_region       = var.new_relic_region
   })
 }
 
@@ -80,7 +81,7 @@ locals {
 resource "linode_instance" "beef_briefing" {
   label     = "beef-briefing-server"
   region    = var.region
-  type      = "g6-standard-2"
+  type      = var.instance_type
   image     = "linode/ubuntu24.04"
   root_pass = random_password.root_password.result
   tags      = ["beef-briefing", "production"]

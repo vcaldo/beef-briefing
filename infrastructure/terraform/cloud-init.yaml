@@ -51,6 +51,7 @@ packages:
 runcmd:
   # Set hostname
   - hostnamectl set-hostname ${hostname}
+  - hostname ${hostname}
   # Restart SSH to apply hardening configuration
   - systemctl restart sshd
   # Install Docker
@@ -72,15 +73,12 @@ runcmd:
   - docker compose version
   - /usr/local/go/bin/go version
   # Install LazyDocker
-  - go install github.com/jesseduffield/lazydocker@latest
-  - sudo mv $HOME/go/bin/lazydocker /usr/local/bin/lazydocker
+  - GOPATH=/usr/local/go /usr/local/go/bin/go install github.com/jesseduffield/lazydocker@latest
+  - ln -sf /usr/local/go/bin/lazydocker /usr/local/bin/lazydocker
   # Install New Relic Infrastructure Agent (if license key provided)
   - |
     if [ -n "${new_relic_license_key}" ]; then
       echo "Installing New Relic Infrastructure Agent..."
       curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && sudo NEW_RELIC_API_KEY="${new_relic_license_key}" NEW_RELIC_ACCOUNT_ID="${new_relic_account_id}" NEW_RELIC_REGION="EU" /usr/local/bin/newrelic install -y
     fi
-  # Restart the system to apply all changes
-  - shutdown -r +0.5 "System restarting to apply all configuration changes"
-
 final_message: "Beef Briefing server setup completed. Docker, Docker Compose, and Go 1.25.4 installed. SSH hardened with admin user only. System will restart in 1 minute."

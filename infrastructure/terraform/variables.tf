@@ -47,3 +47,15 @@ variable "new_relic_account_id" {
   sensitive   = true
   default     = ""
 }
+
+variable "new_relic_region" {
+  description = "New Relic region (e.g., US or EU)"
+  type        = string
+  default     = "EU"
+}
+
+variable "instance_type" {
+  description = "Linode instance type (e.g., g6-standard-2)"
+  type        = string
+  default     = "g6-standard-2"
+}

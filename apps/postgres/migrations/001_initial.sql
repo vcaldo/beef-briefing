@@ -30,12 +30,14 @@ CREATE TABLE chats (
     first_name TEXT,
     last_name TEXT,
     is_forum BOOLEAN DEFAULT FALSE,
+    migrated_from_chat_id BIGINT UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_chats_username ON chats(username) WHERE username IS NOT NULL;
 CREATE INDEX idx_chats_type ON chats(type);
+CREATE INDEX idx_chats_migrated_from ON chats(migrated_from_chat_id) WHERE migrated_from_chat_id IS NOT NULL;
 
 -- Users table
 CREATE TABLE users (

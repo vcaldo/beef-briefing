@@ -18,3 +18,7 @@ region = "es-mad"
 
 # Optional: Override SSH public key path (default: ~/.ssh/id_rsa.pub)
 # ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# Optional: New Relic license key for infrastructure monitoring
+# new_relic_license_key = "your-new-relic-license-key"
+

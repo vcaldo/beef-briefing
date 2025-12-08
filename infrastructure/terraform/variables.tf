@@ -33,3 +33,10 @@ variable "hostname" {
   type        = string
   default     = "beef-briefing"
 }
+
+variable "new_relic_license_key" {
+  description = "New Relic license key for infrastructure monitoring"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

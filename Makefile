@@ -246,12 +246,36 @@ tf-root-pass: ## Show root password (SENSITIVE)
 tf-connect: ## SSH to the Linode instance
 	@ssh admin@$$(cd $(TERRAFORM_DIR) && terraform output -raw instance_ip)
 
-tf-setup: ## Setup Terraform configuration (copy tfvars example)
+tf-setup: ## Setup Terraform configuration (copy tfvars example and populate from .env)
 	@if [ ! -f $(TERRAFORM_DIR)/terraform.tfvars ]; then \
 		cp $(TERRAFORM_DIR)/terraform.tfvars.example $(TERRAFORM_DIR)/terraform.tfvars; \
-		echo "Created terraform.tfvars from example. Please edit with your values."; \
+		echo "Created terraform.tfvars from example."; \
+		if [ -f infrastructure/.env.prod ]; then \
+			ENV_FILE=infrastructure/.env.prod; \
+		elif [ -f infrastructure/.env.dev ]; then \
+			ENV_FILE=infrastructure/.env.dev; \
+		else \
+			echo "Warning: No .env.prod or .env.dev found. Please edit terraform.tfvars manually."; \
+			exit 0; \
+		fi; \
+		LINODE_TOKEN=$$(grep '^LINODE_TOKEN=' $$ENV_FILE | cut -d'=' -f2); \
+		DOMAIN_NAME=$$(grep '^DOMAIN_NAME=' $$ENV_FILE | cut -d'=' -f2); \
+		NEW_RELIC_KEY=$$(grep '^NEW_RELIC_LICENSE_KEY=' $$ENV_FILE | cut -d'=' -f2); \
+		if [ -n "$$LINODE_TOKEN" ]; then \
+			sed -i "s|linode_token = \".*\"|linode_token = \"$$LINODE_TOKEN\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated linode_token from $$ENV_FILE"; \
+		fi; \
+		if [ -n "$$DOMAIN_NAME" ]; then \
+			sed -i "s|# domain_name = \".*\"|domain_name = \"$$DOMAIN_NAME\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated domain_name from $$ENV_FILE"; \
+		fi; \
+		if [ -n "$$NEW_RELIC_KEY" ]; then \
+			echo "new_relic_license_key = \"$$NEW_RELIC_KEY\"" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated new_relic_license_key from $$ENV_FILE"; \
+		fi; \
+		echo "Setup complete! Review $(TERRAFORM_DIR)/terraform.tfvars before applying."; \
 	else \
-		echo "terraform.tfvars already exists."; \
+		echo "terraform.tfvars already exists. Delete it first to recreate."; \
 	fi
 
 tf-docs: ## Show Terraform documentation

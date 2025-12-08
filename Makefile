@@ -1,6 +1,7 @@
 # Variables
 COMPOSE_FILE ?= infrastructure/docker-compose.dev.yml
 ENV_FILE ?= infrastructure/.env.dev
+TERRAFORM_DIR := infrastructure/terraform
 
 # Service names
 API_SERVICE := api-service
@@ -179,10 +180,121 @@ admin-panel-set-password-file: ## Generate password hash and write to file
 admin-panel-set-session-file: ## Generate session secret and write to file
 	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../infrastructure/secrets -session-only
 
+# Terraform targets
+tf-init: ## Initialize Terraform working directory
+	cd $(TERRAFORM_DIR) && terraform init
+
+tf-plan: ## Show Terraform execution plan
+	cd $(TERRAFORM_DIR) && terraform plan
+
+tf-apply: ## Apply Terraform configuration
+	cd $(TERRAFORM_DIR) && terraform apply
+
+tf-destroy: ## Destroy Terraform-managed infrastructure (DANGEROUS!)
+	cd $(TERRAFORM_DIR) && terraform destroy
+
+tf-output: ## Show all Terraform outputs
+	cd $(TERRAFORM_DIR) && terraform output
+
+tf-show: ## Show current Terraform state
+	cd $(TERRAFORM_DIR) && terraform show
+
+tf-validate: ## Validate Terraform configuration
+	cd $(TERRAFORM_DIR) && terraform validate
+
+tf-refresh: ## Refresh Terraform state
+	cd $(TERRAFORM_DIR) && terraform refresh
+
+# Terraform formatting and state
+tf-fmt: ## Format Terraform files
+	cd $(TERRAFORM_DIR) && terraform fmt -recursive
+
+tf-fmt-check: ## Check if Terraform files are formatted
+	cd $(TERRAFORM_DIR) && terraform fmt -check -recursive
+
+tf-state-list: ## List resources in Terraform state
+	cd $(TERRAFORM_DIR) && terraform state list
+
+tf-state-show: ## Show detailed state for a resource (set RESOURCE=<name>)
+	@if [ -z "$(RESOURCE)" ]; then \
+		echo "Error: RESOURCE variable is required. Usage: make tf-state-show RESOURCE=<resource_name>"; \
+		exit 1; \
+	fi
+	cd $(TERRAFORM_DIR) && terraform state show $(RESOURCE)
+
+tf-unlock: ## Force unlock Terraform state (DANGEROUS! Prompts for LOCK_ID)
+	@echo "WARNING: This will force unlock the Terraform state."
+	@echo "Only use this if you are certain there is no other Terraform process running."
+	@read -p "Enter the Lock ID to unlock: " lock_id; \
+	if [ -z "$$lock_id" ]; then \
+		echo "Error: Lock ID cannot be empty"; \
+		exit 1; \
+	fi; \
+	cd $(TERRAFORM_DIR) && terraform force-unlock -force $$lock_id
+
+# Terraform outputs
+tf-ip: ## Show instance IP address
+	@cd $(TERRAFORM_DIR) && terraform output -raw instance_ip
+
+tf-ssh: ## Show SSH connection command
+	@cd $(TERRAFORM_DIR) && terraform output -raw ssh_connection
+
+tf-root-pass: ## Show root password (SENSITIVE)
+	@cd $(TERRAFORM_DIR) && terraform output -raw root_password
+
+# Terraform utilities
+tf-connect: ## SSH to the Linode instance
+	@ssh admin@$$(cd $(TERRAFORM_DIR) && terraform output -raw instance_ip)
+
+tf-setup: ## Setup Terraform configuration (copy tfvars example and populate from .env)
+	@if [ ! -f $(TERRAFORM_DIR)/terraform.tfvars ]; then \
+		cp $(TERRAFORM_DIR)/terraform.tfvars.example $(TERRAFORM_DIR)/terraform.tfvars; \
+		echo "Created terraform.tfvars from example."; \
+		if [ -f infrastructure/.env.prod ]; then \
+			ENV_FILE=infrastructure/.env.prod; \
+		elif [ -f infrastructure/.env.dev ]; then \
+			ENV_FILE=infrastructure/.env.dev; \
+		else \
+			echo "Warning: No .env.prod or .env.dev found. Please edit terraform.tfvars manually."; \
+			exit 0; \
+		fi; \
+		LINODE_TOKEN=$$(grep '^LINODE_TOKEN=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		DOMAIN_NAME=$$(grep '^DOMAIN_NAME=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		NEW_RELIC_KEY=$$(grep '^NEW_RELIC_LICENSE_KEY=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		SSH_KEY_PATH=$$(grep '^SSH_PUBLIC_KEY_PATH=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		if [ -n "$$LINODE_TOKEN" ]; then \
+			sed -i "s|linode_token = \".*\"|linode_token = \"$$LINODE_TOKEN\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated linode_token from $$ENV_FILE"; \
+		fi; \
+		if [ -n "$$DOMAIN_NAME" ]; then \
+			sed -i "s|# domain_name = \".*\"|domain_name = \"$$DOMAIN_NAME\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated domain_name from $$ENV_FILE"; \
+		fi; \
+		if [ -n "$$NEW_RELIC_KEY" ]; then \
+			echo "new_relic_license_key = \"$$NEW_RELIC_KEY\"" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated new_relic_license_key from $$ENV_FILE"; \
+		fi; \
+		if [ -n "$$SSH_KEY_PATH" ]; then \
+			sed -i "s|# ssh_public_key_path = \".*\"|ssh_public_key_path = \"$$SSH_KEY_PATH\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated ssh_public_key_path from $$ENV_FILE"; \
+		fi; \
+		echo "Setup complete! Review $(TERRAFORM_DIR)/terraform.tfvars before applying."; \
+	else \
+		echo "terraform.tfvars already exists. Delete it first to recreate."; \
+	fi
+
+tf-docs: ## Show Terraform documentation
+	@cat $(TERRAFORM_DIR)/README.md
+
+tf-deploy-check: tf-validate tf-fmt-check tf-plan ## Full pre-deployment check (validate, format check, plan)
+
 # Phony targets
 .PHONY: help up down restart ps clean prune build build-api build-bot build-postgres build-admin-panel \
 	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel \
 	shell-api shell-bot shell-postgres shell-minio shell-admin-panel \
 	go-build-api go-build-bot go-build-admin-panel go-build-import-cli go-build go-clean fmt fmt-check \
 	admin-panel-set-secrets admin-panel-set-password admin-panel-set-session \
-	admin-panel-set-secrets-files admin-panel-set-password-file admin-panel-set-session-file
+	admin-panel-set-secrets-files admin-panel-set-password-file admin-panel-set-session-file \
+	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
+	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
+	tf-ip tf-ssh tf-root-pass tf-connect tf-setup tf-docs tf-deploy-check

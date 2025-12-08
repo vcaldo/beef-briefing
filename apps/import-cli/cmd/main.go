@@ -197,8 +197,8 @@ func runImport(cmd *cobra.Command, args []string) error {
 					return fmt.Errorf("%s (use --force to bypass this check)", errMsg)
 				}
 
-				slog.Warn("proceeding with mismatched supergroup ID", 
-					"expected", expectedID, 
+				slog.Warn("proceeding with mismatched supergroup ID",
+					"expected", expectedID,
 					"provided", chatID,
 					"export_id", metadata.ID,
 				)

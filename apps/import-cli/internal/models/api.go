@@ -11,14 +11,14 @@ type Update struct {
 
 // Chat represents a Telegram chat
 type Chat struct {
-	ID                  int64  `json:"id"`
-	Type                string `json:"type"`
-	Title               string `json:"title,omitempty"`
-	Username            string `json:"username,omitempty"`
-	FirstName           string `json:"first_name,omitempty"`
-	LastName            string `json:"last_name,omitempty"`
-	MigrateFromChatID   *int64 `json:"migrate_from_chat_id,omitempty"`
-	MigrateToChatID     *int64 `json:"migrate_to_chat_id,omitempty"`
+	ID                int64  `json:"id"`
+	Type              string `json:"type"`
+	Title             string `json:"title,omitempty"`
+	Username          string `json:"username,omitempty"`
+	FirstName         string `json:"first_name,omitempty"`
+	LastName          string `json:"last_name,omitempty"`
+	MigrateFromChatID *int64 `json:"migrate_from_chat_id,omitempty"`
+	MigrateToChatID   *int64 `json:"migrate_to_chat_id,omitempty"`
 }
 
 // User represents a Telegram user

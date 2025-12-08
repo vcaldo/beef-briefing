@@ -20,9 +20,9 @@ type ImportState struct {
 	ReactionsCount    int              `json:"reactions_count"`
 	StartedAt         string           `json:"started_at"`
 	LastUpdatedAt     string           `json:"last_updated_at"`
-	Users             map[int64]string `json:"users"`                  // userID -> displayName
-	ProcessedMessages map[int64]bool   `json:"processed_messages"`      // msgID -> processed (for resume support with negative IDs)
-	Errors            []ImportError    `json:"errors,omitempty"`       // Recent errors
+	Users             map[int64]string `json:"users"`              // userID -> displayName
+	ProcessedMessages map[int64]bool   `json:"processed_messages"` // msgID -> processed (for resume support with negative IDs)
+	Errors            []ImportError    `json:"errors,omitempty"`   // Recent errors
 	MediaStats        MediaStats       `json:"media_stats"`
 	ReactionStats     ReactionStats    `json:"reaction_stats"`
 }

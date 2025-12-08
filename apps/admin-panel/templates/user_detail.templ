@@ -1,0 +1,394 @@
+package templates
+
+import (
+	"fmt"
+	"time"
+)
+
+// UserDetail holds details for a single user view
+type UserDetail struct {
+	ID           int64
+	IsBot        bool
+	FirstName    string
+	LastName     string
+	Username     string
+	LanguageCode string
+	IsPremium    bool
+	CreatedAt    time.Time
+
+	// Stats
+	TotalMessages     int
+	TotalChats        int
+	MediaShared       int
+	DaysActive        int
+	AvgMessagesPerDay float64
+	ReactionsGiven    int
+	ReactionsReceived int
+	FirstActive       time.Time
+	LastActive        time.Time
+}
+
+// UserChatInfo holds chat membership info for a user
+type UserChatInfo struct {
+	ChatID       int64
+	Title        string
+	Type         string
+	MessageCount int
+	FirstActive  time.Time
+	LastActive   time.Time
+}
+
+// UserMessageInfo holds message info for display
+type UserMessageInfo struct {
+	ID            int64
+	ChatID        int64
+	ChatTitle     string
+	Date          time.Time
+	TruncatedText string
+	FullText      string
+	HasMedia      bool
+}
+
+// UserStreakInfo holds streak statistics
+type UserStreakInfo struct {
+	MaxPostingStreak  int
+	MaxSilenceStreak  int
+	CurrentStreak     int
+	IsCurrentlyActive bool
+}
+
+// UserReactionInfo holds reaction statistics
+type UserReactionInfo struct {
+	TotalGiven    int
+	TotalReceived int
+	TopGiven      []EmojiStat
+	TopReceived   []EmojiStat
+}
+
+// EmojiStat holds emoji usage info
+type EmojiStat struct {
+	Emoji string
+	Count int
+}
+
+templ UserDetailPage(user UserDetail, chats []UserChatInfo, messages []UserMessageInfo, streaks UserStreakInfo, reactions UserReactionInfo, nextCursor int64, theme string) {
+	@Layout(theme, userDetailTitle(user), userDetailContent(user, chats, messages, streaks, reactions, nextCursor))
+}
+
+templ userDetailContent(user UserDetail, chats []UserChatInfo, messages []UserMessageInfo, streaks UserStreakInfo, reactions UserReactionInfo, nextCursor int64) {
+	<div class="space-y-6">
+		<!-- Header -->
+		<div class="flex items-center gap-4">
+			<a href="javascript:history.back()" class="btn btn-ghost btn-circle">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
+				</svg>
+			</a>
+			<div class="avatar placeholder">
+				<div class="bg-neutral text-neutral-content rounded-full w-16">
+					<span class="text-2xl">{ userInitial(user) }</span>
+				</div>
+			</div>
+			<div class="flex-1">
+				<h1 class="text-3xl font-bold font-heading flex items-center gap-2">
+					{ userDetailTitle(user) }
+					if user.IsPremium {
+						<span class="badge badge-warning badge-sm">⭐ Premium</span>
+					}
+					if user.IsBot {
+						<span class="badge badge-info badge-sm">🤖 Bot</span>
+					}
+				</h1>
+				<div class="flex items-center gap-2 text-base-content/60">
+					if user.Username != "" {
+						<span class="font-mono">{ "@" + user.Username }</span>
+					}
+					if user.LanguageCode != "" {
+						<span class="badge badge-ghost badge-sm">{ user.LanguageCode }</span>
+					}
+					<span class="text-sm">ID: { fmt.Sprintf("%d", user.ID) }</span>
+				</div>
+			</div>
+		</div>
+
+		<!-- Summary Stats -->
+		<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+			@userStatCard("Messages", fmt.Sprintf("%d", user.TotalMessages), "📨")
+			@userStatCard("Chats", fmt.Sprintf("%d", user.TotalChats), "💬")
+			@userStatCard("Media", fmt.Sprintf("%d", user.MediaShared), "🖼️")
+			@userStatCard("Days Active", fmt.Sprintf("%d", user.DaysActive), "📅")
+			@userStatCard("Avg/Day", fmt.Sprintf("%.1f", user.AvgMessagesPerDay), "📊")
+			@userStatCard("Reactions", fmt.Sprintf("%d/%d", user.ReactionsGiven, user.ReactionsReceived), "❤️")
+		</div>
+
+		<!-- Streaks Card -->
+		if user.TotalMessages > 0 {
+			<div class="card glass-card">
+				<div class="card-body">
+					<h2 class="card-title font-heading">📈 Activity Streaks</h2>
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+						<div class="stat bg-base-200 rounded-box">
+							<div class="stat-figure text-success">🔥</div>
+							<div class="stat-title">Max Posting Streak</div>
+							<div class="stat-value text-success">{ fmt.Sprintf("%d", streaks.MaxPostingStreak) }</div>
+							<div class="stat-desc">consecutive days</div>
+						</div>
+						<div class="stat bg-base-200 rounded-box">
+							<div class="stat-figure text-warning">😴</div>
+							<div class="stat-title">Max Silence Streak</div>
+							<div class="stat-value text-warning">{ fmt.Sprintf("%d", streaks.MaxSilenceStreak) }</div>
+							<div class="stat-desc">days without posting</div>
+						</div>
+						<div class="stat bg-base-200 rounded-box">
+							if streaks.IsCurrentlyActive {
+								<div class="stat-figure text-primary">⚡</div>
+								<div class="stat-title">Current Streak</div>
+								<div class="stat-value text-primary">{ fmt.Sprintf("%d", streaks.CurrentStreak) }</div>
+								<div class="stat-desc">days posting</div>
+							} else {
+								<div class="stat-figure text-base-content/50">💤</div>
+								<div class="stat-title">Days Since Active</div>
+								<div class="stat-value text-base-content/50">{ fmt.Sprintf("%d", streaks.CurrentStreak) }</div>
+								<div class="stat-desc">days inactive</div>
+							}
+						</div>
+					</div>
+				</div>
+			</div>
+		}
+
+		<!-- Reactions Card -->
+		if reactions.TotalGiven > 0 || reactions.TotalReceived > 0 {
+			<div class="card glass-card">
+				<div class="card-body">
+					<h2 class="card-title font-heading">❤️ Reactions</h2>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
+						<!-- Given -->
+						<div>
+							<h3 class="font-semibold mb-2">Given ({ fmt.Sprintf("%d", reactions.TotalGiven) })</h3>
+							if len(reactions.TopGiven) > 0 {
+								<div class="flex flex-wrap gap-2">
+									for _, emoji := range reactions.TopGiven {
+										<div class="badge badge-lg gap-1">
+											<span class="text-lg">{ emoji.Emoji }</span>
+											<span class="font-mono">{ fmt.Sprintf("%d", emoji.Count) }</span>
+										</div>
+									}
+								</div>
+							} else {
+								<p class="text-base-content/60">No reactions given</p>
+							}
+						</div>
+						<!-- Received -->
+						<div>
+							<h3 class="font-semibold mb-2">Received ({ fmt.Sprintf("%d", reactions.TotalReceived) })</h3>
+							if len(reactions.TopReceived) > 0 {
+								<div class="flex flex-wrap gap-2">
+									for _, emoji := range reactions.TopReceived {
+										<div class="badge badge-lg gap-1">
+											<span class="text-lg">{ emoji.Emoji }</span>
+											<span class="font-mono">{ fmt.Sprintf("%d", emoji.Count) }</span>
+										</div>
+									}
+								</div>
+							} else {
+								<p class="text-base-content/60">No reactions received</p>
+							}
+						</div>
+					</div>
+				</div>
+			</div>
+		}
+
+		<!-- Groups Table -->
+		<div class="card glass-card">
+			<div class="card-body">
+				<h2 class="card-title font-heading">💬 Chats ({ fmt.Sprintf("%d", len(chats)) })</h2>
+				if len(chats) == 0 {
+					<div class="text-center py-8 text-base-content/60">
+						<span class="text-3xl block mb-2">💬</span>
+						No chat activity
+					</div>
+				} else {
+					<div class="overflow-x-auto mt-2">
+						<table class="table table-zebra w-full">
+							<thead>
+								<tr>
+									<th>Chat</th>
+									<th class="text-right font-mono">Messages</th>
+									<th class="font-mono">First Active</th>
+									<th class="font-mono">Last Active</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, chat := range chats {
+									<tr class="hover">
+										<td>
+											<a href={ templ.SafeURL(fmt.Sprintf("/chats/%d", chat.ChatID)) } class="link link-hover flex items-center gap-2">
+												<span>{ chatTypeIcon(chat.Type) }</span>
+												<span>{ chatDisplayTitle(chat) }</span>
+												<span class="badge badge-ghost badge-sm">{ chat.Type }</span>
+											</a>
+										</td>
+										<td class="text-right font-mono">{ fmt.Sprintf("%d", chat.MessageCount) }</td>
+										<td class="font-mono text-sm">{ formatUserDate(chat.FirstActive) }</td>
+										<td class="font-mono text-sm">{ formatUserDate(chat.LastActive) }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+			</div>
+		</div>
+
+		<!-- Messages Table -->
+		<div class="card glass-card">
+			<div class="card-body">
+				<h2 class="card-title font-heading">📨 Recent Messages</h2>
+				<div id="messages-container" class="overflow-x-auto mt-2">
+					@UserMessagesTable(messages, user.ID, nextCursor)
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ UserMessagesTable(messages []UserMessageInfo, userID int64, nextCursor int64) {
+	if len(messages) == 0 {
+		<div class="text-center py-8 text-base-content/60">
+			<span class="text-3xl block mb-2">📭</span>
+			No messages yet
+		</div>
+	} else {
+		<table class="table table-zebra w-full">
+			<thead>
+				<tr>
+					<th class="font-mono">Date</th>
+					<th>Chat</th>
+					<th>Message</th>
+					<th class="text-center">Media</th>
+				</tr>
+			</thead>
+			<tbody id="messages-tbody">
+				@UserMessagesRows(messages)
+			</tbody>
+		</table>
+		if nextCursor > 0 {
+			<div class="flex justify-center mt-4">
+				<button
+					class="btn btn-outline"
+					hx-get={ fmt.Sprintf("/users/%d/messages?cursor=%d", userID, nextCursor) }
+					hx-target="#messages-tbody"
+					hx-swap="beforeend"
+					hx-indicator="#load-more-spinner"
+				>
+					<span id="load-more-spinner" class="loading loading-spinner loading-sm htmx-indicator"></span>
+					Load More
+				</button>
+			</div>
+		}
+	}
+}
+
+templ UserMessagesRows(messages []UserMessageInfo) {
+	for _, msg := range messages {
+		<tr class="hover">
+			<td class="font-mono text-sm whitespace-nowrap">{ formatUserDateTime(msg.Date) }</td>
+			<td>
+				<a href={ templ.SafeURL(fmt.Sprintf("/chats/%d", msg.ChatID)) } class="link link-hover text-sm">
+					{ msg.ChatTitle }
+				</a>
+			</td>
+			<td class="max-w-md">
+				if msg.TruncatedText != "" {
+					<div class="tooltip tooltip-bottom text-left" data-tip={ msg.FullText }>
+						<span class="text-sm">{ msg.TruncatedText }</span>
+					</div>
+				} else {
+					<span class="text-base-content/40 text-sm italic">No text content</span>
+				}
+			</td>
+			<td class="text-center">
+				if msg.HasMedia {
+					<span class="badge badge-ghost">📎</span>
+				}
+			</td>
+		</tr>
+	}
+}
+
+templ userStatCard(label string, value string, icon string) {
+	<div class="stat-card glass-card p-4">
+		<div class="flex items-center gap-3">
+			<span class="text-2xl">{ icon }</span>
+			<div>
+				<div class="text-xl font-bold font-mono">{ value }</div>
+				<div class="text-sm text-base-content/60">{ label }</div>
+			</div>
+		</div>
+	</div>
+}
+
+func userDetailTitle(user UserDetail) string {
+	if user.FirstName != "" || user.LastName != "" {
+		name := user.FirstName
+		if user.LastName != "" {
+			if name != "" {
+				name += " "
+			}
+			name += user.LastName
+		}
+		return name
+	}
+	if user.Username != "" {
+		return "@" + user.Username
+	}
+	return fmt.Sprintf("User %d", user.ID)
+}
+
+func userInitial(user UserDetail) string {
+	if user.FirstName != "" {
+		return string([]rune(user.FirstName)[0])
+	}
+	if user.Username != "" {
+		return string([]rune(user.Username)[0])
+	}
+	return "?"
+}
+
+func chatTypeIcon(chatType string) string {
+	switch chatType {
+	case "private":
+		return "👤"
+	case "group":
+		return "👥"
+	case "supergroup":
+		return "👥"
+	case "channel":
+		return "📢"
+	default:
+		return "💬"
+	}
+}
+
+func chatDisplayTitle(chat UserChatInfo) string {
+	if chat.Title != "" {
+		return chat.Title
+	}
+	return fmt.Sprintf("Chat %d", chat.ChatID)
+}
+
+func formatUserDate(t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	return t.Format("Jan 2, 2006")
+}
+
+func formatUserDateTime(t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	return t.Format("Jan 2, 2006 15:04")
+}

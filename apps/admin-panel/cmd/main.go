@@ -163,6 +163,8 @@ func setupRouter(h *handler.Handler, authManager *auth.Auth, rateLimiter *middle
 	protected.HandleFunc("/chats/{id:[0-9-]+}", h.ChatDetail).Methods("GET")
 	protected.HandleFunc("/chats/{id:[0-9-]+}/stats-partial", h.StatsPartial).Methods("GET")
 	protected.HandleFunc("/chats/{id:[0-9-]+}/calendar-data", h.CalendarData).Methods("GET")
+	protected.HandleFunc("/users/{id:[0-9]+}", h.UserDetail).Methods("GET")
+	protected.HandleFunc("/users/{id:[0-9]+}/messages", h.UserMessagesPartial).Methods("GET")
 	protected.HandleFunc("/auth/logout", h.Logout).Methods("POST")
 	protected.HandleFunc("/theme", h.SetTheme).Methods("POST")
 

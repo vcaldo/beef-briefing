@@ -19,6 +19,7 @@ import (
 type Handler struct {
 	auth     *auth.Auth
 	chatRepo *repository.ChatRepository
+	userRepo *repository.UserRepository
 }
 
 // NewHandler creates a new Handler
@@ -26,6 +27,7 @@ func NewHandler(a *auth.Auth, db *sql.DB) *Handler {
 	return &Handler{
 		auth:     a,
 		chatRepo: repository.NewChatRepository(db),
+		userRepo: repository.NewUserRepository(db),
 	}
 }
 
@@ -321,5 +323,189 @@ func renderLoginError(w http.ResponseWriter, r *http.Request, msg string) {
 	if err := templates.Login(msg).Render(r.Context(), w); err != nil {
 		slog.Error("failed to render login error", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+const defaultPageSize = 20
+
+// UserDetail renders the user detail page
+func (h *Handler) UserDetail(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	theme := h.auth.GetTheme(r)
+
+	vars := mux.Vars(r)
+	userID, err := strconv.ParseInt(vars["id"], 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get user details
+	user, err := h.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		slog.Error("failed to get user", "error", err, "user_id", userID)
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Get user's chats
+	chats, err := h.userRepo.GetUserChats(ctx, userID)
+	if err != nil {
+		slog.Error("failed to get user chats", "error", err, "user_id", userID)
+		chats = []repository.UserChat{}
+	}
+
+	// Get user's messages (first page)
+	messages, err := h.userRepo.GetUserMessages(ctx, userID, 0, defaultPageSize)
+	if err != nil {
+		slog.Error("failed to get user messages", "error", err, "user_id", userID)
+		messages = []repository.UserMessage{}
+	}
+
+	// Get reaction stats
+	reactionStats, err := h.userRepo.GetUserReactionStats(ctx, userID)
+	if err != nil {
+		slog.Error("failed to get user reaction stats", "error", err, "user_id", userID)
+		reactionStats = &repository.UserReactionStats{}
+	}
+
+	// Get activity dates and compute streaks
+	activityDates, err := h.userRepo.GetUserActivityDates(ctx, userID)
+	if err != nil {
+		slog.Error("failed to get user activity dates", "error", err, "user_id", userID)
+		activityDates = []time.Time{}
+	}
+	streaks := repository.ComputeStreaks(activityDates)
+
+	// Calculate derived stats
+	daysActive := len(activityDates)
+	var avgMessagesPerDay float64
+	if daysActive > 0 {
+		avgMessagesPerDay = float64(user.TotalMessages) / float64(daysActive)
+	}
+
+	// Convert to template types
+	templateUser := templates.UserDetail{
+		ID:                user.ID,
+		IsBot:             user.IsBot,
+		FirstName:         user.FirstName,
+		LastName:          user.LastName,
+		Username:          user.Username,
+		LanguageCode:      user.LanguageCode,
+		IsPremium:         user.IsPremium,
+		CreatedAt:         user.CreatedAt,
+		TotalMessages:     user.TotalMessages,
+		TotalChats:        user.TotalChats,
+		MediaShared:       user.MediaShared,
+		DaysActive:        daysActive,
+		AvgMessagesPerDay: avgMessagesPerDay,
+		ReactionsGiven:    user.ReactionsGiven,
+		ReactionsReceived: user.ReactionsReceived,
+		FirstActive:       user.FirstActive,
+		LastActive:        user.LastActive,
+	}
+
+	templateChats := make([]templates.UserChatInfo, len(chats))
+	for i, c := range chats {
+		templateChats[i] = templates.UserChatInfo{
+			ChatID:       c.ChatID,
+			Title:        c.Title,
+			Type:         c.Type,
+			MessageCount: c.MessageCount,
+			FirstActive:  c.FirstActive,
+			LastActive:   c.LastActive,
+		}
+	}
+
+	templateMessages := make([]templates.UserMessageInfo, len(messages))
+	for i, m := range messages {
+		templateMessages[i] = templates.UserMessageInfo{
+			ID:            m.ID,
+			ChatID:        m.ChatID,
+			ChatTitle:     m.ChatTitle,
+			Date:          m.Date,
+			TruncatedText: repository.TruncateText(m.Text, 100),
+			FullText:      m.Text,
+			HasMedia:      m.HasMedia,
+		}
+	}
+
+	templateStreaks := templates.UserStreakInfo{
+		MaxPostingStreak:  streaks.MaxPostingStreak,
+		MaxSilenceStreak:  streaks.MaxSilenceStreak,
+		CurrentStreak:     streaks.CurrentStreak,
+		IsCurrentlyActive: streaks.IsCurrentlyActive,
+	}
+
+	templateReactions := templates.UserReactionInfo{
+		TotalGiven:    reactionStats.TotalGiven,
+		TotalReceived: reactionStats.TotalReceived,
+	}
+	for _, e := range reactionStats.TopGiven {
+		templateReactions.TopGiven = append(templateReactions.TopGiven, templates.EmojiStat{
+			Emoji: e.Emoji,
+			Count: e.Count,
+		})
+	}
+	for _, e := range reactionStats.TopReceived {
+		templateReactions.TopReceived = append(templateReactions.TopReceived, templates.EmojiStat{
+			Emoji: e.Emoji,
+			Count: e.Count,
+		})
+	}
+
+	// Determine next cursor for pagination
+	var nextCursor int64
+	if len(messages) == defaultPageSize {
+		nextCursor = messages[len(messages)-1].ID
+	}
+
+	if err := templates.UserDetailPage(templateUser, templateChats, templateMessages, templateStreaks, templateReactions, nextCursor, theme).Render(ctx, w); err != nil {
+		slog.Error("failed to render user detail", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// UserMessagesPartial returns message rows for HTMX pagination
+func (h *Handler) UserMessagesPartial(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	vars := mux.Vars(r)
+	userID, err := strconv.ParseInt(vars["id"], 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	cursor, _ := strconv.ParseInt(r.URL.Query().Get("cursor"), 10, 64)
+
+	messages, err := h.userRepo.GetUserMessages(ctx, userID, cursor, defaultPageSize)
+	if err != nil {
+		slog.Error("failed to get user messages", "error", err, "user_id", userID)
+		messages = []repository.UserMessage{}
+	}
+
+	templateMessages := make([]templates.UserMessageInfo, len(messages))
+	for i, m := range messages {
+		templateMessages[i] = templates.UserMessageInfo{
+			ID:            m.ID,
+			ChatID:        m.ChatID,
+			ChatTitle:     m.ChatTitle,
+			Date:          m.Date,
+			TruncatedText: repository.TruncateText(m.Text, 100),
+			FullText:      m.Text,
+			HasMedia:      m.HasMedia,
+		}
+	}
+
+	if err := templates.UserMessagesRows(templateMessages).Render(ctx, w); err != nil {
+		slog.Error("failed to render user messages", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+
+	// If there are more messages, add the "Load More" button via out-of-band swap
+	if len(messages) == defaultPageSize {
+		nextCursor := messages[len(messages)-1].ID
+		w.Header().Set("HX-Trigger-After-Swap", `{"updateLoadMore": {"userID": `+strconv.FormatInt(userID, 10)+`, "cursor": `+strconv.FormatInt(nextCursor, 10)+`}}`)
 	}
 }

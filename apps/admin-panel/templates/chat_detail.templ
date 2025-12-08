@@ -177,7 +177,7 @@ templ StatsTable(stats []UserStats) {
 				for _, user := range stats {
 					<tr class="hover">
 						<td class="sticky left-0 bg-base-100 z-10">
-							<div class="flex items-center gap-2">
+							<a href={ templ.SafeURL(fmt.Sprintf("/users/%d", user.UserID)) } class="flex items-center gap-2 link link-hover">
 								<div class="avatar placeholder">
 									<div class="bg-neutral text-neutral-content rounded-full w-8">
 										<span class="text-xs">{ userInitials(user.FirstName, user.LastName, user.Username) }</span>
@@ -189,7 +189,7 @@ templ StatsTable(stats []UserStats) {
 											<div class="text-xs text-base-content/60 font-mono">{ "@" + user.Username }</div>
 										}
 									</div>
-							</div>
+							</a>
 						</td>
 						<td class="text-right font-mono">{ fmt.Sprintf("%d", user.MessageCount) }</td>
 						<td class="text-right font-mono">{ fmt.Sprintf("%d", user.ReactionsGiven) }</td>

@@ -33,3 +33,8 @@ output "ssh_connection" {
   description = "SSH connection command"
   value       = "ssh admin@${tolist(linode_instance.beef_briefing.ipv4)[0]}"
 }
+
+output "ssh_user_host" {
+  description = "SSH user and host"
+  value       = "admin@${tolist(linode_instance.beef_briefing.ipv4)[0]}"
+}

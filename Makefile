@@ -239,6 +239,9 @@ tf-ip: ## Show instance IP address
 tf-ssh: ## Show SSH connection command
 	@cd $(TERRAFORM_DIR) && terraform output -raw ssh_connection
 
+tf-ssh-user-host: ## Show SSH user and host
+	@cd $(TERRAFORM_DIR) && terraform output -raw ssh_user_host
+
 tf-root-pass: ## Show root password (SENSITIVE)
 	@cd $(TERRAFORM_DIR) && terraform output -raw root_password
 
@@ -293,6 +296,36 @@ tf-docs: ## Show Terraform documentation
 
 tf-deploy-check: tf-validate tf-fmt-check tf-plan ## Full pre-deployment check (validate, format check, plan)
 
+# Production deployment targets
+PROD_COMPOSE_FILE := infrastructure/docker-compose.prod.yml
+PROD_ENV_FILE := infrastructure/.env.prod
+COMMIT_HASH ?= $(shell git rev-parse --short HEAD)
+
+deploy: ## Deploy to production server with commit-tagged images
+	@echo "🚀 Starting deployment with commit hash: $(COMMIT_HASH)"
+	@echo "📝 Updating IMAGE_TAG in $(PROD_ENV_FILE)..."
+	@sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=$(COMMIT_HASH)/' $(PROD_ENV_FILE)
+	@echo "🔨 Building Docker images..."
+	@docker compose -f $(PROD_COMPOSE_FILE) --env-file $(PROD_ENV_FILE) build
+	@echo "💾 Saving images to /tmp/images-$(COMMIT_HASH).tar.gz..."
+	@docker save $$(docker compose -f $(PROD_COMPOSE_FILE) --env-file $(PROD_ENV_FILE) config --images | grep -v minio) | gzip > /tmp/images-$(COMMIT_HASH).tar.gz
+	@echo "📤 Transferring files to server..."
+	@scp $(PROD_COMPOSE_FILE) $$($(MAKE) -s tf-ssh-user-host):/tmp/docker-compose.yml
+	@scp $(PROD_ENV_FILE) $$($(MAKE) -s tf-ssh-user-host):/tmp/.env
+	@scp -r infrastructure/secrets $$($(MAKE) -s tf-ssh-user-host):/tmp/
+	@scp /tmp/images-$(COMMIT_HASH).tar.gz $$($(MAKE) -s tf-ssh-user-host):/tmp/
+	@echo "🚢 Deploying on server..."
+	@ssh $$($(MAKE) -s tf-ssh-user-host) '\
+		mkdir -p /app && \
+		mv /tmp/docker-compose.yml /app/ && \
+		mv /tmp/.env /app/ && \
+		rm -rf /app/secrets && mv /tmp/secrets /app/ && \
+		gunzip -c /tmp/images-$(COMMIT_HASH).tar.gz | docker load && \
+		cd /app && docker compose up -d && \
+		rm /tmp/images-$(COMMIT_HASH).tar.gz'
+	@rm /tmp/images-$(COMMIT_HASH).tar.gz
+	@echo "✅ Deployment complete! Services running with image tag: $(COMMIT_HASH)"
+
 # Phony targets
 .PHONY: help up down restart ps clean prune build build-api build-bot build-postgres build-admin-panel \
 	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel \
@@ -302,4 +335,5 @@ tf-deploy-check: tf-validate tf-fmt-check tf-plan ## Full pre-deployment check (
 	admin-panel-set-secrets-files admin-panel-set-password-file admin-panel-set-session-file \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
-	tf-ip tf-ssh tf-root-pass tf-connect tf-setup tf-docs tf-deploy-check
+	tf-ip tf-ssh tf-root-pass tf-connect tf-setup tf-docs tf-deploy-check \
+	deploy

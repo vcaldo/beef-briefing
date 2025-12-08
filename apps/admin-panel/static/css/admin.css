@@ -1,0 +1,334 @@
+/* ==========================================================================
+   Beef Briefing Admin Panel - Custom CSS
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   CSS Custom Properties (Theme Variables)
+   -------------------------------------------------------------------------- */
+:root {
+  --accent-glow: rgba(59, 130, 246, 0.4);
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --navbar-bg-start: rgba(15, 23, 42, 0.95);
+  --navbar-bg-end: rgba(30, 41, 59, 0.95);
+  --gradient-start: #f8fafc;
+  --gradient-end: #e2e8f0;
+}
+
+[data-theme="dark"] {
+  --accent-glow: rgba(6, 182, 212, 0.4);
+  --card-bg: rgba(15, 23, 42, 0.95);
+  --navbar-bg-start: rgba(15, 23, 42, 0.98);
+  --navbar-bg-end: rgba(30, 41, 59, 0.98);
+  --gradient-start: #0f172a;
+  --gradient-end: #1e293b;
+}
+
+[data-theme="business"] {
+  --accent-glow: rgba(245, 158, 11, 0.4);
+  --card-bg: rgba(24, 24, 27, 0.95);
+  --navbar-bg-start: rgba(24, 24, 27, 0.98);
+  --navbar-bg-end: rgba(39, 39, 42, 0.98);
+  --gradient-start: #18181b;
+  --gradient-end: #27272a;
+}
+
+[data-theme="cyberpunk"] {
+  --accent-glow: rgba(236, 72, 153, 0.4);
+  --card-bg: rgba(30, 41, 59, 0.95);
+  --navbar-bg-start: rgba(30, 41, 59, 0.98);
+  --navbar-bg-end: rgba(15, 23, 42, 0.98);
+  --gradient-start: #1e293b;
+  --gradient-end: #0f172a;
+}
+
+[data-theme="forest"] {
+  --accent-glow: rgba(16, 185, 129, 0.4);
+  --card-bg: rgba(20, 83, 45, 0.95);
+  --navbar-bg-start: rgba(20, 83, 45, 0.98);
+  --navbar-bg-end: rgba(22, 101, 52, 0.98);
+  --gradient-start: #14532d;
+  --gradient-end: #166534;
+}
+
+/* --------------------------------------------------------------------------
+   Typography
+   -------------------------------------------------------------------------- */
+.font-heading {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* --------------------------------------------------------------------------
+   Background
+   -------------------------------------------------------------------------- */
+.bg-gradient {
+  background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+  min-height: 100vh;
+}
+
+/* --------------------------------------------------------------------------
+   Navbar
+   -------------------------------------------------------------------------- */
+.navbar-container {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.navbar {
+  background: linear-gradient(90deg, var(--navbar-bg-start) 0%, var(--navbar-bg-end) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid oklch(var(--a) / 0.3);
+  padding: 0 1rem;
+}
+
+.navbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  transition: transform 150ms ease;
+}
+
+.navbar-logo:hover {
+  transform: translateY(-1px);
+}
+
+.navbar-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  background: linear-gradient(90deg, oklch(var(--p)), oklch(var(--a)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* --------------------------------------------------------------------------
+   Glass Card Effect
+   -------------------------------------------------------------------------- */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid oklch(var(--a) / 0.2);
+  transition: all 200ms ease;
+}
+
+.glass-card:hover {
+  border-color: oklch(var(--a) / 0.4);
+  box-shadow: 0 8px 32px var(--accent-glow);
+}
+
+/* --------------------------------------------------------------------------
+   Stat Cards
+   -------------------------------------------------------------------------- */
+.stat-card {
+  background: linear-gradient(135deg, oklch(var(--p) / 0.1) 0%, oklch(var(--p) / 0.05) 100%);
+  border-radius: 0.75rem;
+  transition: all 200ms ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.stats-row .stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* --------------------------------------------------------------------------
+   Tables
+   -------------------------------------------------------------------------- */
+.table tbody tr {
+  transition: background-color 150ms ease;
+}
+
+.table tbody tr:hover {
+  background-color: oklch(var(--p) / 0.08);
+}
+
+.table th {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+/* Sticky first column */
+.table th.sticky,
+.table td.sticky {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+}
+
+/* --------------------------------------------------------------------------
+   Buttons
+   -------------------------------------------------------------------------- */
+.btn {
+  transition: all 150ms ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.login-btn {
+  transition: all 200ms ease;
+}
+
+.login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px var(--accent-glow);
+}
+
+/* --------------------------------------------------------------------------
+   HTMX Transitions
+   -------------------------------------------------------------------------- */
+.htmx-swapping {
+  opacity: 0;
+  transform: scale(0.98);
+  transition: all 150ms ease-out;
+}
+
+.htmx-settling {
+  opacity: 1;
+  transform: scale(1);
+  transition: all 150ms ease-in;
+}
+
+.htmx-added {
+  opacity: 0;
+}
+
+.htmx-added.htmx-settling {
+  opacity: 1;
+  transition: opacity 150ms ease-in;
+}
+
+/* --------------------------------------------------------------------------
+   Animations
+   -------------------------------------------------------------------------- */
+@keyframes value-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.value-pulse {
+  animation: value-pulse 300ms ease;
+}
+
+/* Loading indicator */
+.htmx-indicator {
+  display: none;
+}
+
+.htmx-request .htmx-indicator {
+  display: inline-block;
+}
+
+.htmx-request.htmx-indicator {
+  display: inline-block;
+}
+
+/* --------------------------------------------------------------------------
+   Form Elements
+   -------------------------------------------------------------------------- */
+.input:focus,
+.select:focus {
+  border-color: oklch(var(--a));
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+/* --------------------------------------------------------------------------
+   Dropdown Menu
+   -------------------------------------------------------------------------- */
+.dropdown-content {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dropdown-content li button.active {
+  background: oklch(var(--p) / 0.2);
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   Calendar Chart Container
+   -------------------------------------------------------------------------- */
+#activity-calendar {
+  width: 100%;
+  min-height: 180px;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Adjustments
+   -------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .navbar-title {
+    display: none;
+  }
+
+  .table {
+    font-size: 0.875rem;
+  }
+
+  .stat-card {
+    padding: 0.75rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Scrollbar Styling
+   -------------------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: oklch(var(--b2));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(var(--bc) / 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(var(--bc) / 0.5);
+}
+
+/* --------------------------------------------------------------------------
+   Alert Styling
+   -------------------------------------------------------------------------- */
+.alert {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* --------------------------------------------------------------------------
+   Avatar Placeholder
+   -------------------------------------------------------------------------- */
+.avatar.placeholder .bg-neutral {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+}

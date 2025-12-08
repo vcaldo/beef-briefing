@@ -1,0 +1,105 @@
+package templates
+
+import (
+	"fmt"
+	"time"
+)
+
+// Chat represents a chat for the dashboard
+type Chat struct {
+	ID           int64
+	Title        string
+	Type         string
+	Username     string
+	MessageCount int
+	UserCount    int
+	LastActivity time.Time
+}
+
+templ Dashboard(chats []Chat, theme string) {
+	@Layout(theme, "Dashboard", dashboardContent(chats))
+}
+
+templ dashboardContent(chats []Chat) {
+	<div class="space-y-6">
+		<div class="flex items-center justify-between">
+			<h1 class="text-3xl font-bold font-heading">Chats</h1>
+			<div class="badge badge-primary badge-lg font-mono">
+				{ fmt.Sprintf("%d", len(chats)) } chats
+			</div>
+		</div>
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+			for _, chat := range chats {
+				@chatCard(chat)
+			}
+		</div>
+		if len(chats) == 0 {
+			<div class="card glass-card">
+				<div class="card-body text-center">
+					<span class="text-4xl mb-2">📭</span>
+					<p class="text-base-content/70">No chats found</p>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+templ chatCard(chat Chat) {
+	<a href={ templ.SafeURL(fmt.Sprintf("/chats/%d", chat.ID)) } class="card glass-card hover:translate-y-[-2px] transition-all duration-200">
+		<div class="card-body">
+			<div class="flex items-start justify-between">
+				<div class="flex-1 min-w-0">
+					<h2 class="card-title font-heading text-lg truncate">
+						{ chatIcon(chat.Type) }
+						{ chatTitle(chat) }
+					</h2>
+					if chat.Username != "" {
+						<p class="text-sm text-base-content/60 font-mono truncate">{ "@" + chat.Username }</p>
+					}
+				</div>
+				<div class="badge badge-outline badge-sm">{ chat.Type }</div>
+			</div>
+			<div class="divider my-2"></div>
+			<div class="stats-row grid grid-cols-2 gap-2 text-sm">
+				<div class="stat-item">
+					<span class="text-base-content/60">Messages</span>
+					<span class="font-mono font-medium">{ fmt.Sprintf("%d", chat.MessageCount) }</span>
+				</div>
+				<div class="stat-item">
+					<span class="text-base-content/60">Users</span>
+					<span class="font-mono font-medium">{ fmt.Sprintf("%d", chat.UserCount) }</span>
+				</div>
+			</div>
+			if !chat.LastActivity.IsZero() {
+				<div class="text-xs text-base-content/50 mt-2">
+					Last activity: { chat.LastActivity.Format("Jan 2, 2006 15:04") }
+				</div>
+			}
+		</div>
+	</a>
+}
+
+func chatIcon(chatType string) string {
+	switch chatType {
+	case "private":
+		return "👤"
+	case "group":
+		return "👥"
+	case "supergroup":
+		return "🏛️"
+	case "channel":
+		return "📢"
+	default:
+		return "💬"
+	}
+}
+
+func chatTitle(chat Chat) string {
+	if chat.Title != "" {
+		return chat.Title
+	}
+	if chat.Username != "" {
+		return "@" + chat.Username
+	}
+	return fmt.Sprintf("Chat %d", chat.ID)
+}

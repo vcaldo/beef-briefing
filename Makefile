@@ -7,10 +7,12 @@ API_SERVICE := api-service
 TELEGRAM_BOT := telegram-bot
 POSTGRES_SERVICE := postgres
 MINIO_SERVICE := minio
+ADMIN_PANEL := admin-panel
 
 # Go directories
 API_DIR := apps/api-service
 BOT_DIR := apps/telegram-bot
+ADMIN_PANEL_DIR := apps/admin-panel
 PKG_DIR := pkg/config
 
 # Default target
@@ -61,6 +63,9 @@ build-bot: ## Rebuild telegram-bot image
 build-postgres: ## Rebuild postgres image
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) build $(POSTGRES_SERVICE)
 
+build-admin-panel: ## Rebuild admin-panel image
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) build $(ADMIN_PANEL)
+
 # Logging targets
 logs: ## Tail logs from all services
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f
@@ -77,6 +82,9 @@ logs-postgres: ## Tail logs from postgres
 logs-minio: ## Tail logs from minio
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f $(MINIO_SERVICE)
 
+logs-admin-panel: ## Tail logs from admin-panel
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f $(ADMIN_PANEL)
+
 # Shell targets
 shell-api: ## Open shell in api-service container
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec $(API_SERVICE) /bin/bash
@@ -90,6 +98,9 @@ shell-postgres: ## Open shell in postgres container
 shell-minio: ## Open shell in minio container
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec $(MINIO_SERVICE) /bin/sh
 
+shell-admin-panel: ## Open shell in admin-panel container
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec $(ADMIN_PANEL) /bin/bash
+
 # Go build targets
 go-build-api: ## Build api-service binary locally
 	@echo "Building api-service..."
@@ -101,12 +112,18 @@ go-build-bot: ## Build telegram-bot binary locally
 	cd $(BOT_DIR) && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/telegram-bot ./cmd
 	@echo "Binary created at $(BOT_DIR)/bin/telegram-bot"
 
-go-build: go-build-api go-build-bot ## Build all Go binaries locally
+go-build-admin-panel: ## Build admin-panel binary locally
+	@echo "Building admin-panel..."
+	cd $(ADMIN_PANEL_DIR) && templ generate && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/admin-panel ./cmd
+	@echo "Binary created at $(ADMIN_PANEL_DIR)/bin/admin-panel"
+
+go-build: go-build-api go-build-bot go-build-admin-panel ## Build all Go binaries locally
 
 go-clean: ## Remove Go build artifacts
 	@echo "Cleaning build artifacts..."
 	rm -rf $(API_DIR)/bin
 	rm -rf $(BOT_DIR)/bin
+	rm -rf $(ADMIN_PANEL_DIR)/bin
 	@echo "Done!"
 
 # Go quality targets
@@ -115,6 +132,8 @@ fmt: ## Format Go code
 	cd $(API_DIR) && gofmt -w -s .
 	@echo "Formatting telegram-bot..."
 	cd $(BOT_DIR) && gofmt -w -s .
+	@echo "Formatting admin-panel..."
+	cd $(ADMIN_PANEL_DIR) && gofmt -w -s .
 	@echo "Formatting pkg/config..."
 	cd $(PKG_DIR) && gofmt -w -s .
 	@echo "Done!"
@@ -124,11 +143,35 @@ fmt-check: ## Check if Go code is formatted
 	@cd $(API_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(API_DIR):" && gofmt -l . && exit 1)
 	@echo "Checking telegram-bot formatting..."
 	@cd $(BOT_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(BOT_DIR):" && gofmt -l . && exit 1)
+	@echo "Checking admin-panel formatting..."
+	@cd $(ADMIN_PANEL_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(ADMIN_PANEL_DIR):" && gofmt -l . && exit 1)
 	@echo "Checking pkg/config formatting..."
 	@cd $(PKG_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(PKG_DIR):" && gofmt -l . && exit 1)
 	@echo "All files properly formatted!"
 
+# Admin Panel secret generation
+admin-panel-set-secrets: ## Generate password hash and session secret for admin panel
+	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -file ../../../$(ENV_FILE)
+
+admin-panel-set-password: ## Generate and update only password hash
+	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -file ../../../$(ENV_FILE) -password-only
+
+admin-panel-set-session: ## Generate and update only session secret
+	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -file ../../../$(ENV_FILE) -session-only
+
+admin-panel-set-secrets-files: ## Generate secrets and write to separate files (recommended)
+	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../infrastructure/secrets
+
+admin-panel-set-password-file: ## Generate password hash and write to file
+	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../infrastructure/secrets -password-only
+
+admin-panel-set-session-file: ## Generate session secret and write to file
+	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../infrastructure/secrets -session-only
+
 # Phony targets
-.PHONY: help up down restart ps clean prune build build-api build-bot build-postgres \
-	logs logs-api logs-bot logs-postgres logs-minio shell-api shell-bot shell-postgres shell-minio \
-	go-build-api go-build-bot go-build go-clean fmt fmt-check
+.PHONY: help up down restart ps clean prune build build-api build-bot build-postgres build-admin-panel \
+	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel \
+	shell-api shell-bot shell-postgres shell-minio shell-admin-panel \
+	go-build-api go-build-bot go-build-admin-panel go-build go-clean fmt fmt-check \
+	admin-panel-set-secrets admin-panel-set-password admin-panel-set-session \
+	admin-panel-set-secrets-files admin-panel-set-password-file admin-panel-set-session-file

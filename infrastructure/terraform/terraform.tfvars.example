@@ -6,9 +6,9 @@
 # Get it from: https://cloud.linode.com/profile/tokens
 linode_token = "your-linode-api-token-here"
 
-# Optional: Override default region (default: eu-central - Madrid)
+# Optional: Override default region (default: es-mad - Madrid)
 # Available regions: eu-central, us-east, us-central, us-southeast, etc.
-# region = "eu-central"
+region = "es-mad"
 
 # Optional: Override domain name (default: barra-pesada.online)
 # domain_name = "barra-pesada.online"

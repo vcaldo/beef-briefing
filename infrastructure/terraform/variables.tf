@@ -11,19 +11,25 @@ variable "region" {
 }
 
 variable "domain_name" {
-  description = "Domain name to configure (e.g., barra-pesada.online)"
+  description = "Domain name to configure (e.g., mydomain.example)"
   type        = string
-  default     = "barra-pesada.online"
+  default     = "mydomain.example"
 }
 
 variable "domain_email" {
   description = "Email address for domain SOA record"
   type        = string
-  default     = "admin@barra-pesada.online"
+  default     = "admin@mydomain.example"
 }
 
 variable "ssh_public_key_path" {
   description = "Path to SSH public key file"
   type        = string
   default     = "~/.ssh/id_rsa.pub"
+}
+
+variable "hostname" {
+  description = "Hostname for the Linode instance"
+  type        = string
+  default     = "beef-briefing"
 }

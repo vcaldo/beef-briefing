@@ -7,13 +7,14 @@ This directory contains Terraform configuration to provision the Linode infrastr
 - **1 Linode Instance**: g6-standard-2 (2 vCPUs, 4GB RAM) in Madrid (eu-central)
 - **Firewall**: Allows SSH (22), HTTP (80), HTTPS (443); blocks all other inbound traffic
 - **DNS**: Managed domain `barra-pesada.online` with A record pointing to the instance
-- **SSH Access**: Configured with your `~/.ssh/id_ed25519.pub` key
+- **SSH Access**: Configured with `admin` user (passwordless sudo) using your `~/.ssh/id_rsa.pub` key
+- **Security**: Root SSH login disabled, password authentication disabled
 - **Docker**: Pre-installed via cloud-init (Docker Engine + Docker Compose)
 
 ## Prerequisites
 
 1. **Linode API Token**: Create at https://cloud.linode.com/profile/tokens
-2. **SSH Key**: Ensure `~/.ssh/id_ed25519.pub` exists
+2. **SSH Key**: Ensure `~/.ssh/id_rsa.pub` exists
 3. **Terraform**: Install from https://www.terraform.io/downloads
 4. **Domain**: `barra-pesada.online` must be registered and ready for DNS management
 
@@ -82,11 +83,21 @@ terraform output -raw root_password
 After Terraform completes:
 
 ```bash
-# SSH into the instance
-ssh root@<instance_ip>
+# SSH into the instance (using admin user)
+ssh admin@<instance_ip>
 
 # Or use the output command
 terraform output -raw ssh_connection | bash
+```
+
+**Note**: The `admin` user has passwordless sudo access and is a member of the `docker` group.
+
+```bash
+# Run commands as admin (no password required)
+sudo systemctl status docker
+
+# Run Docker commands without sudo
+docker ps
 ```
 
 ## DNS Configuration
@@ -102,16 +113,31 @@ The Terraform configuration creates:
 
 ## What Gets Installed
 
-The cloud-init script automatically installs:
+The cloud-init script automatically:
+
+**Creates Admin User**:
+- Username: `admin`
+- Groups: `sudo`, `docker`
+- Passwordless sudo: Enabled
+- SSH key: Your public key from `ssh_public_key_path`
+
+**Installs Software**:
 - Docker Engine (latest stable)
 - Docker Compose Plugin (v2)
+- Go 1.25.4
 - Required dependencies (ca-certificates, curl, gnupg)
+
+**Hardens SSH**:
+- Root login: Disabled (`PermitRootLogin no`)
+- Password authentication: Disabled
+- Only `admin` user allowed to SSH
 
 Verify installation after SSH:
 
 ```bash
 docker --version
 docker compose version
+go version
 ```
 
 ## Next Steps
@@ -184,9 +210,12 @@ nslookup barra-pesada.online
 ## Security Notes
 
 - `terraform.tfvars` contains sensitive data and is gitignored
-- Root password is randomly generated and marked sensitive in outputs
+- Root password is randomly generated for emergency console access (Linode Lish)
+- Root SSH login is **disabled** - only `admin` user can SSH
+- Password authentication is **disabled** - SSH keys only
+- `admin` user has passwordless sudo and docker group access
 - Firewall restricts all ports except 22, 80, 443
-- Always use SSH key authentication (password auth disabled by default)
+- SSH hardening applied via cloud-init (`AllowUsers admin`, `PermitRootLogin no`)
 
 ## Cost Estimate
 

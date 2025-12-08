@@ -1,46 +1,74 @@
-#!/bin/bash
-set -e
+#cloud-config
 
-# Update system
-apt-get update
-apt-get upgrade -y
+# Create admin user with sudo and docker access
+users:
+  - name: admin
+    groups: [sudo, docker]
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${ssh_public_key}
 
-# Install prerequisites
-apt-get install -y ca-certificates curl gnupg lsb-release
+# Disable password authentication and root login
+ssh_pwauth: false
+disable_root: false
 
-# Add Docker's official GPG key
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-chmod a+r /etc/apt/keyrings/docker.gpg
+# SSH hardening configuration
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-hardening.conf
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      PubkeyAuthentication yes
+      ChallengeResponseAuthentication no
+      UsePAM yes
+      AllowUsers admin
+      X11Forwarding no
+      PrintMotd no
+      AcceptEnv LANG LC_*
+    permissions: '0644'
 
-# Set up Docker repository
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+# Configure hostname
+hostname: ${hostname}
+fqdn: ${hostname}.local
+preserve_hostname: true
 
-# Install Docker Engine and Docker Compose
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+# Package updates and installations
+package_update: true
+package_upgrade: true
 
-# Enable and start Docker
-systemctl enable docker
-systemctl start docker
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - wget
 
-# Add default user to docker group (optional, for non-root docker access)
-usermod -aG docker root
+# Commands to run after package installation
+runcmd:
+  # Set hostname
+  - hostnamectl set-hostname ${hostname}
+  # Install Docker
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  - chmod a+r /etc/apt/keyrings/docker.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - systemctl enable docker
+  - systemctl start docker
+  # Install Go 1.25.4
+  - wget https://go.dev/dl/go1.25.4.linux-amd64.tar.gz -O /tmp/go1.25.4.linux-amd64.tar.gz
+  - tar -C /usr/local -xzf /tmp/go1.25.4.linux-amd64.tar.gz
+  - rm /tmp/go1.25.4.linux-amd64.tar.gz
+  - echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
+  # Verify installations
+  - docker --version
+  - docker compose version
+  - /usr/local/go/bin/go version
+  # Restart SSH to apply hardening configuration
+  - systemctl restart sshd
+  # Restart the system to apply all changes
+  - shutdown -r +1 "System restarting to apply all configuration changes"
 
-# Install Go 1.25.4
-wget https://go.dev/dl/go1.25.4.linux-amd64.tar.gz -O /tmp/go1.25.4.linux-amd64.tar.gz
-tar -C /usr/local -xzf /tmp/go1.25.4.linux-amd64.tar.gz
-rm /tmp/go1.25.4.linux-amd64.tar.gz
-
-# Add Go to PATH
-echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
-export PATH=$PATH:/usr/local/go/bin
-
-# Verify installation
-docker --version
-docker compose version
-go version
-
-echo "Docker, Docker Compose, and Go 1.25.4 installation completed successfully"
+final_message: "Beef Briefing server setup completed. Docker, Docker Compose, and Go 1.25.4 installed. SSH hardened with admin user only. System will restart in 1 minute."

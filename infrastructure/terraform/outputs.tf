@@ -31,5 +31,5 @@ output "domain_id" {
 
 output "ssh_connection" {
   description = "SSH connection command"
-  value       = "ssh root@${tolist(linode_instance.beef_briefing.ipv4)[0]}"
+  value       = "ssh admin@${tolist(linode_instance.beef_briefing.ipv4)[0]}"
 }

@@ -68,18 +68,20 @@ resource "linode_firewall" "beef_briefing_firewall" {
 
 # Cloud-init script to install Docker and Docker Compose
 locals {
-  cloud_init_script = templatefile("${path.module}/cloud-init.yaml", {})
+  cloud_init_script = templatefile("${path.module}/cloud-init.yaml", {
+    ssh_public_key = linode_sshkey.beef_briefing_key.ssh_key
+    hostname       = var.hostname
+  })
 }
 
 # Linode instance
 resource "linode_instance" "beef_briefing" {
-  label           = "beef-briefing-server"
-  region          = var.region
-  type            = "g6-standard-2"
-  image           = "linode/ubuntu24.04"
-  root_pass       = random_password.root_password.result
-  authorized_keys = [linode_sshkey.beef_briefing_key.ssh_key]
-  tags            = ["beef-briefing", "production"]
+  label     = "beef-briefing-server"
+  region    = var.region
+  type      = "g6-standard-2"
+  image     = "linode/ubuntu24.04"
+  root_pass = random_password.root_password.result
+  tags      = ["beef-briefing", "production"]
 
   metadata {
     user_data = base64encode(local.cloud_init_script)

@@ -308,7 +308,12 @@ deploy: ## Deploy to production server with commit-tagged images
 	@echo "🔨 Building Docker images..."
 	@docker compose -f $(PROD_COMPOSE_FILE) --env-file $(PROD_ENV_FILE) build
 	@echo "💾 Saving images to /tmp/images-$(COMMIT_HASH).tar.gz..."
-	@docker save $$(docker compose -f $(PROD_COMPOSE_FILE) --env-file $(PROD_ENV_FILE) config --images | grep -v minio) | gzip > /tmp/images-$(COMMIT_HASH).tar.gz
+	@docker save \
+		beef-briefing/postgres:$(COMMIT_HASH) \
+		beef-briefing/api-service:$(COMMIT_HASH) \
+		beef-briefing/telegram-bot:$(COMMIT_HASH) \
+		beef-briefing/admin-panel:$(COMMIT_HASH) \
+		| gzip > /tmp/images-$(COMMIT_HASH).tar.gz
 	@echo "📤 Transferring files to server..."
 	@scp $(PROD_COMPOSE_FILE) $$($(MAKE) -s tf-ssh-user-host):/tmp/docker-compose.yml
 	@scp $(PROD_ENV_FILE) $$($(MAKE) -s tf-ssh-user-host):/tmp/.env
@@ -316,12 +321,12 @@ deploy: ## Deploy to production server with commit-tagged images
 	@scp /tmp/images-$(COMMIT_HASH).tar.gz $$($(MAKE) -s tf-ssh-user-host):/tmp/
 	@echo "🚢 Deploying on server..."
 	@ssh $$($(MAKE) -s tf-ssh-user-host) '\
-		mkdir -p /app && \
-		mv /tmp/docker-compose.yml /app/ && \
-		mv /tmp/.env /app/ && \
-		rm -rf /app/secrets && mv /tmp/secrets /app/ && \
+		mkdir -p ~/beef-briefing && \
+		mv /tmp/docker-compose.yml ~/beef-briefing/ && \
+		mv /tmp/.env ~/beef-briefing/ && \
+		rm -rf ~/beef-briefing/secrets && mv /tmp/secrets ~/beef-briefing/ && \
 		gunzip -c /tmp/images-$(COMMIT_HASH).tar.gz | docker load && \
-		cd /app && docker compose up -d && \
+		cd ~/beef-briefing && docker compose up -d && \
 		rm /tmp/images-$(COMMIT_HASH).tar.gz'
 	@rm /tmp/images-$(COMMIT_HASH).tar.gz
 	@echo "✅ Deployment complete! Services running with image tag: $(COMMIT_HASH)"

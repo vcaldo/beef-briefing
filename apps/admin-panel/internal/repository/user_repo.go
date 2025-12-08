@@ -20,12 +20,12 @@ type User struct {
 	CreatedAt    time.Time
 
 	// Computed stats
-	TotalMessages    int
-	TotalChats       int
-	MediaShared      int
-	FirstActive      time.Time
-	LastActive       time.Time
-	ReactionsGiven   int
+	TotalMessages     int
+	TotalChats        int
+	MediaShared       int
+	FirstActive       time.Time
+	LastActive        time.Time
+	ReactionsGiven    int
 	ReactionsReceived int
 }
 
@@ -66,9 +66,9 @@ type EmojiCount struct {
 
 // UserStreaks holds streak information for a user
 type UserStreaks struct {
-	MaxPostingStreak  int // max consecutive days with posts
-	MaxSilenceStreak  int // max consecutive days without posts
-	CurrentStreak     int // current streak from today backwards
+	MaxPostingStreak  int  // max consecutive days with posts
+	MaxSilenceStreak  int  // max consecutive days without posts
+	CurrentStreak     int  // current streak from today backwards
 	IsCurrentlyActive bool // whether current streak is posting (true) or silence (false)
 }
 

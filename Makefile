@@ -13,6 +13,7 @@ ADMIN_PANEL := admin-panel
 API_DIR := apps/api-service
 BOT_DIR := apps/telegram-bot
 ADMIN_PANEL_DIR := apps/admin-panel
+IMPORT_CLI_DIR := apps/import-cli
 PKG_DIR := pkg/config
 
 # Default target
@@ -117,13 +118,19 @@ go-build-admin-panel: ## Build admin-panel binary locally
 	cd $(ADMIN_PANEL_DIR) && templ generate && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/admin-panel ./cmd
 	@echo "Binary created at $(ADMIN_PANEL_DIR)/bin/admin-panel"
 
-go-build: go-build-api go-build-bot go-build-admin-panel ## Build all Go binaries locally
+go-build-import-cli: ## Build import-cli binary locally
+	@echo "Building import-cli..."
+	cd $(IMPORT_CLI_DIR) && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/import-cli ./cmd
+	@echo "Binary created at $(IMPORT_CLI_DIR)/bin/import-cli"
+
+go-build: go-build-api go-build-bot go-build-admin-panel go-build-import-cli ## Build all Go binaries locally
 
 go-clean: ## Remove Go build artifacts
 	@echo "Cleaning build artifacts..."
 	rm -rf $(API_DIR)/bin
 	rm -rf $(BOT_DIR)/bin
 	rm -rf $(ADMIN_PANEL_DIR)/bin
+	rm -rf $(IMPORT_CLI_DIR)/bin
 	@echo "Done!"
 
 # Go quality targets
@@ -134,6 +141,8 @@ fmt: ## Format Go code
 	cd $(BOT_DIR) && gofmt -w -s .
 	@echo "Formatting admin-panel..."
 	cd $(ADMIN_PANEL_DIR) && gofmt -w -s .
+	@echo "Formatting import-cli..."
+	cd $(IMPORT_CLI_DIR) && gofmt -w -s .
 	@echo "Formatting pkg/config..."
 	cd $(PKG_DIR) && gofmt -w -s .
 	@echo "Done!"
@@ -145,6 +154,8 @@ fmt-check: ## Check if Go code is formatted
 	@cd $(BOT_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(BOT_DIR):" && gofmt -l . && exit 1)
 	@echo "Checking admin-panel formatting..."
 	@cd $(ADMIN_PANEL_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(ADMIN_PANEL_DIR):" && gofmt -l . && exit 1)
+	@echo "Checking import-cli formatting..."
+	@cd $(IMPORT_CLI_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(IMPORT_CLI_DIR):" && gofmt -l . && exit 1)
 	@echo "Checking pkg/config formatting..."
 	@cd $(PKG_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(PKG_DIR):" && gofmt -l . && exit 1)
 	@echo "All files properly formatted!"
@@ -172,6 +183,6 @@ admin-panel-set-session-file: ## Generate session secret and write to file
 .PHONY: help up down restart ps clean prune build build-api build-bot build-postgres build-admin-panel \
 	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel \
 	shell-api shell-bot shell-postgres shell-minio shell-admin-panel \
-	go-build-api go-build-bot go-build-admin-panel go-build go-clean fmt fmt-check \
+	go-build-api go-build-bot go-build-admin-panel go-build-import-cli go-build go-clean fmt fmt-check \
 	admin-panel-set-secrets admin-panel-set-password admin-panel-set-session \
 	admin-panel-set-secrets-files admin-panel-set-password-file admin-panel-set-session-file

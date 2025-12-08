@@ -13,7 +13,7 @@ Secure web admin panel for the Beef Briefing system. Provides real-time statisti
 
 ## Tech Stack
 
-- **Backend**: Go 1.23+, Gorilla Mux, Templ templates
+- **Backend**: Go 1.25+, Gorilla Mux, Templ templates
 - **Frontend**: DaisyUI, Tailwind CSS, HTMX, ECharts
 - **Database**: PostgreSQL
 - **Auth**: Gorilla Sessions, bcrypt
@@ -60,7 +60,7 @@ Files are automatically mounted in Docker at `/app/secrets/` (read-only).
 
 ### Prerequisites
 
-- Go 1.23+
+- Go 1.25+
 - Templ CLI: `go install github.com/a-h/templ/cmd/templ@latest`
 - PostgreSQL running with Beef Briefing schema
 

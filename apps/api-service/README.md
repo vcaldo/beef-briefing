@@ -26,7 +26,7 @@ A Go-based REST API service for ingesting Telegram group chat data, including me
 22 tables modeling the complete Telegram data structure:
 
 **Core Entities**:
-- `chats`, `users` - Chat and user profiles
+- `chats`, `users` - Chat and user profiles (chats include `migrated_from_chat_id` for group→supergroup linking)
 - `updates` - Raw webhook payloads with deduplication
 
 **Messages**:
@@ -58,6 +58,9 @@ A Go-based REST API service for ingesting Telegram group chat data, including me
 
 **Design Note - Denormalized Reactions**:
 The `message_id` in reaction tables stores the Telegram message ID (not a FK to `messages.id`). This allows storing reactions for messages that may not have been captured (e.g., reactions to old messages before the bot joined).
+
+**Design Note - Group to Supergroup Migration**:
+When a Telegram group is upgraded to a supergroup, the chat ID changes completely (e.g., `123456789` → `-100123456789`). Telegram sends a `my_chat_member` update with `chat.migrate_from_chat_id` set to the old group ID. The API detects this and stores the relationship in `chats.migrated_from_chat_id`, allowing queries to link messages from both the old group and new supergroup as belonging to the same logical chat.
 
 See [`apps/postgres/migrations/`](../postgres/migrations/) for full schema.
 

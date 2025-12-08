@@ -21,17 +21,29 @@ type Update struct {
 	EditedMessage        *Message                    `json:"edited_message,omitempty"`
 	MessageReaction      *MessageReactionUpdated     `json:"message_reaction,omitempty"`
 	MessageReactionCount *MessageReactionCountUpdate `json:"message_reaction_count,omitempty"`
+	MyChatMember         *ChatMemberUpdated          `json:"my_chat_member,omitempty"`
 }
 
 // Chat represents a Telegram chat
 type Chat struct {
-	ID        int64  `json:"id"`
-	Type      string `json:"type"`
-	Title     string `json:"title,omitempty"`
-	Username  string `json:"username,omitempty"`
-	FirstName string `json:"first_name,omitempty"`
-	LastName  string `json:"last_name,omitempty"`
-	IsForum   bool   `json:"is_forum,omitempty"`
+	ID                int64  `json:"id"`
+	Type              string `json:"type"`
+	Title             string `json:"title,omitempty"`
+	Username          string `json:"username,omitempty"`
+	FirstName         string `json:"first_name,omitempty"`
+	LastName          string `json:"last_name,omitempty"`
+	IsForum           bool   `json:"is_forum,omitempty"`
+	MigrateFromChatID *int64 `json:"migrate_from_chat_id,omitempty"`
+	MigrateToChatID   *int64 `json:"migrate_to_chat_id,omitempty"`
+}
+
+// ChatMemberUpdated represents changes in the status of a chat member
+type ChatMemberUpdated struct {
+	Chat          Chat  `json:"chat"`
+	From          User  `json:"from"`
+	Date          int64 `json:"date"`
+	OldChatMember any   `json:"old_chat_member"`
+	NewChatMember any   `json:"new_chat_member"`
 }
 
 // User represents a Telegram user
@@ -76,6 +88,8 @@ type Message struct {
 	HasProtectedContent bool            `json:"has_protected_content,omitempty"`
 	IsAutomaticForward  bool            `json:"is_automatic_forward,omitempty"`
 	IsTopicMessage      bool            `json:"is_topic_message,omitempty"`
+	MigrateFromChatID   *int64          `json:"migrate_from_chat_id,omitempty"`
+	MigrateToChatID     *int64          `json:"migrate_to_chat_id,omitempty"`
 }
 
 // MessageEntity represents a special entity in a text message

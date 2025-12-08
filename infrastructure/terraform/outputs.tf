@@ -38,3 +38,18 @@ output "ssh_user_host" {
   description = "SSH user and host"
   value       = "admin@${tolist(linode_instance.beef_briefing.ipv4)[0]}"
 }
+
+output "block_storage_id" {
+  description = "The ID of the block storage volume"
+  value       = linode_volume.beef_briefing_postgres_volume.id
+}
+
+output "block_storage_size" {
+  description = "The size of the block storage volume in GB"
+  value       = linode_volume.beef_briefing_postgres_volume.size
+}
+
+output "block_storage_filesystem_path" {
+  description = "The filesystem path for the block storage volume"
+  value       = linode_volume.beef_briefing_postgres_volume.filesystem_path
+}

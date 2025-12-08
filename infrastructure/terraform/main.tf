@@ -60,6 +60,15 @@ resource "linode_firewall" "beef_briefing_firewall" {
     ipv6     = ["::/0"]
   }
 
+  inbound {
+    label    = "allow-tcp-8081"
+    action   = "ACCEPT"
+    protocol = "TCP"
+    ports    = "8081"
+    ipv4     = ["0.0.0.0/0"]
+    ipv6     = ["::/0"]
+  }
+
   inbound_policy  = "DROP"
   outbound_policy = "ACCEPT"
 
@@ -69,11 +78,13 @@ resource "linode_firewall" "beef_briefing_firewall" {
 # Cloud-init script to install Docker and Docker Compose
 locals {
   cloud_init_script = templatefile("${path.module}/cloud-init.yaml", {
-    ssh_public_key         = linode_sshkey.beef_briefing_key.ssh_key
-    hostname               = var.hostname
-    new_relic_license_key  = var.new_relic_license_key
-    new_relic_account_id   = var.new_relic_account_id
-    new_relic_region       = var.new_relic_region
+    ssh_public_key           = linode_sshkey.beef_briefing_key.ssh_key
+    hostname                 = var.hostname
+    new_relic_license_key    = var.new_relic_license_key
+    new_relic_account_id     = var.new_relic_account_id
+    new_relic_region         = var.new_relic_region
+    block_storage_label      = var.block_storage_label
+    block_storage_mount_path = var.block_storage_mount_path
   })
 }
 
@@ -115,4 +126,13 @@ resource "linode_domain_record" "beef_briefing_www_record" {
   record_type = "A"
   target      = tolist(linode_instance.beef_briefing.ipv4)[0]
   ttl_sec     = 300
+}
+
+# Block storage volume for PostgreSQL persistent data
+resource "linode_volume" "beef_briefing_postgres_volume" {
+  label     = var.block_storage_label
+  region    = var.region
+  size      = var.block_storage_size
+  linode_id = linode_instance.beef_briefing.id
+  tags      = ["beef-briefing", "production", "postgres"]
 }

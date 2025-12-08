@@ -286,6 +286,11 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 			sed -i "s|# ssh_public_key_path = \".*\"|ssh_public_key_path = \"$$SSH_KEY_PATH\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated ssh_public_key_path from $$ENV_FILE"; \
 		fi; \
+		BLOCK_STORAGE_SIZE=$$(grep '^BLOCK_STORAGE_SIZE=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		if [ -n "$$BLOCK_STORAGE_SIZE" ]; then \
+			echo "block_storage_size = $$BLOCK_STORAGE_SIZE" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated block_storage_size from $$ENV_FILE"; \
+		fi; \
 		echo "Setup complete! Review $(TERRAFORM_DIR)/terraform.tfvars before applying."; \
 	else \
 		echo "terraform.tfvars already exists. Delete it first to recreate."; \

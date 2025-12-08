@@ -13,7 +13,7 @@ services:
     ports:
       - "${DB_PORT}:5432"
     volumes:
-      - postgres_data_prod:/var/lib/postgresql/data
+      - ${POSTGRES_DATA_PATH:-/mnt/postgres-data}:/var/lib/postgresql/data
     networks:
       - beef-prod-network
     restart: unless-stopped
@@ -112,7 +112,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data_prod:
   minio_data_prod:
 
 networks:

@@ -81,4 +81,40 @@ runcmd:
       echo "Installing New Relic Infrastructure Agent..."
       curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && sudo NEW_RELIC_API_KEY="${new_relic_license_key}" NEW_RELIC_ACCOUNT_ID="${new_relic_account_id}" NEW_RELIC_REGION="EU" /usr/local/bin/newrelic install -y
     fi
+  # Mount block storage for PostgreSQL data
+  - |
+    echo "Waiting for block storage device to appear..."
+    DEVICE_PATH="/dev/disk/by-id/scsi-0Linode_Volume_${block_storage_label}"
+    MOUNT_PATH="${block_storage_mount_path}"
+    MAX_ATTEMPTS=60
+    ATTEMPT=0
+    while [ ! -e "$DEVICE_PATH" ] && [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+      echo "Waiting for $DEVICE_PATH... (attempt $((ATTEMPT+1))/$MAX_ATTEMPTS)"
+      sleep 5
+      ATTEMPT=$((ATTEMPT+1))
+    done
+    if [ ! -e "$DEVICE_PATH" ]; then
+      echo "ERROR: Block storage device $DEVICE_PATH did not appear after $MAX_ATTEMPTS attempts"
+      exit 1
+    fi
+    echo "Block storage device found at $DEVICE_PATH"
+    # Check if already formatted
+    if ! blkid "$DEVICE_PATH" | grep -q 'TYPE='; then
+      echo "Formatting block storage with ext4..."
+      mkfs.ext4 "$DEVICE_PATH"
+    else
+      echo "Block storage already formatted, skipping format"
+    fi
+    # Create mount point and mount
+    mkdir -p "$MOUNT_PATH"
+    mount "$DEVICE_PATH" "$MOUNT_PATH"
+    # Add to fstab for persistence across reboots
+    if ! grep -q "$DEVICE_PATH" /etc/fstab; then
+      echo "$DEVICE_PATH $MOUNT_PATH ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
+      echo "Added block storage to /etc/fstab"
+    fi
+    # Set ownership for PostgreSQL container (uid/gid 999)
+    chown -R 999:999 "$MOUNT_PATH"
+    chmod 700 "$MOUNT_PATH"
+    echo "Block storage mounted at $MOUNT_PATH and configured for PostgreSQL"
 final_message: "Beef Briefing server setup completed. Docker, Docker Compose, and Go 1.25.4 installed. SSH hardened with admin user only. System will restart in 1 minute."

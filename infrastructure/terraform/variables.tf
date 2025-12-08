@@ -59,3 +59,21 @@ variable "instance_type" {
   type        = string
   default     = "g6-standard-2"
 }
+
+variable "block_storage_size" {
+  description = "Size of the block storage volume in GB for PostgreSQL data"
+  type        = number
+  default     = 10
+}
+
+variable "block_storage_label" {
+  description = "Label for the block storage volume"
+  type        = string
+  default     = "beef-briefing-postgres-data"
+}
+
+variable "block_storage_mount_path" {
+  description = "Mount path for the block storage volume on the instance"
+  type        = string
+  default     = "/mnt/postgres-data"
+}

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -33,6 +34,8 @@ var (
 	delayMS      int
 	apiURL       string
 	resetState   bool
+	force        bool
+	forceChatID  bool
 )
 
 func main() {
@@ -101,6 +104,8 @@ func init() {
 	importCmd.Flags().IntVarP(&delayMS, "delay-ms", "d", 1, "Delay between batches in milliseconds")
 	importCmd.Flags().StringVarP(&apiURL, "api-url", "u", "http://localhost:8080", "API service URL")
 	importCmd.Flags().BoolVar(&resetState, "reset", false, "Reset import state before starting")
+	importCmd.Flags().BoolVar(&force, "force", false, "Force import even if calculated supergroup ID doesn't match provided chat ID")
+	importCmd.Flags().BoolVar(&forceChatID, "force-chat-id", false, "Allow importing to different chat ID than previous import state")
 
 	importCmd.MarkFlagRequired("export-path")
 
@@ -168,6 +173,46 @@ func runImport(cmd *cobra.Command, args []string) error {
 		"id", metadata.ID,
 	)
 
+	// Detect supergroup migration scenario
+	var needsMigrationLink bool
+	var oldChatID int64
+
+	if strings.Contains(metadata.Type, "supergroup") {
+		if createChat {
+			return fmt.Errorf("supergroup exports cannot use --create-chat; must provide actual supergroup chat ID via --chat-id")
+		}
+
+		if chatID != 0 {
+			// Calculate expected supergroup ID from old group ID
+			// Formula: supergroup_id = -1000000000000 - old_group_id
+			expectedID := -1000000000000 - metadata.ID
+
+			if chatID != expectedID {
+				errMsg := fmt.Sprintf(
+					"supergroup ID mismatch: expected %d (calculated from export ID %d), but got %d",
+					expectedID, metadata.ID, chatID,
+				)
+
+				if !force {
+					return fmt.Errorf("%s (use --force to bypass this check)", errMsg)
+				}
+
+				slog.Warn("proceeding with mismatched supergroup ID", 
+					"expected", expectedID, 
+					"provided", chatID,
+					"export_id", metadata.ID,
+				)
+			}
+
+			oldChatID = metadata.ID
+			needsMigrationLink = true
+			slog.Info("supergroup migration detected",
+				"old_group_id", oldChatID,
+				"new_supergroup_id", chatID,
+			)
+		}
+	}
+
 	// Determine chat ID
 	targetChatID := chatID
 	if createChat {
@@ -187,7 +232,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load existing state
-	if err := stateMgr.Load(); err != nil {
+	if err := stateMgr.Load(targetChatID, forceChatID); err != nil {
 		return fmt.Errorf("loading import state: %w", err)
 	}
 
@@ -211,6 +256,36 @@ func runImport(cmd *cobra.Command, args []string) error {
 
 	// Initialize API client
 	apiClient := client.New(apiURL, batchSize, delayMS)
+
+	// Send migration update if this is a migrated supergroup
+	if needsMigrationLink {
+		slog.Info("linking migrated supergroup", "old_chat_id", oldChatID, "new_chat_id", targetChatID)
+
+		migrationUpdate := &models.Update{
+			UpdateID: 0, // Special marker for synthetic updates
+			MyChatMember: &models.ChatMemberUpdated{
+				Chat: models.Chat{
+					ID:                targetChatID,
+					Type:              "supergroup",
+					Title:             metadata.Name,
+					MigrateFromChatID: &oldChatID,
+				},
+				From: models.User{
+					ID:        0,
+					FirstName: "Import-CLI",
+					IsBot:     true,
+				},
+				Date: time.Now().Unix(),
+			},
+		}
+
+		if err := apiClient.SendUpdate(migrationUpdate); err != nil {
+			slog.Error("failed to link migration", "error", err, "old_chat_id", oldChatID, "new_chat_id", targetChatID)
+			slog.Warn("continuing import without migration link")
+		} else {
+			slog.Info("migration link created successfully")
+		}
+	}
 
 	// Count messages for progress (if not already counted)
 	if existingState.TotalMessages == 0 {
@@ -485,7 +560,7 @@ func parseUserInfo(name, fromID string) (int64, string) {
 func runStatus(cmd *cobra.Command, args []string) error {
 	stateMgr := state.NewManager(exportPath)
 
-	if err := stateMgr.Load(); err != nil {
+	if err := stateMgr.Load(0, false); err != nil {
 		return fmt.Errorf("loading import state: %w", err)
 	}
 

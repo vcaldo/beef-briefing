@@ -349,24 +349,36 @@ func (s *IngestService) uploadOrReuseMedia(ctx context.Context, tx *sql.Tx, file
 }
 
 func (s *IngestService) processMediaFile(ctx context.Context, tx *sql.Tx, messageID int64, mediaType, fileID, fileUniqueID string, fileSize *int64, mimeType, fileName string, duration, width, height *int, performer, title string, files map[string][]byte) error {
+	var objectKey, fileHash string
+
+	// Try to download and store the file if available
 	data, ok := files[fileID]
-	if !ok {
-		slog.Warn("media file not found in request, skipping",
+	if ok {
+		if mimeType == "" {
+			mimeType = "application/octet-stream"
+		}
+
+		var err error
+		objectKey, fileHash, err = s.uploadOrReuseMedia(ctx, tx, fileID, data, mimeType, mediaType)
+		if err != nil {
+			slog.Error("failed to upload media, saving metadata only",
+				"file_id", fileID,
+				"media_type", mediaType,
+				"error", err,
+			)
+			// Continue to insert metadata even if upload fails
+			objectKey = ""
+			fileHash = ""
+		}
+	} else {
+		slog.Info("media file not downloaded, saving metadata only",
 			"file_id", fileID,
 			"media_type", mediaType,
+			"file_size", fileSize,
 		)
-		return nil
 	}
 
-	if mimeType == "" {
-		mimeType = "application/octet-stream"
-	}
-
-	objectKey, fileHash, err := s.uploadOrReuseMedia(ctx, tx, fileID, data, mimeType, mediaType)
-	if err != nil {
-		return err
-	}
-
+	// Insert metadata (objectKey and fileHash will be empty strings if file wasn't downloaded)
 	return s.mediaRepo.InsertMediaFile(ctx, tx, messageID, mediaType, fileID, fileUniqueID, objectKey, fileHash,
 		fileSize, mimeType, fileName, duration, width, height, performer, title)
 }

@@ -439,6 +439,19 @@ tf-sync-object-storage-env: ## Sync Object Storage credentials from Terraform to
 	echo "✓ Updated MINIO_BUCKET=$$BUCKET_NAME"; \
 	echo "Sync complete!"
 
+mc-setup-prod: ## Configure MinIO Client (mc) alias 'beef-briefing-prod' from Terraform outputs
+	@if [ ! -f $(TERRAFORM_DIR)/terraform.tfstate ]; then \
+		echo "Error: No Terraform state found. Run 'make tf-apply' first."; \
+		exit 1; \
+	fi
+	@echo "Configuring mc alias 'beef-briefing-prod'..."
+	@ENDPOINT=$$($(MAKE) -s tf-object-storage-endpoint); \
+	ACCESS_KEY=$$($(MAKE) -s tf-object-storage-access-key); \
+	SECRET_KEY=$$($(MAKE) -s tf-object-storage-secret-key); \
+	mc alias set beef-briefing-prod https://$$ENDPOINT $$ACCESS_KEY $$SECRET_KEY
+	@echo "✓ Alias 'beef-briefing-prod' configured successfully"
+	@echo "Test with: mc ls beef-briefing-prod"
+
 tf-docs: ## Show Terraform documentation
 	@cat $(TERRAFORM_DIR)/README.md
 
@@ -474,5 +487,5 @@ rollback-force: ## Rollback to previous deployment (skip confirmation)
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-root-pass tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
-	tf-connect tf-setup tf-sync-object-storage-env tf-docs tf-deploy-check \
+	tf-connect tf-setup tf-sync-object-storage-env mc-setup-prod tf-docs tf-deploy-check \
 	deploy deploy-skip-build deploy-skip-cleanup rollback rollback-force

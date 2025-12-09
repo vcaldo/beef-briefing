@@ -101,6 +101,8 @@ resource "linode_instance" "beef_briefing" {
     user_data = base64encode(local.cloud_init_script)
   }
 
+  # to recreate the linode it's necessary to taint the resouce
+  # terraform taint linode_instance.beef_briefing
   lifecycle {
     ignore_changes = [metadata]
   }

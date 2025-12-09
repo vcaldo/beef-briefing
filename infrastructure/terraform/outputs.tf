@@ -75,3 +75,24 @@ output "object_storage_bucket_name" {
   description = "The name of the Object Storage bucket"
   value       = linode_object_storage_bucket.telegram_media_bucket.label
 }
+
+output "object_storage_region" {
+  description = "The region of the Object Storage bucket"
+  value       = linode_object_storage_bucket.telegram_media_bucket.region
+}
+
+output "deployment_notes" {
+  description = "Important deployment notes and next steps"
+  value       = <<-EOT
+
+    ========================================
+    Beef Briefing Infrastructure Deployed
+    ========================================
+
+    Server IP: ${tolist(linode_instance.beef_briefing.ipv4)[0]}
+    Domain: ${linode_domain.beef_briefing_domain.domain}
+    SSH: ssh admin@${tolist(linode_instance.beef_briefing.ipv4)[0]}
+
+    ========================================
+  EOT
+}

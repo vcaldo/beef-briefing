@@ -60,20 +60,56 @@ variable "instance_type" {
   default     = "g6-standard-2"
 }
 
-variable "block_storage_size" {
-  description = "Size of the block storage volume in GB for PostgreSQL data"
+variable "postgres_volume_size" {
+  description = "Size of the PostgreSQL volume in GB"
   type        = number
   default     = 10
 }
 
-variable "block_storage_label" {
-  description = "Label for the block storage volume"
+variable "postgres_volume_label" {
+  description = "Label for the PostgreSQL volume"
   type        = string
   default     = "beef-briefing-postgres-data"
 }
 
-variable "block_storage_mount_path" {
-  description = "Mount path for the block storage volume on the instance"
+variable "postgres_volume_mount_path" {
+  description = "Mount path for the PostgreSQL volume on the instance"
   type        = string
   default     = "/mnt/postgres-data"
+}
+
+variable "object_storage_region" {
+  description = "Linode Object Storage region (e.g., es-mad, eu-central, us-east)"
+  type        = string
+  default     = "es-mad"
+}
+
+variable "object_storage_bucket_label" {
+  description = "Label for the Object Storage bucket"
+  type        = string
+  default     = "telegram-media"
+}
+
+variable "object_storage_acl" {
+  description = "Access control list for the Object Storage bucket"
+  type        = string
+  default     = "private"
+}
+
+variable "object_storage_versioning" {
+  description = "Enable versioning for the Object Storage bucket"
+  type        = bool
+  default     = true
+}
+
+variable "object_storage_lifecycle_expiration_days" {
+  description = "Number of days after which objects expire and are deleted"
+  type        = number
+  default     = 365
+}
+
+variable "object_storage_noncurrent_version_expiration_days" {
+  description = "Number of days after which noncurrent versions expire and are deleted"
+  type        = number
+  default     = 5
 }

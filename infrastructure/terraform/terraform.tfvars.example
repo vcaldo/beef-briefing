@@ -26,3 +26,19 @@ region = "es-mad"
 # Optional: New Relic license key for infrastructure monitoring
 # new_relic_license_key = "your-new-relic-license-key"
 
+# Optional: New Relic account ID for infrastructure monitoring
+# new_relic_account_id = "your-new-relic-account-id"
+
+# Optional: Object Storage region (default: es-mad - Madrid)
+# Available regions: es-mad, eu-central, us-east, etc.
+# object_storage_region = "es-mad"
+
+# Optional: Object Storage bucket label (default: telegram-media)
+# object_storage_bucket_label = "telegram-media"
+
+# Optional: Object Storage lifecycle expiration in days (default: 365)
+# object_storage_lifecycle_expiration_days = 365
+
+# Optional: Object Storage noncurrent version expiration in days (default: 5)
+# object_storage_noncurrent_version_expiration_days = 5
+

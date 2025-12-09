@@ -13,7 +13,8 @@ terraform {
 }
 
 provider "linode" {
-  token = var.linode_token
+  token            = var.linode_token
+  obj_use_temp_keys = true
 }
 
 # Generate random root password
@@ -83,8 +84,8 @@ locals {
     new_relic_license_key    = var.new_relic_license_key
     new_relic_account_id     = var.new_relic_account_id
     new_relic_region         = var.new_relic_region
-    block_storage_label      = var.block_storage_label
-    block_storage_mount_path = var.block_storage_mount_path
+    postgres_volume_label      = var.postgres_volume_label
+    postgres_volume_mount_path = var.postgres_volume_mount_path
   })
 }
 
@@ -128,14 +129,45 @@ resource "linode_domain_record" "beef_briefing_www_record" {
   ttl_sec     = 300
 }
 
-# Block storage volume for PostgreSQL persistent data
+# PostgreSQL persistent data volume
 resource "linode_volume" "beef_briefing_postgres_volume" {
-  label     = var.block_storage_label
+  label     = var.postgres_volume_label
   region    = var.region
-  size      = var.block_storage_size
+  size      = var.postgres_volume_size
   linode_id = linode_instance.beef_briefing.id
   tags      = ["beef-briefing", "production", "postgres"]
-  lifecycle {
-    prevent_destroy = true
+}
+
+# Object Storage bucket for media files
+resource "linode_object_storage_bucket" "telegram_media_bucket" {
+  region  = var.object_storage_region
+  label   = var.object_storage_bucket_label
+  acl     = var.object_storage_acl
+
+  lifecycle_rule {
+    enabled = true
+    id      = "expire-old-objects"
+
+    expiration {
+      days = var.object_storage_lifecycle_expiration_days
+    }
+
+    noncurrent_version_expiration {
+      days = var.object_storage_noncurrent_version_expiration_days
+    }
+  }
+
+  cors_enabled = true
+  versioning   = var.object_storage_versioning
+}
+
+# Object Storage access keys
+resource "linode_object_storage_key" "telegram_media_key" {
+  label = "beef-briefing-telegram-media-key"
+
+  bucket_access {
+    bucket_name = linode_object_storage_bucket.telegram_media_bucket.label
+    region      = linode_object_storage_bucket.telegram_media_bucket.region
+    permissions = "read_write"
   }
 }

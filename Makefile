@@ -249,6 +249,15 @@ tf-ssh-user-host: ## Show SSH user and host
 tf-root-pass: ## Show root password (SENSITIVE)
 	@cd $(TERRAFORM_DIR) && terraform output -raw root_password
 
+tf-object-storage-endpoint: ## Show Object Storage endpoint
+	@cd $(TERRAFORM_DIR) && terraform output -raw object_storage_endpoint
+
+tf-object-storage-access-key: ## Show Object Storage access key ID (SENSITIVE)
+	@cd $(TERRAFORM_DIR) && terraform output -raw object_storage_access_key_id
+
+tf-object-storage-secret-key: ## Show Object Storage secret access key (SENSITIVE)
+	@cd $(TERRAFORM_DIR) && terraform output -raw object_storage_secret_access_key
+
 # Terraform utilities
 tf-connect: ## SSH to the Linode instance
 	@ssh admin@$$(cd $(TERRAFORM_DIR) && terraform output -raw instance_ip)
@@ -295,10 +304,60 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 			echo "block_storage_size = $$BLOCK_STORAGE_SIZE" >> $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated block_storage_size from $$ENV_FILE"; \
 		fi; \
+		OBJECT_STORAGE_CLUSTER=$$(grep '^OBJECT_STORAGE_CLUSTER=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		if [ -n "$$OBJECT_STORAGE_CLUSTER" ]; then \
+			echo "object_storage_cluster = \"$$OBJECT_STORAGE_CLUSTER\"" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated object_storage_cluster from $$ENV_FILE"; \
+		fi; \
+		OBJECT_STORAGE_LIFECYCLE_DAYS=$$(grep '^OBJECT_STORAGE_LIFECYCLE_DAYS=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		if [ -n "$$OBJECT_STORAGE_LIFECYCLE_DAYS" ]; then \
+			echo "object_storage_lifecycle_expiration_days = $$OBJECT_STORAGE_LIFECYCLE_DAYS" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated object_storage_lifecycle_expiration_days from $$ENV_FILE"; \
+		fi; \
+		OBJECT_STORAGE_VERSION_RETENTION_DAYS=$$(grep '^OBJECT_STORAGE_VERSION_RETENTION_DAYS=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		if [ -n "$$OBJECT_STORAGE_VERSION_RETENTION_DAYS" ]; then \
+			echo "object_storage_noncurrent_version_expiration_days = $$OBJECT_STORAGE_VERSION_RETENTION_DAYS" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated object_storage_noncurrent_version_expiration_days from $$ENV_FILE"; \
+		fi; \
 		echo "Setup complete! Review $(TERRAFORM_DIR)/terraform.tfvars before applying."; \
 	else \
 		echo "terraform.tfvars already exists. Delete it first to recreate."; \
 	fi
+
+tf-sync-object-storage-env: ## Sync Object Storage credentials from Terraform to .env.prod
+	@if [ ! -f $(TERRAFORM_DIR)/terraform.tfstate ]; then \
+		echo "Error: No Terraform state found. Run 'make tf-apply' first."; \
+		exit 1; \
+	fi
+	@echo "Syncing Object Storage credentials to $(PROD_ENV_FILE)..."
+	@ENDPOINT=$$(cd $(TERRAFORM_DIR) && terraform output -raw object_storage_endpoint); \
+	ACCESS_KEY=$$(cd $(TERRAFORM_DIR) && terraform output -raw object_storage_access_key_id); \
+	SECRET_KEY=$$(cd $(TERRAFORM_DIR) && terraform output -raw object_storage_secret_access_key); \
+	if grep -q '^MINIO_ENDPOINT=' $(PROD_ENV_FILE); then \
+		sed -i "s|^MINIO_ENDPOINT=.*|MINIO_ENDPOINT=$$ENDPOINT|" $(PROD_ENV_FILE); \
+	else \
+		echo "MINIO_ENDPOINT=$$ENDPOINT" >> $(PROD_ENV_FILE); \
+	fi; \
+	if grep -q '^MINIO_ACCESS_KEY=' $(PROD_ENV_FILE); then \
+		sed -i "s|^MINIO_ACCESS_KEY=.*|MINIO_ACCESS_KEY=$$ACCESS_KEY|" $(PROD_ENV_FILE); \
+	else \
+		echo "MINIO_ACCESS_KEY=$$ACCESS_KEY" >> $(PROD_ENV_FILE); \
+	fi; \
+	if grep -q '^MINIO_SECRET_KEY=' $(PROD_ENV_FILE); then \
+		sed -i "s|^MINIO_SECRET_KEY=.*|MINIO_SECRET_KEY=$$SECRET_KEY|" $(PROD_ENV_FILE); \
+	else \
+		echo "MINIO_SECRET_KEY=$$SECRET_KEY" >> $(PROD_ENV_FILE); \
+	fi; \
+	if grep -q '^MINIO_USE_SSL=' $(PROD_ENV_FILE); then \
+		sed -i "s|^MINIO_USE_SSL=.*|MINIO_USE_SSL=true|" $(PROD_ENV_FILE); \
+	else \
+		echo "MINIO_USE_SSL=true" >> $(PROD_ENV_FILE); \
+	fi; \
+	echo "✓ Updated MINIO_ENDPOINT=$$ENDPOINT"; \
+	echo "✓ Updated MINIO_ACCESS_KEY"; \
+	echo "✓ Updated MINIO_SECRET_KEY"; \
+	echo "✓ Updated MINIO_USE_SSL=true"; \
+	echo "Sync complete!"
 
 tf-docs: ## Show Terraform documentation
 	@cat $(TERRAFORM_DIR)/README.md
@@ -355,5 +414,6 @@ deploy: ## Deploy to production server with commit-tagged images
 	admin-panel-set-secrets-files admin-panel-set-password-file admin-panel-set-session-file \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
-	tf-ip tf-ssh tf-root-pass tf-connect tf-setup tf-docs tf-deploy-check \
+	tf-ip tf-ssh tf-root-pass tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key \
+	tf-connect tf-setup tf-sync-object-storage-env tf-docs tf-deploy-check \
 	deploy

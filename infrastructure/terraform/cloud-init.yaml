@@ -83,9 +83,9 @@ runcmd:
     fi
   # Mount block storage for PostgreSQL data
   - |
-    echo "Waiting for block storage device to appear..."
-    DEVICE_PATH="/dev/disk/by-id/scsi-0Linode_Volume_${block_storage_label}"
-    MOUNT_PATH="${block_storage_mount_path}"
+    echo "Waiting for PostgreSQL volume device to appear..."
+    DEVICE_PATH="/dev/disk/by-id/scsi-0Linode_Volume_${postgres_volume_label}"
+    MOUNT_PATH="${postgres_volume_mount_path}"
     MAX_ATTEMPTS=60
     ATTEMPT=0
     while [ ! -e "$DEVICE_PATH" ] && [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do

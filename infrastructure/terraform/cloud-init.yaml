@@ -26,6 +26,39 @@ write_files:
       X11Forwarding no
       PrintMotd no
       AcceptEnv LANG LC_*
+      MaxAuthTries 3
+      LoginGraceTime 20
+      ClientAliveInterval 300
+      ClientAliveCountMax 2
+    permissions: '0644'
+
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+    permissions: '0644'
+
+  - path: /etc/sysctl.d/99-security.conf
+    content: |
+      # Network security
+      net.ipv4.conf.all.rp_filter = 1
+      net.ipv4.conf.default.rp_filter = 1
+      net.ipv4.icmp_echo_ignore_broadcasts = 1
+      net.ipv4.conf.all.accept_redirects = 0
+      net.ipv4.conf.default.accept_redirects = 0
+      net.ipv4.conf.all.send_redirects = 0
+      net.ipv4.conf.default.send_redirects = 0
+      net.ipv4.conf.all.accept_source_route = 0
+      net.ipv4.conf.default.accept_source_route = 0
+      net.ipv4.tcp_syncookies = 1
+      net.ipv6.conf.all.accept_redirects = 0
+      net.ipv6.conf.default.accept_redirects = 0
+
+      # Kernel hardening
+      kernel.randomize_va_space = 2
+      kernel.kptr_restrict = 2
+      kernel.dmesg_restrict = 1
     permissions: '0644'
 
 # Configure hostname
@@ -43,19 +76,23 @@ packages:
   - gnupg
   - lsb-release
   - wget
-  - make
+  - vim
+  - gzip
+  - unattended-upgrades
+  - apt-listchanges
+  - bash-completion
 
 # Commands to run after package installation
 runcmd:
   # Set hostname
   - hostnamectl set-hostname ${hostname}
-  # Install New Relic Infrastructure Agent (if license key provided)
-  - |
-    if [ -n "${new_relic_license_key}" ]; then
-      echo "Installing New Relic Infrastructure Agent..."
-      curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash
-      NEW_RELIC_API_KEY="${new_relic_license_key}" NEW_RELIC_ACCOUNT_ID="" NEW_RELIC_REGION="EU" /usr/local/bin/newrelic install -y
-    fi
+  - hostname ${hostname}
+  # Restart SSH to apply hardening configuration
+  - systemctl restart sshd
+  # Apply kernel hardening
+  - sysctl --system
+  # Enable unattended upgrades
+  - dpkg-reconfigure -plow unattended-upgrades
   # Install Docker
   - install -m 0755 -d /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -65,18 +102,66 @@ runcmd:
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   - systemctl enable docker
   - systemctl start docker
-  # Install Go 1.25.4
-  - wget https://go.dev/dl/go1.25.4.linux-amd64.tar.gz -O /tmp/go1.25.4.linux-amd64.tar.gz
-  - tar -C /usr/local -xzf /tmp/go1.25.4.linux-amd64.tar.gz
-  - rm /tmp/go1.25.4.linux-amd64.tar.gz
-  - echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
-  # Verify installations
-  - docker --version
-  - docker compose version
-  - /usr/local/go/bin/go version
-  # Restart SSH to apply hardening configuration
-  - systemctl restart sshd
-  # Restart the system to apply all changes
-  - shutdown -r +1 "System restarting to apply all configuration changes"
 
-final_message: "Beef Briefing server setup completed. Docker, Docker Compose, and Go 1.25.4 installed. SSH hardened with admin user only. System will restart in 1 minute."
+  # Install LazyDocker (optional development tool)
+  - curl https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
+  - cp $HOME/.local/bin/lazydocker /usr/local/bin/lazydocker || echo "LazyDocker installation failed (non-critical)"
+
+  # Install New Relic Infrastructure Agent (if license key provided)
+  - |
+    if [ -n "${new_relic_license_key}" ]; then
+      echo "Installing New Relic Infrastructure Agent..."
+      curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && NEW_RELIC_API_KEY="${new_relic_license_key}" NEW_RELIC_ACCOUNT_ID="${new_relic_account_id}" NEW_RELIC_REGION="${new_relic_region}" /usr/local/bin/newrelic install -y
+    fi
+
+  # Verify critical installations
+  - docker --version && echo "Docker installed successfully"
+  - docker compose version && echo "Docker Compose installed successfully"
+
+  # Mount block storage for PostgreSQL data
+  - |
+    echo "Waiting for PostgreSQL volume device to appear..."
+    DEVICE_PATH="/dev/disk/by-id/scsi-0Linode_Volume_${postgres_volume_label}"
+    MOUNT_PATH="${postgres_volume_mount_path}"
+    MAX_ATTEMPTS=60
+    ATTEMPT=0
+    while [ ! -e "$DEVICE_PATH" ] && [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+      echo "Waiting for $DEVICE_PATH... (attempt $((ATTEMPT+1))/$MAX_ATTEMPTS)"
+      sleep 5
+      ATTEMPT=$((ATTEMPT+1))
+    done
+    if [ ! -e "$DEVICE_PATH" ]; then
+      echo "ERROR: Block storage device $DEVICE_PATH did not appear after $MAX_ATTEMPTS attempts"
+      exit 1
+    fi
+    echo "Block storage device found at $DEVICE_PATH"
+    # Check if already formatted
+    if ! blkid "$DEVICE_PATH" | grep -q 'TYPE='; then
+      echo "Formatting block storage with ext4..."
+      mkfs.ext4 "$DEVICE_PATH"
+    else
+      echo "Block storage already formatted, skipping format"
+    fi
+    # Create mount point and mount
+    mkdir -p "$MOUNT_PATH"
+    mount "$DEVICE_PATH" "$MOUNT_PATH"
+    # Add to fstab for persistence across reboots
+    if ! grep -q "$DEVICE_PATH" /etc/fstab; then
+      echo "$DEVICE_PATH $MOUNT_PATH ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
+      echo "Added block storage to /etc/fstab"
+    fi
+    # Create PostgreSQL data directory (needed because ext4 creates lost+found)
+    mkdir -p "$MOUNT_PATH/pgdata"
+    chown -R 999:999 "$MOUNT_PATH/pgdata"
+    chmod 700 "$MOUNT_PATH/pgdata"
+    echo "Block storage mounted at $MOUNT_PATH and configured for PostgreSQL"
+
+  # Create deployment directory structure for admin user
+  - mkdir -p /home/admin/beef-briefing
+  - chown -R admin:admin /home/admin/beef-briefing
+  - echo "Deployment directory created at /home/admin/beef-briefing"
+
+  # Reboot if needed
+  - test -f /var/run/reboot-required && (echo "Reboot required. Rebooting now..." && reboot) || echo "No reboot needed"
+
+final_message: "Beef Briefing server setup completed. Docker and Docker Compose installed. PostgreSQL volume mounted at ${postgres_volume_mount_path}. SSH hardened with admin user only. Ready for application deployment."

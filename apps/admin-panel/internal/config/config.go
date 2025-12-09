@@ -27,6 +27,7 @@ type Config struct {
 	AdminPasswordHashFile string `envconfig:"ADMIN_PASSWORD_HASH_FILE"`
 	SessionSecret         string `envconfig:"SESSION_SECRET"`
 	SessionSecretFile     string `envconfig:"SESSION_SECRET_FILE"`
+	SecureCookies         bool   `envconfig:"SECURE_COOKIES" default:"true"`
 
 	// Application
 	Environment string `envconfig:"ENVIRONMENT" default:"development"`

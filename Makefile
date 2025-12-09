@@ -130,8 +130,16 @@ go-build-import-cli: ## Build import-cli binary locally
 
 go-build-import-cli-prod: ## Build import-cli for remote architecture and deploy to production server
 	@echo "Building import-cli for remote server..."
-	@REMOTE_ARCH=$$(cd $(TERRAFORM_DIR) && terraform output -raw instance_architecture 2>/dev/null || echo "amd64"); \
+	@SSH_HOST=$$($(MAKE) -s tf-ssh-user-host); \
+	REMOTE_ARCH_RAW=$$(ssh $$SSH_HOST 'uname -m' 2>/dev/null || echo "x86_64"); \
+	case "$$REMOTE_ARCH_RAW" in \
+		x86_64) REMOTE_ARCH="amd64" ;; \
+		aarch64) REMOTE_ARCH="arm64" ;; \
+		armv7l) REMOTE_ARCH="arm" ;; \
+		*) REMOTE_ARCH="amd64" ;; \
+	esac; \
 	HOST_ARCH=$$(go env GOHOSTARCH); \
+	echo "Remote architecture: $$REMOTE_ARCH_RAW (GOARCH: $$REMOTE_ARCH)"; \
 	if [ "$$HOST_ARCH" != "$$REMOTE_ARCH" ]; then \
 		echo "Cross-compiling from $$HOST_ARCH to $$REMOTE_ARCH"; \
 	fi; \
@@ -262,7 +270,14 @@ tf-ssh-user-host: ## Show SSH user and host
 	@cd $(TERRAFORM_DIR) && terraform output -raw ssh_user_host
 
 tf-arch: ## Show instance CPU architecture for cross-compilation
-	@cd $(TERRAFORM_DIR) && terraform output -raw instance_architecture
+	@REMOTE_ARCH_RAW=$$(ssh $$($(MAKE) -s tf-ssh-user-host) 'uname -m' 2>/dev/null || echo "x86_64"); \
+	case "$$REMOTE_ARCH_RAW" in \
+		x86_64) REMOTE_ARCH="amd64" ;; \
+		aarch64) REMOTE_ARCH="arm64" ;; \
+		armv7l) REMOTE_ARCH="arm" ;; \
+		*) REMOTE_ARCH="amd64" ;; \
+	esac; \
+	echo "$$REMOTE_ARCH_RAW (GOARCH: $$REMOTE_ARCH)"
 
 tf-root-pass: ## Show root password (SENSITIVE)
 	@cd $(TERRAFORM_DIR) && terraform output -raw root_password

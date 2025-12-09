@@ -56,7 +56,7 @@ output "postgres_volume_filesystem_path" {
 
 output "object_storage_endpoint" {
   description = "The endpoint URL for Linode Object Storage (without https://)"
-  value       = "${linode_object_storage_bucket.telegram_media_bucket.region}.linodeobjects.com"
+  value       = linode_object_storage_bucket.telegram_media_bucket.hostname
 }
 
 output "object_storage_access_key_id" {

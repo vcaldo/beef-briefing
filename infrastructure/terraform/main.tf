@@ -78,6 +78,14 @@ locals {
     postgres_volume_label      = var.postgres_volume_label
     postgres_volume_mount_path = var.postgres_volume_mount_path
   })
+
+  # Sanitize domain name for use in bucket label (replace dots with dashes)
+  # e.g., "barra-pesada.online" -> "barra-pesada-online"
+  sanitized_domain = replace(var.domain_name, ".", "-")
+
+  # Generate unique bucket label: {sanitized-domain}-{bucket-suffix}
+  # e.g., "barra-pesada-online-telegram-media"
+  object_storage_bucket_label = "${local.sanitized_domain}-${var.object_storage_bucket_suffix}"
 }
 
 # Linode instance
@@ -132,7 +140,7 @@ resource "linode_volume" "beef_briefing_postgres_volume" {
 # Object Storage bucket for media files
 resource "linode_object_storage_bucket" "telegram_media_bucket" {
   region  = var.object_storage_region
-  label   = var.object_storage_bucket_label
+  label   = local.object_storage_bucket_label
   acl     = var.object_storage_acl
 
   lifecycle_rule {

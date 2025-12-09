@@ -84,8 +84,8 @@ variable "object_storage_region" {
   default     = "es-mad"
 }
 
-variable "object_storage_bucket_label" {
-  description = "Label for the Object Storage bucket"
+variable "object_storage_bucket_suffix" {
+  description = "Suffix for the Object Storage bucket (prefixed with sanitized domain name for uniqueness)"
   type        = string
   default     = "telegram-media"
 }

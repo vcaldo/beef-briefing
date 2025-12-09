@@ -78,11 +78,13 @@ postgres_volume_label      = "beef-briefing-postgres-data"
 postgres_volume_mount_path = "/mnt/postgres-data"
 
 # Optional: Object Storage (Telegram media files)
-object_storage_region                           = "es-mad"         # Madrid
-object_storage_bucket_label                     = "telegram-media"
-object_storage_acl                              = "private"
-object_storage_versioning                       = true
-object_storage_lifecycle_expiration_days        = 365  # 1 year
+# Note: Bucket name is auto-generated as {sanitized-domain}-{suffix}
+# e.g., "barra-pesada-online-telegram-media" for domain "barra-pesada.online"
+object_storage_region                             = "es-mad"         # Madrid
+object_storage_bucket_suffix                      = "telegram-media" # Suffix only
+object_storage_acl                                = "private"
+object_storage_versioning                         = true
+object_storage_lifecycle_expiration_days          = 365  # 1 year
 object_storage_noncurrent_version_expiration_days = 5    # Old versions
 
 # Optional: New Relic Monitoring

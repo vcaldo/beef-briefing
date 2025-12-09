@@ -59,8 +59,10 @@ linode_token = "your-linode-api-token-here"
 # Available regions: es-mad, eu-central, us-east, etc.
 # object_storage_region = "es-mad"
 
-# Object Storage bucket label (default: telegram-media)
-# object_storage_bucket_label = "telegram-media"
+# Object Storage bucket suffix (default: telegram-media)
+# The final bucket name will be: {sanitized-domain}-{suffix}
+# e.g., with domain "barra-pesada.online": "barra-pesada-online-telegram-media"
+# object_storage_bucket_suffix = "telegram-media"
 
 # Access control list for the bucket (default: private)
 # object_storage_acl = "private"

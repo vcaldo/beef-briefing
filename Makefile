@@ -258,6 +258,9 @@ tf-object-storage-access-key: ## Show Object Storage access key ID (SENSITIVE)
 tf-object-storage-secret-key: ## Show Object Storage secret access key (SENSITIVE)
 	@cd $(TERRAFORM_DIR) && terraform output -raw object_storage_secret_access_key
 
+tf-object-storage-bucket: ## Show Object Storage bucket name
+	@cd $(TERRAFORM_DIR) && terraform output -raw object_storage_bucket_name
+
 # Terraform utilities
 tf-connect: ## SSH to the Linode instance
 	@ssh admin@$$(cd $(TERRAFORM_DIR) && terraform output -raw instance_ip)
@@ -336,11 +339,6 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 			sed -i "s|# object_storage_region = \".*\"|object_storage_region = \"$$OBJECT_STORAGE_REGION\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated object_storage_region from $$ENV_FILE"; \
 		fi; \
-		MINIO_BUCKET=$$(grep '^MINIO_BUCKET=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
-		if [ -n "$$MINIO_BUCKET" ]; then \
-			sed -i "s|# object_storage_bucket_label = \".*\"|object_storage_bucket_label = \"$$MINIO_BUCKET\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
-			echo "✓ Populated object_storage_bucket_label from $$ENV_FILE"; \
-		fi; \
 		OBJECT_STORAGE_VERSIONING=$$(grep '^OBJECT_STORAGE_VERSIONING=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		if [ -n "$$OBJECT_STORAGE_VERSIONING" ]; then \
 			sed -i "s|# object_storage_versioning = .*|object_storage_versioning = $$OBJECT_STORAGE_VERSIONING|" $(TERRAFORM_DIR)/terraform.tfvars; \
@@ -367,9 +365,10 @@ tf-sync-object-storage-env: ## Sync Object Storage credentials from Terraform to
 		exit 1; \
 	fi
 	@echo "Syncing Object Storage credentials to $(PROD_ENV_FILE)..."
-	@ENDPOINT=$$(cd $(TERRAFORM_DIR) && terraform output -raw object_storage_endpoint); \
-	ACCESS_KEY=$$(cd $(TERRAFORM_DIR) && terraform output -raw object_storage_access_key_id); \
-	SECRET_KEY=$$(cd $(TERRAFORM_DIR) && terraform output -raw object_storage_secret_access_key); \
+	@ENDPOINT=$$($(MAKE) -s tf-object-storage-endpoint); \
+	ACCESS_KEY=$$($(MAKE) -s tf-object-storage-access-key); \
+	SECRET_KEY=$$($(MAKE) -s tf-object-storage-secret-key); \
+	BUCKET_NAME=$$($(MAKE) -s tf-object-storage-bucket); \
 	if grep -q '^MINIO_ENDPOINT=' $(PROD_ENV_FILE); then \
 		sed -i "s|^MINIO_ENDPOINT=.*|MINIO_ENDPOINT=$$ENDPOINT|" $(PROD_ENV_FILE); \
 	else \
@@ -390,10 +389,16 @@ tf-sync-object-storage-env: ## Sync Object Storage credentials from Terraform to
 	else \
 		echo "MINIO_USE_SSL=true" >> $(PROD_ENV_FILE); \
 	fi; \
+	if grep -q '^MINIO_BUCKET=' $(PROD_ENV_FILE); then \
+		sed -i "s|^MINIO_BUCKET=.*|MINIO_BUCKET=$$BUCKET_NAME|" $(PROD_ENV_FILE); \
+	else \
+		echo "MINIO_BUCKET=$$BUCKET_NAME" >> $(PROD_ENV_FILE); \
+	fi; \
 	echo "✓ Updated MINIO_ENDPOINT=$$ENDPOINT"; \
 	echo "✓ Updated MINIO_ACCESS_KEY"; \
 	echo "✓ Updated MINIO_SECRET_KEY"; \
 	echo "✓ Updated MINIO_USE_SSL=true"; \
+	echo "✓ Updated MINIO_BUCKET=$$BUCKET_NAME"; \
 	echo "Sync complete!"
 
 tf-docs: ## Show Terraform documentation
@@ -430,6 +435,6 @@ rollback-force: ## Rollback to previous deployment (skip confirmation)
 	admin-panel-set-secrets-files admin-panel-set-password-file admin-panel-set-session-file \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
-	tf-ip tf-ssh tf-root-pass tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key \
+	tf-ip tf-ssh tf-ssh-user-host tf-root-pass tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage-env tf-docs tf-deploy-check \
 	deploy deploy-skip-build deploy-skip-cleanup rollback rollback-force

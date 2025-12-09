@@ -26,6 +26,39 @@ write_files:
       X11Forwarding no
       PrintMotd no
       AcceptEnv LANG LC_*
+      MaxAuthTries 3
+      LoginGraceTime 20
+      ClientAliveInterval 300
+      ClientAliveCountMax 2
+    permissions: '0644'
+
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+    permissions: '0644'
+
+  - path: /etc/sysctl.d/99-security.conf
+    content: |
+      # Network security
+      net.ipv4.conf.all.rp_filter = 1
+      net.ipv4.conf.default.rp_filter = 1
+      net.ipv4.icmp_echo_ignore_broadcasts = 1
+      net.ipv4.conf.all.accept_redirects = 0
+      net.ipv4.conf.default.accept_redirects = 0
+      net.ipv4.conf.all.send_redirects = 0
+      net.ipv4.conf.default.send_redirects = 0
+      net.ipv4.conf.all.accept_source_route = 0
+      net.ipv4.conf.default.accept_source_route = 0
+      net.ipv4.tcp_syncookies = 1
+      net.ipv6.conf.all.accept_redirects = 0
+      net.ipv6.conf.default.accept_redirects = 0
+
+      # Kernel hardening
+      kernel.randomize_va_space = 2
+      kernel.kptr_restrict = 2
+      kernel.dmesg_restrict = 1
     permissions: '0644'
 
 # Configure hostname
@@ -45,7 +78,9 @@ packages:
   - wget
   - make
   - vim
-  - gunzip
+  - gzip
+  - unattended-upgrades
+  - apt-listchanges
 
 # Commands to run after package installation
 runcmd:
@@ -54,6 +89,10 @@ runcmd:
   - hostname ${hostname}
   # Restart SSH to apply hardening configuration
   - systemctl restart sshd
+  # Apply kernel hardening
+  - sysctl --system
+  # Enable unattended upgrades
+  - dpkg-reconfigure -plow unattended-upgrades
   # Install Docker
   - install -m 0755 -d /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg

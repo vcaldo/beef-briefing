@@ -100,6 +100,10 @@ resource "linode_instance" "beef_briefing" {
   metadata {
     user_data = base64encode(local.cloud_init_script)
   }
+
+  lifecycle {
+    ignore_changes = [metadata]
+  }
 }
 
 # Domain management

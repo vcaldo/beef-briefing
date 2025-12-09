@@ -29,10 +29,10 @@ var ValidThemes = map[string]bool{
 
 // Auth handles authentication and session management
 type Auth struct {
-	store        *sessions.CookieStore
-	username     string
-	passwordHash string
-	isProduction bool
+	store         *sessions.CookieStore
+	username      string
+	passwordHash  string
+	secureCookies bool
 }
 
 // NewAuth creates a new Auth instance
@@ -48,15 +48,15 @@ func NewAuth(cfg *config.Config) (*Auth, error) {
 		Path:     "/",
 		MaxAge:   sessionMaxAge,
 		HttpOnly: true,
-		Secure:   cfg.IsProduction(),
+		Secure:   cfg.SecureCookies,
 		SameSite: http.SameSiteLaxMode,
 	}
 
 	return &Auth{
-		store:        store,
-		username:     cfg.AdminUsername,
-		passwordHash: cfg.AdminPasswordHash,
-		isProduction: cfg.IsProduction(),
+		store:         store,
+		username:      cfg.AdminUsername,
+		passwordHash:  cfg.AdminPasswordHash,
+		secureCookies: cfg.SecureCookies,
 	}, nil
 }
 

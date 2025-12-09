@@ -136,10 +136,6 @@ resource "linode_volume" "beef_briefing_postgres_volume" {
   size      = var.block_storage_size
   linode_id = linode_instance.beef_briefing.id
   tags      = ["beef-briefing", "production", "postgres"]
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 # Attach existing volume to instance if volume_id is provided

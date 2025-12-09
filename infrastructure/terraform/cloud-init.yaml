@@ -120,7 +120,7 @@ runcmd:
   - |
     if [ -n "${new_relic_license_key}" ]; then
       echo "Installing New Relic Infrastructure Agent..."
-      curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && sudo NEW_RELIC_API_KEY="${new_relic_license_key}" NEW_RELIC_ACCOUNT_ID="${new_relic_account_id}" NEW_RELIC_REGION="EU" /usr/local/bin/newrelic install -y
+      curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && NEW_RELIC_API_KEY="${new_relic_license_key}" NEW_RELIC_ACCOUNT_ID="${new_relic_account_id}" NEW_RELIC_REGION="EU" /usr/local/bin/newrelic install -y
     fi
   # Mount block storage for PostgreSQL data
   - |
@@ -161,5 +161,5 @@ runcmd:
     echo "Block storage mounted at $MOUNT_PATH and configured for PostgreSQL"
 
   # Reboot if needed
-  - needrestart -r a
+  - test -f /var/run/reboot-required && (echo "Reboot required. Rebooting now..." && reboot) || echo "No reboot needed"
 final_message: "Beef Briefing server setup completed. Docker, Docker Compose, and Go 1.25.4 installed. SSH hardened with admin user only. System will restart in 1 minute."

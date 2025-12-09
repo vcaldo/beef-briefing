@@ -9,6 +9,7 @@ TELEGRAM_BOT := telegram-bot
 POSTGRES_SERVICE := postgres
 MINIO_SERVICE := minio
 ADMIN_PANEL := admin-panel
+NEWRELIC_INFRA := newrelic-infra
 
 # Go directories
 API_DIR := apps/api-service
@@ -87,6 +88,9 @@ logs-minio: ## Tail logs from minio
 logs-admin-panel: ## Tail logs from admin-panel
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f $(ADMIN_PANEL)
 
+logs-newrelic: ## Tail logs from newrelic-infra
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f $(NEWRELIC_INFRA)
+
 # Shell targets
 shell-api: ## Open shell in api-service container
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec $(API_SERVICE) /bin/bash
@@ -102,6 +106,9 @@ shell-minio: ## Open shell in minio container
 
 shell-admin-panel: ## Open shell in admin-panel container
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec $(ADMIN_PANEL) /bin/bash
+
+shell-newrelic: ## Open shell in newrelic-infra container
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec $(NEWRELIC_INFRA) /bin/sh
 
 # Go build targets
 go-build-api: ## Build api-service binary locally
@@ -341,8 +348,8 @@ deploy: ## Deploy to production server with commit-tagged images
 
 # Phony targets
 .PHONY: help up down restart ps clean prune build build-api build-bot build-postgres build-admin-panel \
-	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel \
-	shell-api shell-bot shell-postgres shell-minio shell-admin-panel \
+	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel logs-newrelic \
+	shell-api shell-bot shell-postgres shell-minio shell-admin-panel shell-newrelic \
 	go-build-api go-build-bot go-build-admin-panel go-build-import-cli go-build go-clean fmt fmt-check \
 	admin-panel-set-secrets admin-panel-set-password admin-panel-set-session \
 	admin-panel-set-secrets-files admin-panel-set-password-file admin-panel-set-session-file \

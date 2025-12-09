@@ -73,7 +73,8 @@ runcmd:
   - docker compose version
   - /usr/local/go/bin/go version
   # Install LazyDocker
-  - GOPATH=/usr/local/go /usr/local/go/bin/go install githulazydocker /usr/local/bin/lazydocker
+  - curl https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
+  - cp $HOME/.local/bin/lazydocker /usr/local/bin/lazydocker
   # Install New Relic Infrastructure Agent (if license key provided)
   - |
     if [ -n "${new_relic_license_key}" ]; then

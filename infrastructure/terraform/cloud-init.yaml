@@ -160,7 +160,6 @@ runcmd:
     chmod 700 "$MOUNT_PATH/pgdata"
     echo "Block storage mounted at $MOUNT_PATH and configured for PostgreSQL"
 
-    # Reboot if necessary to apply changes
   # Reboot if needed
   - needrestart -r a
 final_message: "Beef Briefing server setup completed. Docker, Docker Compose, and Go 1.25.4 installed. SSH hardened with admin user only. System will restart in 1 minute."

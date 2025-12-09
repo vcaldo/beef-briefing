@@ -33,3 +33,66 @@ output "ssh_connection" {
   description = "SSH connection command"
   value       = "ssh admin@${tolist(linode_instance.beef_briefing.ipv4)[0]}"
 }
+
+output "ssh_user_host" {
+  description = "SSH user and host"
+  value       = "admin@${tolist(linode_instance.beef_briefing.ipv4)[0]}"
+}
+
+output "postgres_volume_id" {
+  description = "The ID of the PostgreSQL volume"
+  value       = linode_volume.beef_briefing_postgres_volume.id
+}
+
+output "postgres_volume_size" {
+  description = "The size of the PostgreSQL volume in GB"
+  value       = linode_volume.beef_briefing_postgres_volume.size
+}
+
+output "postgres_volume_filesystem_path" {
+  description = "The filesystem path for the PostgreSQL volume"
+  value       = linode_volume.beef_briefing_postgres_volume.filesystem_path
+}
+
+output "object_storage_endpoint" {
+  description = "The endpoint URL for Linode Object Storage (without https://)"
+  value       = linode_object_storage_bucket.telegram_media_bucket.s3_endpoint
+}
+
+output "object_storage_access_key_id" {
+  description = "The access key ID for Object Storage"
+  value       = linode_object_storage_key.telegram_media_key.access_key
+  sensitive   = true
+}
+
+output "object_storage_secret_access_key" {
+  description = "The secret access key for Object Storage"
+  value       = linode_object_storage_key.telegram_media_key.secret_key
+  sensitive   = true
+}
+
+output "object_storage_bucket_name" {
+  description = "The name of the Object Storage bucket"
+  value       = linode_object_storage_bucket.telegram_media_bucket.label
+}
+
+output "object_storage_region" {
+  description = "The region of the Object Storage bucket"
+  value       = linode_object_storage_bucket.telegram_media_bucket.region
+}
+
+output "deployment_notes" {
+  description = "Important deployment notes and next steps"
+  value       = <<-EOT
+
+    ========================================
+    Beef Briefing Infrastructure Deployed
+    ========================================
+
+    Server IP: ${tolist(linode_instance.beef_briefing.ipv4)[0]}
+    Domain: ${linode_domain.beef_briefing_domain.domain}
+    SSH: ssh admin@${tolist(linode_instance.beef_briefing.ipv4)[0]}
+
+    ========================================
+  EOT
+}

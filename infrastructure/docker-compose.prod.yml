@@ -1,27 +1,26 @@
-# Development environment - local machine
+# Production environment - Linode server
 services:
   postgres:
     image: postgis/postgis:17-3.4
-    container_name: beef-postgres-dev
+    container_name: beef-postgres-prod
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
-    ports:
-      - "${DB_PORT}:5432"
+    # PostgreSQL only accessible via internal Docker network (no external port exposure)
     volumes:
-      - postgres_data_dev:/var/lib/postgresql/data
-      - ../apps/postgres/migrations:/docker-entrypoint-initdb.d/migrations:ro
-      - ../apps/postgres/seeds:/docker-entrypoint-initdb.d/seeds:ro
+      - ${POSTGRES_DATA_PATH:-/mnt/postgres-data}/pgdata:/var/lib/postgresql/data
+      - ./postgres/migrations:/docker-entrypoint-initdb.d:ro
     networks:
-      - beef-dev-network
+      - beef-prod-network
     restart: unless-stopped
 
   api-service:
     build:
       context: ..
       dockerfile: apps/api-service/Dockerfile
-    container_name: beef-api-service-dev
+    image: beef-briefing/api-service:${IMAGE_TAG}
+    container_name: beef-api-service-prod
     environment:
       DB_HOST: postgres
       DB_USER: ${DB_USER}
@@ -31,59 +30,44 @@ services:
       DB_SSL_MODE: disable
       API_PORT: ${API_PORT}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_BUCKET: telegram-media
-      MINIO_USE_SSL: false
-      ENVIRONMENT: development
-      LOG_LEVEL: debug
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_USE_SSL: ${MINIO_USE_SSL}
+      ENVIRONMENT: production
+      LOG_LEVEL: info
     ports:
       - "${API_PORT}:${API_PORT}"
     depends_on:
       - postgres
-      - minio
     networks:
-      - beef-dev-network
-    restart: unless-stopped
-
-  minio:
-    image: minio/minio:latest
-    container_name: beef-minio-dev
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data_dev:/minio_data
-    command: minio server /minio_data --console-address ":9001"
-    networks:
-      - beef-dev-network
+      - beef-prod-network
     restart: unless-stopped
 
   telegram-bot:
     build:
       context: ..
       dockerfile: apps/telegram-bot/Dockerfile
-    container_name: beef-telegram-bot-dev
+    image: beef-briefing/telegram-bot:${IMAGE_TAG}
+    container_name: beef-telegram-bot-prod
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       API_SERVICE_URL: http://api-service:${API_PORT}
-      ENVIRONMENT: development
-      LOG_LEVEL: debug
+      ENVIRONMENT: production
+      LOG_LEVEL: info
     depends_on:
       - api-service
     networks:
-      - beef-dev-network
+      - beef-prod-network
     restart: unless-stopped
 
   admin-panel:
     build:
       context: ..
       dockerfile: apps/admin-panel/Dockerfile
-    container_name: beef-admin-panel-dev
+    image: beef-briefing/admin-panel:${IMAGE_TAG}
+    container_name: beef-admin-panel-prod
     environment:
       DB_HOST: postgres
       DB_USER: ${DB_USER}
@@ -95,22 +79,33 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD_HASH_FILE: ${ADMIN_PASSWORD_HASH_FILE}
       SESSION_SECRET_FILE: ${SESSION_SECRET_FILE}
-      ENVIRONMENT: development
-      LOG_LEVEL: debug
+      SECURE_COOKIES: false
+      ENVIRONMENT: production
+      LOG_LEVEL: info
     volumes:
-      - ./secrets:/app/secrets:ro
+      - ./secrets/admin-panel:/app/secrets:ro
     ports:
       - "${ADMIN_PANEL_PORT:-8081}:${ADMIN_PANEL_PORT:-8081}"
     depends_on:
       - postgres
     networks:
-      - beef-dev-network
+      - beef-prod-network
     restart: unless-stopped
 
-volumes:
-  postgres_data_dev:
-  minio_data_dev:
+  newrelic-infra:
+    image: newrelic/infrastructure:latest
+    container_name: beef-newrelic-infra-prod
+    cap_add:
+      - SYS_PTRACE
+    network_mode: bridge
+    pid: host
+    privileged: true
+    volumes:
+      - "/:/host:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./secrets/new-relic/newrelic-infra.yml:/etc/newrelic-infra.yml:ro"
+    restart: unless-stopped
 
 networks:
-  beef-dev-network:
+  beef-prod-network:
     driver: bridge

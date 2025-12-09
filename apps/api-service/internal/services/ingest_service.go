@@ -209,8 +209,16 @@ func (s *IngestService) processMessage(ctx context.Context, tx *sql.Tx, msg *mod
 }
 
 func (s *IngestService) processMedia(ctx context.Context, tx *sql.Tx, messageID int64, msg *models.Message, files map[string][]byte) error {
+	// Track processed file IDs to prevent duplicates (e.g., GIFs with both Document and Animation fields)
+	processedFileIDs := make(map[string]bool)
+
 	// Process photos
 	for _, photo := range msg.Photo {
+		if processedFileIDs[photo.FileID] {
+			slog.Debug("skipping duplicate photo file_id", "file_id", photo.FileID)
+			continue
+		}
+
 		data, ok := files[photo.FileID]
 		if !ok {
 			slog.Warn("photo file not found in request, skipping", "file_id", photo.FileID)
@@ -225,60 +233,74 @@ func (s *IngestService) processMedia(ctx context.Context, tx *sql.Tx, messageID 
 
 		if err := s.mediaRepo.InsertPhoto(ctx, tx, messageID, &photo, objectKey, fileHash); err != nil {
 			slog.Warn("failed to insert photo", "error", err)
+		} else {
+			processedFileIDs[photo.FileID] = true
 		}
 	}
 
 	// Process video
-	if msg.Video != nil {
+	if msg.Video != nil && msg.Video.FileID != "" && !processedFileIDs[msg.Video.FileID] {
 		if err := s.processMediaFile(ctx, tx, messageID, "video", msg.Video.FileID, msg.Video.FileUniqueID,
 			msg.Video.FileSize, msg.Video.MimeType, msg.Video.FileName,
 			&msg.Video.Duration, &msg.Video.Width, &msg.Video.Height, "", "", files); err != nil {
 			slog.Error("failed to process video", "error", err)
+		} else {
+			processedFileIDs[msg.Video.FileID] = true
 		}
 	}
 
 	// Process audio
-	if msg.Audio != nil {
+	if msg.Audio != nil && msg.Audio.FileID != "" && !processedFileIDs[msg.Audio.FileID] {
 		if err := s.processMediaFile(ctx, tx, messageID, "audio", msg.Audio.FileID, msg.Audio.FileUniqueID,
 			msg.Audio.FileSize, msg.Audio.MimeType, msg.Audio.FileName,
 			&msg.Audio.Duration, nil, nil, msg.Audio.Performer, msg.Audio.Title, files); err != nil {
 			slog.Error("failed to process audio", "error", err)
+		} else {
+			processedFileIDs[msg.Audio.FileID] = true
 		}
 	}
 
 	// Process voice
-	if msg.Voice != nil {
+	if msg.Voice != nil && msg.Voice.FileID != "" && !processedFileIDs[msg.Voice.FileID] {
 		if err := s.processMediaFile(ctx, tx, messageID, "voice", msg.Voice.FileID, msg.Voice.FileUniqueID,
 			msg.Voice.FileSize, msg.Voice.MimeType, "",
 			&msg.Voice.Duration, nil, nil, "", "", files); err != nil {
 			slog.Error("failed to process voice", "error", err)
+		} else {
+			processedFileIDs[msg.Voice.FileID] = true
 		}
 	}
 
-	// Process document
-	if msg.Document != nil {
-		if err := s.processMediaFile(ctx, tx, messageID, "document", msg.Document.FileID, msg.Document.FileUniqueID,
-			msg.Document.FileSize, msg.Document.MimeType, msg.Document.FileName,
-			nil, nil, nil, "", "", files); err != nil {
-			slog.Error("failed to process document", "error", err)
-		}
-	}
-
-	// Process animation
-	if msg.Animation != nil {
+	// Process animation BEFORE document (has richer metadata for GIFs: width, height, duration)
+	if msg.Animation != nil && msg.Animation.FileID != "" && !processedFileIDs[msg.Animation.FileID] {
 		if err := s.processMediaFile(ctx, tx, messageID, "animation", msg.Animation.FileID, msg.Animation.FileUniqueID,
 			msg.Animation.FileSize, msg.Animation.MimeType, msg.Animation.FileName,
 			&msg.Animation.Duration, &msg.Animation.Width, &msg.Animation.Height, "", "", files); err != nil {
 			slog.Error("failed to process animation", "error", err)
+		} else {
+			processedFileIDs[msg.Animation.FileID] = true
+		}
+	}
+
+	// Process document AFTER animation (GIFs may have both fields with same file_id)
+	if msg.Document != nil && msg.Document.FileID != "" && !processedFileIDs[msg.Document.FileID] {
+		if err := s.processMediaFile(ctx, tx, messageID, "document", msg.Document.FileID, msg.Document.FileUniqueID,
+			msg.Document.FileSize, msg.Document.MimeType, msg.Document.FileName,
+			nil, nil, nil, "", "", files); err != nil {
+			slog.Error("failed to process document", "error", err)
+		} else {
+			processedFileIDs[msg.Document.FileID] = true
 		}
 	}
 
 	// Process video note
-	if msg.VideoNote != nil {
+	if msg.VideoNote != nil && msg.VideoNote.FileID != "" && !processedFileIDs[msg.VideoNote.FileID] {
 		if err := s.processMediaFile(ctx, tx, messageID, "video_note", msg.VideoNote.FileID, msg.VideoNote.FileUniqueID,
 			msg.VideoNote.FileSize, "", "",
 			&msg.VideoNote.Duration, &msg.VideoNote.Length, &msg.VideoNote.Length, "", "", files); err != nil {
 			slog.Error("failed to process video note", "error", err)
+		} else {
+			processedFileIDs[msg.VideoNote.FileID] = true
 		}
 	}
 

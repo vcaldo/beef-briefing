@@ -11,8 +11,7 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
-      - ../apps/postgres/migrations:/docker-entrypoint-initdb.d/migrations:ro
-      - ../apps/postgres/seeds:/docker-entrypoint-initdb.d/seeds:ro
+      - ../apps/postgres/migrations:/docker-entrypoint-initdb.d:ro
     networks:
       - beef-dev-network
     restart: unless-stopped
@@ -98,7 +97,7 @@ services:
       ENVIRONMENT: development
       LOG_LEVEL: debug
     volumes:
-      - ./secrets:/app/secrets:ro
+      - ./secrets/apps/admin-panel:/app/secrets:ro
     ports:
       - "${ADMIN_PANEL_PORT:-8081}:${ADMIN_PANEL_PORT:-8081}"
     depends_on:

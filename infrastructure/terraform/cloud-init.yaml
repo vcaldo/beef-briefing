@@ -132,4 +132,13 @@ runcmd:
     chown -R 999:999 "$MOUNT_PATH/pgdata"
     chmod 700 "$MOUNT_PATH/pgdata"
     echo "Block storage mounted at $MOUNT_PATH and configured for PostgreSQL"
-final_message: "Beef Briefing server setup completed. Docker, Docker Compose, and Go 1.25.4 installed. SSH hardened with admin user only. System will restart in 1 minute."
+  # Reboot only if required (kernel updates, etc.)
+  - |
+    if [ -f /var/run/reboot-required ]; then
+      echo "Reboot required, rebooting in 10 seconds..."
+      sleep 10
+      reboot
+    else
+      echo "No reboot required"
+    fi
+final_message: "Beef Briefing server setup completed. Docker, Docker Compose, and Go 1.25.4 installed. SSH hardened with admin user only."

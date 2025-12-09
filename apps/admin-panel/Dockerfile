@@ -1,6 +1,9 @@
 # Build stage
 FROM golang:1.25-alpine AS builder
 
+# TARGETARCH is automatically set by Docker when using --platform
+ARG TARGETARCH
+
 WORKDIR /app
 
 # Install templ CLI
@@ -17,7 +20,7 @@ COPY apps/admin-panel/ .
 RUN templ generate
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -a -installsuffix cgo -o main ./cmd
 
 # Runtime stage
 FROM alpine:3.21

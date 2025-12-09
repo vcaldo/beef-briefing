@@ -77,6 +77,24 @@ get_ssh_host() {
     }
 }
 
+# Get remote server CPU architecture (returns GOARCH-compatible value: amd64, arm64, arm)
+get_remote_arch() {
+    local ssh_host="$1"
+    local arch_raw
+    arch_raw=$(ssh "$ssh_host" 'uname -m' 2>/dev/null) || {
+        log_warn "Failed to detect remote architecture, defaulting to amd64"
+        echo "amd64"
+        return
+    }
+
+    case "$arch_raw" in
+        x86_64)  echo "amd64" ;;
+        aarch64) echo "arm64" ;;
+        armv7l)  echo "arm" ;;
+        *)       echo "amd64" ;;
+    esac
+}
+
 # Get current git commit hash (short)
 get_commit_hash() {
     git -C "$PROJECT_ROOT" rev-parse --short HEAD

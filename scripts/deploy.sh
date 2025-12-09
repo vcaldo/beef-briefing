@@ -66,6 +66,25 @@ log_success "SSH host: $SSH_HOST"
 COMMIT_HASH=$(get_commit_hash)
 log_success "Commit hash: $COMMIT_HASH"
 
+# Detect remote server architecture for cross-platform builds
+log_info "Detecting remote server architecture..."
+REMOTE_ARCH=$(get_remote_arch "$SSH_HOST")
+HOST_ARCH=$(uname -m)
+case "$HOST_ARCH" in
+    x86_64)  HOST_GOARCH="amd64" ;;
+    aarch64|arm64) HOST_GOARCH="arm64" ;;
+    armv7l)  HOST_GOARCH="arm" ;;
+    *)       HOST_GOARCH="amd64" ;;
+esac
+
+if [[ "$HOST_GOARCH" != "$REMOTE_ARCH" ]]; then
+    log_warn "Cross-platform build: local $HOST_GOARCH -> remote $REMOTE_ARCH"
+    DOCKER_PLATFORM="linux/$REMOTE_ARCH"
+else
+    log_success "Native build: $REMOTE_ARCH"
+    DOCKER_PLATFORM="linux/$REMOTE_ARCH"
+fi
+
 # =============================================================================
 # SAVE PREVIOUS TAG (for rollback)
 # =============================================================================
@@ -93,9 +112,9 @@ log_success "Updated IMAGE_TAG to $COMMIT_HASH"
 # BUILD DOCKER IMAGES
 # =============================================================================
 if [[ "$SKIP_BUILD" == "false" ]]; then
-    log_step "Building Docker images..."
-    docker compose -f "$PROD_COMPOSE_FILE" --env-file "$PROD_ENV_FILE" build
-    log_success "Docker images built"
+    log_step "Building Docker images for platform $DOCKER_PLATFORM..."
+    DOCKER_DEFAULT_PLATFORM="$DOCKER_PLATFORM" docker compose -f "$PROD_COMPOSE_FILE" --env-file "$PROD_ENV_FILE" build
+    log_success "Docker images built for $DOCKER_PLATFORM"
 
     # Verify images exist
     log_info "Verifying built images..."

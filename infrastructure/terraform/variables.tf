@@ -77,9 +77,3 @@ variable "block_storage_mount_path" {
   type        = string
   default     = "/mnt/postgres-data"
 }
-
-variable "volume_id" {
-  description = "ID of the existing Linode volume to attach (if empty, a new volume will be created)"
-  type        = number
-  default     = null
-}

@@ -26,9 +26,3 @@ region = "es-mad"
 # Optional: New Relic license key for infrastructure monitoring
 # new_relic_license_key = "your-new-relic-license-key"
 
-# Optional: Use an existing Linode volume instead of creating a new one
-# If set, Terraform will attach this volume instead of creating a new one
-# This prevents volume deletion when running terraform destroy
-# Get volume ID from: https://cloud.linode.com/volumes
-# volume_id = 123456
-

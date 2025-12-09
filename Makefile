@@ -416,13 +416,13 @@ PROD_COMPOSE_FILE := infrastructure/docker-compose.prod.yml
 PROD_ENV_FILE := infrastructure/.env.prod
 COMMIT_HASH ?= $(shell git rev-parse --short HEAD)
 
-deploy: ## Deploy to production server with commit-tagged images
+deploy: tf-sync-object-storage-env ## Deploy to production server with commit-tagged images
 	@./scripts/deploy.sh
 
-deploy-skip-build: ## Deploy using existing images (skip build step)
+deploy-skip-build: tf-sync-object-storage-env ## Deploy using existing images (skip build step)
 	@./scripts/deploy.sh --skip-build
 
-deploy-skip-cleanup: ## Deploy without cleaning up old images
+deploy-skip-cleanup: tf-sync-object-storage-env ## Deploy without cleaning up old images
 	@./scripts/deploy.sh --skip-cleanup
 
 rollback: ## Rollback to previous deployment

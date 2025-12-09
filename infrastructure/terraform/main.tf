@@ -128,8 +128,9 @@ resource "linode_domain_record" "beef_briefing_www_record" {
   ttl_sec     = 300
 }
 
-# Block storage volume for PostgreSQL persistent data
+# Use existing volume if volume_id is provided, otherwise create a new one
 resource "linode_volume" "beef_briefing_postgres_volume" {
+  count     = var.volume_id == null ? 1 : 0
   label     = var.block_storage_label
   region    = var.region
   size      = var.block_storage_size
@@ -139,4 +140,11 @@ resource "linode_volume" "beef_briefing_postgres_volume" {
   lifecycle {
     prevent_destroy = true
   }
+}
+
+# Attach existing volume to instance if volume_id is provided
+resource "linode_volume_attachment" "beef_briefing_volume_attach" {
+  count     = var.volume_id != null ? 1 : 0
+  volume_id = var.volume_id
+  linode_id = linode_instance.beef_briefing.id
 }

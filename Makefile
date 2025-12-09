@@ -301,6 +301,8 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 		if [ -n "$$DOMAIN_NAME" ]; then \
 			sed -i "s|# domain_name = \".*\"|domain_name = \"$$DOMAIN_NAME\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated domain_name from $$ENV_FILE"; \
+			sed -i "s|# domain_email = \".*\"|domain_email = \"admin@$$DOMAIN_NAME\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated domain_email as admin@$$DOMAIN_NAME"; \
 		fi; \
 		if [ -n "$$NEW_RELIC_KEY" ]; then \
 			sed -i "s|# new_relic_license_key = \".*\"|new_relic_license_key = \"$$NEW_RELIC_KEY\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
@@ -338,6 +340,11 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 		if [ -n "$$MINIO_BUCKET" ]; then \
 			sed -i "s|# object_storage_bucket_label = \".*\"|object_storage_bucket_label = \"$$MINIO_BUCKET\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated object_storage_bucket_label from $$ENV_FILE"; \
+		fi; \
+		OBJECT_STORAGE_VERSIONING=$$(grep '^OBJECT_STORAGE_VERSIONING=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		if [ -n "$$OBJECT_STORAGE_VERSIONING" ]; then \
+			sed -i "s|# object_storage_versioning = .*|object_storage_versioning = $$OBJECT_STORAGE_VERSIONING|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated object_storage_versioning from $$ENV_FILE"; \
 		fi; \
 		OBJECT_STORAGE_LIFECYCLE_DAYS=$$(grep '^OBJECT_STORAGE_LIFECYCLE_DAYS=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		if [ -n "$$OBJECT_STORAGE_LIFECYCLE_DAYS" ]; then \

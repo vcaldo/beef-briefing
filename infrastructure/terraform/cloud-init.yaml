@@ -80,6 +80,21 @@ runcmd:
       echo "Installing New Relic Infrastructure Agent..."
       curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && sudo NEW_RELIC_API_KEY="${new_relic_license_key}" NEW_RELIC_ACCOUNT_ID="${new_relic_account_id}" NEW_RELIC_REGION="EU" /usr/local/bin/newrelic install -y
     fi
+  # Attach existing block storage volume using Linode CLI (if volume ID provided)
+  - |
+    if [ -n "${linode_volume_id}" ]; then
+      echo "Attaching existing block storage volume ${linode_volume_id}..."
+      # Get instance ID from metadata service
+      INSTANCE_ID=$(curl -s http://169.254.169.254/v1/instance-id)
+      echo "Instance ID: $INSTANCE_ID"
+      curl -s -X POST \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${linode_token}" \
+        -d "{\"linode_id\": $INSTANCE_ID}" \
+        "https://api.linode.com/v4/volumes/${linode_volume_id}/attach"
+      echo "Volume attachment request sent"
+      sleep 5
+    fi
   # Mount block storage for PostgreSQL data
   - |
     echo "Waiting for block storage device to appear..."

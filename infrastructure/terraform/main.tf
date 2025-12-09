@@ -85,6 +85,8 @@ locals {
     new_relic_region         = var.new_relic_region
     block_storage_label      = var.block_storage_label
     block_storage_mount_path = var.block_storage_mount_path
+    linode_token             = var.linode_token
+    linode_volume_id         = var.linode_volume_id != null ? var.linode_volume_id : ""
   })
 }
 
@@ -128,11 +130,7 @@ resource "linode_domain_record" "beef_briefing_www_record" {
   ttl_sec     = 300
 }
 
-# Block storage volume for PostgreSQL persistent data
-resource "linode_volume" "beef_briefing_postgres_volume" {
-  label     = var.block_storage_label
-  region    = var.region
-  size      = var.block_storage_size
-  linode_id = linode_instance.beef_briefing.id
-  tags      = ["beef-briefing", "production", "postgres"]
-}
+# NOTE: Block storage volume is managed outside of Terraform
+# The volume is attached via cloud-init using Linode CLI
+# This ensures the volume persists across terraform destroy cycles
+# Set linode_volume_id in terraform.tfvars to attach an existing volume

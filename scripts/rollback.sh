@@ -50,7 +50,7 @@ log_success "SSH host: $SSH_HOST"
 log_step "Checking for previous deployment..."
 
 # Get previous tag from server
-PREVIOUS_TAG=$(remote_exec "$SSH_HOST" "cat $REMOTE_PREVIOUS_TAG_FILE 2>/dev/null" || echo "")
+PREVIOUS_TAG=$(remote_exec "$SSH_HOST" "cat ~/beef-briefing/.previous_tag 2>/dev/null" || echo "")
 
 if [[ -z "$PREVIOUS_TAG" ]]; then
     log_error "No previous deployment found. Cannot rollback."
@@ -124,7 +124,7 @@ remote_exec "$SSH_HOST" "
     cd ~/beef-briefing
 
     # Update IMAGE_TAG in .env
-    sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/' .env
+    sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG='$PREVIOUS_TAG'/' .env
 
     # Restart services with previous images
     docker compose up -d

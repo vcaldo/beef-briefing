@@ -76,7 +76,7 @@ PREVIOUS_TAG=$(remote_exec "$SSH_HOST" "cat $REMOTE_APP_DIR/.env 2>/dev/null | g
 
 if [[ -n "$PREVIOUS_TAG" && "$PREVIOUS_TAG" != "$COMMIT_HASH" ]]; then
     log_info "Previous tag: $PREVIOUS_TAG"
-    remote_exec "$SSH_HOST" "echo '$PREVIOUS_TAG' > $REMOTE_PREVIOUS_TAG_FILE"
+    remote_exec "$SSH_HOST" "mkdir -p ~/beef-briefing && echo '$PREVIOUS_TAG' > ~/beef-briefing/.previous_tag"
     log_success "Saved previous tag for rollback"
 else
     log_warn "No previous tag to save (first deployment or same version)"

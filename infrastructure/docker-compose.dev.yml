@@ -1,9 +1,7 @@
 # Development environment - local machine
 services:
   postgres:
-    build:
-      context: ../apps/postgres
-      dockerfile: Dockerfile
+    image: postgis/postgis:17-3.4
     container_name: beef-postgres-dev
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -13,6 +11,8 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
+      - ../apps/postgres/migrations:/docker-entrypoint-initdb.d/migrations:ro
+      - ../apps/postgres/seeds:/docker-entrypoint-initdb.d/seeds:ro
     networks:
       - beef-dev-network
     restart: unless-stopped

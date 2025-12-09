@@ -63,9 +63,6 @@ build-api: ## Rebuild api-service image
 build-bot: ## Rebuild telegram-bot image
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) build $(TELEGRAM_BOT)
 
-build-postgres: ## Rebuild postgres image
-	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) build $(POSTGRES_SERVICE)
-
 build-admin-panel: ## Rebuild admin-panel image
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) build $(ADMIN_PANEL)
 
@@ -323,7 +320,6 @@ deploy: ## Deploy to production server with commit-tagged images
 	@docker images | grep "beef-briefing.*$(COMMIT_HASH)" || (echo "❌ Error: Images not built with tag $(COMMIT_HASH)" && exit 1)
 	@echo "💾 Saving images to /tmp/images-$(COMMIT_HASH).tar.gz..."
 	@docker save \
-		beef-briefing/postgres:$(COMMIT_HASH) \
 		beef-briefing/api-service:$(COMMIT_HASH) \
 		beef-briefing/telegram-bot:$(COMMIT_HASH) \
 		beef-briefing/admin-panel:$(COMMIT_HASH) \
@@ -333,13 +329,17 @@ deploy: ## Deploy to production server with commit-tagged images
 	@scp $(PROD_COMPOSE_FILE) $$($(MAKE) -s tf-ssh-user-host):/tmp/docker-compose.yml
 	@scp $(PROD_ENV_FILE) $$($(MAKE) -s tf-ssh-user-host):/tmp/.env
 	@scp -r infrastructure/secrets $$($(MAKE) -s tf-ssh-user-host):/tmp/
+	@scp -r apps/postgres/migrations $$($(MAKE) -s tf-ssh-user-host):/tmp/postgres-migrations
+	@scp -r apps/postgres/seeds $$($(MAKE) -s tf-ssh-user-host):/tmp/postgres-seeds
 	@scp /tmp/images-$(COMMIT_HASH).tar.gz $$($(MAKE) -s tf-ssh-user-host):/tmp/
 	@echo "🚢 Deploying on server..."
 	@ssh $$($(MAKE) -s tf-ssh-user-host) '\
-		mkdir -p ~/beef-briefing && \
+		mkdir -p ~/beef-briefing/postgres && \
 		mv /tmp/docker-compose.yml ~/beef-briefing/ && \
 		mv /tmp/.env ~/beef-briefing/ && \
 		rm -rf ~/beef-briefing/secrets && mv /tmp/secrets ~/beef-briefing/ && \
+		rm -rf ~/beef-briefing/postgres/migrations && mv /tmp/postgres-migrations ~/beef-briefing/postgres/migrations && \
+		rm -rf ~/beef-briefing/postgres/seeds && mv /tmp/postgres-seeds ~/beef-briefing/postgres/seeds && \
 		gunzip -c /tmp/images-$(COMMIT_HASH).tar.gz | docker load && \
 		cd ~/beef-briefing && docker compose up -d && \
 		rm /tmp/images-$(COMMIT_HASH).tar.gz'

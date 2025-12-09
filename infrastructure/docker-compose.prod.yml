@@ -1,10 +1,7 @@
 # Production environment - Linode server
 services:
   postgres:
-    build:
-      context: ../apps/postgres
-      dockerfile: Dockerfile
-    image: beef-briefing/postgres:${IMAGE_TAG}
+    image: postgis/postgis:17-3.4
     container_name: beef-postgres-prod
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -14,6 +11,8 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - ${POSTGRES_DATA_PATH:-/mnt/postgres-data}/pgdata:/var/lib/postgresql/data
+      - ./postgres/migrations:/docker-entrypoint-initdb.d/migrations:ro
+      - ./postgres/seeds:/docker-entrypoint-initdb.d/seeds:ro
     networks:
       - beef-prod-network
     restart: unless-stopped

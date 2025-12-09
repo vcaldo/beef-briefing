@@ -94,6 +94,15 @@ func (h *UpdateHandler) Handle(ctx context.Context, b *bot.Bot, update *models.U
 // extractFileIDs extracts all file IDs from an update
 func (h *UpdateHandler) extractFileIDs(update *models.Update) []string {
 	var fileIDs []string
+	seenFileIDs := make(map[string]bool)
+
+	// Helper function to add file ID only if not already seen
+	addFileID := func(fileID string) {
+		if fileID != "" && !seenFileIDs[fileID] {
+			fileIDs = append(fileIDs, fileID)
+			seenFileIDs[fileID] = true
+		}
+	}
 
 	// Helper function to process a message
 	processMessage := func(msg *models.Message) {
@@ -104,48 +113,48 @@ func (h *UpdateHandler) extractFileIDs(update *models.Update) []string {
 		// Photo - get largest size only (last in array)
 		if len(msg.Photo) > 0 {
 			largest := msg.Photo[len(msg.Photo)-1]
-			fileIDs = append(fileIDs, largest.FileID)
+			addFileID(largest.FileID)
 		}
 
 		// Video
 		if msg.Video != nil {
-			fileIDs = append(fileIDs, msg.Video.FileID)
+			addFileID(msg.Video.FileID)
 		}
 
 		// Audio
 		if msg.Audio != nil {
-			fileIDs = append(fileIDs, msg.Audio.FileID)
+			addFileID(msg.Audio.FileID)
 		}
 
 		// Voice
 		if msg.Voice != nil {
-			fileIDs = append(fileIDs, msg.Voice.FileID)
+			addFileID(msg.Voice.FileID)
 		}
 
-		// Document
-		if msg.Document != nil {
-			fileIDs = append(fileIDs, msg.Document.FileID)
-		}
-
-		// Animation
+		// Animation - process before Document (has richer metadata for GIFs)
 		if msg.Animation != nil {
-			fileIDs = append(fileIDs, msg.Animation.FileID)
+			addFileID(msg.Animation.FileID)
+		}
+
+		// Document - may have same file_id as Animation for GIFs, deduplication handles it
+		if msg.Document != nil {
+			addFileID(msg.Document.FileID)
 		}
 
 		// VideoNote
 		if msg.VideoNote != nil {
-			fileIDs = append(fileIDs, msg.VideoNote.FileID)
+			addFileID(msg.VideoNote.FileID)
 		}
 
 		// Sticker
 		if msg.Sticker != nil {
-			fileIDs = append(fileIDs, msg.Sticker.FileID)
+			addFileID(msg.Sticker.FileID)
 		}
 
 		// Game photos - get largest size only
 		if msg.Game != nil && len(msg.Game.Photo) > 0 {
 			largest := msg.Game.Photo[len(msg.Game.Photo)-1]
-			fileIDs = append(fileIDs, largest.FileID)
+			addFileID(largest.FileID)
 		}
 	}
 

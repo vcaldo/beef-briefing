@@ -42,6 +42,7 @@ func (r *MediaRepository) GetObjectKeyByHash(ctx context.Context, tx *sql.Tx, fi
 }
 
 // InsertMediaFile inserts a media file record
+// objectKey and fileHash can be empty strings if the file was not downloaded/stored
 func (r *MediaRepository) InsertMediaFile(ctx context.Context, tx *sql.Tx, messageID int64, mediaType, fileID, fileUniqueID, objectKey, fileHash string, fileSize *int64, mimeType, fileName string, duration, width, height *int, performer, title string) error {
 	query := `
 		INSERT INTO media_files (
@@ -56,8 +57,8 @@ func (r *MediaRepository) InsertMediaFile(ctx context.Context, tx *sql.Tx, messa
 		mediaType,
 		fileID,
 		fileUniqueID,
-		objectKey,
-		fileHash,
+		NullString(objectKey), // NULL if file wasn't downloaded
+		NullString(fileHash),  // NULL if file wasn't downloaded
 		NullInt64(fileSize),
 		NullString(mimeType),
 		NullString(fileName),

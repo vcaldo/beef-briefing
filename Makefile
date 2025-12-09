@@ -275,6 +275,9 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 			exit 0; \
 		fi; \
 		LINODE_TOKEN=$$(grep '^LINODE_TOKEN=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		LINODE_REGION=$$(grep '^LINODE_REGION=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		LINODE_INSTANCE_TYPE=$$(grep '^LINODE_INSTANCE_TYPE=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		LINODE_HOSTNAME=$$(grep '^LINODE_HOSTNAME=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		DOMAIN_NAME=$$(grep '^DOMAIN_NAME=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		NEW_RELIC_KEY=$$(grep '^NEW_RELIC_LICENSE_KEY=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		NEW_RELIC_ACCOUNT=$$(grep '^NEW_RELIC_ACCOUNT_ID=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
@@ -283,17 +286,34 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 			sed -i "s|linode_token = \".*\"|linode_token = \"$$LINODE_TOKEN\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated linode_token from $$ENV_FILE"; \
 		fi; \
+		if [ -n "$$LINODE_REGION" ]; then \
+			sed -i "s|# region = \".*\"|region = \"$$LINODE_REGION\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated region from $$ENV_FILE"; \
+		fi; \
+		if [ -n "$$LINODE_INSTANCE_TYPE" ]; then \
+			sed -i "s|# instance_type = \".*\"|instance_type = \"$$LINODE_INSTANCE_TYPE\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated instance_type from $$ENV_FILE"; \
+		fi; \
+		if [ -n "$$LINODE_HOSTNAME" ]; then \
+			sed -i "s|# hostname = \".*\"|hostname = \"$$LINODE_HOSTNAME\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated hostname from $$ENV_FILE"; \
+		fi; \
 		if [ -n "$$DOMAIN_NAME" ]; then \
 			sed -i "s|# domain_name = \".*\"|domain_name = \"$$DOMAIN_NAME\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated domain_name from $$ENV_FILE"; \
 		fi; \
 		if [ -n "$$NEW_RELIC_KEY" ]; then \
-			echo "new_relic_license_key = \"$$NEW_RELIC_KEY\"" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			sed -i "s|# new_relic_license_key = \".*\"|new_relic_license_key = \"$$NEW_RELIC_KEY\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated new_relic_license_key from $$ENV_FILE"; \
 		fi; \
 		if [ -n "$$NEW_RELIC_ACCOUNT" ]; then \
-			echo "new_relic_account_id = \"$$NEW_RELIC_ACCOUNT\"" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			sed -i "s|# new_relic_account_id = \".*\"|new_relic_account_id = \"$$NEW_RELIC_ACCOUNT\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated new_relic_account_id from $$ENV_FILE"; \
+		fi; \
+		NEW_RELIC_REGION=$$(grep '^NEW_RELIC_REGION=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		if [ -n "$$NEW_RELIC_REGION" ]; then \
+			sed -i "s|# new_relic_region = \".*\"|new_relic_region = \"$$NEW_RELIC_REGION\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated new_relic_region from $$ENV_FILE"; \
 		fi; \
 		if [ -n "$$SSH_KEY_PATH" ]; then \
 			sed -i "s|# ssh_public_key_path = \".*\"|ssh_public_key_path = \"$$SSH_KEY_PATH\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
@@ -301,22 +321,32 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 		fi; \
 		POSTGRES_VOLUME_SIZE=$$(grep '^POSTGRES_VOLUME_SIZE=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		if [ -n "$$POSTGRES_VOLUME_SIZE" ]; then \
-			echo "postgres_volume_size = $$POSTGRES_VOLUME_SIZE" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			sed -i "s|# postgres_volume_size = .*|postgres_volume_size = $$POSTGRES_VOLUME_SIZE|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated postgres_volume_size from $$ENV_FILE"; \
+		fi; \
+		POSTGRES_DATA_PATH=$$(grep '^POSTGRES_DATA_PATH=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		if [ -n "$$POSTGRES_DATA_PATH" ]; then \
+			sed -i "s|# postgres_volume_mount_path = \".*\"|postgres_volume_mount_path = \"$$POSTGRES_DATA_PATH\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated postgres_volume_mount_path from $$ENV_FILE"; \
 		fi; \
 		OBJECT_STORAGE_REGION=$$(grep '^OBJECT_STORAGE_REGION=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		if [ -n "$$OBJECT_STORAGE_REGION" ]; then \
-			echo "object_storage_region = \"$$OBJECT_STORAGE_REGION\"" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			sed -i "s|# object_storage_region = \".*\"|object_storage_region = \"$$OBJECT_STORAGE_REGION\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated object_storage_region from $$ENV_FILE"; \
+		fi; \
+		MINIO_BUCKET=$$(grep '^MINIO_BUCKET=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		if [ -n "$$MINIO_BUCKET" ]; then \
+			sed -i "s|# object_storage_bucket_label = \".*\"|object_storage_bucket_label = \"$$MINIO_BUCKET\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated object_storage_bucket_label from $$ENV_FILE"; \
 		fi; \
 		OBJECT_STORAGE_LIFECYCLE_DAYS=$$(grep '^OBJECT_STORAGE_LIFECYCLE_DAYS=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		if [ -n "$$OBJECT_STORAGE_LIFECYCLE_DAYS" ]; then \
-			echo "object_storage_lifecycle_expiration_days = $$OBJECT_STORAGE_LIFECYCLE_DAYS" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			sed -i "s|# object_storage_lifecycle_expiration_days = .*|object_storage_lifecycle_expiration_days = $$OBJECT_STORAGE_LIFECYCLE_DAYS|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated object_storage_lifecycle_expiration_days from $$ENV_FILE"; \
 		fi; \
 		OBJECT_STORAGE_VERSION_RETENTION_DAYS=$$(grep '^OBJECT_STORAGE_VERSION_RETENTION_DAYS=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		if [ -n "$$OBJECT_STORAGE_VERSION_RETENTION_DAYS" ]; then \
-			echo "object_storage_noncurrent_version_expiration_days = $$OBJECT_STORAGE_VERSION_RETENTION_DAYS" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			sed -i "s|# object_storage_noncurrent_version_expiration_days = .*|object_storage_noncurrent_version_expiration_days = $$OBJECT_STORAGE_VERSION_RETENTION_DAYS|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated object_storage_noncurrent_version_expiration_days from $$ENV_FILE"; \
 		fi; \
 		echo "Setup complete! Review $(TERRAFORM_DIR)/terraform.tfvars before applying."; \

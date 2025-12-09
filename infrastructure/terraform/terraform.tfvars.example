@@ -2,43 +2,88 @@
 # Copy this file to terraform.tfvars and fill in your actual values
 # terraform.tfvars is gitignored for security
 
-# Required: Your Linode API token
+# =============================================================================
+# REQUIRED VARIABLES
+# =============================================================================
+
+# Your Linode API token
 # Get it from: https://cloud.linode.com/profile/tokens
 linode_token = "your-linode-api-token-here"
 
-# Optional: Override default region (default: es-mad - Madrid)
-# Available regions: eu-central, us-east, us-central, us-southeast, etc.
-region = "es-mad"
+# =============================================================================
+# LINODE INSTANCE CONFIGURATION
+# =============================================================================
 
-# Optional: Override domain name (default: mydomain.example)
-# domain_name = "mydomain.example"
+# Linode region for deployment (default: eu-central)
+# Available regions: eu-central, es-mad, us-east, us-central, us-southeast, etc.
+# region = "eu-central"
 
-# Optional: Override domain email (default: admin@mydomain.example)
-# domain_email = "admin@mydomain.example"
-
-# Optional: Override SSH public key path (default: ~/.ssh/id_rsa.pub)
-# ssh_public_key_path = "~/.ssh/id_rsa.pub"
-
-# Optional: Override instance type (default: g6-standard-2)
+# Linode instance type (default: g6-standard-2)
 # Available types: g6-nanode-1, g6-standard-1, g6-standard-2, g6-standard-4, etc.
 # instance_type = "g6-standard-2"
 
-# Optional: New Relic license key for infrastructure monitoring
-# new_relic_license_key = "your-new-relic-license-key"
+# Hostname for the Linode instance (default: beef-briefing)
+# hostname = "beef-briefing"
 
-# Optional: New Relic account ID for infrastructure monitoring
-# new_relic_account_id = "your-new-relic-account-id"
+# Path to SSH public key file (default: ~/.ssh/id_rsa.pub)
+# ssh_public_key_path = "~/.ssh/id_rsa.pub"
 
-# Optional: Object Storage region (default: es-mad - Madrid)
+# =============================================================================
+# DOMAIN CONFIGURATION
+# =============================================================================
+
+# Domain name to configure (default: mydomain.example)
+# domain_name = "mydomain.example"
+
+# Email address for domain SOA record (default: admin@mydomain.example)
+# domain_email = "admin@mydomain.example"
+
+# =============================================================================
+# POSTGRESQL BLOCK STORAGE
+# =============================================================================
+
+# Size of the PostgreSQL volume in GB (default: 10)
+# postgres_volume_size = 10
+
+# Label for the PostgreSQL volume (default: beef-briefing-postgres-data)
+# postgres_volume_label = "beef-briefing-postgres-data"
+
+# Mount path for the PostgreSQL volume on the instance (default: /mnt/postgres-data)
+# postgres_volume_mount_path = "/mnt/postgres-data"
+
+# =============================================================================
+# LINODE OBJECT STORAGE
+# =============================================================================
+
+# Object Storage region (default: es-mad)
 # Available regions: es-mad, eu-central, us-east, etc.
 # object_storage_region = "es-mad"
 
-# Optional: Object Storage bucket label (default: telegram-media)
+# Object Storage bucket label (default: telegram-media)
 # object_storage_bucket_label = "telegram-media"
 
-# Optional: Object Storage lifecycle expiration in days (default: 365)
+# Access control list for the bucket (default: private)
+# object_storage_acl = "private"
+
+# Enable versioning for the bucket (default: true)
+# object_storage_versioning = true
+
+# Number of days after which objects expire and are deleted (default: 365)
 # object_storage_lifecycle_expiration_days = 365
 
-# Optional: Object Storage noncurrent version expiration in days (default: 5)
+# Number of days after which noncurrent versions expire (default: 5)
 # object_storage_noncurrent_version_expiration_days = 5
+
+# =============================================================================
+# NEW RELIC MONITORING (OPTIONAL)
+# =============================================================================
+
+# New Relic license key for infrastructure monitoring
+# new_relic_license_key = "your-new-relic-license-key"
+
+# New Relic account ID for infrastructure monitoring
+# new_relic_account_id = "your-new-relic-account-id"
+
+# New Relic region (default: EU)
+# new_relic_region = "EU"
 

@@ -299,15 +299,15 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 			sed -i "s|# ssh_public_key_path = \".*\"|ssh_public_key_path = \"$$SSH_KEY_PATH\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated ssh_public_key_path from $$ENV_FILE"; \
 		fi; \
-		BLOCK_STORAGE_SIZE=$$(grep '^BLOCK_STORAGE_SIZE=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
-		if [ -n "$$BLOCK_STORAGE_SIZE" ]; then \
-			echo "block_storage_size = $$BLOCK_STORAGE_SIZE" >> $(TERRAFORM_DIR)/terraform.tfvars; \
-			echo "✓ Populated block_storage_size from $$ENV_FILE"; \
+		POSTGRES_VOLUME_SIZE=$$(grep '^POSTGRES_VOLUME_SIZE=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		if [ -n "$$POSTGRES_VOLUME_SIZE" ]; then \
+			echo "postgres_volume_size = $$POSTGRES_VOLUME_SIZE" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated postgres_volume_size from $$ENV_FILE"; \
 		fi; \
-		OBJECT_STORAGE_CLUSTER=$$(grep '^OBJECT_STORAGE_CLUSTER=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
-		if [ -n "$$OBJECT_STORAGE_CLUSTER" ]; then \
-			echo "object_storage_cluster = \"$$OBJECT_STORAGE_CLUSTER\"" >> $(TERRAFORM_DIR)/terraform.tfvars; \
-			echo "✓ Populated object_storage_cluster from $$ENV_FILE"; \
+		OBJECT_STORAGE_REGION=$$(grep '^OBJECT_STORAGE_REGION=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		if [ -n "$$OBJECT_STORAGE_REGION" ]; then \
+			echo "object_storage_region = \"$$OBJECT_STORAGE_REGION\"" >> $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated object_storage_region from $$ENV_FILE"; \
 		fi; \
 		OBJECT_STORAGE_LIFECYCLE_DAYS=$$(grep '^OBJECT_STORAGE_LIFECYCLE_DAYS=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		if [ -n "$$OBJECT_STORAGE_LIFECYCLE_DAYS" ]; then \

@@ -186,7 +186,7 @@ remote_exec "$SSH_HOST" "
     # Move files to app directory
     mv /tmp/docker-compose.yml ~/beef-briefing/
     mv /tmp/.env ~/beef-briefing/
-    rm -rf ~/beef-briefing/secrets && mv /tmp/secrets ~/beef-briefing/
+    rm -rf ~/beef-briefing/secrets && mv /tmp/apps/ ~/beef-briefing/secrets/
     rm -rf ~/beef-briefing/postgres/migrations && mv /tmp/postgres-migrations ~/beef-briefing/postgres/migrations
     rm -rf ~/beef-briefing/postgres/seeds && mv /tmp/postgres-seeds ~/beef-briefing/postgres/seeds
 

@@ -199,13 +199,13 @@ admin-panel-set-session: ## Generate and update only session secret
 	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -file ../../../$(ENV_FILE) -session-only
 
 admin-panel-set-secrets-files: ## Generate secrets and write to separate files (recommended)
-	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../infrastructure/secrets/admin-panel
+	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../infrastructure/secrets/apps/admin-panel
 
 admin-panel-set-password-file: ## Generate password hash and write to file
-	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../infrastructure/secrets/admin-panel -password-only
+	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../infrastructure/secrets/apps/admin-panel -password-only
 
 admin-panel-set-session-file: ## Generate session secret and write to file
-	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../infrastructure/secrets/admin-panel -session-only
+	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../infrastructure/secrets/apps/admin-panel -session-only
 
 # Terraform targets
 tf-init: ## Initialize Terraform working directory

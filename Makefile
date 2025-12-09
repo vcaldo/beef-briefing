@@ -339,6 +339,11 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 			sed -i "s|# object_storage_region = \".*\"|object_storage_region = \"$$OBJECT_STORAGE_REGION\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated object_storage_region from $$ENV_FILE"; \
 		fi; \
+		OBJECT_STORAGE_BUCKET_SUFFIX=$$(grep '^OBJECT_STORAGE_BUCKET_SUFFIX=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		if [ -n "$$OBJECT_STORAGE_BUCKET_SUFFIX" ]; then \
+			sed -i "s|# object_storage_bucket_suffix = \".*\"|object_storage_bucket_suffix = \"$$OBJECT_STORAGE_BUCKET_SUFFIX\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated object_storage_bucket_suffix from $$ENV_FILE"; \
+		fi; \
 		OBJECT_STORAGE_VERSIONING=$$(grep '^OBJECT_STORAGE_VERSIONING=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		if [ -n "$$OBJECT_STORAGE_VERSIONING" ]; then \
 			sed -i "s|# object_storage_versioning = .*|object_storage_versioning = $$OBJECT_STORAGE_VERSIONING|" $(TERRAFORM_DIR)/terraform.tfvars; \

@@ -76,13 +76,11 @@ packages:
   - gnupg
   - lsb-release
   - wget
-  - make
   - vim
   - gzip
   - unattended-upgrades
   - apt-listchanges
   - bash-completion
-  - needrestart
 
 # Commands to run after package installation
 runcmd:
@@ -104,15 +102,7 @@ runcmd:
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   - systemctl enable docker
   - systemctl start docker
-  # Install Go 1.25.4
-  - wget https://go.dev/dl/go1.25.4.linux-amd64.tar.gz -O /tmp/go1.25.4.linux-amd64.tar.gz
-  - tar -C /usr/local -xzf /tmp/go1.25.4.linux-amd64.tar.gz
-  - rm /tmp/go1.25.4.linux-amd64.tar.gz
-  - echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
-  # Verify installations
-  - docker --version
-  - docker compose version
-  - /usr/local/go/bin/go version
+
   # Install LazyDocker
   - curl https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
   - cp $HOME/.local/bin/lazydocker /usr/local/bin/lazydocker
@@ -122,6 +112,12 @@ runcmd:
       echo "Installing New Relic Infrastructure Agent..."
       curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && NEW_RELIC_API_KEY="${new_relic_license_key}" NEW_RELIC_ACCOUNT_ID="${new_relic_account_id}" NEW_RELIC_REGION="EU" /usr/local/bin/newrelic install -y
     fi
+  # Verify installations
+  - docker --version && echo "Docker installed successfully"
+  - docker compose version && echo "Docker Compose installed successfully"
+  - lazydocker --version && echo "LazyDocker installed successfully"
+  - newrelic --version && echo "New Relic CLI installed successfully"
+
   # Mount block storage for PostgreSQL data
   - |
     echo "Waiting for PostgreSQL volume device to appear..."

@@ -128,6 +128,21 @@ go-build-import-cli: ## Build import-cli binary locally
 	cd $(IMPORT_CLI_DIR) && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/import-cli ./cmd
 	@echo "Binary created at $(IMPORT_CLI_DIR)/bin/import-cli"
 
+go-build-import-cli-prod: ## Build import-cli for remote architecture and deploy to production server
+	@echo "Building import-cli for remote server..."
+	@REMOTE_ARCH=$$(cd $(TERRAFORM_DIR) && terraform output -raw instance_architecture 2>/dev/null || echo "amd64"); \
+	HOST_ARCH=$$(go env GOHOSTARCH); \
+	if [ "$$HOST_ARCH" != "$$REMOTE_ARCH" ]; then \
+		echo "Cross-compiling from $$HOST_ARCH to $$REMOTE_ARCH"; \
+	fi; \
+	cd $(IMPORT_CLI_DIR) && CGO_ENABLED=0 GOOS=linux GOARCH=$$REMOTE_ARCH go build -a -installsuffix cgo -o bin/import-cli ./cmd
+	@echo "Creating remote directory..."
+	@ssh $$($(MAKE) -s tf-ssh-user-host) 'mkdir -p ~/beef-briefing/apps/import-cli/bin'
+	@echo "Copying binary to production server..."
+	@scp $(IMPORT_CLI_DIR)/bin/import-cli $$($(MAKE) -s tf-ssh-user-host):~/beef-briefing/apps/import-cli/bin/
+	@ssh $$($(MAKE) -s tf-ssh-user-host) 'chmod +x ~/beef-briefing/apps/import-cli/bin/import-cli'
+	@echo "✓ Binary deployed to $$($(MAKE) -s tf-ssh-user-host):~/beef-briefing/apps/import-cli/bin/import-cli"
+
 go-build: go-build-api go-build-bot go-build-admin-panel go-build-import-cli ## Build all Go binaries locally
 
 go-clean: ## Remove Go build artifacts
@@ -245,6 +260,9 @@ tf-ssh: ## Show SSH connection command
 
 tf-ssh-user-host: ## Show SSH user and host
 	@cd $(TERRAFORM_DIR) && terraform output -raw ssh_user_host
+
+tf-arch: ## Show instance CPU architecture for cross-compilation
+	@cd $(TERRAFORM_DIR) && terraform output -raw instance_architecture
 
 tf-root-pass: ## Show root password (SENSITIVE)
 	@cd $(TERRAFORM_DIR) && terraform output -raw root_password

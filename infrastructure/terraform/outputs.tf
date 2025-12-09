@@ -75,3 +75,8 @@ output "object_storage_bucket_name" {
   description = "The name of the Object Storage bucket"
   value       = linode_object_storage_bucket.telegram_media_bucket.label
 }
+
+output "instance_architecture" {
+  description = "The CPU architecture of the instance (hardcoded to amd64 based on cloud-init Go installation)"
+  value       = "amd64"
+}

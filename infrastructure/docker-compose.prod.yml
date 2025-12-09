@@ -116,6 +116,7 @@ services:
     container_name: beef-newrelic-infra-prod
     cap_add:
       - SYS_PTRACE
+    network_mode: bridge
     pid: host
     privileged: true
     volumes:

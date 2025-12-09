@@ -26,7 +26,6 @@ This directory contains Terraform configuration to provision the complete Linode
   - Port 22 (SSH) - Worldwide
   - Port 80 (HTTP) - Worldwide
   - Port 443 (HTTPS) - Worldwide
-  - Port 8081 (Admin Panel) - Worldwide ⚠️ Consider restricting
   - Default policy: DROP all other inbound, ACCEPT all outbound
 - **DNS**: Managed domain with Linode DNS
   - A record: `barra-pesada.online` → instance IP
@@ -106,7 +105,7 @@ terraform plan
 
 Review the resources that will be created:
 - **linode_instance.beef_briefing**: Ubuntu 24.04 server with cloud-init
-- **linode_firewall.beef_briefing_firewall**: Inbound rules for ports 22, 80, 443, 8081
+- **linode_firewall.beef_briefing_firewall**: Inbound rules for ports 22, 80, 443
 - **linode_sshkey.beef_briefing_key**: SSH public key upload
 - **linode_domain.beef_briefing_domain**: DNS zone for your domain
 - **linode_domain_record.beef_briefing_a_record**: Root domain A record
@@ -350,8 +349,7 @@ nslookup barra-pesada.online
 - ✅ SSH login grace time: 20 seconds
 
 ### Network Security
-- ✅ Firewall restricts all ports except 22, 80, 443, 8081 (default DROP)
-- ⚠️ Port 8081 (Admin Panel) exposed to 0.0.0.0/0 - consider restricting to specific IPs
+- ✅ Firewall restricts all ports except 22, 80, 443 (default DROP)
 - ✅ PostgreSQL port (5432) **not exposed externally** - internal Docker network only
 - ✅ SYN flood protection enabled (tcp_syncookies)
 - ✅ ICMP redirects disabled

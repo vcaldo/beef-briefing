@@ -61,15 +61,6 @@ resource "linode_firewall" "beef_briefing_firewall" {
     ipv6     = ["::/0"]
   }
 
-  inbound {
-    label    = "allow-tcp-8081"
-    action   = "ACCEPT"
-    protocol = "TCP"
-    ports    = "8081"
-    ipv4     = ["0.0.0.0/0"]
-    ipv6     = ["::/0"]
-  }
-
   inbound_policy  = "DROP"
   outbound_policy = "ACCEPT"
 

@@ -45,7 +45,7 @@ type ChatDetail struct {
 // Overview response
 type OverviewResponse struct {
 	TotalMessages  int              `json:"total_messages"`
-	UniqueUsers    int              `json:"unique_users"`
+	TotalUsers     int              `json:"total_users"`
 	TotalReactions int              `json:"total_reactions"`
 	TotalMedia     int              `json:"total_media"`
 	MessagesPerDay float64          `json:"messages_per_day"`
@@ -91,7 +91,7 @@ type UserDetailResponse struct {
 }
 
 type UserDetailStats struct {
-	MessageCount      int       `json:"message_count"`
+	TotalMessages     int       `json:"total_messages"`
 	ReactionsGiven    int       `json:"reactions_given"`
 	ReactionsReceived int       `json:"reactions_received"`
 	MediaSent         int       `json:"media_sent"`

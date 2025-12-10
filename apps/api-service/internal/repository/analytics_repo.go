@@ -66,12 +66,12 @@ func (r *AnalyticsRepository) GetOverviewStats(ctx context.Context, chatID int64
 
 func (r *AnalyticsRepository) GetMostActiveUser(ctx context.Context, chatID int64, startDate, endDate time.Time) (*models.UserSummary, error) {
 	query := `
-		SELECT u.id, COALESCE(u.username, ''), u.first_name, COALESCE(u.last_name, '')
+		SELECT u.id, COALESCE(u.username, ''), u.first_name, COALESCE(u.last_name, ''), COUNT(*) as message_count
 		FROM messages m
 		INNER JOIN users u ON u.id = m.user_id
 		WHERE m.chat_id = $1 AND m.date >= $2 AND m.date < $3
 		GROUP BY u.id, u.username, u.first_name, u.last_name
-		ORDER BY COUNT(*) DESC
+		ORDER BY message_count DESC
 		LIMIT 1
 	`
 
@@ -81,6 +81,7 @@ func (r *AnalyticsRepository) GetMostActiveUser(ctx context.Context, chatID int6
 		&user.Username,
 		&user.FirstName,
 		&user.LastName,
+		&user.MessageCount,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil

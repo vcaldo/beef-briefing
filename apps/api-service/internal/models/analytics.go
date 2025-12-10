@@ -60,10 +60,11 @@ type OverviewResponse struct {
 }
 
 type UserSummary struct {
-	UserID    int64  `json:"user_id"`
-	Username  string `json:"username,omitempty"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name,omitempty"`
+	UserID       int64  `json:"user_id"`
+	Username     string `json:"username,omitempty"`
+	FirstName    string `json:"first_name"`
+	LastName     string `json:"last_name,omitempty"`
+	MessageCount int    `json:"message_count,omitempty"`
 }
 
 type EmojiBreakdown struct {

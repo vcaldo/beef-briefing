@@ -136,18 +136,45 @@ func (h *Handler) ChatDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse year parameter for date range
+	// Parse filter parameters
 	year, _ := strconv.Atoi(r.URL.Query().Get("year"))
 	if year == 0 {
 		year = time.Now().Year()
 	}
 
-	// Calculate date range for the selected year
-	startDate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
-	if year == time.Now().Year() {
-		// For current year, use now as end date
-		endDate = time.Now().Add(24 * time.Hour)
+	month, _ := strconv.Atoi(r.URL.Query().Get("month"))
+	if month < 0 || month > 12 {
+		month = 0 // 0 = all months
+	}
+
+	timezone := r.URL.Query().Get("tz")
+	if timezone == "" {
+		timezone = "UTC"
+	}
+
+	// Calculate date range based on year and month
+	var startDate, endDate time.Time
+	if month == 0 {
+		// Full year
+		startDate = time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+		endDate = time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
+		if year == time.Now().Year() {
+			// For current year, use now as end date
+			endDate = time.Now().Add(24 * time.Hour)
+		}
+	} else {
+		// Specific month
+		startDate = time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+		endDate = time.Date(year, time.Month(month)+1, 1, 0, 0, 0, 0, time.UTC)
+		// Handle December -> January transition
+		if month == 12 {
+			endDate = time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
+		}
+		// For current month, cap at now
+		now := time.Now()
+		if year == now.Year() && month == int(now.Month()) {
+			endDate = now.Add(24 * time.Hour)
+		}
 	}
 
 	// Get chat details
@@ -199,7 +226,7 @@ func (h *Handler) ChatDetail(w http.ResponseWriter, r *http.Request) {
 
 	templateOverview := templates.Overview{
 		TotalMessages:  overview.TotalMessages,
-		UniqueUsers:    overview.UniqueUsers,
+		UniqueUsers:    overview.TotalUsers,
 		TotalReactions: overview.TotalReactions,
 		TotalMedia:     overview.TotalMedia,
 		MessagesPerDay: overview.MessagesPerDay,
@@ -240,7 +267,9 @@ func (h *Handler) ChatDetail(w http.ResponseWriter, r *http.Request) {
 
 	filter := templates.FilterParams{
 		Year:           year,
+		Month:          month,
 		AvailableYears: years,
+		Timezone:       timezone,
 		StartDate:      startDate,
 		EndDate:        endDate,
 	}
@@ -262,11 +291,7 @@ func (h *Handler) LeaderboardPartial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse filter params
-	year, _ := strconv.Atoi(r.URL.Query().Get("year"))
-	if year == 0 {
-		year = time.Now().Year()
-	}
+	filter := parseFilterParams(r)
 
 	metric := r.URL.Query().Get("metric")
 	if metric == "" {
@@ -278,14 +303,7 @@ func (h *Handler) LeaderboardPartial(w http.ResponseWriter, r *http.Request) {
 		limit = 50
 	}
 
-	// Calculate date range
-	startDate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
-	if year == time.Now().Year() {
-		endDate = time.Now().Add(24 * time.Hour)
-	}
-
-	leaderboard, err := h.api.GetLeaderboard(ctx, chatID, startDate, endDate, metric, limit)
+	leaderboard, err := h.api.GetLeaderboard(ctx, chatID, filter.StartDate, filter.EndDate, metric, limit)
 	if err != nil {
 		slog.Error("failed to get leaderboard from API", "error", err, "chat_id", chatID)
 		leaderboard = []apiclient.LeaderboardEntry{}
@@ -303,7 +321,7 @@ func (h *Handler) LeaderboardPartial(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := templates.LeaderboardTable(templateLeaderboard, chatID, year).Render(ctx, w); err != nil {
+	if err := templates.LeaderboardTable(templateLeaderboard, chatID, filter.Year, filter.Month, filter.Timezone).Render(ctx, w); err != nil {
 		slog.Error("failed to render leaderboard table", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
@@ -320,19 +338,9 @@ func (h *Handler) HeatmapPartial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	year, _ := strconv.Atoi(r.URL.Query().Get("year"))
-	if year == 0 {
-		year = time.Now().Year()
-	}
+	filter := parseFilterParams(r)
 
-	// Calculate date range
-	startDate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
-	if year == time.Now().Year() {
-		endDate = time.Now().Add(24 * time.Hour)
-	}
-
-	heatmap, err := h.api.GetHeatmap(ctx, chatID, startDate, endDate)
+	heatmap, err := h.api.GetHeatmap(ctx, chatID, filter.StartDate, filter.EndDate)
 	if err != nil {
 		slog.Error("failed to get heatmap from API", "error", err, "chat_id", chatID)
 		heatmap = []apiclient.HeatmapDay{}
@@ -346,7 +354,7 @@ func (h *Handler) HeatmapPartial(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := templates.HeatmapChart(templateHeatmap, year).Render(ctx, w); err != nil {
+	if err := templates.HeatmapChart(templateHeatmap, filter.Year, filter.Month, filter.Timezone).Render(ctx, w); err != nil {
 		slog.Error("failed to render heatmap", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
@@ -363,24 +371,14 @@ func (h *Handler) TimelinePartial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	year, _ := strconv.Atoi(r.URL.Query().Get("year"))
-	if year == 0 {
-		year = time.Now().Year()
-	}
+	filter := parseFilterParams(r)
 
 	granularity := r.URL.Query().Get("granularity")
 	if granularity == "" {
 		granularity = "day"
 	}
 
-	// Calculate date range
-	startDate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
-	if year == time.Now().Year() {
-		endDate = time.Now().Add(24 * time.Hour)
-	}
-
-	timeline, err := h.api.GetTimeline(ctx, chatID, startDate, endDate, granularity)
+	timeline, err := h.api.GetTimeline(ctx, chatID, filter.StartDate, filter.EndDate, granularity)
 	if err != nil {
 		slog.Error("failed to get timeline from API", "error", err, "chat_id", chatID)
 		timeline = []apiclient.TimelinePoint{}
@@ -413,10 +411,7 @@ func (h *Handler) TopContentPartial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	year, _ := strconv.Atoi(r.URL.Query().Get("year"))
-	if year == 0 {
-		year = time.Now().Year()
-	}
+	filter := parseFilterParams(r)
 
 	metric := r.URL.Query().Get("metric")
 	if metric == "" {
@@ -428,14 +423,7 @@ func (h *Handler) TopContentPartial(w http.ResponseWriter, r *http.Request) {
 		limit = 10
 	}
 
-	// Calculate date range
-	startDate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
-	if year == time.Now().Year() {
-		endDate = time.Now().Add(24 * time.Hour)
-	}
-
-	topContent, err := h.api.GetTopContent(ctx, chatID, startDate, endDate, metric, limit)
+	topContent, err := h.api.GetTopContent(ctx, chatID, filter.StartDate, filter.EndDate, metric, limit)
 	if err != nil {
 		slog.Error("failed to get top content from API", "error", err, "chat_id", chatID)
 		topContent = []apiclient.TopMessage{}
@@ -482,19 +470,9 @@ func (h *Handler) UserDetailPartial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	year, _ := strconv.Atoi(r.URL.Query().Get("year"))
-	if year == 0 {
-		year = time.Now().Year()
-	}
+	filter := parseFilterParams(r)
 
-	// Calculate date range
-	startDate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
-	if year == time.Now().Year() {
-		endDate = time.Now().Add(24 * time.Hour)
-	}
-
-	userDetail, err := h.api.GetUserDetail(ctx, chatID, userID, startDate, endDate)
+	userDetail, err := h.api.GetUserDetail(ctx, chatID, userID, filter.StartDate, filter.EndDate)
 	if err != nil {
 		slog.Error("failed to get user detail from API", "error", err, "chat_id", chatID, "user_id", userID)
 		if err := templates.UserDetailContent(nil).Render(ctx, w); err != nil {
@@ -518,7 +496,7 @@ func (h *Handler) UserDetailPartial(w http.ResponseWriter, r *http.Request) {
 		FirstName: userDetail.FirstName,
 		LastName:  userDetail.LastName,
 		Stats: templates.UserDetailStats{
-			MessageCount:      userDetail.Stats.MessageCount,
+			MessageCount:      userDetail.Stats.TotalMessages,
 			ReactionsGiven:    userDetail.Stats.ReactionsGiven,
 			ReactionsReceived: userDetail.Stats.ReactionsReceived,
 			MediaSent:         userDetail.Stats.MediaSent,
@@ -574,10 +552,7 @@ func (h *Handler) CompareUsersPartial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	year, _ := strconv.Atoi(r.URL.Query().Get("year"))
-	if year == 0 {
-		year = time.Now().Year()
-	}
+	filter := parseFilterParams(r)
 
 	// Parse user IDs from query param
 	userIDsStr := r.URL.Query().Get("user_ids")
@@ -600,14 +575,7 @@ func (h *Handler) CompareUsersPartial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Calculate date range
-	startDate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
-	if year == time.Now().Year() {
-		endDate = time.Now().Add(24 * time.Hour)
-	}
-
-	comparisons, err := h.api.CompareUsers(ctx, chatID, userIDs, startDate, endDate)
+	comparisons, err := h.api.CompareUsers(ctx, chatID, userIDs, filter.StartDate, filter.EndDate)
 	if err != nil {
 		slog.Error("failed to compare users from API", "error", err, "chat_id", chatID)
 		comparisons = []apiclient.UserComparison{}
@@ -697,6 +665,61 @@ func calculateAvailableYears(firstMessage, lastMessage time.Time) []int {
 	}
 
 	return years
+}
+
+// filterParams holds parsed filter parameters
+type filterParams struct {
+	Year      int
+	Month     int
+	Timezone  string
+	StartDate time.Time
+	EndDate   time.Time
+}
+
+// parseFilterParams extracts filter parameters from the request query string
+func parseFilterParams(r *http.Request) filterParams {
+	year, _ := strconv.Atoi(r.URL.Query().Get("year"))
+	if year == 0 {
+		year = time.Now().Year()
+	}
+
+	month, _ := strconv.Atoi(r.URL.Query().Get("month"))
+	if month < 0 || month > 12 {
+		month = 0
+	}
+
+	timezone := r.URL.Query().Get("tz")
+	if timezone == "" {
+		timezone = "UTC"
+	}
+
+	// Calculate date range
+	var startDate, endDate time.Time
+	if month == 0 {
+		startDate = time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+		endDate = time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
+		if year == time.Now().Year() {
+			endDate = time.Now().Add(24 * time.Hour)
+		}
+	} else {
+		startDate = time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+		endDate = time.Date(year, time.Month(month)+1, 1, 0, 0, 0, 0, time.UTC)
+		if month == 12 {
+			endDate = time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
+		}
+		now := time.Now()
+		if year == now.Year() && month == int(now.Month()) {
+			endDate = now.Add(24 * time.Hour)
+		}
+	}
+
+	return filterParams{
+		Year:      year,
+		Month:     month,
+		Timezone:  timezone,
+		StartDate: startDate,
+		EndDate:   endDate,
+	}
 }
 
 // splitAndTrim splits a string by separator and trims whitespace from each part

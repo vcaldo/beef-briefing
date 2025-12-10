@@ -223,6 +223,19 @@ generate-traefik-password: ## Generate Traefik dashboard password and update .en
 	@chmod +x scripts/generate-traefik-password.sh
 	@scripts/generate-traefik-password.sh
 
+# Analytics API key generation
+generate-analytics-api-key: ## Generate analytics API key and save to secrets directory
+	@echo "Generating analytics API key..."
+	@mkdir -p infrastructure/secrets/apps/api-service
+	@openssl rand -base64 32 > infrastructure/secrets/apps/api-service/analytics_api_key
+	@chmod 600 infrastructure/secrets/apps/api-service/analytics_api_key
+	@echo "✓ Analytics API key generated at infrastructure/secrets/apps/api-service/analytics_api_key"
+	@echo ""
+	@echo "Generated key:"
+	@cat infrastructure/secrets/apps/api-service/analytics_api_key
+	@echo ""
+	@echo "This key will be automatically deployed to production when you run 'make deploy'"
+
 # Terraform targets
 tf-init: ## Initialize Terraform working directory
 	cd $(TERRAFORM_DIR) && terraform init
@@ -518,9 +531,9 @@ rollback-force: ## Rollback to previous deployment (skip confirmation)
 	go-build-api go-build-bot go-build-admin-panel go-build-import-cli go-build go-clean fmt fmt-check \
 	admin-panel-set-secrets admin-panel-set-password admin-panel-set-session \
 	admin-panel-set-secrets-files admin-panel-set-password-file admin-panel-set-session-file \
-	generate-traefik-password \
+	generate-traefik-password generate-analytics-api-key \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
-	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
+	tf-fmt tf-fmt-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-root-pass tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage-env mc-setup-prod tf-docs tf-deploy-check \
 	deploy deploy-skip-build deploy-skip-cleanup deploy-regenerate-certs clean-letsencrypt-certs rollback rollback-force

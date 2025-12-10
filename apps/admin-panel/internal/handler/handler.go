@@ -394,7 +394,7 @@ func (h *Handler) TimelinePartial(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := templates.TimelineChart(templateTimeline, granularity).Render(ctx, w); err != nil {
+	if err := templates.TimelineChart(templateTimeline, granularity, filter.Timezone).Render(ctx, w); err != nil {
 		slog.Error("failed to render timeline", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
@@ -475,7 +475,7 @@ func (h *Handler) UserDetailPartial(w http.ResponseWriter, r *http.Request) {
 	userDetail, err := h.api.GetUserDetail(ctx, chatID, userID, filter.StartDate, filter.EndDate)
 	if err != nil {
 		slog.Error("failed to get user detail from API", "error", err, "chat_id", chatID, "user_id", userID)
-		if err := templates.UserDetailContent(nil).Render(ctx, w); err != nil {
+		if err := templates.UserDetailContent(nil, filter.Timezone).Render(ctx, w); err != nil {
 			slog.Error("failed to render user not found", "error", err)
 		}
 		return
@@ -535,7 +535,7 @@ func (h *Handler) UserDetailPartial(w http.ResponseWriter, r *http.Request) {
 		templateUser.TopEmojisReceived[i] = templates.EmojiBreakdown{Emoji: e.Emoji, Count: e.Count}
 	}
 
-	if err := templates.UserDetailContent(templateUser).Render(ctx, w); err != nil {
+	if err := templates.UserDetailContent(templateUser, filter.Timezone).Render(ctx, w); err != nil {
 		slog.Error("failed to render user detail modal", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}

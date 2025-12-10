@@ -20,7 +20,10 @@ document.body.addEventListener('htmx:afterSwap', function(event) {
     initTimeline();
   }
   if (targetId === 'user-detail-content') {
-    initUserActivityChart();
+    // Use requestAnimationFrame to ensure DOM is fully updated
+    requestAnimationFrame(function() {
+      initUserActivityChart();
+    });
   }
 });
 
@@ -196,6 +199,8 @@ function initTimeline() {
   const dataAttr = timelineEl.getAttribute('data-timeline-data');
   const chatIdAttr = timelineEl.getAttribute('data-chat-id');
   const yearAttr = timelineEl.getAttribute('data-year');
+  const monthAttr = timelineEl.getAttribute('data-month');
+  const timezoneAttr = timelineEl.getAttribute('data-timezone');
 
   let data = [];
 
@@ -211,7 +216,9 @@ function initTimeline() {
   // If no data, fetch it
   if (data.length === 0 && chatIdAttr) {
     const year = yearAttr || new Date().getFullYear();
-    fetch(`/chats/${chatIdAttr}/timeline?year=${year}&granularity=week`)
+    const month = monthAttr || '0';
+    const tz = timezoneAttr ? encodeURIComponent(timezoneAttr) : 'UTC';
+    fetch(`/chats/${chatIdAttr}/timeline?year=${year}&month=${month}&tz=${tz}&granularity=week`)
       .then(response => response.text())
       .then(html => {
         const parser = new DOMParser();
@@ -401,6 +408,41 @@ function renderTimeline(element, data) {
 }
 
 /**
+ * Get timezone offset in hours from UTC for a given IANA timezone
+ */
+function getTimezoneOffset(timezone) {
+  if (!timezone || timezone === 'UTC') return 0;
+
+  try {
+    // Create a date and format it in both UTC and the target timezone
+    const now = new Date();
+    const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const tzDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+    // Offset in hours (positive = ahead of UTC, negative = behind)
+    return Math.round((tzDate - utcDate) / (1000 * 60 * 60));
+  } catch (e) {
+    console.error('Failed to get timezone offset:', e);
+    return 0;
+  }
+}
+
+/**
+ * Shift an array of 24 hourly values by a timezone offset
+ */
+function shiftHourlyData(data, offsetHours) {
+  if (offsetHours === 0 || data.length !== 24) return data;
+
+  const shifted = new Array(24).fill(0);
+  for (let i = 0; i < 24; i++) {
+    // UTC hour i becomes local hour (i + offset) % 24
+    let localHour = (i + offsetHours) % 24;
+    if (localHour < 0) localHour += 24;
+    shifted[localHour] = data[i];
+  }
+  return shifted;
+}
+
+/**
  * Initialize the user activity by hour chart
  */
 function initUserActivityChart() {
@@ -408,6 +450,7 @@ function initUserActivityChart() {
   if (!activityEl) return;
 
   const dataAttr = activityEl.getAttribute('data-activity-data');
+  const timezone = activityEl.getAttribute('data-timezone') || 'UTC';
   let data = [];
 
   if (dataAttr) {
@@ -421,7 +464,11 @@ function initUserActivityChart() {
 
   if (data.length === 0) return;
 
-  renderUserActivityChart(activityEl, data);
+  // Shift data based on timezone offset
+  const offset = getTimezoneOffset(timezone);
+  const shiftedData = shiftHourlyData(data, offset);
+
+  renderUserActivityChart(activityEl, shiftedData);
 }
 
 /**

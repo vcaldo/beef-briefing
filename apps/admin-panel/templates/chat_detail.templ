@@ -545,17 +545,21 @@ templ HeatmapChart(days []HeatmapDay, year int, month int, tz string) {
 	</script>
 }
 
-templ TimelineChart(points []TimelinePoint, granularity string) {
+templ TimelineChart(points []TimelinePoint, granularity string, timezone string) {
 	<div
 		id="timeline-chart"
 		class="w-full h-64"
 		data-timeline-data={ timelineDataJSON(points) }
 		data-granularity={ granularity }
+		data-timezone={ timezone }
 	></div>
 	<script>
-		if (typeof initTimeline === 'function') {
-			initTimeline();
-		}
+		// Use requestAnimationFrame to ensure DOM is ready after HTMX swap
+		requestAnimationFrame(function() {
+			if (typeof initTimeline === 'function') {
+				initTimeline();
+			}
+		});
 	</script>
 }
 
@@ -602,7 +606,7 @@ templ TopContentList(messages []TopMessage, metric string) {
 	}
 }
 
-templ UserDetailContent(user *UserDetail) {
+templ UserDetailContent(user *UserDetail, timezone string) {
 	if user == nil {
 		<div class="text-center py-8 text-base-content/60">
 			<span class="text-3xl block mb-2">👤</span>
@@ -689,13 +693,16 @@ templ UserDetailContent(user *UserDetail) {
 		<!-- Activity by Hour -->
 		if len(user.ActivityByHour) > 0 {
 			<div>
-				<h4 class="text-sm font-semibold mb-2">Activity by Hour</h4>
-				<div id="user-activity-chart" class="w-full h-32" data-activity-data={ activityByHourJSON(user.ActivityByHour) }></div>
+				<h4 class="text-sm font-semibold mb-2">Activity by Hour <span class="text-xs font-normal text-base-content/60">({ timezone })</span></h4>
+				<div id="user-activity-chart" class="w-full h-32" data-activity-data={ activityByHourJSON(user.ActivityByHour) } data-timezone={ timezone }></div>
 			</div>
 			<script>
-				if (typeof initUserActivityChart === 'function') {
-					initUserActivityChart();
-				}
+				// Use requestAnimationFrame to ensure DOM is ready after HTMX swap
+				requestAnimationFrame(function() {
+					if (typeof initUserActivityChart === 'function') {
+						initUserActivityChart();
+					}
+				});
 			</script>
 		}
 	}

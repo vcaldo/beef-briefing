@@ -52,6 +52,16 @@ require_dir "$SECRETS_DIR" "Secrets directory"
 require_dir "$MIGRATIONS_DIR" "Migrations directory"
 require_dir "$SEEDS_DIR" "Seeds directory"
 
+# Check for letsencrypt directory (optional - created on first run if missing)
+LETSENCRYPT_DIR="$PROJECT_ROOT/infrastructure/letsencrypt"
+if [[ -d "$LETSENCRYPT_DIR" ]]; then
+    HAS_LETSENCRYPT=true
+    log_info "Found letsencrypt directory (will transfer certificates)"
+else
+    HAS_LETSENCRYPT=false
+    log_info "No letsencrypt directory found (will be created on server)"
+fi
+
 # Validate environment variables
 log_info "Validating environment variables..."
 validate_env_vars "$PROD_ENV_FILE"
@@ -166,6 +176,12 @@ remote_copy "$MIGRATIONS_DIR" "$SSH_HOST" "/tmp/postgres-migrations"
 log_info "Transferring seeds..."
 remote_copy "$SEEDS_DIR" "$SSH_HOST" "/tmp/postgres-seeds"
 
+# Transfer letsencrypt directory if it exists
+if [[ "$HAS_LETSENCRYPT" == "true" ]]; then
+    log_info "Transferring letsencrypt certificates..."
+    remote_copy "$LETSENCRYPT_DIR" "$SSH_HOST" "/tmp/"
+fi
+
 # Transfer image tarball
 log_info "Transferring images ($TARBALL_SIZE)..."
 remote_copy "$IMAGE_TARBALL" "$SSH_HOST" "/tmp/"
@@ -189,6 +205,25 @@ remote_exec "$SSH_HOST" "
     rm -rf ~/beef-briefing/secrets && mv /tmp/apps/ ~/beef-briefing/secrets/
     rm -rf ~/beef-briefing/postgres/migrations && mv /tmp/postgres-migrations ~/beef-briefing/postgres/migrations
     rm -rf ~/beef-briefing/postgres/seeds && mv /tmp/postgres-seeds ~/beef-briefing/postgres/seeds
+
+    # Setup letsencrypt directory if transferred
+    if [ -d /tmp/letsencrypt ]; then
+        echo 'Setting up letsencrypt directory...'
+        mkdir -p ~/beef-briefing/letsencrypt
+        mv /tmp/letsencrypt/* ~/beef-briefing/letsencrypt/ 2>/dev/null || true
+        rmdir /tmp/letsencrypt
+    fi
+
+    # Ensure letsencrypt directory exists with proper permissions
+    mkdir -p ~/beef-briefing/letsencrypt
+    chmod 700 ~/beef-briefing/letsencrypt
+
+    # Create acme.json if it doesn't exist
+    if [ ! -f ~/beef-briefing/letsencrypt/acme.json ]; then
+        touch ~/beef-briefing/letsencrypt/acme.json
+        chmod 600 ~/beef-briefing/letsencrypt/acme.json
+        echo 'Created acme.json for Let'\''s Encrypt'
+    fi
 
     # Load Docker images
     echo 'Loading Docker images...'

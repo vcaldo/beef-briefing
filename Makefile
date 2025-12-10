@@ -1,6 +1,8 @@
 # Variables
 COMPOSE_FILE ?= infrastructure/docker-compose.dev.yml
 ENV_FILE ?= infrastructure/.env.dev
+PROD_COMPOSE_FILE := infrastructure/docker-compose.prod.yml
+PROD_ENV_FILE := infrastructure/.env.prod
 TERRAFORM_DIR := infrastructure/terraform
 
 # Service names
@@ -87,6 +89,15 @@ logs-admin-panel: ## Tail logs from admin-panel
 
 logs-newrelic: ## Tail logs from newrelic-infra
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f $(NEWRELIC_INFRA)
+
+logs-traefik: ## Tail logs from traefik (production only)
+	@if [ "$(COMPOSE_FILE)" = "$(PROD_COMPOSE_FILE)" ]; then \
+		SSH_HOST=$$($(MAKE) -s tf-ssh-user-host); \
+		ssh $$SSH_HOST 'cd ~/beef-briefing && docker compose logs -f traefik'; \
+	else \
+		echo "Error: logs-traefik only available for production environment"; \
+		echo "Use: make logs-traefik COMPOSE_FILE=$(PROD_COMPOSE_FILE)"; \
+	fi
 
 # Shell targets
 shell-api: ## Open shell in api-service container
@@ -207,6 +218,11 @@ admin-panel-set-password-file: ## Generate password hash and write to file
 admin-panel-set-session-file: ## Generate session secret and write to file
 	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../infrastructure/secrets/apps/admin-panel -session-only
 
+# Traefik password generation
+generate-traefik-password: ## Generate Traefik dashboard password and update .env.prod
+	@chmod +x scripts/generate-traefik-password.sh
+	@scripts/generate-traefik-password.sh
+
 # Terraform targets
 tf-init: ## Initialize Terraform working directory
 	cd $(TERRAFORM_DIR) && terraform init
@@ -302,10 +318,10 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 	@if [ ! -f $(TERRAFORM_DIR)/terraform.tfvars ]; then \
 		cp $(TERRAFORM_DIR)/terraform.tfvars.example $(TERRAFORM_DIR)/terraform.tfvars; \
 		echo "Created terraform.tfvars from example."; \
-		if [ -f infrastructure/.env.prod ]; then \
-			ENV_FILE=infrastructure/.env.prod; \
-		elif [ -f infrastructure/.env.dev ]; then \
-			ENV_FILE=infrastructure/.env.dev; \
+		if [ -f $(PROD_ENV_FILE) ]; then \
+			ENV_FILE=$(PROD_ENV_FILE); \
+		elif [ -f $(ENV_FILE) ]; then \
+			ENV_FILE=$(ENV_FILE); \
 		else \
 			echo "Warning: No .env.prod or .env.dev found. Please edit terraform.tfvars manually."; \
 			exit 0; \
@@ -315,6 +331,7 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 		LINODE_INSTANCE_TYPE=$$(grep '^LINODE_INSTANCE_TYPE=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		LINODE_HOSTNAME=$$(grep '^LINODE_HOSTNAME=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		DOMAIN_NAME=$$(grep '^DOMAIN_NAME=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		ADMIN_PANEL_DOMAIN_SUFFIX=$$(grep '^ADMIN_PANEL_DOMAIN_SUFFIX=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		NEW_RELIC_KEY=$$(grep '^NEW_RELIC_LICENSE_KEY=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		NEW_RELIC_ACCOUNT=$$(grep '^NEW_RELIC_ACCOUNT_ID=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		SSH_KEY_PATH=$$(grep '^SSH_PUBLIC_KEY_PATH=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
@@ -339,6 +356,10 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 			echo "✓ Populated domain_name from $$ENV_FILE"; \
 			sed -i "s|# domain_email = \".*\"|domain_email = \"admin@$$DOMAIN_NAME\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated domain_email as admin@$$DOMAIN_NAME"; \
+		fi; \
+		if [ -n "$$ADMIN_PANEL_DOMAIN_SUFFIX" ]; then \
+			sed -i "s|# admin_panel_domain_suffix = \".*\"|admin_panel_domain_suffix = \"$$ADMIN_PANEL_DOMAIN_SUFFIX\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated admin_panel_domain_suffix from $$ENV_FILE"; \
 		fi; \
 		if [ -n "$$NEW_RELIC_KEY" ]; then \
 			sed -i "s|# new_relic_license_key = \".*\"|new_relic_license_key = \"$$NEW_RELIC_KEY\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
@@ -407,18 +428,22 @@ tf-sync-object-storage-env: ## Sync Object Storage credentials from Terraform to
 	ACCESS_KEY=$$($(MAKE) -s tf-object-storage-access-key); \
 	SECRET_KEY=$$($(MAKE) -s tf-object-storage-secret-key); \
 	BUCKET_NAME=$$($(MAKE) -s tf-object-storage-bucket); \
+	ENDPOINT_ESCAPED=$$(printf '%s\n' "$$ENDPOINT" | sed 's/[&/\]/\\&/g'); \
+	ACCESS_KEY_ESCAPED=$$(printf '%s\n' "$$ACCESS_KEY" | sed 's/[&/\]/\\&/g'); \
+	SECRET_KEY_ESCAPED=$$(printf '%s\n' "$$SECRET_KEY" | sed 's/[&/\]/\\&/g'); \
+	BUCKET_NAME_ESCAPED=$$(printf '%s\n' "$$BUCKET_NAME" | sed 's/[&/\]/\\&/g'); \
 	if grep -q '^MINIO_ENDPOINT=' $(PROD_ENV_FILE); then \
-		sed -i "s|^MINIO_ENDPOINT=.*|MINIO_ENDPOINT=$$ENDPOINT|" $(PROD_ENV_FILE); \
+		sed -i "s|^MINIO_ENDPOINT=.*|MINIO_ENDPOINT=$$ENDPOINT_ESCAPED|" $(PROD_ENV_FILE); \
 	else \
 		echo "MINIO_ENDPOINT=$$ENDPOINT" >> $(PROD_ENV_FILE); \
 	fi; \
 	if grep -q '^MINIO_ACCESS_KEY=' $(PROD_ENV_FILE); then \
-		sed -i "s|^MINIO_ACCESS_KEY=.*|MINIO_ACCESS_KEY=$$ACCESS_KEY|" $(PROD_ENV_FILE); \
+		sed -i "s|^MINIO_ACCESS_KEY=.*|MINIO_ACCESS_KEY=$$ACCESS_KEY_ESCAPED|" $(PROD_ENV_FILE); \
 	else \
 		echo "MINIO_ACCESS_KEY=$$ACCESS_KEY" >> $(PROD_ENV_FILE); \
 	fi; \
 	if grep -q '^MINIO_SECRET_KEY=' $(PROD_ENV_FILE); then \
-		sed -i "s|^MINIO_SECRET_KEY=.*|MINIO_SECRET_KEY=$$SECRET_KEY|" $(PROD_ENV_FILE); \
+		sed -i "s|^MINIO_SECRET_KEY=.*|MINIO_SECRET_KEY=$$SECRET_KEY_ESCAPED|" $(PROD_ENV_FILE); \
 	else \
 		echo "MINIO_SECRET_KEY=$$SECRET_KEY" >> $(PROD_ENV_FILE); \
 	fi; \
@@ -428,7 +453,7 @@ tf-sync-object-storage-env: ## Sync Object Storage credentials from Terraform to
 		echo "MINIO_USE_SSL=true" >> $(PROD_ENV_FILE); \
 	fi; \
 	if grep -q '^MINIO_BUCKET=' $(PROD_ENV_FILE); then \
-		sed -i "s|^MINIO_BUCKET=.*|MINIO_BUCKET=$$BUCKET_NAME|" $(PROD_ENV_FILE); \
+		sed -i "s|^MINIO_BUCKET=.*|MINIO_BUCKET=$$BUCKET_NAME_ESCAPED|" $(PROD_ENV_FILE); \
 	else \
 		echo "MINIO_BUCKET=$$BUCKET_NAME" >> $(PROD_ENV_FILE); \
 	fi; \
@@ -458,8 +483,6 @@ tf-docs: ## Show Terraform documentation
 tf-deploy-check: tf-validate tf-fmt-check tf-plan ## Full pre-deployment check (validate, format check, plan)
 
 # Production deployment targets
-PROD_COMPOSE_FILE := infrastructure/docker-compose.prod.yml
-PROD_ENV_FILE := infrastructure/.env.prod
 COMMIT_HASH ?= $(shell git rev-parse --short HEAD)
 
 deploy: tf-sync-object-storage-env ## Deploy to production server with commit-tagged images
@@ -471,6 +494,17 @@ deploy-skip-build: tf-sync-object-storage-env ## Deploy using existing images (s
 deploy-skip-cleanup: tf-sync-object-storage-env ## Deploy without cleaning up old images
 	@./scripts/deploy.sh --skip-cleanup
 
+deploy-regenerate-certs: ## Deploy with fresh Let's Encrypt certificates (removes acme.json first)
+	@echo "Removing Let's Encrypt certificates on remote server..."
+	@ssh $(shell $(MAKE) -s tf-ssh-user-host) 'rm -f ~/beef-briefing/infrastructure/letsencrypt/acme.json'
+	@echo "✓ Certificates removed, deploying with fresh certificates..."
+	@$(MAKE) deploy
+
+clean-letsencrypt-certs: ## Remove Let's Encrypt certificates on remote server (without deploying)
+	@echo "Removing Let's Encrypt certificates on remote server..."
+	@ssh $(shell $(MAKE) -s tf-ssh-user-host) 'rm -f ~/beef-briefing/infrastructure/letsencrypt/acme.json'
+	@echo "✓ Certificates removed"
+
 rollback: ## Rollback to previous deployment
 	@./scripts/rollback.sh
 
@@ -479,13 +513,14 @@ rollback-force: ## Rollback to previous deployment (skip confirmation)
 
 # Phony targets
 .PHONY: help up down restart ps clean prune build build-api build-bot build-postgres build-admin-panel \
-	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel logs-newrelic \
+	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel logs-newrelic logs-traefik \
 	shell-api shell-bot shell-postgres shell-minio shell-admin-panel shell-newrelic \
 	go-build-api go-build-bot go-build-admin-panel go-build-import-cli go-build go-clean fmt fmt-check \
 	admin-panel-set-secrets admin-panel-set-password admin-panel-set-session \
 	admin-panel-set-secrets-files admin-panel-set-password-file admin-panel-set-session-file \
+	generate-traefik-password \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-root-pass tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage-env mc-setup-prod tf-docs tf-deploy-check \
-	deploy deploy-skip-build deploy-skip-cleanup rollback rollback-force
+	deploy deploy-skip-build deploy-skip-cleanup deploy-regenerate-certs clean-letsencrypt-certs rollback rollback-force

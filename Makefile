@@ -220,67 +220,8 @@ admin-panel-set-session-file: ## Generate session secret and write to file
 
 # Traefik password generation
 generate-traefik-password: ## Generate Traefik dashboard password and update .env.prod
-	@echo "========================================="
-	@echo "Traefik Dashboard Password Generator"
-	@echo "========================================="
-	@echo ""
-	@# Check if htpasswd is available
-	@if ! command -v htpasswd >/dev/null 2>&1; then \
-		echo "Error: htpasswd command not found."; \
-		echo ""; \
-		echo "Install apache2-utils (Debian/Ubuntu):"; \
-		echo "  sudo apt-get install apache2-utils"; \
-		echo ""; \
-		echo "Install httpd-tools (RHEL/CentOS/Fedora):"; \
-		echo "  sudo yum install httpd-tools"; \
-		echo "  # or: sudo dnf install httpd-tools"; \
-		echo ""; \
-		echo "Install apache2-utils (macOS with Homebrew):"; \
-		echo "  brew install httpd"; \
-		echo ""; \
-		exit 1; \
-	fi
-	@# Prompt for username
-	@read -p "Enter dashboard username [admin]: " username; \
-	username=$${username:-admin}; \
-	echo ""; \
-	echo "Enter dashboard password:"; \
-	stty -echo; \
-	read password; \
-	stty echo; \
-	echo ""; \
-	echo "Confirm password:"; \
-	stty -echo; \
-	read password_confirm; \
-	stty echo; \
-	echo ""; \
-	if [ "$$password" != "$$password_confirm" ]; then \
-		echo "Error: Passwords do not match"; \
-		exit 1; \
-	fi; \
-	if [ -z "$$password" ]; then \
-		echo "Error: Password cannot be empty"; \
-		exit 1; \
-	fi; \
-	if [ $${#password} -lt 8 ]; then \
-		echo "Warning: Password is less than 8 characters"; \
-	fi; \
-	echo "Generating htpasswd entry..."; \
-	htpasswd_entry=$$(htpasswd -nbB "$$username" "$$password"); \
-	echo ""; \
-	if grep -q '^TRAEFIK_DASHBOARD_USERS=' $(PROD_ENV_FILE); then \
-		awk -v entry="$$htpasswd_entry" '/^TRAEFIK_DASHBOARD_USERS=/ {print "TRAEFIK_DASHBOARD_USERS=" entry; next} {print}' $(PROD_ENV_FILE) > $(PROD_ENV_FILE).tmp && mv $(PROD_ENV_FILE).tmp $(PROD_ENV_FILE); \
-		echo "✓ Updated TRAEFIK_DASHBOARD_USERS in $(PROD_ENV_FILE)"; \
-	else \
-		echo "" >> $(PROD_ENV_FILE); \
-		echo "# Traefik dashboard basic auth (generated $$(date '+%Y-%m-%d %H:%M:%S'))" >> $(PROD_ENV_FILE); \
-		echo "TRAEFIK_DASHBOARD_USERS=$$htpasswd_entry" >> $(PROD_ENV_FILE); \
-		echo "✓ Added TRAEFIK_DASHBOARD_USERS to $(PROD_ENV_FILE)"; \
-	fi; \
-	DOMAIN=$$(grep '^DOMAIN_NAME=' $(PROD_ENV_FILE) | cut -d'=' -f2 | tr -d '\n\r"'); \
-	echo ""; \
-	echo "Dashboard will be accessible at: https://$$DOMAIN/traefik-dashboard"; \
-	echo "Username: $$username"
+	@chmod +x scripts/generate-traefik-password.sh
+	@scripts/generate-traefik-password.sh
 
 # Terraform targets
 tf-init: ## Initialize Terraform working directory

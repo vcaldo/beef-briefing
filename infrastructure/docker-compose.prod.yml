@@ -148,23 +148,6 @@ services:
     depends_on:
       - admin-panel
 
-
-
-
-  newrelic-infra:
-    image: newrelic/infrastructure:latest
-    container_name: beef-newrelic-infra-prod
-    cap_add:
-      - SYS_PTRACE
-    network_mode: bridge
-    pid: host
-    privileged: true
-    volumes:
-      - "/:/host:ro"
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - "./secrets/new-relic/newrelic-infra.yml:/etc/newrelic-infra.yml:ro"
-    restart: unless-stopped
-
 networks:
   beef-prod-network:
     driver: bridge

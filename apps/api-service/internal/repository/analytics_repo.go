@@ -736,3 +736,96 @@ func (r *AnalyticsRepository) GetUserComparisons(ctx context.Context, chatID int
 
 	return comparisons, nil
 }
+
+// ============================================
+// CHAT LISTING QUERIES
+// ============================================
+
+// ListChats returns all chats with summary statistics (no time range required)
+func (r *AnalyticsRepository) ListChats(ctx context.Context) ([]models.ChatSummary, error) {
+	query := `
+		SELECT
+			c.id,
+			COALESCE(c.title, '') as title,
+			c.type,
+			COALESCE(c.username, '') as username,
+			COUNT(DISTINCT m.id) as message_count,
+			COUNT(DISTINCT m.user_id) as user_count,
+			COALESCE(MAX(m.date), c.created_at) as last_activity
+		FROM chats c
+		LEFT JOIN messages m ON m.chat_id = c.id
+		GROUP BY c.id, c.title, c.type, c.username, c.created_at
+		ORDER BY last_activity DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query chats: %w", err)
+	}
+	defer rows.Close()
+
+	var chats []models.ChatSummary
+	for rows.Next() {
+		var c models.ChatSummary
+		if err := rows.Scan(
+			&c.ID,
+			&c.Title,
+			&c.Type,
+			&c.Username,
+			&c.MessageCount,
+			&c.UserCount,
+			&c.LastActivity,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan chat row: %w", err)
+		}
+		chats = append(chats, c)
+	}
+
+	return chats, rows.Err()
+}
+
+// GetChat returns detailed information about a single chat (no time range required)
+func (r *AnalyticsRepository) GetChat(ctx context.Context, chatID int64) (*models.ChatDetail, error) {
+	query := `
+		SELECT
+			c.id,
+			COALESCE(c.title, '') as title,
+			c.type,
+			COALESCE(c.username, '') as username,
+			COALESCE(c.first_name, '') as first_name,
+			COALESCE(c.last_name, '') as last_name,
+			COUNT(DISTINCT m.id) as message_count,
+			COUNT(DISTINCT m.user_id) as user_count,
+			COUNT(DISTINCT mf.id) as media_count,
+			COALESCE(MIN(m.date), c.created_at) as first_message,
+			COALESCE(MAX(m.date), c.created_at) as last_message
+		FROM chats c
+		LEFT JOIN messages m ON m.chat_id = c.id
+		LEFT JOIN media_files mf ON mf.message_id = m.id
+		WHERE c.id = $1
+		GROUP BY c.id, c.title, c.type, c.username, c.first_name, c.last_name, c.created_at
+	`
+
+	var c models.ChatDetail
+	err := r.db.QueryRowContext(ctx, query, chatID).Scan(
+		&c.ID,
+		&c.Title,
+		&c.Type,
+		&c.Username,
+		&c.FirstName,
+		&c.LastName,
+		&c.MessageCount,
+		&c.UserCount,
+		&c.MediaCount,
+		&c.FirstMessage,
+		&c.LastMessage,
+	)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("chat not found: %d", chatID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query chat %d: %w", chatID, err)
+	}
+
+	return &c, nil
+}

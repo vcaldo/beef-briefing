@@ -8,7 +8,10 @@
       "Bash(docker exec:*)",
       "Bash(curl:*)",
       "Bash(make help:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(templ generate:*)",
+      "Bash(go build:*)",
+      "Bash(make logs-admin-panel:*)"
     ]
   }
 }

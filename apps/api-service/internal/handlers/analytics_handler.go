@@ -320,3 +320,67 @@ func (h *AnalyticsHandler) HandleCompare(w http.ResponseWriter, r *http.Request)
 
 	h.writeResponse(w, chatID, startDate, endDate, comparison)
 }
+
+// HandleListChats - GET /api/v1/analytics/chats
+// Returns all chats with summary statistics (no time range required)
+func (h *AnalyticsHandler) HandleListChats(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	chats, err := h.analyticsService.ListChats(ctx)
+	if err != nil {
+		slog.Error("failed to list chats", "error", err)
+		h.writeError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Write response without time range metadata
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	response := map[string]interface{}{
+		"data": chats,
+		"metadata": map[string]interface{}{
+			"generated_at": time.Now(),
+			"total_count":  len(chats),
+		},
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		slog.Error("failed to encode response", "error", err)
+	}
+}
+
+// HandleGetChat - GET /api/v1/analytics/chats/{chat_id}/info
+// Returns detailed information about a single chat (no time range required)
+func (h *AnalyticsHandler) HandleGetChat(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	chatID, err := h.parseChatID(r)
+	if err != nil {
+		h.writeError(w, "invalid chat_id", http.StatusBadRequest)
+		return
+	}
+
+	chat, err := h.analyticsService.GetChat(ctx, chatID)
+	if err != nil {
+		slog.Error("failed to get chat", "chat_id", chatID, "error", err)
+		if strings.Contains(err.Error(), "not found") {
+			h.writeError(w, "chat not found", http.StatusNotFound)
+			return
+		}
+		h.writeError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Write response without time range metadata
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	response := map[string]interface{}{
+		"data": chat,
+		"metadata": map[string]interface{}{
+			"chat_id":      chatID,
+			"generated_at": time.Now(),
+		},
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		slog.Error("failed to encode response", "error", err)
+	}
+}

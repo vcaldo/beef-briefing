@@ -145,3 +145,29 @@ type UserComparison struct {
 	MediaSent         int     `json:"media_sent"`
 	AvgMessageLength  float64 `json:"avg_message_length"`
 }
+
+// Chat listing response (no time range required)
+type ChatSummary struct {
+	ID           int64     `json:"id"`
+	Title        string    `json:"title"`
+	Type         string    `json:"type"`
+	Username     string    `json:"username,omitempty"`
+	MessageCount int       `json:"message_count"`
+	UserCount    int       `json:"user_count"`
+	LastActivity time.Time `json:"last_activity"`
+}
+
+// Chat detail response (no time range required)
+type ChatDetail struct {
+	ID           int64     `json:"id"`
+	Title        string    `json:"title"`
+	Type         string    `json:"type"`
+	Username     string    `json:"username,omitempty"`
+	FirstName    string    `json:"first_name,omitempty"`
+	LastName     string    `json:"last_name,omitempty"`
+	MessageCount int       `json:"message_count"`
+	UserCount    int       `json:"user_count"`
+	MediaCount   int       `json:"media_count"`
+	FirstMessage time.Time `json:"first_message"`
+	LastMessage  time.Time `json:"last_message"`
+}

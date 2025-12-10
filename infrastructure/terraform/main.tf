@@ -143,6 +143,15 @@ resource "linode_domain_record" "beef_briefing_www_record" {
   ttl_sec     = 300
 }
 
+# admin subdomain (optional, pointing to same IP)
+resource "linode_domain_record" "beef_briefing_admin_record" {
+  domain_id   = linode_domain.beef_briefing_domain.id
+  name        = "admin"
+  record_type = "A"
+  target      = tolist(linode_instance.beef_briefing.ipv4)[0]
+  ttl_sec     = 300
+}
+
 # PostgreSQL persistent data volume
 resource "linode_volume" "beef_briefing_postgres_volume" {
   label     = var.postgres_volume_label

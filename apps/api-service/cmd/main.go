@@ -154,9 +154,17 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	// Analytics routes (authenticated with API key)
 	if cfg.AnalyticsAPIKey != "" {
 		apiKeyAuth := middleware.NewAPIKeyAuth(cfg.AnalyticsAPIKey)
+
+		// Chat listing route (no chat_id required)
+		chatsRouter := api.PathPrefix("/analytics/chats").Subrouter()
+		chatsRouter.Use(apiKeyAuth.Authenticate)
+		chatsRouter.HandleFunc("", analyticsHandler.HandleListChats).Methods("GET")
+
+		// Per-chat analytics routes
 		analyticsRouter := api.PathPrefix("/analytics/chats/{chat_id}").Subrouter()
 		analyticsRouter.Use(apiKeyAuth.Authenticate)
 
+		analyticsRouter.HandleFunc("/info", analyticsHandler.HandleGetChat).Methods("GET")
 		analyticsRouter.HandleFunc("/overview", analyticsHandler.HandleOverview).Methods("GET")
 		analyticsRouter.HandleFunc("/leaderboard", analyticsHandler.HandleLeaderboard).Methods("GET")
 		analyticsRouter.HandleFunc("/users/{user_id}", analyticsHandler.HandleUserDetail).Methods("GET")

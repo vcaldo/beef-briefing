@@ -267,18 +267,17 @@ generate-traefik-password: ## Generate Traefik dashboard password and update .en
 	fi; \
 	echo "Generating htpasswd entry..."; \
 	htpasswd_entry=$$(htpasswd -nbB "$$username" "$$password"); \
-	escaped_entry=$$(echo "$$htpasswd_entry" | sed 's/\$$/\$\$$$/g'); \
 	echo ""; \
 	if grep -q '^TRAEFIK_DASHBOARD_USERS=' $(PROD_ENV_FILE); then \
-		sed -i.bak "s|^TRAEFIK_DASHBOARD_USERS=.*|TRAEFIK_DASHBOARD_USERS=$$escaped_entry|" $(PROD_ENV_FILE) && rm -f $(PROD_ENV_FILE).bak; \
+		awk -v entry="$$htpasswd_entry" '/^TRAEFIK_DASHBOARD_USERS=/ {print "TRAEFIK_DASHBOARD_USERS=" entry; next} {print}' $(PROD_ENV_FILE) > $(PROD_ENV_FILE).tmp && mv $(PROD_ENV_FILE).tmp $(PROD_ENV_FILE); \
 		echo "✓ Updated TRAEFIK_DASHBOARD_USERS in $(PROD_ENV_FILE)"; \
 	else \
 		echo "" >> $(PROD_ENV_FILE); \
 		echo "# Traefik dashboard basic auth (generated $$(date '+%Y-%m-%d %H:%M:%S'))" >> $(PROD_ENV_FILE); \
-		echo "TRAEFIK_DASHBOARD_USERS=$$escaped_entry" >> $(PROD_ENV_FILE); \
+		echo "TRAEFIK_DASHBOARD_USERS=$$htpasswd_entry" >> $(PROD_ENV_FILE); \
 		echo "✓ Added TRAEFIK_DASHBOARD_USERS to $(PROD_ENV_FILE)"; \
 	fi; \
-	DOMAIN=$$(grep '^DOMAIN_NAME=' $(PROD_ENV_FILE) | cut -d'=' -f2 | tr -d '"' || echo "yourdomain.com"); \
+	DOMAIN=$$(grep '^DOMAIN_NAME=' $(PROD_ENV_FILE) | cut -d'=' -f2 | tr -d '\n\r"'); \
 	echo ""; \
 	echo "Dashboard will be accessible at: https://$$DOMAIN/traefik-dashboard"; \
 	echo "Username: $$username"

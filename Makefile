@@ -428,18 +428,22 @@ tf-sync-object-storage-env: ## Sync Object Storage credentials from Terraform to
 	ACCESS_KEY=$$($(MAKE) -s tf-object-storage-access-key); \
 	SECRET_KEY=$$($(MAKE) -s tf-object-storage-secret-key); \
 	BUCKET_NAME=$$($(MAKE) -s tf-object-storage-bucket); \
+	ENDPOINT_ESCAPED=$$(printf '%s\n' "$$ENDPOINT" | sed 's/[&/\]/\\&/g'); \
+	ACCESS_KEY_ESCAPED=$$(printf '%s\n' "$$ACCESS_KEY" | sed 's/[&/\]/\\&/g'); \
+	SECRET_KEY_ESCAPED=$$(printf '%s\n' "$$SECRET_KEY" | sed 's/[&/\]/\\&/g'); \
+	BUCKET_NAME_ESCAPED=$$(printf '%s\n' "$$BUCKET_NAME" | sed 's/[&/\]/\\&/g'); \
 	if grep -q '^MINIO_ENDPOINT=' $(PROD_ENV_FILE); then \
-		sed -i "s|^MINIO_ENDPOINT=.*|MINIO_ENDPOINT=$$ENDPOINT|" $(PROD_ENV_FILE); \
+		sed -i "s|^MINIO_ENDPOINT=.*|MINIO_ENDPOINT=$$ENDPOINT_ESCAPED|" $(PROD_ENV_FILE); \
 	else \
 		echo "MINIO_ENDPOINT=$$ENDPOINT" >> $(PROD_ENV_FILE); \
 	fi; \
 	if grep -q '^MINIO_ACCESS_KEY=' $(PROD_ENV_FILE); then \
-		sed -i "s|^MINIO_ACCESS_KEY=.*|MINIO_ACCESS_KEY=$$ACCESS_KEY|" $(PROD_ENV_FILE); \
+		sed -i "s|^MINIO_ACCESS_KEY=.*|MINIO_ACCESS_KEY=$$ACCESS_KEY_ESCAPED|" $(PROD_ENV_FILE); \
 	else \
 		echo "MINIO_ACCESS_KEY=$$ACCESS_KEY" >> $(PROD_ENV_FILE); \
 	fi; \
 	if grep -q '^MINIO_SECRET_KEY=' $(PROD_ENV_FILE); then \
-		sed -i "s|^MINIO_SECRET_KEY=.*|MINIO_SECRET_KEY=$$SECRET_KEY|" $(PROD_ENV_FILE); \
+		sed -i "s|^MINIO_SECRET_KEY=.*|MINIO_SECRET_KEY=$$SECRET_KEY_ESCAPED|" $(PROD_ENV_FILE); \
 	else \
 		echo "MINIO_SECRET_KEY=$$SECRET_KEY" >> $(PROD_ENV_FILE); \
 	fi; \
@@ -449,7 +453,7 @@ tf-sync-object-storage-env: ## Sync Object Storage credentials from Terraform to
 		echo "MINIO_USE_SSL=true" >> $(PROD_ENV_FILE); \
 	fi; \
 	if grep -q '^MINIO_BUCKET=' $(PROD_ENV_FILE); then \
-		sed -i "s|^MINIO_BUCKET=.*|MINIO_BUCKET=$$BUCKET_NAME|" $(PROD_ENV_FILE); \
+		sed -i "s|^MINIO_BUCKET=.*|MINIO_BUCKET=$$BUCKET_NAME_ESCAPED|" $(PROD_ENV_FILE); \
 	else \
 		echo "MINIO_BUCKET=$$BUCKET_NAME" >> $(PROD_ENV_FILE); \
 	fi; \
@@ -490,6 +494,17 @@ deploy-skip-build: tf-sync-object-storage-env ## Deploy using existing images (s
 deploy-skip-cleanup: tf-sync-object-storage-env ## Deploy without cleaning up old images
 	@./scripts/deploy.sh --skip-cleanup
 
+deploy-regenerate-certs: ## Deploy with fresh Let's Encrypt certificates (removes acme.json first)
+	@echo "Removing Let's Encrypt certificates on remote server..."
+	@ssh $(shell $(MAKE) -s tf-ssh-user-host) 'rm -f ~/beef-briefing/infrastructure/letsencrypt/acme.json'
+	@echo "✓ Certificates removed, deploying with fresh certificates..."
+	@$(MAKE) deploy
+
+clean-letsencrypt-certs: ## Remove Let's Encrypt certificates on remote server (without deploying)
+	@echo "Removing Let's Encrypt certificates on remote server..."
+	@ssh $(shell $(MAKE) -s tf-ssh-user-host) 'rm -f ~/beef-briefing/infrastructure/letsencrypt/acme.json'
+	@echo "✓ Certificates removed"
+
 rollback: ## Rollback to previous deployment
 	@./scripts/rollback.sh
 
@@ -508,4 +523,4 @@ rollback-force: ## Rollback to previous deployment (skip confirmation)
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-root-pass tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage-env mc-setup-prod tf-docs tf-deploy-check \
-	deploy deploy-skip-build deploy-skip-cleanup rollback rollback-force
+	deploy deploy-skip-build deploy-skip-cleanup deploy-regenerate-certs clean-letsencrypt-certs rollback rollback-force

@@ -91,7 +91,7 @@ services:
     labels:
       - "traefik.enable=true"
       # Router configuration
-      - "traefik.http.routers.admin-panel.rule=Host(`${ADMIN_PANEL_DOMAIN_SUFFIX}.${DOMAIN_NAME}`)"
+      - 'traefik.http.routers.admin-panel.rule=Host(`admin.barra-pesada.online`)'
       - "traefik.http.routers.admin-panel.entrypoints=websecure"
       - "traefik.http.routers.admin-panel.tls.certresolver=letsencrypt"
       # Service configuration
@@ -136,18 +136,20 @@ services:
     labels:
       # Enable Traefik for this service
       - "traefik.enable=true"
-      # Dashboard routing
-      - "traefik.http.routers.traefik-dashboard.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/traefik-dashboard`)"
-      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
-      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.traefik-dashboard.service=api@internal"
-      # Dashboard middleware (basic auth + strip prefix)
-      - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth,traefik-strip"
+      # Dashboard routing - Traefik API is at /api and dashboard at /dashboard
+      - 'traefik.http.routers.traefik-api.rule=Host(`barra-pesada.online`) && (PathPrefix(`/api`) || PathPrefix(`/traefik-dashboard`))'
+      - "traefik.http.routers.traefik-api.entrypoints=websecure"
+      - "traefik.http.routers.traefik-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-api.service=api@internal"
+      # Dashboard middleware (basic auth only, no strip prefix)
+      - "traefik.http.routers.traefik-api.middlewares=traefik-auth"
       - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_USERS}"
-      - "traefik.http.middlewares.traefik-strip.stripprefix.prefixes=/traefik-dashboard"
     restart: unless-stopped
     depends_on:
       - admin-panel
+
+
+
 
   newrelic-infra:
     image: newrelic/infrastructure:latest

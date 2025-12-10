@@ -30,6 +30,18 @@ secrets/
 ### new-relic/
 - `newrelic-infra.yml` - New Relic infrastructure agent configuration file
 
+### Traefik Dashboard Credentials
+
+**Note:** Traefik dashboard credentials are **not** stored as separate files in this directory. Instead, they are managed via the `TRAEFIK_DASHBOARD_USERS` environment variable in `.env.prod`.
+
+To generate Traefik dashboard credentials:
+
+```bash
+make generate-traefik-password
+```
+
+This will generate bcrypt-hashed credentials in htpasswd format and update the `infrastructure/.env.prod` file automatically.
+
 ## Usage
 
 These files are automatically read by the admin panel when the following environment variables are set:

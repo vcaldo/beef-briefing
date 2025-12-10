@@ -111,6 +111,13 @@ yarn-error.log
 secrets.json
 credentials/
 private_keys/
+infrastructure/secrets/
+
+# Let's Encrypt certificates (SSL)
+infrastructure/letsencrypt/
+letsencrypt/
+acme.json
+acme-staging.json
 
 # Test coverage
 coverage/

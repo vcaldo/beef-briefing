@@ -33,6 +33,9 @@ REQUIRED_ENV_VARS=(
     "MINIO_ACCESS_KEY"
     "MINIO_SECRET_KEY"
     "MINIO_BUCKET"
+    "DOMAIN_NAME"
+    "LETSENCRYPT_EMAIL"
+    "TRAEFIK_DASHBOARD_USERS"
 )
 
 # =============================================================================
@@ -136,6 +139,17 @@ validate_env_vars() {
             missing+=("$var (placeholder value)")
         fi
     done
+
+    # Special validation for Traefik dashboard users (htpasswd bcrypt format)
+    if grep -q '^TRAEFIK_DASHBOARD_USERS=' "$env_file"; then
+        traefik_users=$(grep '^TRAEFIK_DASHBOARD_USERS=' "$env_file" | cut -d'=' -f2-)
+        # Check for bcrypt format markers: $2y$ or $2a$ (with or without docker-compose escaping $$)
+        if [[ "$traefik_users" != *'$2y$'* ]] && [[ "$traefik_users" != *'$2a$'* ]] && \
+           [[ "$traefik_users" != *'$$2y$$'* ]] && [[ "$traefik_users" != *'$$2a$$'* ]]; then
+            log_warn "TRAEFIK_DASHBOARD_USERS does not appear to be in htpasswd bcrypt format"
+            log_warn "Run 'make generate-traefik-password ENV_FILE=infrastructure/.env.prod' to generate a proper entry"
+        fi
+    fi
 
     if [[ ${#missing[@]} -gt 0 ]]; then
         log_error "Missing or invalid environment variables in $env_file:"

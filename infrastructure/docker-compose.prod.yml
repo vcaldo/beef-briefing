@@ -79,18 +79,78 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD_HASH_FILE: ${ADMIN_PASSWORD_HASH_FILE}
       SESSION_SECRET_FILE: ${SESSION_SECRET_FILE}
-      SECURE_COOKIES: false
+      SECURE_COOKIES: true
       ENVIRONMENT: production
       LOG_LEVEL: info
     volumes:
       - ./secrets/admin-panel:/app/secrets:ro
-    ports:
-      - "${ADMIN_PANEL_PORT:-8081}:${ADMIN_PANEL_PORT:-8081}"
     depends_on:
       - postgres
     networks:
       - beef-prod-network
+    labels:
+      - "traefik.enable=true"
+      # Router configuration
+      - "traefik.http.routers.admin-panel.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.admin-panel.entrypoints=websecure"
+      - "traefik.http.routers.admin-panel.tls.certresolver=letsencrypt"
+      # Service configuration
+      - "traefik.http.services.admin-panel.loadbalancer.server.port=${ADMIN_PANEL_PORT:-8081}"
+      # Middleware: strip /admin prefix
+      - "traefik.http.routers.admin-panel.middlewares=admin-strip"
+      - "traefik.http.middlewares.admin-strip.stripprefix.prefixes=/admin"
     restart: unless-stopped
+
+  traefik:
+    image: traefik:v3.6.4
+    container_name: beef-traefik-prod
+    command:
+      # API Settings
+      - "--api.dashboard=true"
+      # Providers
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=beef-prod-network"
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # HTTP to HTTPS redirect
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # Let's Encrypt
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # Optional: Let's Encrypt Staging (for testing - uncomment to use)
+      # - "--certificatesresolvers.letsencrypt-staging.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      # - "--certificatesresolvers.letsencrypt-staging.acme.httpchallenge=true"
+      # - "--certificatesresolvers.letsencrypt-staging.acme.httpchallenge.entrypoint=web"
+      # - "--certificatesresolvers.letsencrypt-staging.acme.email=${LETSENCRYPT_EMAIL}"
+      # - "--certificatesresolvers.letsencrypt-staging.acme.storage=/letsencrypt/acme-staging.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    networks:
+      - beef-prod-network
+    labels:
+      # Enable Traefik for this service
+      - "traefik.enable=true"
+      # Dashboard routing
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/traefik-dashboard`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      # Dashboard middleware (basic auth + strip prefix)
+      - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth,traefik-strip"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_USERS}"
+      - "traefik.http.middlewares.traefik-strip.stripprefix.prefixes=/traefik-dashboard"
+    restart: unless-stopped
+    depends_on:
+      - admin-panel
 
   newrelic-infra:
     image: newrelic/infrastructure:latest

@@ -1,6 +1,8 @@
 # Variables
 COMPOSE_FILE ?= infrastructure/docker-compose.dev.yml
 ENV_FILE ?= infrastructure/.env.dev
+PROD_COMPOSE_FILE := infrastructure/docker-compose.prod.yml
+PROD_ENV_FILE := infrastructure/.env.prod
 TERRAFORM_DIR := infrastructure/terraform
 
 # Service names
@@ -87,6 +89,15 @@ logs-admin-panel: ## Tail logs from admin-panel
 
 logs-newrelic: ## Tail logs from newrelic-infra
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f $(NEWRELIC_INFRA)
+
+logs-traefik: ## Tail logs from traefik (production only)
+	@if [ "$(COMPOSE_FILE)" = "$(PROD_COMPOSE_FILE)" ]; then \
+		SSH_HOST=$$($(MAKE) -s tf-ssh-user-host); \
+		ssh $$SSH_HOST 'cd ~/beef-briefing && docker compose logs -f traefik'; \
+	else \
+		echo "Error: logs-traefik only available for production environment"; \
+		echo "Use: make logs-traefik COMPOSE_FILE=$(PROD_COMPOSE_FILE)"; \
+	fi
 
 # Shell targets
 shell-api: ## Open shell in api-service container
@@ -207,6 +218,71 @@ admin-panel-set-password-file: ## Generate password hash and write to file
 admin-panel-set-session-file: ## Generate session secret and write to file
 	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../infrastructure/secrets/apps/admin-panel -session-only
 
+# Traefik password generation
+generate-traefik-password: ## Generate Traefik dashboard password and update .env.prod
+	@echo "========================================="
+	@echo "Traefik Dashboard Password Generator"
+	@echo "========================================="
+	@echo ""
+	@# Check if htpasswd is available
+	@if ! command -v htpasswd >/dev/null 2>&1; then \
+		echo "Error: htpasswd command not found."; \
+		echo ""; \
+		echo "Install apache2-utils (Debian/Ubuntu):"; \
+		echo "  sudo apt-get install apache2-utils"; \
+		echo ""; \
+		echo "Install httpd-tools (RHEL/CentOS/Fedora):"; \
+		echo "  sudo yum install httpd-tools"; \
+		echo "  # or: sudo dnf install httpd-tools"; \
+		echo ""; \
+		echo "Install apache2-utils (macOS with Homebrew):"; \
+		echo "  brew install httpd"; \
+		echo ""; \
+		exit 1; \
+	fi
+	@# Prompt for username
+	@read -p "Enter dashboard username [admin]: " username; \
+	username=$${username:-admin}; \
+	echo ""; \
+	echo "Enter dashboard password:"; \
+	stty -echo; \
+	read password; \
+	stty echo; \
+	echo ""; \
+	echo "Confirm password:"; \
+	stty -echo; \
+	read password_confirm; \
+	stty echo; \
+	echo ""; \
+	if [ "$$password" != "$$password_confirm" ]; then \
+		echo "Error: Passwords do not match"; \
+		exit 1; \
+	fi; \
+	if [ -z "$$password" ]; then \
+		echo "Error: Password cannot be empty"; \
+		exit 1; \
+	fi; \
+	if [ $${#password} -lt 8 ]; then \
+		echo "Warning: Password is less than 8 characters"; \
+	fi; \
+	echo "Generating htpasswd entry..."; \
+	htpasswd_entry=$$(htpasswd -nbB "$$username" "$$password"); \
+	escaped_entry=$$(echo "$$htpasswd_entry" | sed 's/\$$/\$\$$$/g'); \
+	echo ""; \
+	if grep -q '^TRAEFIK_DASHBOARD_USERS=' $(PROD_ENV_FILE); then \
+		sed -i.bak "s|^TRAEFIK_DASHBOARD_USERS=.*|TRAEFIK_DASHBOARD_USERS=$$escaped_entry|" $(PROD_ENV_FILE) && rm -f $(PROD_ENV_FILE).bak; \
+		echo "✓ Updated TRAEFIK_DASHBOARD_USERS in $(PROD_ENV_FILE)"; \
+	else \
+		echo "" >> $(PROD_ENV_FILE); \
+		echo "# Traefik dashboard basic auth (generated $$(date '+%Y-%m-%d %H:%M:%S'))" >> $(PROD_ENV_FILE); \
+		echo "TRAEFIK_DASHBOARD_USERS=$$escaped_entry" >> $(PROD_ENV_FILE); \
+		echo "✓ Added TRAEFIK_DASHBOARD_USERS to $(PROD_ENV_FILE)"; \
+	fi; \
+	DOMAIN=$$(grep '^DOMAIN_NAME=' $(PROD_ENV_FILE) | cut -d'=' -f2 | tr -d '"' || echo "yourdomain.com"); \
+	echo ""; \
+	echo "Dashboard will be accessible at: https://$$DOMAIN/traefik-dashboard"; \
+	echo "Username: $$username"
+
 # Terraform targets
 tf-init: ## Initialize Terraform working directory
 	cd $(TERRAFORM_DIR) && terraform init
@@ -302,10 +378,10 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 	@if [ ! -f $(TERRAFORM_DIR)/terraform.tfvars ]; then \
 		cp $(TERRAFORM_DIR)/terraform.tfvars.example $(TERRAFORM_DIR)/terraform.tfvars; \
 		echo "Created terraform.tfvars from example."; \
-		if [ -f infrastructure/.env.prod ]; then \
-			ENV_FILE=infrastructure/.env.prod; \
-		elif [ -f infrastructure/.env.dev ]; then \
-			ENV_FILE=infrastructure/.env.dev; \
+		if [ -f $(PROD_ENV_FILE) ]; then \
+			ENV_FILE=$(PROD_ENV_FILE); \
+		elif [ -f $(ENV_FILE) ]; then \
+			ENV_FILE=$(ENV_FILE); \
 		else \
 			echo "Warning: No .env.prod or .env.dev found. Please edit terraform.tfvars manually."; \
 			exit 0; \
@@ -458,8 +534,6 @@ tf-docs: ## Show Terraform documentation
 tf-deploy-check: tf-validate tf-fmt-check tf-plan ## Full pre-deployment check (validate, format check, plan)
 
 # Production deployment targets
-PROD_COMPOSE_FILE := infrastructure/docker-compose.prod.yml
-PROD_ENV_FILE := infrastructure/.env.prod
 COMMIT_HASH ?= $(shell git rev-parse --short HEAD)
 
 deploy: tf-sync-object-storage-env ## Deploy to production server with commit-tagged images
@@ -479,11 +553,12 @@ rollback-force: ## Rollback to previous deployment (skip confirmation)
 
 # Phony targets
 .PHONY: help up down restart ps clean prune build build-api build-bot build-postgres build-admin-panel \
-	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel logs-newrelic \
+	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel logs-newrelic logs-traefik \
 	shell-api shell-bot shell-postgres shell-minio shell-admin-panel shell-newrelic \
 	go-build-api go-build-bot go-build-admin-panel go-build-import-cli go-build go-clean fmt fmt-check \
 	admin-panel-set-secrets admin-panel-set-password admin-panel-set-session \
 	admin-panel-set-secrets-files admin-panel-set-password-file admin-panel-set-session-file \
+	generate-traefik-password \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-root-pass tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \

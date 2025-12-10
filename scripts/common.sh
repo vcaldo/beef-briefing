@@ -143,11 +143,14 @@ validate_env_vars() {
     # Special validation for Traefik dashboard users (htpasswd bcrypt format)
     if grep -q '^TRAEFIK_DASHBOARD_USERS=' "$env_file"; then
         traefik_users=$(grep '^TRAEFIK_DASHBOARD_USERS=' "$env_file" | cut -d'=' -f2-)
-        # Check for bcrypt format markers: $2y$ or $2a$ (with or without docker-compose escaping $$)
-        if [[ "$traefik_users" != *'$2y$'* ]] && [[ "$traefik_users" != *'$2a$'* ]] && \
-           [[ "$traefik_users" != *'$$2y$$'* ]] && [[ "$traefik_users" != *'$$2a$$'* ]]; then
-            log_warn "TRAEFIK_DASHBOARD_USERS does not appear to be in htpasswd bcrypt format"
-            log_warn "Run 'make generate-traefik-password ENV_FILE=infrastructure/.env.prod' to generate a proper entry"
+
+        # MUST use $$2y$$ or $$2a$$ format (double $$ for docker-compose escaping)
+        # Single $ will be interpreted as variable substitution and corrupt the hash
+        if [[ "$traefik_users" != *'$$2y$$'* ]] && [[ "$traefik_users" != *'$$2a$$'* ]]; then
+            log_error "TRAEFIK_DASHBOARD_USERS must use \$\$ escaped format for docker-compose"
+            log_error "Current value uses single \$ which will be corrupted by variable expansion"
+            log_error "Run 'make generate-traefik-password ENV_FILE=infrastructure/.env.prod' to fix"
+            missing+=("TRAEFIK_DASHBOARD_USERS (invalid format)")
         fi
     fi
 

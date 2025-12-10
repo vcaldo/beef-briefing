@@ -140,9 +140,14 @@ generate_htpasswd_entry() {
 update_env_file() {
     local htpasswd_entry="$1"
 
+    # Escape $ to $$ for docker-compose .env file compatibility
+    # Docker compose interprets single $ as variable substitution
+    local escaped_entry
+    escaped_entry=$(echo "$htpasswd_entry" | sed 's/\$/\$\$/g')
+
     if grep -q '^TRAEFIK_DASHBOARD_USERS=' "$PROD_ENV_FILE"; then
         # Update existing entry
-        awk -v entry="$htpasswd_entry" '/^TRAEFIK_DASHBOARD_USERS=/ {print "TRAEFIK_DASHBOARD_USERS=" entry; next} {print}' "$PROD_ENV_FILE" > "$PROD_ENV_FILE.tmp"
+        awk -v entry="$escaped_entry" '/^TRAEFIK_DASHBOARD_USERS=/ {print "TRAEFIK_DASHBOARD_USERS=" entry; next} {print}' "$PROD_ENV_FILE" > "$PROD_ENV_FILE.tmp"
         if [ $? -ne 0 ]; then
             log_error "Failed to update $PROD_ENV_FILE"
             rm -f "$PROD_ENV_FILE.tmp"
@@ -154,7 +159,7 @@ update_env_file() {
         # Add new entry
         echo "" >> "$PROD_ENV_FILE" || { log_error "Failed to write to $PROD_ENV_FILE"; exit 1; }
         echo "# Traefik dashboard basic auth (generated $(date '+%Y-%m-%d %H:%M:%S'))" >> "$PROD_ENV_FILE" || { log_error "Failed to write to $PROD_ENV_FILE"; exit 1; }
-        echo "TRAEFIK_DASHBOARD_USERS=$htpasswd_entry" >> "$PROD_ENV_FILE" || { log_error "Failed to write to $PROD_ENV_FILE"; exit 1; }
+        echo "TRAEFIK_DASHBOARD_USERS=$escaped_entry" >> "$PROD_ENV_FILE" || { log_error "Failed to write to $PROD_ENV_FILE"; exit 1; }
         log_success "Added TRAEFIK_DASHBOARD_USERS to $PROD_ENV_FILE"
     fi
 }

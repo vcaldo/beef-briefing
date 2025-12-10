@@ -91,7 +91,7 @@ services:
     labels:
       - "traefik.enable=true"
       # Router configuration
-      - 'traefik.http.routers.admin-panel.rule=Host(`admin.barra-pesada.online`)'
+      - 'traefik.http.routers.admin-panel.rule=Host(`${ADMIN_PANEL_DOMAIN_SUFFIX}.${DOMAIN_NAME}`)'
       - "traefik.http.routers.admin-panel.entrypoints=websecure"
       - "traefik.http.routers.admin-panel.tls.certresolver=letsencrypt"
       # Service configuration
@@ -137,7 +137,7 @@ services:
       # Enable Traefik for this service
       - "traefik.enable=true"
       # Dashboard routing - Traefik API is at /api and dashboard at /dashboard
-      - 'traefik.http.routers.traefik-api.rule=Host(`barra-pesada.online`) && (PathPrefix(`/api`) || PathPrefix(`/traefik-dashboard`))'
+      - 'traefik.http.routers.traefik-api.rule=Host(`${DOMAIN_NAME}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))'
       - "traefik.http.routers.traefik-api.entrypoints=websecure"
       - "traefik.http.routers.traefik-api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.traefik-api.service=api@internal"

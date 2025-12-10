@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,8 +11,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	_ "github.com/lib/pq"
 
+	"beef-briefing/apps/admin-panel/internal/apiclient"
 	"beef-briefing/apps/admin-panel/internal/auth"
 	"beef-briefing/apps/admin-panel/internal/config"
 	"beef-briefing/apps/admin-panel/internal/handler"
@@ -36,17 +35,15 @@ func main() {
 		"environment", cfg.Environment,
 	)
 
-	// Connect to database
-	db, err := setupDatabase(cfg)
-	if err != nil {
-		slog.Error("failed to connect to database", "error", err)
-		os.Exit(1)
-	}
-	defer db.Close()
+	// Initialize API client
+	apiClient := apiclient.NewClient(apiclient.Config{
+		BaseURL: cfg.APIServiceURL,
+		APIKey:  cfg.AnalyticsAPIKey,
+		Timeout: 30 * time.Second,
+	})
 
-	slog.Info("connected to database",
-		"host", cfg.DBHost,
-		"database", cfg.DBName,
+	slog.Info("configured API client",
+		"api_url", cfg.APIServiceURL,
 	)
 
 	// Initialize components
@@ -56,7 +53,7 @@ func main() {
 		os.Exit(1)
 	}
 	rateLimiter := middleware.NewRateLimiter()
-	h := handler.NewHandler(authManager, db)
+	h := handler.NewHandler(authManager, apiClient)
 
 	// Setup router
 	router := setupRouter(h, authManager, rateLimiter)
@@ -122,28 +119,6 @@ func setupLogger(cfg *config.Config) {
 	slog.SetDefault(slog.New(handler))
 }
 
-func setupDatabase(cfg *config.Config) (*sql.DB, error) {
-	db, err := sql.Open("postgres", cfg.DSN())
-	if err != nil {
-		return nil, fmt.Errorf("opening database: %w", err)
-	}
-
-	// Configure connection pool
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
-
-	// Verify connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := db.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("pinging database: %w", err)
-	}
-
-	return db, nil
-}
-
 func setupRouter(h *handler.Handler, authManager *auth.Auth, rateLimiter *middleware.RateLimiter) *mux.Router {
 	r := mux.NewRouter()
 
@@ -159,10 +134,19 @@ func setupRouter(h *handler.Handler, authManager *auth.Auth, rateLimiter *middle
 	protected := r.PathPrefix("/").Subrouter()
 	protected.Use(authManager.RequireAuth)
 
+	// Dashboard and chat views
 	protected.HandleFunc("/", h.Dashboard).Methods("GET")
 	protected.HandleFunc("/chats/{id:[0-9-]+}", h.ChatDetail).Methods("GET")
-	protected.HandleFunc("/chats/{id:[0-9-]+}/stats-partial", h.StatsPartial).Methods("GET")
-	protected.HandleFunc("/chats/{id:[0-9-]+}/calendar-data", h.CalendarData).Methods("GET")
+
+	// Analytics partials (HTMX endpoints)
+	protected.HandleFunc("/chats/{id:[0-9-]+}/leaderboard", h.LeaderboardPartial).Methods("GET")
+	protected.HandleFunc("/chats/{id:[0-9-]+}/heatmap", h.HeatmapPartial).Methods("GET")
+	protected.HandleFunc("/chats/{id:[0-9-]+}/timeline", h.TimelinePartial).Methods("GET")
+	protected.HandleFunc("/chats/{id:[0-9-]+}/top-content", h.TopContentPartial).Methods("GET")
+	protected.HandleFunc("/chats/{id:[0-9-]+}/users/{user_id:[0-9]+}", h.UserDetailPartial).Methods("GET")
+	protected.HandleFunc("/chats/{id:[0-9-]+}/compare", h.CompareUsersPartial).Methods("GET")
+
+	// Auth and settings
 	protected.HandleFunc("/auth/logout", h.Logout).Methods("POST")
 	protected.HandleFunc("/theme", h.SetTheme).Methods("POST")
 

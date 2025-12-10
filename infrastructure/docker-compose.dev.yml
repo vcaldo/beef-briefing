@@ -85,12 +85,8 @@ services:
       dockerfile: apps/admin-panel/Dockerfile
     container_name: beef-admin-panel-dev
     environment:
-      DB_HOST: postgres
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_PORT: 5432
-      DB_SSL_MODE: disable
+      API_SERVICE_URL: http://api-service:${API_PORT}
+      ANALYTICS_API_KEY: ${ANALYTICS_API_KEY}
       ADMIN_PANEL_PORT: ${ADMIN_PANEL_PORT:-8081}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD_HASH_FILE: ${ADMIN_PASSWORD_HASH_FILE}
@@ -102,7 +98,7 @@ services:
     ports:
       - "${ADMIN_PANEL_PORT:-8081}:${ADMIN_PANEL_PORT:-8081}"
     depends_on:
-      - postgres
+      - api-service
     networks:
       - beef-dev-network
     restart: unless-stopped

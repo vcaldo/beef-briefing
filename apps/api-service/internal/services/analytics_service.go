@@ -253,3 +253,13 @@ func (s *AnalyticsService) CompareUsers(ctx context.Context, chatID int64, userI
 
 	return s.analyticsRepo.GetUserComparisons(ctx, chatID, userIDs, startDate, endDate)
 }
+
+// ListChats returns all chats with summary statistics (no time range required)
+func (s *AnalyticsService) ListChats(ctx context.Context) ([]models.ChatSummary, error) {
+	return s.analyticsRepo.ListChats(ctx)
+}
+
+// GetChat returns detailed information about a single chat (no time range required)
+func (s *AnalyticsService) GetChat(ctx context.Context, chatID int64) (*models.ChatDetail, error) {
+	return s.analyticsRepo.GetChat(ctx, chatID)
+}

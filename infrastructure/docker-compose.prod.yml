@@ -72,12 +72,8 @@ services:
     image: beef-briefing/admin-panel:${IMAGE_TAG}
     container_name: beef-admin-panel-prod
     environment:
-      DB_HOST: postgres
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_PORT: 5432
-      DB_SSL_MODE: disable
+      API_SERVICE_URL: http://api-service:${API_PORT}
+      ANALYTICS_API_KEY_FILE: /app/secrets/analytics_api_key
       ADMIN_PANEL_PORT: ${ADMIN_PANEL_PORT:-8081}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD_HASH_FILE: ${ADMIN_PASSWORD_HASH_FILE}
@@ -87,8 +83,9 @@ services:
       LOG_LEVEL: info
     volumes:
       - ./secrets/admin-panel:/app/secrets:ro
+      - ./secrets/api-service/analytics_api_key:/app/secrets/analytics_api_key:ro
     depends_on:
-      - postgres
+      - api-service
     networks:
       - beef-prod-network
     labels:
@@ -150,23 +147,6 @@ services:
     restart: unless-stopped
     depends_on:
       - admin-panel
-
-
-
-
-  newrelic-infra:
-    image: newrelic/infrastructure:latest
-    container_name: beef-newrelic-infra-prod
-    cap_add:
-      - SYS_PTRACE
-    network_mode: bridge
-    pid: host
-    privileged: true
-    volumes:
-      - "/:/host:ro"
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - "./secrets/new-relic/newrelic-infra.yml:/etc/newrelic-infra.yml:ro"
-    restart: unless-stopped
 
 networks:
   beef-prod-network:

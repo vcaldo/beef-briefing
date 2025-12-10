@@ -226,6 +226,13 @@ make generate-traefik-password
 
 Updates `TRAEFIK_DASHBOARD_USERS` in `.env.prod` with bcrypt hash ($$2y$$ escaping for docker-compose).
 
+**Analytics API Key**:
+```bash
+make generate-analytics-api-key
+```
+
+Generates a secure random API key and saves it to `infrastructure/secrets/apps/api-service/analytics_api_key`. This key is automatically deployed to production when you run `make deploy`. The key is used for authenticating requests to the analytics endpoints.
+
 ## Import CLI Usage
 
 Import Telegram Desktop exports into the system:

@@ -35,6 +35,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: telegram-media
       MINIO_USE_SSL: false
+      ANALYTICS_API_KEY: ${ANALYTICS_API_KEY}
       ENVIRONMENT: development
       LOG_LEVEL: debug
     ports:

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"beef-briefing/apps/api-service/internal/handlers"
+	"beef-briefing/apps/api-service/internal/middleware"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/apps/api-service/internal/storage"
 	"beef-briefing/pkg/config"
@@ -139,13 +140,35 @@ func initDatabase(cfg *config.Config) (*sql.DB, error) {
 func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Config) *mux.Router {
 	router := mux.NewRouter()
 
-	// Create service and handler
+	// Create services and handlers
 	ingestService := services.NewIngestService(db, minioClient)
 	ingestHandler := handlers.NewIngestHandler(ingestService, cfg)
 
-	// API routes
+	analyticsService := services.NewAnalyticsService(db)
+	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
+
+	// API v1 routes (public)
 	api := router.PathPrefix("/api/v1").Subrouter()
 	api.HandleFunc("/ingest", ingestHandler.HandleIngest).Methods("POST")
+
+	// Analytics routes (authenticated with API key)
+	if cfg.AnalyticsAPIKey != "" {
+		apiKeyAuth := middleware.NewAPIKeyAuth(cfg.AnalyticsAPIKey)
+		analyticsRouter := api.PathPrefix("/analytics/chats/{chat_id}").Subrouter()
+		analyticsRouter.Use(apiKeyAuth.Authenticate)
+
+		analyticsRouter.HandleFunc("/overview", analyticsHandler.HandleOverview).Methods("GET")
+		analyticsRouter.HandleFunc("/leaderboard", analyticsHandler.HandleLeaderboard).Methods("GET")
+		analyticsRouter.HandleFunc("/users/{user_id}", analyticsHandler.HandleUserDetail).Methods("GET")
+		analyticsRouter.HandleFunc("/timeline", analyticsHandler.HandleTimeline).Methods("GET")
+		analyticsRouter.HandleFunc("/heatmap", analyticsHandler.HandleHeatmap).Methods("GET")
+		analyticsRouter.HandleFunc("/top-content", analyticsHandler.HandleTopContent).Methods("GET")
+		analyticsRouter.HandleFunc("/compare", analyticsHandler.HandleCompare).Methods("GET")
+
+		slog.Info("analytics endpoints enabled", "path_prefix", "/api/v1/analytics")
+	} else {
+		slog.Warn("analytics endpoints disabled (ANALYTICS_API_KEY not configured)")
+	}
 
 	// Health check endpoint
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

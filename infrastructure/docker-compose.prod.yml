@@ -35,8 +35,11 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: ${MINIO_BUCKET}
       MINIO_USE_SSL: ${MINIO_USE_SSL}
+      ANALYTICS_API_KEY_FILE: ${ANALYTICS_API_KEY_FILE}
       ENVIRONMENT: production
       LOG_LEVEL: info
+    volumes:
+      - ./secrets/api-service:/app/secrets:ro
     ports:
       - "${API_PORT}:${API_PORT}"
     depends_on:

@@ -261,7 +261,11 @@ cd ~/beef-briefing/apps/import-cli
 5. Test with curl using multipart form data
 
 ### Updating Admin Panel UI
-?
+
+1. Edit templates in `apps/admin-panel/templates/*.templ`
+2. Run `cd apps/admin-panel && templ generate`
+3. Test locally: `make up-build`
+4. Deploy: `make deploy`
 
 ### Adding New Environment Variables
 

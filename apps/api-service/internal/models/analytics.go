@@ -49,14 +49,14 @@ type Metadata struct {
 
 // Overview response
 type OverviewResponse struct {
-	TotalMessages      int                    `json:"total_messages"`
-	TotalUsers         int                    `json:"total_users"`
-	TotalReactions     int                    `json:"total_reactions"`
-	TotalMedia         int                    `json:"total_media"`
-	MessagesPerDay     float64                `json:"messages_per_day"`
-	MostActiveUser     *UserSummary           `json:"most_active_user"`
-	TopEmojis          []EmojiBreakdown       `json:"top_emojis"`
-	MediaTypeBreakdown map[string]int         `json:"media_type_breakdown"`
+	TotalMessages      int              `json:"total_messages"`
+	TotalUsers         int              `json:"total_users"`
+	TotalReactions     int              `json:"total_reactions"`
+	TotalMedia         int              `json:"total_media"`
+	MessagesPerDay     float64          `json:"messages_per_day"`
+	MostActiveUser     *UserSummary     `json:"most_active_user"`
+	TopEmojis          []EmojiBreakdown `json:"top_emojis"`
+	MediaTypeBreakdown map[string]int   `json:"media_type_breakdown"`
 }
 
 type UserSummary struct {
@@ -82,11 +82,11 @@ type LeaderboardEntry struct {
 // User detail response
 type UserDetailResponse struct {
 	UserSummary
-	Stats              UserDetailStats  `json:"stats"`
-	Streaks            StreakInfo       `json:"streaks"`
-	TopEmojisUsed      []EmojiBreakdown `json:"top_emojis_used"`
-	TopEmojisReceived  []EmojiBreakdown `json:"top_emojis_received"`
-	ActivityByHour     map[int]int      `json:"activity_by_hour"` // Hour (0-23) -> count
+	Stats             UserDetailStats  `json:"stats"`
+	Streaks           StreakInfo       `json:"streaks"`
+	TopEmojisUsed     []EmojiBreakdown `json:"top_emojis_used"`
+	TopEmojisReceived []EmojiBreakdown `json:"top_emojis_received"`
+	ActivityByHour    map[int]int      `json:"activity_by_hour"` // Hour (0-23) -> count
 }
 
 type UserDetailStats struct {
@@ -127,8 +127,8 @@ type HeatmapDay struct {
 
 // Top content response
 type TopMessage struct {
-	MessageID         int64            `json:"message_id"`
-	TelegramMessageID int64            `json:"telegram_message_id"`
+	MessageID         int64 `json:"message_id"`
+	TelegramMessageID int64 `json:"telegram_message_id"`
 	UserSummary
 	Date         time.Time        `json:"date"`
 	Text         string           `json:"text,omitempty"`

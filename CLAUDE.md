@@ -251,9 +251,17 @@ cd ~/beef-briefing/apps/import-cli
 # With media files
 ./bin/import-cli import --chat-id -1003280306634 --export-path /path/to/export --include-media
 
+# With bot detection (skips bot messages by default)
+./bin/import-cli import --chat-id -1003280306634 --export-path /path/to/export --telegram-token YOUR_BOT_TOKEN
+
+# Include bot messages (disable bot filtering)
+./bin/import-cli import --chat-id -1003280306634 --export-path /path/to/export --telegram-token YOUR_BOT_TOKEN --skip-bots=false
+
 # Check status
 ./bin/import-cli status --export-path /path/to/export
 ```
+
+**Bot Detection**: The import-cli can query the Telegram API to detect bot users and skip their messages during import. This is enabled by default (`--skip-bots=true`) but requires a Telegram bot token. The token can be provided via `--telegram-token` flag or `TELEGRAM_BOT_TOKEN` environment variable. User lookups are cached to minimize API calls. Detected bots and skipped message counts are tracked in the import state and displayed in status output.
 
 **Group Migration**: When importing supergroup exports, the `result.json` contains the old group ID. You must provide the actual supergroup ID using `--chat-id`. The CLI validates the conversion formula: `supergroup_id = -1000000000000 - old_group_id`.
 

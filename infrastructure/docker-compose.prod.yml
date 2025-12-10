@@ -91,7 +91,7 @@ services:
     labels:
       - "traefik.enable=true"
       # Router configuration
-      - "traefik.http.routers.admin-panel.rule=Host(${ADMIN_PANEL_DOMAIN_SUFFIX}.${DOMAIN_NAME})"
+      - "traefik.http.routers.admin-panel.rule=Host(`${ADMIN_PANEL_DOMAIN_SUFFIX}.${DOMAIN_NAME}`)"
       - "traefik.http.routers.admin-panel.entrypoints=websecure"
       - "traefik.http.routers.admin-panel.tls.certresolver=letsencrypt"
       # Service configuration

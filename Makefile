@@ -331,6 +331,7 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 		LINODE_INSTANCE_TYPE=$$(grep '^LINODE_INSTANCE_TYPE=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		LINODE_HOSTNAME=$$(grep '^LINODE_HOSTNAME=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		DOMAIN_NAME=$$(grep '^DOMAIN_NAME=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		ADMIN_PANEL_DOMAIN_SUFFIX=$$(grep '^ADMIN_PANEL_DOMAIN_SUFFIX=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		NEW_RELIC_KEY=$$(grep '^NEW_RELIC_LICENSE_KEY=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		NEW_RELIC_ACCOUNT=$$(grep '^NEW_RELIC_ACCOUNT_ID=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		SSH_KEY_PATH=$$(grep '^SSH_PUBLIC_KEY_PATH=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
@@ -355,6 +356,10 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 			echo "✓ Populated domain_name from $$ENV_FILE"; \
 			sed -i "s|# domain_email = \".*\"|domain_email = \"admin@$$DOMAIN_NAME\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
 			echo "✓ Populated domain_email as admin@$$DOMAIN_NAME"; \
+		fi; \
+		if [ -n "$$ADMIN_PANEL_DOMAIN_SUFFIX" ]; then \
+			sed -i "s|# admin_panel_domain_suffix = \".*\"|admin_panel_domain_suffix = \"$$ADMIN_PANEL_DOMAIN_SUFFIX\"|" $(TERRAFORM_DIR)/terraform.tfvars; \
+			echo "✓ Populated admin_panel_domain_suffix from $$ENV_FILE"; \
 		fi; \
 		if [ -n "$$NEW_RELIC_KEY" ]; then \
 			sed -i "s|# new_relic_license_key = \".*\"|new_relic_license_key = \"$$NEW_RELIC_KEY\"|" $(TERRAFORM_DIR)/terraform.tfvars; \

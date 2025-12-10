@@ -146,7 +146,7 @@ resource "linode_domain_record" "beef_briefing_www_record" {
 # admin subdomain (optional, pointing to same IP)
 resource "linode_domain_record" "beef_briefing_admin_record" {
   domain_id   = linode_domain.beef_briefing_domain.id
-  name        = "admin"
+  name        = var.admin_panel_domain_suffix
   record_type = "A"
   target      = tolist(linode_instance.beef_briefing.ipv4)[0]
   ttl_sec     = 300

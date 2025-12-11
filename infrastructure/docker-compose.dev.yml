@@ -14,7 +14,7 @@ services:
       - ../apps/postgres/migrations:/docker-entrypoint-initdb.d:ro
       # To restore a backup on dev environment startup, make clean
       # uncomment the line below and comment the line above and make up
-      # - ../local_backups/db/restore.sql:/docker-entrypoint-initdb.d/99-restore.sql:ro
+      # - ../local_backups/db/latest.sql:/docker-entrypoint-initdb.d/99-restore.sql:ro
     networks:
       - beef-dev-network
     restart: unless-stopped

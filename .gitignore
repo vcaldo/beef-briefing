@@ -136,6 +136,11 @@ local_import/
 import-report.md
 .import-state.json
 
+# Local backups (keep docs, ignore backup files)
+local_backups/pgsql/*.sql.gz
+local_backups/pgsql/*.sql
+local_backups/pgsql/restore.sql
+
 # Terraform
 *.tfstate
 *.tfstate.*

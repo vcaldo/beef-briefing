@@ -43,7 +43,7 @@ func main() {
 			slog.Error("failed to initialize New Relic", "error", err)
 			slog.Info("continuing without New Relic instrumentation")
 		} else {
-			slog.Info("New Relic APM initialized", "app_name", appName, "region", cfg.NewRelicRegion)
+			slog.Info("New Relic APM initialized", "app_name", appName)
 		}
 	} else {
 		slog.Debug("New Relic not configured, skipping APM initialization")
@@ -115,23 +115,12 @@ func initNewRelic(cfg *config.Config) (*newrelic.Application, string, error) {
 	// Build app name following pattern: {base}-{service}-{environment}
 	appName := fmt.Sprintf("%s-%s-%s", cfg.NewRelicAppName, serviceName, cfg.Environment)
 
-	opts := []newrelic.ConfigOption{
+	nrApp, err := newrelic.NewApplication(
 		newrelic.ConfigAppName(appName),
 		newrelic.ConfigLicense(cfg.NewRelicLicenseKey),
 		newrelic.ConfigDistributedTracerEnabled(true),
 		newrelic.ConfigAppLogForwardingEnabled(true),
-	}
-
-	// Configure EU region endpoint if specified
-	// Note: The agent auto-detects region from license key prefix (eu01),
-	// but we allow explicit override via config
-	if cfg.NewRelicRegion == "EU" {
-		opts = append(opts, func(c *newrelic.Config) {
-			c.Host = "collector.eu.newrelic.com"
-		})
-	}
-
-	nrApp, err := newrelic.NewApplication(opts...)
+	)
 	if err != nil {
 		return nil, "", err
 	}

@@ -47,27 +47,17 @@ func main() {
 		const serviceName = "api-service"
 		appName := fmt.Sprintf("%s-%s-%s", cfg.NewRelicAppName, serviceName, cfg.Environment)
 
-		// Configure New Relic options
-		nrOpts := []newrelic.ConfigOption{
+		nrApp, err = newrelic.NewApplication(
 			newrelic.ConfigAppName(appName),
 			newrelic.ConfigLicense(cfg.NewRelicLicenseKey),
 			newrelic.ConfigDistributedTracerEnabled(true),
 			newrelic.ConfigAppLogForwardingEnabled(true),
-		}
-
-		// Set region-specific collector host
-		if cfg.NewRelicRegion == "EU" {
-			nrOpts = append(nrOpts, func(c *newrelic.Config) {
-				c.Host = "collector.eu01.nr-data.net"
-			})
-		}
-
-		nrApp, err = newrelic.NewApplication(nrOpts...)
+		)
 		if err != nil {
 			slog.Warn("failed to initialize New Relic, continuing without instrumentation", "error", err)
 			nrApp = nil
 		} else {
-			slog.Info("New Relic APM initialized", "app_name", appName, "region", cfg.NewRelicRegion)
+			slog.Info("New Relic APM initialized", "app_name", appName)
 			// Allow time for New Relic to initialize
 			time.Sleep(250 * time.Millisecond)
 		}

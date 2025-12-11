@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"beef-briefing/apps/telegram-bot/internal/client"
 	"beef-briefing/apps/telegram-bot/internal/handlers"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 func main() {
@@ -31,15 +33,29 @@ func main() {
 		"api_service_url", cfg.APIServiceURL,
 	)
 
+	// Initialize New Relic APM (optional - continues without if fails)
+	var nrApp *newrelic.Application
+	if cfg.NewRelicEnabled() {
+		nrApp, err = initNewRelic(cfg)
+		if err != nil {
+			slog.Error("failed to initialize New Relic", "error", err)
+			slog.Info("continuing without New Relic instrumentation")
+		} else {
+			slog.Info("New Relic initialized successfully", "app_name", cfg.NewRelicAppName)
+		}
+	} else {
+		slog.Debug("New Relic not configured, skipping APM initialization")
+	}
+
 	// Create context for graceful shutdown
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
 	// Initialize API client
-	apiClient := client.NewAPIClient(cfg.APIServiceURL)
+	apiClient := client.NewAPIClient(cfg.APIServiceURL, nrApp)
 
 	// Initialize update handler once (reused for all updates)
-	updateHandler := handlers.NewUpdateHandler(apiClient)
+	updateHandler := handlers.NewUpdateHandler(apiClient, nrApp)
 
 	// Create bot instance with allowed updates including reactions
 	opts := []bot.Option{
@@ -79,7 +95,47 @@ func main() {
 	// Start bot with graceful shutdown
 	b.Start(ctx)
 
-	slog.Info("bot stopped gracefully")
+	slog.Info("bot stopped, shutting down...")
+
+	// Graceful shutdown - flush New Relic data
+	if nrApp != nil {
+		slog.Info("flushing New Relic data...")
+		nrApp.Shutdown(5 * time.Second)
+	}
+
+	slog.Info("telegram-bot stopped gracefully")
+}
+
+// initNewRelic initializes the New Relic application with the given configuration
+func initNewRelic(cfg *config.Config) (*newrelic.Application, error) {
+	opts := []newrelic.ConfigOption{
+		newrelic.ConfigAppName(cfg.NewRelicAppName),
+		newrelic.ConfigLicense(cfg.NewRelicLicenseKey),
+		newrelic.ConfigDistributedTracerEnabled(true),
+		newrelic.ConfigAppLogForwardingEnabled(true),
+	}
+
+	// Configure EU region endpoint if specified
+	// Note: The agent auto-detects region from license key prefix (eu01),
+	// but we allow explicit override via config
+	if cfg.NewRelicRegion == "EU" {
+		opts = append(opts, func(c *newrelic.Config) {
+			c.Host = "collector.eu.newrelic.com"
+		})
+	}
+
+	nrApp, err := newrelic.NewApplication(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wait for connection to New Relic
+	if err := nrApp.WaitForConnection(5 * time.Second); err != nil {
+		slog.Warn("New Relic connection timeout", "error", err)
+		// Continue anyway - data will be sent when connection establishes
+	}
+
+	return nrApp, nil
 }
 
 func setupLogger(cfg *config.Config) {

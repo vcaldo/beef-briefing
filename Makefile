@@ -524,6 +524,16 @@ rollback: ## Rollback to previous deployment
 rollback-force: ## Rollback to previous deployment (skip confirmation)
 	@./scripts/rollback.sh --force
 
+# Database backup/restore targets
+backup-prod-db: ## Backup production database to local_backups/pgsql/
+	@./scripts/backup-prod-db.sh
+
+prepare-restore-db: ## Prepare to restore a backup to local dev (WARNING: deletes local volume!)
+	@./scripts/prepare-restore-db.sh $(BACKUP)
+
+disable-restore-db: ## Disable restore mount after restore is complete
+	@./scripts/disable-restore-db.sh
+
 # Phony targets
 .PHONY: help up down restart ps clean prune build build-api build-bot build-postgres build-admin-panel \
 	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel logs-newrelic logs-traefik \
@@ -536,4 +546,5 @@ rollback-force: ## Rollback to previous deployment (skip confirmation)
 	tf-fmt tf-fmt-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-root-pass tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage-env mc-setup-prod tf-docs tf-deploy-check \
-	deploy deploy-skip-build deploy-skip-cleanup deploy-regenerate-certs clean-letsencrypt-certs rollback rollback-force
+	deploy deploy-skip-build deploy-skip-cleanup deploy-regenerate-certs clean-letsencrypt-certs rollback rollback-force \
+	backup-prod-db prepare-restore-db disable-restore-db

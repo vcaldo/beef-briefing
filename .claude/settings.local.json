@@ -15,7 +15,9 @@
       "Bash(make go-build-admin-panel:*)",
       "Bash(make go-build-import-cli:*)",
       "Bash(make fmt:*)",
-      "Bash(go run:*)"
+      "Bash(go run:*)",
+      "Bash(mkdir:*)",
+      "Bash(chmod:*)"
     ]
   }
 }

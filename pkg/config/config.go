@@ -44,6 +44,7 @@ type Config struct {
 	// New Relic APM Configuration
 	NewRelicAppName    string `envconfig:"NEW_RELIC_APP_NAME"`
 	NewRelicLicenseKey string `envconfig:"NEW_RELIC_LICENSE_KEY"`
+	NewRelicRegion     string `envconfig:"NEW_RELIC_REGION" default:"EU"`
 }
 
 // DSN returns PostgreSQL connection string

@@ -42,8 +42,10 @@ func main() {
 	// Initialize New Relic APM (optional - continues without if not configured)
 	var nrApp *newrelic.Application
 	if cfg.NewRelicEnabled() {
-		// Append environment name to app name to distinguish dev/prod in New Relic
-		appName := fmt.Sprintf("%s-%s", cfg.NewRelicAppName, cfg.Environment)
+		// Build app name: {base-name}-{service}-{environment}
+		// e.g., "beef-briefing-api-service-production"
+		const serviceName = "api-service"
+		appName := fmt.Sprintf("%s-%s-%s", cfg.NewRelicAppName, serviceName, cfg.Environment)
 		nrApp, err = newrelic.NewApplication(
 			newrelic.ConfigAppName(appName),
 			newrelic.ConfigLicense(cfg.NewRelicLicenseKey),

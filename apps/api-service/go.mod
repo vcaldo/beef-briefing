@@ -8,7 +8,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/minio/minio-go/v7 v7.0.82
 	github.com/newrelic/go-agent/v3 v3.42.0
-	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.3
+	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.5
 )
 
 require (

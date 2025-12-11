@@ -115,7 +115,7 @@ func (c *Client) GetCacheStats() (total int, bots int) {
 
 	total = len(c.cache)
 	for _, info := range c.cache {
-		if info.IsBot {
+		if info != nil && info.IsBot {
 			bots++
 		}
 	}

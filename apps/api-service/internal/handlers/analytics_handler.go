@@ -13,6 +13,7 @@ import (
 	"beef-briefing/apps/api-service/internal/services"
 
 	"github.com/gorilla/mux"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type AnalyticsHandler struct {
@@ -92,11 +93,16 @@ func (h *AnalyticsHandler) writeError(w http.ResponseWriter, message string, sta
 // HandleOverview - GET /api/v1/analytics/chats/{chat_id}/overview
 func (h *AnalyticsHandler) HandleOverview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	chatID, err := h.parseChatID(r)
 	if err != nil {
 		h.writeError(w, "invalid chat_id", http.StatusBadRequest)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
 	}
 
 	startDate, endDate, err := h.parseTimeRange(r)
@@ -108,6 +114,9 @@ func (h *AnalyticsHandler) HandleOverview(w http.ResponseWriter, r *http.Request
 	overview, err := h.analyticsService.GetOverview(ctx, chatID, startDate, endDate)
 	if err != nil {
 		slog.Error("failed to get overview", "chat_id", chatID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		h.writeError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -118,11 +127,16 @@ func (h *AnalyticsHandler) HandleOverview(w http.ResponseWriter, r *http.Request
 // HandleLeaderboard - GET /api/v1/analytics/chats/{chat_id}/leaderboard
 func (h *AnalyticsHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	chatID, err := h.parseChatID(r)
 	if err != nil {
 		h.writeError(w, "invalid chat_id", http.StatusBadRequest)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
 	}
 
 	startDate, endDate, err := h.parseTimeRange(r)
@@ -141,9 +155,17 @@ func (h *AnalyticsHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Requ
 		limit = 10
 	}
 
+	if txn != nil {
+		txn.AddAttribute("metric", metric)
+		txn.AddAttribute("limit", limit)
+	}
+
 	leaderboard, err := h.analyticsService.GetLeaderboard(ctx, chatID, startDate, endDate, metric, limit)
 	if err != nil {
 		slog.Error("failed to get leaderboard", "chat_id", chatID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		h.writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -154,6 +176,7 @@ func (h *AnalyticsHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Requ
 // HandleUserDetail - GET /api/v1/analytics/chats/{chat_id}/users/{user_id}
 func (h *AnalyticsHandler) HandleUserDetail(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	chatID, err := h.parseChatID(r)
 	if err != nil {
@@ -168,6 +191,11 @@ func (h *AnalyticsHandler) HandleUserDetail(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("user_id", userID)
+	}
+
 	startDate, endDate, err := h.parseTimeRange(r)
 	if err != nil {
 		h.writeError(w, err.Error(), http.StatusBadRequest)
@@ -177,6 +205,9 @@ func (h *AnalyticsHandler) HandleUserDetail(w http.ResponseWriter, r *http.Reque
 	userDetail, err := h.analyticsService.GetUserDetail(ctx, chatID, userID, startDate, endDate)
 	if err != nil {
 		slog.Error("failed to get user detail", "chat_id", chatID, "user_id", userID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		h.writeError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -187,11 +218,16 @@ func (h *AnalyticsHandler) HandleUserDetail(w http.ResponseWriter, r *http.Reque
 // HandleTimeline - GET /api/v1/analytics/chats/{chat_id}/timeline
 func (h *AnalyticsHandler) HandleTimeline(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	chatID, err := h.parseChatID(r)
 	if err != nil {
 		h.writeError(w, "invalid chat_id", http.StatusBadRequest)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
 	}
 
 	startDate, endDate, err := h.parseTimeRange(r)
@@ -205,9 +241,16 @@ func (h *AnalyticsHandler) HandleTimeline(w http.ResponseWriter, r *http.Request
 		granularity = "day" // default
 	}
 
+	if txn != nil {
+		txn.AddAttribute("granularity", granularity)
+	}
+
 	timeline, err := h.analyticsService.GetTimeline(ctx, chatID, startDate, endDate, granularity)
 	if err != nil {
 		slog.Error("failed to get timeline", "chat_id", chatID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		h.writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -218,11 +261,16 @@ func (h *AnalyticsHandler) HandleTimeline(w http.ResponseWriter, r *http.Request
 // HandleHeatmap - GET /api/v1/analytics/chats/{chat_id}/heatmap
 func (h *AnalyticsHandler) HandleHeatmap(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	chatID, err := h.parseChatID(r)
 	if err != nil {
 		h.writeError(w, "invalid chat_id", http.StatusBadRequest)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
 	}
 
 	startDate, endDate, err := h.parseTimeRange(r)
@@ -234,6 +282,9 @@ func (h *AnalyticsHandler) HandleHeatmap(w http.ResponseWriter, r *http.Request)
 	heatmap, err := h.analyticsService.GetHeatmap(ctx, chatID, startDate, endDate)
 	if err != nil {
 		slog.Error("failed to get heatmap", "chat_id", chatID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		h.writeError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -244,11 +295,16 @@ func (h *AnalyticsHandler) HandleHeatmap(w http.ResponseWriter, r *http.Request)
 // HandleTopContent - GET /api/v1/analytics/chats/{chat_id}/top-content
 func (h *AnalyticsHandler) HandleTopContent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	chatID, err := h.parseChatID(r)
 	if err != nil {
 		h.writeError(w, "invalid chat_id", http.StatusBadRequest)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
 	}
 
 	startDate, endDate, err := h.parseTimeRange(r)
@@ -267,9 +323,17 @@ func (h *AnalyticsHandler) HandleTopContent(w http.ResponseWriter, r *http.Reque
 		limit = 10
 	}
 
+	if txn != nil {
+		txn.AddAttribute("metric", metric)
+		txn.AddAttribute("limit", limit)
+	}
+
 	topContent, err := h.analyticsService.GetTopContent(ctx, chatID, startDate, endDate, metric, limit)
 	if err != nil {
 		slog.Error("failed to get top content", "chat_id", chatID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		h.writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -280,11 +344,16 @@ func (h *AnalyticsHandler) HandleTopContent(w http.ResponseWriter, r *http.Reque
 // HandleCompare - GET /api/v1/analytics/chats/{chat_id}/compare
 func (h *AnalyticsHandler) HandleCompare(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	chatID, err := h.parseChatID(r)
 	if err != nil {
 		h.writeError(w, "invalid chat_id", http.StatusBadRequest)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
 	}
 
 	startDate, endDate, err := h.parseTimeRange(r)
@@ -311,9 +380,16 @@ func (h *AnalyticsHandler) HandleCompare(w http.ResponseWriter, r *http.Request)
 		userIDs = append(userIDs, id)
 	}
 
+	if txn != nil {
+		txn.AddAttribute("compare_user_count", len(userIDs))
+	}
+
 	comparison, err := h.analyticsService.CompareUsers(ctx, chatID, userIDs, startDate, endDate)
 	if err != nil {
 		slog.Error("failed to compare users", "chat_id", chatID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		h.writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -325,12 +401,20 @@ func (h *AnalyticsHandler) HandleCompare(w http.ResponseWriter, r *http.Request)
 // Returns all chats with summary statistics (no time range required)
 func (h *AnalyticsHandler) HandleListChats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	chats, err := h.analyticsService.ListChats(ctx)
 	if err != nil {
 		slog.Error("failed to list chats", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		h.writeError(w, "internal server error", http.StatusInternalServerError)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chats_count", len(chats))
 	}
 
 	// Write response without time range metadata
@@ -352,6 +436,7 @@ func (h *AnalyticsHandler) HandleListChats(w http.ResponseWriter, r *http.Reques
 // Returns detailed information about a single chat (no time range required)
 func (h *AnalyticsHandler) HandleGetChat(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	chatID, err := h.parseChatID(r)
 	if err != nil {
@@ -359,9 +444,16 @@ func (h *AnalyticsHandler) HandleGetChat(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+	}
+
 	chat, err := h.analyticsService.GetChat(ctx, chatID)
 	if err != nil {
 		slog.Error("failed to get chat", "chat_id", chatID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		if strings.Contains(err.Error(), "not found") {
 			h.writeError(w, "chat not found", http.StatusNotFound)
 			return

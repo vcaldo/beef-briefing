@@ -8,17 +8,21 @@ import (
 
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/repository"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type AnalyticsService struct {
 	db            *sql.DB
+	nrApp         *newrelic.Application
 	analyticsRepo *repository.AnalyticsRepository
 }
 
-func NewAnalyticsService(db *sql.DB) *AnalyticsService {
+func NewAnalyticsService(db *sql.DB, nrApp *newrelic.Application) *AnalyticsService {
 	return &AnalyticsService{
 		db:            db,
-		analyticsRepo: repository.NewAnalyticsRepository(db),
+		nrApp:         nrApp,
+		analyticsRepo: repository.NewAnalyticsRepository(db, nrApp),
 	}
 }
 

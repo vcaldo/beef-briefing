@@ -9,6 +9,8 @@ import (
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 // IngestHandler handles HTTP requests for the ingest endpoint.
@@ -30,9 +32,13 @@ func NewIngestHandler(ingestService *services.IngestService, cfg *config.Config)
 // HandleIngest processes incoming multipart ingestion requests.
 func (h *IngestHandler) HandleIngest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	if err := r.ParseMultipartForm(h.config.MaxUploadSizeBytes()); err != nil {
 		slog.Error("failed to parse multipart form", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "invalid multipart request", http.StatusBadRequest)
 		return
 	}
@@ -47,19 +53,49 @@ func (h *IngestHandler) HandleIngest(w http.ResponseWriter, r *http.Request) {
 	var update models.Update
 	if err := json.Unmarshal([]byte(updateJSON), &update); err != nil {
 		slog.Error("failed to decode update", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "invalid update JSON", http.StatusBadRequest)
 		return
+	}
+
+	// Add custom attributes for debugging and filtering
+	if txn != nil {
+		txn.AddAttribute("update_id", update.UpdateID)
+		if update.Message != nil {
+			txn.AddAttribute("chat_id", update.Message.Chat.ID)
+			txn.AddAttribute("update_type", "message")
+		} else if update.EditedMessage != nil {
+			txn.AddAttribute("chat_id", update.EditedMessage.Chat.ID)
+			txn.AddAttribute("update_type", "edited_message")
+		} else if update.MessageReaction != nil {
+			txn.AddAttribute("chat_id", update.MessageReaction.Chat.ID)
+			txn.AddAttribute("update_type", "message_reaction")
+		} else if update.MessageReactionCount != nil {
+			txn.AddAttribute("chat_id", update.MessageReactionCount.Chat.ID)
+			txn.AddAttribute("update_type", "message_reaction_count")
+		} else if update.MyChatMember != nil {
+			txn.AddAttribute("chat_id", update.MyChatMember.Chat.ID)
+			txn.AddAttribute("update_type", "my_chat_member")
+		}
 	}
 
 	slog.Info("received update", "update_id", update.UpdateID)
 
 	files := h.extractFiles(r)
+	if txn != nil {
+		txn.AddAttribute("files_count", len(files))
+	}
 
 	if err := h.ingestService.ProcessUpdate(ctx, &update, files); err != nil {
 		slog.Error("failed to process update",
 			"update_id", update.UpdateID,
 			"error", err,
 		)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}

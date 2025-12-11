@@ -6,18 +6,27 @@ import (
 	"fmt"
 
 	"beef-briefing/apps/api-service/internal/models"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type UserRepository struct {
-	db *sql.DB
+	db    *sql.DB
+	nrApp *newrelic.Application
 }
 
-func NewUserRepository(db *sql.DB) *UserRepository {
-	return &UserRepository{db: db}
+func NewUserRepository(db *sql.DB, nrApp *newrelic.Application) *UserRepository {
+	return &UserRepository{db: db, nrApp: nrApp}
 }
 
 // UpsertUser inserts or updates a user
 func (r *UserRepository) UpsertUser(ctx context.Context, tx *sql.Tx, user *models.User) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:upsert-user")
+		defer segment.End()
+	}
+
 	query := `
 		INSERT INTO users (id, is_bot, first_name, last_name, username, language_code, is_premium)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)

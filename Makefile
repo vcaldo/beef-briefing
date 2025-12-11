@@ -345,7 +345,7 @@ tf-setup: ## Setup Terraform configuration (copy tfvars example and populate fro
 		LINODE_HOSTNAME=$$(grep '^LINODE_HOSTNAME=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		DOMAIN_NAME=$$(grep '^DOMAIN_NAME=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		ADMIN_PANEL_DOMAIN_SUFFIX=$$(grep '^ADMIN_PANEL_DOMAIN_SUFFIX=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
-		NEW_RELIC_KEY=$$(grep '^NEW_RELIC_LICENSE_KEY=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
+		NEW_RELIC_KEY=$$(grep '^NEW_RELIC_API_KEY=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		NEW_RELIC_ACCOUNT=$$(grep '^NEW_RELIC_ACCOUNT_ID=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		SSH_KEY_PATH=$$(grep '^SSH_PUBLIC_KEY_PATH=' $$ENV_FILE | cut -d'=' -f2 | tr -d '\n\r'); \
 		if [ -n "$$LINODE_TOKEN" ]; then \

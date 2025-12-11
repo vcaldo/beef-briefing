@@ -6,14 +6,17 @@ import (
 	"fmt"
 
 	"beef-briefing/apps/api-service/internal/models"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type MediaRepository struct {
-	db *sql.DB
+	db    *sql.DB
+	nrApp *newrelic.Application
 }
 
-func NewMediaRepository(db *sql.DB) *MediaRepository {
-	return &MediaRepository{db: db}
+func NewMediaRepository(db *sql.DB, nrApp *newrelic.Application) *MediaRepository {
+	return &MediaRepository{db: db, nrApp: nrApp}
 }
 
 // GetObjectKeyByHash checks if a file with the given hash already exists in any media table.

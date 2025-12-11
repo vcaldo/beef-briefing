@@ -281,7 +281,7 @@ func main() {
 
 #### Configuration
 - Set via environment variables (never hardcode license keys):
-  - `NEW_RELIC_LICENSE_KEY` (required)
+  - `NEW_RELIC_API_KEY` (required)
   - `NEW_RELIC_APP_NAME` (required, use service name: `beef-briefing-api-service`)
   - `NEW_RELIC_ENABLED` (optional, default: `true`)
   - `NEW_RELIC_LOG_LEVEL` (optional: `debug`, `info`, `warn`, `error`)
@@ -301,9 +301,9 @@ import (
 )
 
 func initNewRelic(appName string) (*newrelic.Application, error) {
-    licenseKey := os.Getenv("NEW_RELIC_LICENSE_KEY")
+    licenseKey := os.Getenv("NEW_RELIC_API_KEY")
     if licenseKey == "" {
-        return nil, fmt.Errorf("NEW_RELIC_LICENSE_KEY is required")
+        return nil, fmt.Errorf("NEW_RELIC_API_KEY is required")
     }
 
     app, err := newrelic.NewApplication(

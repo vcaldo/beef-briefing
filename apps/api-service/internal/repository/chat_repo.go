@@ -6,18 +6,27 @@ import (
 	"fmt"
 
 	"beef-briefing/apps/api-service/internal/models"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type ChatRepository struct {
-	db *sql.DB
+	db    *sql.DB
+	nrApp *newrelic.Application
 }
 
-func NewChatRepository(db *sql.DB) *ChatRepository {
-	return &ChatRepository{db: db}
+func NewChatRepository(db *sql.DB, nrApp *newrelic.Application) *ChatRepository {
+	return &ChatRepository{db: db, nrApp: nrApp}
 }
 
 // UpsertChat inserts or updates a chat
 func (r *ChatRepository) UpsertChat(ctx context.Context, tx *sql.Tx, chat *models.Chat) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:upsert-chat")
+		defer segment.End()
+	}
+
 	query := `
 		INSERT INTO chats (id, type, title, username, first_name, last_name, is_forum)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -49,6 +58,12 @@ func (r *ChatRepository) UpsertChat(ctx context.Context, tx *sql.Tx, chat *model
 
 // LinkMigratedChat records the migration relationship between old group and new supergroup
 func (r *ChatRepository) LinkMigratedChat(ctx context.Context, tx *sql.Tx, newChatID, oldChatID int64) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:link-migrated-chat")
+		defer segment.End()
+	}
+
 	query := `
 		UPDATE chats
 		SET migrated_from_chat_id = $2, updated_at = NOW()

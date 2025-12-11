@@ -19,6 +19,8 @@ import (
 
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
+	"github.com/newrelic/go-agent/v3/integrations/nrgorilla"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 func main() {
@@ -37,6 +39,42 @@ func main() {
 		"api_port", cfg.APIPort,
 	)
 
+	// Initialize New Relic APM (optional - continues without if not configured)
+	var nrApp *newrelic.Application
+	if cfg.NewRelicEnabled() {
+		// Build app name: {base-name}-{service}-{environment}
+		// e.g., "beef-briefing-api-service-production"
+		const serviceName = "api-service"
+		appName := fmt.Sprintf("%s-%s-%s", cfg.NewRelicAppName, serviceName, cfg.Environment)
+
+		// Configure New Relic options
+		nrOpts := []newrelic.ConfigOption{
+			newrelic.ConfigAppName(appName),
+			newrelic.ConfigLicense(cfg.NewRelicLicenseKey),
+			newrelic.ConfigDistributedTracerEnabled(true),
+			newrelic.ConfigAppLogForwardingEnabled(true),
+		}
+
+		// Set region-specific collector host
+		if cfg.NewRelicRegion == "EU" {
+			nrOpts = append(nrOpts, func(c *newrelic.Config) {
+				c.Host = "collector.eu01.nr-data.net"
+			})
+		}
+
+		nrApp, err = newrelic.NewApplication(nrOpts...)
+		if err != nil {
+			slog.Warn("failed to initialize New Relic, continuing without instrumentation", "error", err)
+			nrApp = nil
+		} else {
+			slog.Info("New Relic APM initialized", "app_name", appName, "region", cfg.NewRelicRegion)
+			// Allow time for New Relic to initialize
+			time.Sleep(250 * time.Millisecond)
+		}
+	} else {
+		slog.Debug("New Relic APM not configured, skipping initialization")
+	}
+
 	// Initialize database connection
 	db, err := initDatabase(cfg)
 	if err != nil {
@@ -45,13 +83,14 @@ func main() {
 	}
 	defer db.Close()
 
-	// Initialize MinIO client
+	// Initialize MinIO client with New Relic instrumentation
 	minioClient, err := storage.NewMinIOClient(
 		cfg.MinIOEndpoint,
 		cfg.MinIOAccessKey,
 		cfg.MinIOSecretKey,
 		cfg.MinIOBucket,
 		cfg.MinIOUseSSL,
+		nrApp,
 	)
 	if err != nil {
 		slog.Error("failed to initialize MinIO client", "error", err)
@@ -59,7 +98,7 @@ func main() {
 	}
 
 	// Setup HTTP router
-	router := setupRouter(db, minioClient, cfg)
+	router := setupRouter(db, minioClient, cfg, nrApp)
 
 	// Create HTTP server
 	server := &http.Server{
@@ -93,6 +132,12 @@ func main() {
 	if err := server.Shutdown(ctx); err != nil {
 		slog.Error("server forced to shutdown", "error", err)
 		os.Exit(1)
+	}
+
+	// Graceful shutdown - flush New Relic data
+	if nrApp != nil {
+		slog.Info("flushing New Relic data...")
+		nrApp.Shutdown(5 * time.Second)
 	}
 
 	slog.Info("server stopped gracefully")
@@ -137,14 +182,19 @@ func initDatabase(cfg *config.Config) (*sql.DB, error) {
 	return db, nil
 }
 
-func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Config) *mux.Router {
+func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Config, nrApp *newrelic.Application) *mux.Router {
 	router := mux.NewRouter()
 
-	// Create services and handlers
-	ingestService := services.NewIngestService(db, minioClient)
+	// Add New Relic middleware for automatic HTTP transaction instrumentation
+	if nrApp != nil {
+		router.Use(nrgorilla.Middleware(nrApp))
+	}
+
+	// Create services and handlers with New Relic instrumentation
+	ingestService := services.NewIngestService(db, minioClient, nrApp)
 	ingestHandler := handlers.NewIngestHandler(ingestService, cfg)
 
-	analyticsService := services.NewAnalyticsService(db)
+	analyticsService := services.NewAnalyticsService(db, nrApp)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 
 	// API v1 routes (public)

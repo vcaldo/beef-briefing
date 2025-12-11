@@ -81,6 +81,8 @@ packages:
   - unattended-upgrades
   - apt-listchanges
   - bash-completion
+  - jq
+  - yq
 
 # Commands to run after package installation
 runcmd:
@@ -113,7 +115,7 @@ runcmd:
       echo "Installing New Relic Infrastructure Agent..."
       curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && NEW_RELIC_API_KEY="${new_relic_license_key}" NEW_RELIC_ACCOUNT_ID="${new_relic_account_id}" NEW_RELIC_REGION="${new_relic_region}" /usr/local/bin/newrelic install -y
     fi
-    echo "log_forward: false" >> /etc/newrelic-infra.yml
+    yq -y '.log_forward = false' /etc/newrelic-infra.yml > /tmp/newrelic.yml && mv /tmp/newrelic.yml /etc/newrelic-infra.yml
 
   # Verify critical installations
   - docker --version && echo "Docker installed successfully"

@@ -12,7 +12,10 @@
       "Bash(templ generate:*)",
       "Bash(go build:*)",
       "Bash(make logs-admin-panel:*)",
-      "Bash(make go-build-admin-panel:*)"
+      "Bash(make go-build-admin-panel:*)",
+      "Bash(make go-build-import-cli:*)",
+      "Bash(make fmt:*)",
+      "Bash(go run:*)"
     ]
   }
 }

@@ -118,12 +118,12 @@ func (s *AnalyticsService) GetUserDetail(ctx context.Context, chatID, userID int
 	}
 
 	return &models.UserDetailResponse{
-		UserSummary:        *userInfo,
-		Stats:              *stats,
-		Streaks:            streaks,
-		TopEmojisUsed:      topEmojisUsed,
-		TopEmojisReceived:  topEmojisReceived,
-		ActivityByHour:     activityByHour,
+		UserSummary:       *userInfo,
+		Stats:             *stats,
+		Streaks:           streaks,
+		TopEmojisUsed:     topEmojisUsed,
+		TopEmojisReceived: topEmojisReceived,
+		ActivityByHour:    activityByHour,
 	}, nil
 }
 

@@ -46,3 +46,19 @@ func (r *ChatRepository) UpsertChat(ctx context.Context, tx *sql.Tx, chat *model
 
 	return nil
 }
+
+// LinkMigratedChat records the migration relationship between old group and new supergroup
+func (r *ChatRepository) LinkMigratedChat(ctx context.Context, tx *sql.Tx, newChatID, oldChatID int64) error {
+	query := `
+		UPDATE chats
+		SET migrated_from_chat_id = $2, updated_at = NOW()
+		WHERE id = $1
+	`
+
+	_, err := tx.ExecContext(ctx, query, newChatID, oldChatID)
+	if err != nil {
+		return fmt.Errorf("failed to link migrated chat: %w", err)
+	}
+
+	return nil
+}

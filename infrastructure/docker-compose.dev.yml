@@ -1,9 +1,7 @@
 # Development environment - local machine
 services:
   postgres:
-    build:
-      context: ../apps/postgres
-      dockerfile: Dockerfile
+    image: postgis/postgis:17-3.4
     container_name: beef-postgres-dev
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -13,6 +11,7 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
+      - ../apps/postgres/migrations:/docker-entrypoint-initdb.d:ro
     networks:
       - beef-dev-network
     restart: unless-stopped
@@ -36,6 +35,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: telegram-media
       MINIO_USE_SSL: false
+      ANALYTICS_API_KEY: ${ANALYTICS_API_KEY}
       ENVIRONMENT: development
       LOG_LEVEL: debug
     ports:
@@ -85,12 +85,8 @@ services:
       dockerfile: apps/admin-panel/Dockerfile
     container_name: beef-admin-panel-dev
     environment:
-      DB_HOST: postgres
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_PORT: 5432
-      DB_SSL_MODE: disable
+      API_SERVICE_URL: http://api-service:${API_PORT}
+      ANALYTICS_API_KEY: ${ANALYTICS_API_KEY}
       ADMIN_PANEL_PORT: ${ADMIN_PANEL_PORT:-8081}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD_HASH_FILE: ${ADMIN_PASSWORD_HASH_FILE}
@@ -98,11 +94,11 @@ services:
       ENVIRONMENT: development
       LOG_LEVEL: debug
     volumes:
-      - ./secrets:/app/secrets:ro
+      - ./secrets/apps/admin-panel:/app/secrets:ro
     ports:
       - "${ADMIN_PANEL_PORT:-8081}:${ADMIN_PANEL_PORT:-8081}"
     depends_on:
-      - postgres
+      - api-service
     networks:
       - beef-dev-network
     restart: unless-stopped

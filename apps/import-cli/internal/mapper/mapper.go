@@ -9,24 +9,54 @@ import (
 	"beef-briefing/apps/import-cli/internal/models"
 )
 
+// BotChecker provides bot status lookup for users
+type BotChecker interface {
+	IsBot(userID int64) bool
+}
+
+// noOpBotChecker always returns false for IsBot
+type noOpBotChecker struct{}
+
+func (n *noOpBotChecker) IsBot(userID int64) bool {
+	return false
+}
+
 // Mapper converts export messages to API format
 type Mapper struct {
-	chatID   int64
-	chatType string
-	chatName string
+	chatID     int64
+	chatType   string
+	chatName   string
+	botChecker BotChecker
 }
 
 // New creates a new Mapper instance
 func New(chatID int64, chatType, chatName string) *Mapper {
 	return &Mapper{
-		chatID:   chatID,
-		chatType: chatType,
-		chatName: chatName,
+		chatID:     chatID,
+		chatType:   chatType,
+		chatName:   chatName,
+		botChecker: &noOpBotChecker{},
 	}
 }
 
+// SetBotChecker sets the bot checker for user lookups
+func (m *Mapper) SetBotChecker(checker BotChecker) {
+	if checker != nil {
+		m.botChecker = checker
+	}
+}
+
+// UpdateResult contains the converted update and metadata
+type UpdateResult struct {
+	Update   *models.Update
+	UserID   int64
+	IsBot    bool
+	UserName string
+}
+
 // ToUpdate converts an ExportMessage to an API Update
-func (m *Mapper) ToUpdate(msg *models.ExportMessage) (*models.Update, error) {
+// Returns UpdateResult with bot status for filtering decisions
+func (m *Mapper) ToUpdate(msg *models.ExportMessage) (*UpdateResult, error) {
 	// Skip service messages for now
 	if msg.IsServiceMessage() {
 		return nil, nil
@@ -41,6 +71,9 @@ func (m *Mapper) ToUpdate(msg *models.ExportMessage) (*models.Update, error) {
 	// Parse user ID from from_id (format: "user123456")
 	userID, userName := m.parseUser(msg.From, msg.FromID)
 
+	// Check if user is a bot
+	isBot := m.botChecker.IsBot(userID)
+
 	// Build the message
 	apiMsg := &models.Message{
 		MessageID: msg.ID,
@@ -52,7 +85,7 @@ func (m *Mapper) ToUpdate(msg *models.ExportMessage) (*models.Update, error) {
 		},
 		From: &models.User{
 			ID:        userID,
-			IsBot:     false,
+			IsBot:     isBot,
 			FirstName: userName,
 		},
 		Text: msg.GetText(),
@@ -101,7 +134,12 @@ func (m *Mapper) ToUpdate(msg *models.ExportMessage) (*models.Update, error) {
 		Message:  apiMsg,
 	}
 
-	return update, nil
+	return &UpdateResult{
+		Update:   update,
+		UserID:   userID,
+		IsBot:    isBot,
+		UserName: userName,
+	}, nil
 }
 
 // parseUser extracts user ID and name from export format
@@ -372,6 +410,7 @@ func (m *Mapper) ToReactionUpdates(msg *models.ExportMessage) ([]*models.Update,
 		// Build individual user reactions from Recent list
 		for _, user := range reaction.Recent {
 			userID, userName := m.parseUser(user.From, user.FromID)
+			isBot := m.botChecker.IsBot(userID)
 
 			// Parse reaction date if available
 			reactionDate := msgTimestamp
@@ -388,7 +427,7 @@ func (m *Mapper) ToReactionUpdates(msg *models.ExportMessage) ([]*models.Update,
 					MessageID: msg.ID,
 					User: &models.User{
 						ID:        userID,
-						IsBot:     false,
+						IsBot:     isBot,
 						FirstName: userName,
 					},
 					Date:        reactionDate,

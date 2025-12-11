@@ -1,0 +1,153 @@
+# Production environment - Linode server
+services:
+  postgres:
+    image: postgis/postgis:17-3.4
+    container_name: beef-postgres-prod
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    # PostgreSQL only accessible via internal Docker network (no external port exposure)
+    volumes:
+      - ${POSTGRES_DATA_PATH:-/mnt/postgres-data}/pgdata:/var/lib/postgresql/data
+      - ./postgres/migrations:/docker-entrypoint-initdb.d:ro
+    networks:
+      - beef-prod-network
+    restart: unless-stopped
+
+  api-service:
+    build:
+      context: ..
+      dockerfile: apps/api-service/Dockerfile
+    image: beef-briefing/api-service:${IMAGE_TAG}
+    container_name: beef-api-service-prod
+    environment:
+      DB_HOST: postgres
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_PORT: 5432
+      DB_SSL_MODE: disable
+      API_PORT: ${API_PORT}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_USE_SSL: ${MINIO_USE_SSL}
+      ANALYTICS_API_KEY_FILE: ${ANALYTICS_API_KEY_FILE}
+      ENVIRONMENT: production
+      LOG_LEVEL: info
+    volumes:
+      - ./secrets/api-service:/app/secrets-api:ro
+    ports:
+      - "${API_PORT}:${API_PORT}"
+    depends_on:
+      - postgres
+    networks:
+      - beef-prod-network
+    restart: unless-stopped
+
+  telegram-bot:
+    build:
+      context: ..
+      dockerfile: apps/telegram-bot/Dockerfile
+    image: beef-briefing/telegram-bot:${IMAGE_TAG}
+    container_name: beef-telegram-bot-prod
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      API_SERVICE_URL: http://api-service:${API_PORT}
+      ENVIRONMENT: production
+      LOG_LEVEL: info
+    depends_on:
+      - api-service
+    networks:
+      - beef-prod-network
+    restart: unless-stopped
+
+  admin-panel:
+    build:
+      context: ..
+      dockerfile: apps/admin-panel/Dockerfile
+    image: beef-briefing/admin-panel:${IMAGE_TAG}
+    container_name: beef-admin-panel-prod
+    environment:
+      API_SERVICE_URL: http://api-service:${API_PORT}
+      ANALYTICS_API_KEY_FILE: ${ANALYTICS_API_KEY_FILE}
+      ADMIN_PANEL_PORT: ${ADMIN_PANEL_PORT:-8081}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD_HASH_FILE: ${ADMIN_PASSWORD_HASH_FILE}
+      SESSION_SECRET_FILE: ${SESSION_SECRET_FILE}
+      SECURE_COOKIES: true
+      ENVIRONMENT: production
+      LOG_LEVEL: info
+    volumes:
+      - ./secrets/admin-panel:/app/secrets:ro
+      - ./secrets/api-service:/app/secrets-api:ro
+    depends_on:
+      - api-service
+    networks:
+      - beef-prod-network
+    labels:
+      - "traefik.enable=true"
+      # Router configuration
+      - 'traefik.http.routers.admin-panel.rule=Host(`${ADMIN_PANEL_DOMAIN_SUFFIX}.${DOMAIN_NAME}`)'
+      - "traefik.http.routers.admin-panel.entrypoints=websecure"
+      - "traefik.http.routers.admin-panel.tls.certresolver=letsencrypt"
+      # Service configuration
+      - "traefik.http.services.admin-panel.loadbalancer.server.port=${ADMIN_PANEL_PORT:-8081}"
+    restart: unless-stopped
+
+  traefik:
+    image: traefik:v3.6.4
+    container_name: beef-traefik-prod
+    command:
+      # API Settings
+      - "--api.dashboard=true"
+      # Providers
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=beef-prod-network"
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # HTTP to HTTPS redirect
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # Let's Encrypt
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # Optional: Let's Encrypt Staging (for testing - uncomment to use)
+      # - "--certificatesresolvers.letsencrypt-staging.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      # - "--certificatesresolvers.letsencrypt-staging.acme.httpchallenge=true"
+      # - "--certificatesresolvers.letsencrypt-staging.acme.httpchallenge.entrypoint=web"
+      # - "--certificatesresolvers.letsencrypt-staging.acme.email=${LETSENCRYPT_EMAIL}"
+      # - "--certificatesresolvers.letsencrypt-staging.acme.storage=/letsencrypt/acme-staging.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    networks:
+      - beef-prod-network
+    labels:
+      # Enable Traefik for this service
+      - "traefik.enable=true"
+      # Dashboard routing - Traefik API is at /api and dashboard at /dashboard
+      - 'traefik.http.routers.traefik-api.rule=Host(`${DOMAIN_NAME}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))'
+      - "traefik.http.routers.traefik-api.entrypoints=websecure"
+      - "traefik.http.routers.traefik-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-api.service=api@internal"
+      # Dashboard middleware (basic auth only, no strip prefix)
+      - "traefik.http.routers.traefik-api.middlewares=traefik-auth"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_USERS}"
+    restart: unless-stopped
+    depends_on:
+      - admin-panel
+
+networks:
+  beef-prod-network:
+    driver: bridge

@@ -12,13 +12,10 @@ import (
 
 // Config holds all configuration for the admin panel
 type Config struct {
-	// Database
-	DBHost     string `envconfig:"DB_HOST" default:"localhost"`
-	DBPort     int    `envconfig:"DB_PORT" default:"5432"`
-	DBUser     string `envconfig:"DB_USER" default:"postgres"`
-	DBPassword string `envconfig:"DB_PASSWORD" default:""`
-	DBName     string `envconfig:"DB_NAME" default:"beef_db"`
-	DBSSLMode  string `envconfig:"DB_SSL_MODE" default:"disable"`
+	// API Service
+	APIServiceURL       string `envconfig:"API_SERVICE_URL" default:"http://api-service:8080"`
+	AnalyticsAPIKey     string `envconfig:"ANALYTICS_API_KEY"`
+	AnalyticsAPIKeyFile string `envconfig:"ANALYTICS_API_KEY_FILE"`
 
 	// Admin Panel
 	AdminPanelPort        int    `envconfig:"ADMIN_PANEL_PORT" default:"8081"`
@@ -27,16 +24,11 @@ type Config struct {
 	AdminPasswordHashFile string `envconfig:"ADMIN_PASSWORD_HASH_FILE"`
 	SessionSecret         string `envconfig:"SESSION_SECRET"`
 	SessionSecretFile     string `envconfig:"SESSION_SECRET_FILE"`
+	SecureCookies         bool   `envconfig:"SECURE_COOKIES" default:"true"`
 
 	// Application
 	Environment string `envconfig:"ENVIRONMENT" default:"development"`
 	LogLevel    string `envconfig:"LOG_LEVEL" default:"info"`
-}
-
-// DSN returns the PostgreSQL connection string
-func (c *Config) DSN() string {
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		c.DBHost, c.DBPort, c.DBUser, c.DBPassword, c.DBName, c.DBSSLMode)
 }
 
 // IsProduction returns true if running in production environment
@@ -90,6 +82,15 @@ func LoadConfig() (*Config, error) {
 		cfg.SessionSecret = secret
 	}
 
+	// Load analytics API key from file if specified
+	if cfg.AnalyticsAPIKeyFile != "" {
+		apiKey, err := readSecretFromFile(cfg.AnalyticsAPIKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read analytics API key from file: %w", err)
+		}
+		cfg.AnalyticsAPIKey = apiKey
+	}
+
 	// Validate that we have the required secrets
 	if cfg.AdminPasswordHash == "" {
 		return nil, fmt.Errorf("ADMIN_PASSWORD_HASH or ADMIN_PASSWORD_HASH_FILE must be set")
@@ -97,6 +98,10 @@ func LoadConfig() (*Config, error) {
 
 	if cfg.SessionSecret == "" {
 		return nil, fmt.Errorf("SESSION_SECRET or SESSION_SECRET_FILE must be set")
+	}
+
+	if cfg.AnalyticsAPIKey == "" {
+		return nil, fmt.Errorf("ANALYTICS_API_KEY or ANALYTICS_API_KEY_FILE must be set")
 	}
 
 	// Validate session secret can be decoded and is the right length

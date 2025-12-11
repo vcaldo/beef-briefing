@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -15,6 +16,7 @@ import (
 	"beef-briefing/apps/import-cli/internal/parser"
 	"beef-briefing/apps/import-cli/internal/reporter"
 	"beef-briefing/apps/import-cli/internal/state"
+	"beef-briefing/apps/import-cli/internal/telegram"
 )
 
 var (
@@ -25,14 +27,18 @@ var (
 	verbose bool
 
 	// Import flags
-	exportPath   string
-	chatID       int64
-	createChat   bool
-	includeMedia bool
-	batchSize    int
-	delayMS      int
-	apiURL       string
-	resetState   bool
+	exportPath    string
+	chatID        int64
+	createChat    bool
+	includeMedia  bool
+	batchSize     int
+	delayMS       int
+	apiURL        string
+	resetState    bool
+	force         bool
+	forceChatID   bool
+	skipBots      bool
+	telegramToken string
 )
 
 func main() {
@@ -101,6 +107,10 @@ func init() {
 	importCmd.Flags().IntVarP(&delayMS, "delay-ms", "d", 1, "Delay between batches in milliseconds")
 	importCmd.Flags().StringVarP(&apiURL, "api-url", "u", "http://localhost:8080", "API service URL")
 	importCmd.Flags().BoolVar(&resetState, "reset", false, "Reset import state before starting")
+	importCmd.Flags().BoolVar(&force, "force", false, "Force import even if calculated supergroup ID doesn't match provided chat ID")
+	importCmd.Flags().BoolVar(&forceChatID, "force-chat-id", false, "Allow importing to different chat ID than previous import state")
+	importCmd.Flags().BoolVar(&skipBots, "skip-bots", true, "Skip messages from bot users (requires --telegram-token)")
+	importCmd.Flags().StringVar(&telegramToken, "telegram-token", "", "Telegram Bot API token for bot detection (or set TELEGRAM_BOT_TOKEN env var)")
 
 	importCmd.MarkFlagRequired("export-path")
 
@@ -168,6 +178,46 @@ func runImport(cmd *cobra.Command, args []string) error {
 		"id", metadata.ID,
 	)
 
+	// Detect supergroup migration scenario
+	var needsMigrationLink bool
+	var oldChatID int64
+
+	if strings.Contains(metadata.Type, "supergroup") {
+		if createChat {
+			return fmt.Errorf("supergroup exports cannot use --create-chat; must provide actual supergroup chat ID via --chat-id")
+		}
+
+		if chatID != 0 {
+			// Calculate expected supergroup ID from old group ID
+			// Formula: supergroup_id = -1000000000000 - old_group_id
+			expectedID := -1000000000000 - metadata.ID
+
+			if chatID != expectedID {
+				errMsg := fmt.Sprintf(
+					"supergroup ID mismatch: expected %d (calculated from export ID %d), but got %d",
+					expectedID, metadata.ID, chatID,
+				)
+
+				if !force {
+					return fmt.Errorf("%s (use --force to bypass this check)", errMsg)
+				}
+
+				slog.Warn("proceeding with mismatched supergroup ID",
+					"expected", expectedID,
+					"provided", chatID,
+					"export_id", metadata.ID,
+				)
+			}
+
+			oldChatID = metadata.ID
+			needsMigrationLink = true
+			slog.Info("supergroup migration detected",
+				"old_group_id", oldChatID,
+				"new_supergroup_id", chatID,
+			)
+		}
+	}
+
 	// Determine chat ID
 	targetChatID := chatID
 	if createChat {
@@ -187,7 +237,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load existing state
-	if err := stateMgr.Load(); err != nil {
+	if err := stateMgr.Load(targetChatID, forceChatID); err != nil {
 		return fmt.Errorf("loading import state: %w", err)
 	}
 
@@ -209,8 +259,52 @@ func runImport(cmd *cobra.Command, args []string) error {
 	// Initialize mapper
 	m := mapper.New(targetChatID, metadata.Type, metadata.Name)
 
+	// Initialize Telegram client for bot detection if token provided
+	token := telegramToken
+	if token == "" {
+		token = os.Getenv("TELEGRAM_BOT_TOKEN")
+	}
+	var telegramClient *telegram.Client
+	if token != "" {
+		telegramClient = telegram.NewClient(token, targetChatID)
+		m.SetBotChecker(telegramClient)
+		slog.Info("bot detection enabled", "skip_bots", skipBots)
+	} else if skipBots {
+		slog.Warn("--skip-bots is enabled but no telegram token provided; bot detection disabled")
+	}
+
 	// Initialize API client
 	apiClient := client.New(apiURL, batchSize, delayMS)
+
+	// Send migration update if this is a migrated supergroup
+	if needsMigrationLink {
+		slog.Info("linking migrated supergroup", "old_chat_id", oldChatID, "new_chat_id", targetChatID)
+
+		migrationUpdate := &models.Update{
+			UpdateID: 0, // Special marker for synthetic updates
+			MyChatMember: &models.ChatMemberUpdated{
+				Chat: models.Chat{
+					ID:                targetChatID,
+					Type:              "supergroup",
+					Title:             metadata.Name,
+					MigrateFromChatID: &oldChatID,
+				},
+				From: models.User{
+					ID:        0,
+					FirstName: "Import-CLI",
+					IsBot:     true,
+				},
+				Date: time.Now().Unix(),
+			},
+		}
+
+		if err := apiClient.SendUpdate(migrationUpdate); err != nil {
+			slog.Error("failed to link migration", "error", err, "old_chat_id", oldChatID, "new_chat_id", targetChatID)
+			slog.Warn("continuing import without migration link")
+		} else {
+			slog.Info("migration link created successfully")
+		}
+	}
 
 	// Count messages for progress (if not already counted)
 	if existingState.TotalMessages == 0 {
@@ -254,14 +348,8 @@ func runImport(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 
-		// Record user
-		userID, userName := parseUserInfo(msg.From, msg.FromID)
-		if userID != 0 {
-			stateMgr.AddUser(userID, userName)
-		}
-
 		// Convert to API format
-		update, err := m.ToUpdate(msg)
+		result, err := m.ToUpdate(msg)
 		if err != nil {
 			stateMgr.IncrementFailed()
 			stateMgr.AddError(msg.ID, err.Error(), time.Now().Format(time.RFC3339))
@@ -269,14 +357,29 @@ func runImport(cmd *cobra.Command, args []string) error {
 			return nil // Continue processing
 		}
 
-		if update == nil {
+		if result == nil {
 			stateMgr.IncrementSkipped()
 			stateMgr.SetLastProcessedID(msg.ID)
 			return nil
 		}
 
+		// Record user (with bot status)
+		if result.UserID != 0 {
+			stateMgr.AddUser(result.UserID, result.UserName)
+			if result.IsBot {
+				stateMgr.AddBotUser(result.UserID)
+			}
+		}
+
+		// Skip bot messages if enabled
+		if skipBots && result.IsBot && telegramClient != nil && telegramClient.IsEnabled() {
+			stateMgr.IncrementBotSkipped()
+			stateMgr.SetLastProcessedID(msg.ID)
+			return nil
+		}
+
 		// Add message to batch
-		batch = append(batch, update)
+		batch = append(batch, result.Update)
 		if includeMedia && msg.HasMedia() {
 			batchMediaPaths = append(batchMediaPaths, msg.GetMediaPath())
 		} else {
@@ -355,16 +458,30 @@ func runImport(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print summary
-	state := stateMgr.GetState()
+	importState := stateMgr.GetState()
 	fmt.Println()
 	fmt.Println("=== Import Complete ===")
 	fmt.Printf("Duration: %s\n", duration.Round(time.Second))
-	fmt.Printf("Total Messages: %d\n", state.TotalMessages)
-	fmt.Printf("Imported: %d\n", state.ImportedCount)
-	fmt.Printf("Skipped: %d\n", state.SkippedCount)
-	fmt.Printf("Failed: %d\n", state.FailedCount)
-	fmt.Printf("Reactions: %d\n", state.ReactionsCount)
+	fmt.Printf("Total Messages: %d\n", importState.TotalMessages)
+	fmt.Printf("Imported: %d\n", importState.ImportedCount)
+	fmt.Printf("Skipped: %d\n", importState.SkippedCount)
+	fmt.Printf("Failed: %d\n", importState.FailedCount)
+	fmt.Printf("Reactions: %d\n", importState.ReactionsCount)
+	if importState.BotSkippedCount > 0 {
+		fmt.Printf("Bot Messages Skipped: %d\n", importState.BotSkippedCount)
+	}
+	if len(importState.BotUsers) > 0 {
+		fmt.Printf("Detected Bots: %d\n", len(importState.BotUsers))
+	}
 	fmt.Printf("Report: %s\n", rep.GetReportPath())
+
+	// Print cache stats if telegram client was used
+	if telegramClient != nil && telegramClient.IsEnabled() {
+		total, bots := telegramClient.GetCacheStats()
+		fmt.Printf("\nTelegram API Stats:\n")
+		fmt.Printf("  Users Checked: %d\n", total)
+		fmt.Printf("  Bots Detected: %d\n", bots)
+	}
 
 	return nil
 }
@@ -485,36 +602,48 @@ func parseUserInfo(name, fromID string) (int64, string) {
 func runStatus(cmd *cobra.Command, args []string) error {
 	stateMgr := state.NewManager(exportPath)
 
-	if err := stateMgr.Load(); err != nil {
+	if err := stateMgr.Load(0, false); err != nil {
 		return fmt.Errorf("loading import state: %w", err)
 	}
 
-	state := stateMgr.GetState()
+	importState := stateMgr.GetState()
 
-	if state.LastProcessedID == 0 {
+	if importState.LastProcessedID == 0 {
 		fmt.Println("No import in progress for this export folder.")
 		return nil
 	}
 
 	fmt.Println("=== Import Status ===")
-	fmt.Printf("Chat ID: %d\n", state.ChatID)
-	fmt.Printf("Started At: %s\n", state.StartedAt)
-	fmt.Printf("Last Updated: %s\n", state.LastUpdatedAt)
-	fmt.Printf("Last Processed ID: %d\n", state.LastProcessedID)
+	fmt.Printf("Chat ID: %d\n", importState.ChatID)
+	fmt.Printf("Started At: %s\n", importState.StartedAt)
+	fmt.Printf("Last Updated: %s\n", importState.LastUpdatedAt)
+	fmt.Printf("Last Processed ID: %d\n", importState.LastProcessedID)
 	fmt.Println()
-	fmt.Printf("Total Messages: %d\n", state.TotalMessages)
-	fmt.Printf("Imported: %d\n", state.ImportedCount)
-	fmt.Printf("Skipped: %d\n", state.SkippedCount)
-	fmt.Printf("Failed: %d\n", state.FailedCount)
+	fmt.Printf("Total Messages: %d\n", importState.TotalMessages)
+	fmt.Printf("Imported: %d\n", importState.ImportedCount)
+	fmt.Printf("Skipped: %d\n", importState.SkippedCount)
+	fmt.Printf("Failed: %d\n", importState.FailedCount)
 
-	if state.TotalMessages > 0 {
-		progress := float64(state.ImportedCount+state.SkippedCount+state.FailedCount) / float64(state.TotalMessages) * 100
+	if importState.TotalMessages > 0 {
+		progress := float64(importState.ImportedCount+importState.SkippedCount+importState.FailedCount) / float64(importState.TotalMessages) * 100
 		fmt.Printf("Progress: %.2f%%\n", progress)
 	}
 
 	fmt.Println()
-	fmt.Printf("Users Discovered: %d\n", len(state.Users))
-	fmt.Printf("Errors Recorded: %d\n", len(state.Errors))
+	fmt.Printf("Users Discovered: %d\n", len(importState.Users))
+	fmt.Printf("Errors Recorded: %d\n", len(importState.Errors))
+
+	// Bot detection stats
+	if importState.BotSkippedCount > 0 || len(importState.BotUsers) > 0 {
+		fmt.Println()
+		fmt.Println("Bot Detection:")
+		if importState.BotSkippedCount > 0 {
+			fmt.Printf("  Bot Messages Skipped: %d\n", importState.BotSkippedCount)
+		}
+		if len(importState.BotUsers) > 0 {
+			fmt.Printf("  Detected Bot Users: %d\n", len(importState.BotUsers))
+		}
+	}
 
 	return nil
 }

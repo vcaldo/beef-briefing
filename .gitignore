@@ -111,6 +111,13 @@ yarn-error.log
 secrets.json
 credentials/
 private_keys/
+infrastructure/secrets/
+
+# Let's Encrypt certificates (SSL)
+infrastructure/letsencrypt/
+letsencrypt/
+acme.json
+acme-staging.json
 
 # Test coverage
 coverage/
@@ -126,6 +133,28 @@ local_docs/
 
 # Local import
 local_import/
+import-report.md
+.import-state.json
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Claude
+.claude/settings.local.json
+.claude/settings.local.json
+
 .import-state.json
 import-report.md
 result.json

@@ -1,5 +1,8 @@
 # Build stage
-FROM golang:1.25 AS builder
+FROM golang:1.25-alpine AS builder
+
+# TARGETARCH is automatically set by Docker when using --platform
+ARG TARGETARCH
 
 WORKDIR /app
 
@@ -17,15 +20,12 @@ COPY apps/admin-panel/ .
 RUN templ generate
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -a -installsuffix cgo -o main ./cmd
 
 # Runtime stage
-FROM ubuntu:24.04
+FROM alpine:3.21
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    tzdata \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 

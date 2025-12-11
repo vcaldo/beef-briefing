@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
@@ -34,6 +36,10 @@ type Config struct {
 	// Application Settings
 	Environment string `envconfig:"ENVIRONMENT" default:"development"`
 	LogLevel    string `envconfig:"LOG_LEVEL" default:"info"`
+
+	// Analytics API Configuration
+	AnalyticsAPIKey     string `envconfig:"ANALYTICS_API_KEY"`
+	AnalyticsAPIKeyFile string `envconfig:"ANALYTICS_API_KEY_FILE"`
 }
 
 // DSN returns PostgreSQL connection string
@@ -62,5 +68,23 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
+	// Load analytics API key from file if specified
+	if cfg.AnalyticsAPIKeyFile != "" {
+		apiKey, err := readSecretFromFile(cfg.AnalyticsAPIKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read analytics API key from file: %w", err)
+		}
+		cfg.AnalyticsAPIKey = apiKey
+	}
+
 	return &cfg, nil
+}
+
+// readSecretFromFile reads a secret from a file and trims whitespace
+func readSecretFromFile(filepath string) (string, error) {
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return "", fmt.Errorf("reading file %s: %w", filepath, err)
+	}
+	return strings.TrimSpace(string(data)), nil
 }

@@ -6,16 +6,19 @@ type Update struct {
 	Message              *Message                    `json:"message,omitempty"`
 	MessageReaction      *MessageReactionUpdated     `json:"message_reaction,omitempty"`
 	MessageReactionCount *MessageReactionCountUpdate `json:"message_reaction_count,omitempty"`
+	MyChatMember         *ChatMemberUpdated          `json:"my_chat_member,omitempty"`
 }
 
 // Chat represents a Telegram chat
 type Chat struct {
-	ID        int64  `json:"id"`
-	Type      string `json:"type"`
-	Title     string `json:"title,omitempty"`
-	Username  string `json:"username,omitempty"`
-	FirstName string `json:"first_name,omitempty"`
-	LastName  string `json:"last_name,omitempty"`
+	ID                int64  `json:"id"`
+	Type              string `json:"type"`
+	Title             string `json:"title,omitempty"`
+	Username          string `json:"username,omitempty"`
+	FirstName         string `json:"first_name,omitempty"`
+	LastName          string `json:"last_name,omitempty"`
+	MigrateFromChatID *int64 `json:"migrate_from_chat_id,omitempty"`
+	MigrateToChatID   *int64 `json:"migrate_to_chat_id,omitempty"`
 }
 
 // User represents a Telegram user
@@ -156,4 +159,11 @@ type ReactionInfo struct {
 type ReactionCount struct {
 	Type       ReactionInfo `json:"type"`
 	TotalCount int          `json:"total_count"`
+}
+
+// ChatMemberUpdated represents changes in the status of a chat member
+type ChatMemberUpdated struct {
+	Chat Chat  `json:"chat"`
+	From User  `json:"from"`
+	Date int64 `json:"date"`
 }

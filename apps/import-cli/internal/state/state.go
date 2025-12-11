@@ -11,19 +11,22 @@ const stateFileName = ".import-state.json"
 
 // ImportState tracks the progress of an import operation
 type ImportState struct {
-	LastProcessedID int64            `json:"last_processed_id"`
-	ChatID          int64            `json:"chat_id"`
-	TotalMessages   int              `json:"total_messages"`
-	ImportedCount   int              `json:"imported_count"`
-	SkippedCount    int              `json:"skipped_count"`
-	FailedCount     int              `json:"failed_count"`
-	ReactionsCount  int              `json:"reactions_count"`
-	StartedAt       string           `json:"started_at"`
-	LastUpdatedAt   string           `json:"last_updated_at"`
-	Users           map[int64]string `json:"users"`            // userID -> displayName
-	Errors          []ImportError    `json:"errors,omitempty"` // Recent errors
-	MediaStats      MediaStats       `json:"media_stats"`
-	ReactionStats   ReactionStats    `json:"reaction_stats"`
+	LastProcessedID   int64            `json:"last_processed_id"`
+	ChatID            int64            `json:"chat_id"`
+	TotalMessages     int              `json:"total_messages"`
+	ImportedCount     int              `json:"imported_count"`
+	SkippedCount      int              `json:"skipped_count"`
+	FailedCount       int              `json:"failed_count"`
+	ReactionsCount    int              `json:"reactions_count"`
+	BotSkippedCount   int              `json:"bot_skipped_count"` // Messages skipped because sender is a bot
+	StartedAt         string           `json:"started_at"`
+	LastUpdatedAt     string           `json:"last_updated_at"`
+	Users             map[int64]string `json:"users"`              // userID -> displayName
+	BotUsers          map[int64]bool   `json:"bot_users"`          // userID -> isBot (detected bots)
+	ProcessedMessages map[int64]bool   `json:"processed_messages"` // msgID -> processed (for resume support with negative IDs)
+	Errors            []ImportError    `json:"errors,omitempty"`   // Recent errors
+	MediaStats        MediaStats       `json:"media_stats"`
+	ReactionStats     ReactionStats    `json:"reaction_stats"`
 }
 
 // ImportError represents a single import error
@@ -71,13 +74,15 @@ func NewManager(exportPath string) *Manager {
 	return &Manager{
 		exportPath: exportPath,
 		state: &ImportState{
-			Users: make(map[int64]string),
+			Users:             make(map[int64]string),
+			BotUsers:          make(map[int64]bool),
+			ProcessedMessages: make(map[int64]bool),
 		},
 	}
 }
 
 // Load loads the state from disk
-func (m *Manager) Load() error {
+func (m *Manager) Load(targetChatID int64, allowOverride bool) error {
 	statePath := filepath.Join(m.exportPath, stateFileName)
 
 	data, err := os.ReadFile(statePath)
@@ -91,6 +96,28 @@ func (m *Manager) Load() error {
 
 	if err := json.Unmarshal(data, m.state); err != nil {
 		return fmt.Errorf("parsing state file: %w", err)
+	}
+
+	// Initialize maps if nil (backward compatibility)
+	if m.state.ProcessedMessages == nil {
+		m.state.ProcessedMessages = make(map[int64]bool)
+	}
+	if m.state.BotUsers == nil {
+		m.state.BotUsers = make(map[int64]bool)
+	}
+
+	// Validate chat ID consistency
+	if m.state.ChatID != 0 && targetChatID != 0 && m.state.ChatID != targetChatID {
+		if !allowOverride {
+			return fmt.Errorf(
+				"this export was previously imported to chat ID %d, cannot import to different chat ID %d (use --force-chat-id to override)",
+				m.state.ChatID, targetChatID,
+			)
+		}
+
+		// Override allowed - log warning and update state
+		fmt.Printf("WARNING: Overriding previous chat ID %d with new chat ID %d\n", m.state.ChatID, targetChatID)
+		m.state.ChatID = targetChatID
 	}
 
 	return nil
@@ -120,6 +147,11 @@ func (m *Manager) GetState() *ImportState {
 // SetLastProcessedID updates the last processed message ID
 func (m *Manager) SetLastProcessedID(id int64) {
 	m.state.LastProcessedID = id
+	// Mark this message as processed
+	if m.state.ProcessedMessages == nil {
+		m.state.ProcessedMessages = make(map[int64]bool)
+	}
+	m.state.ProcessedMessages[id] = true
 }
 
 // GetLastProcessedID returns the last processed message ID
@@ -173,6 +205,29 @@ func (m *Manager) AddUser(userID int64, displayName string) {
 	m.state.Users[userID] = displayName
 }
 
+// AddBotUser marks a user as a bot
+func (m *Manager) AddBotUser(userID int64) {
+	if m.state.BotUsers == nil {
+		m.state.BotUsers = make(map[int64]bool)
+	}
+	m.state.BotUsers[userID] = true
+}
+
+// IncrementBotSkipped increments the bot-skipped message count
+func (m *Manager) IncrementBotSkipped() {
+	m.state.BotSkippedCount++
+}
+
+// GetBotSkippedCount returns the number of messages skipped due to bot detection
+func (m *Manager) GetBotSkippedCount() int {
+	return m.state.BotSkippedCount
+}
+
+// GetBotUsers returns the map of detected bot users
+func (m *Manager) GetBotUsers() map[int64]bool {
+	return m.state.BotUsers
+}
+
 // SetStartedAt sets the import start time
 func (m *Manager) SetStartedAt(timestamp string) {
 	m.state.StartedAt = timestamp
@@ -200,13 +255,16 @@ func (m *Manager) IncrementReaction() {
 
 // ShouldSkip returns true if the message has already been processed
 func (m *Manager) ShouldSkip(msgID int64) bool {
-	return msgID <= m.state.LastProcessedID
+	// Use ProcessedMessages map to handle negative message IDs
+	return m.state.ProcessedMessages[msgID]
 }
 
 // Reset clears the state for a fresh import
 func (m *Manager) Reset() {
 	m.state = &ImportState{
-		Users: make(map[int64]string),
+		Users:             make(map[int64]string),
+		BotUsers:          make(map[int64]bool),
+		ProcessedMessages: make(map[int64]bool),
 	}
 }
 

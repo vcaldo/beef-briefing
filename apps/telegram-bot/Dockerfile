@@ -1,4 +1,7 @@
-FROM golang:1.25 AS builder
+FROM golang:1.25-alpine AS builder
+
+# TARGETARCH is automatically set by Docker when using --platform
+ARG TARGETARCH
 
 WORKDIR /build
 
@@ -9,11 +12,11 @@ COPY apps/telegram-bot ./apps/telegram-bot
 WORKDIR /build/apps/telegram-bot
 
 RUN go mod download
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o telegram-bot ./cmd
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -a -installsuffix cgo -o telegram-bot ./cmd
 
-FROM ubuntu:24.04
+FROM alpine:3.21
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates
 
 WORKDIR /root/
 COPY --from=builder /build/apps/telegram-bot/telegram-bot .

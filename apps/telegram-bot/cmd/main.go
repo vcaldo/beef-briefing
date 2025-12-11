@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -36,12 +37,13 @@ func main() {
 	// Initialize New Relic APM (optional - continues without if fails)
 	var nrApp *newrelic.Application
 	if cfg.NewRelicEnabled() {
-		nrApp, err = initNewRelic(cfg)
+		var appName string
+		nrApp, appName, err = initNewRelic(cfg)
 		if err != nil {
 			slog.Error("failed to initialize New Relic", "error", err)
 			slog.Info("continuing without New Relic instrumentation")
 		} else {
-			slog.Info("New Relic initialized successfully", "app_name", cfg.NewRelicAppName)
+			slog.Info("New Relic APM initialized", "app_name", appName, "region", cfg.NewRelicRegion)
 		}
 	} else {
 		slog.Debug("New Relic not configured, skipping APM initialization")
@@ -107,9 +109,14 @@ func main() {
 }
 
 // initNewRelic initializes the New Relic application with the given configuration
-func initNewRelic(cfg *config.Config) (*newrelic.Application, error) {
+func initNewRelic(cfg *config.Config) (*newrelic.Application, string, error) {
+	const serviceName = "telegram-bot"
+
+	// Build app name following pattern: {base}-{service}-{environment}
+	appName := fmt.Sprintf("%s-%s-%s", cfg.NewRelicAppName, serviceName, cfg.Environment)
+
 	opts := []newrelic.ConfigOption{
-		newrelic.ConfigAppName(cfg.NewRelicAppName),
+		newrelic.ConfigAppName(appName),
 		newrelic.ConfigLicense(cfg.NewRelicLicenseKey),
 		newrelic.ConfigDistributedTracerEnabled(true),
 		newrelic.ConfigAppLogForwardingEnabled(true),
@@ -126,7 +133,7 @@ func initNewRelic(cfg *config.Config) (*newrelic.Application, error) {
 
 	nrApp, err := newrelic.NewApplication(opts...)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	// Wait for connection to New Relic
@@ -135,7 +142,7 @@ func initNewRelic(cfg *config.Config) (*newrelic.Application, error) {
 		// Continue anyway - data will be sent when connection establishes
 	}
 
-	return nrApp, nil
+	return nrApp, appName, nil
 }
 
 func setupLogger(cfg *config.Config) {

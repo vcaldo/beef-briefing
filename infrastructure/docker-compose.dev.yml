@@ -41,7 +41,6 @@ services:
       ANALYTICS_API_KEY: ${ANALYTICS_API_KEY}
       NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
-      NEW_RELIC_REGION: ${NEW_RELIC_REGION:-EU}
       ENVIRONMENT: development
       LOG_LEVEL: debug
     ports:
@@ -77,6 +76,8 @@ services:
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       API_SERVICE_URL: http://api-service:${API_PORT}
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: development
       LOG_LEVEL: debug
     depends_on:

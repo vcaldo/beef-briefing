@@ -140,6 +140,8 @@ import-report.md
 local_backups/pgsql/*.sql.gz
 local_backups/pgsql/*.sql
 local_backups/pgsql/restore.sql
+local_backups/db/*.sql.gz
+local_backups/db/*.sql
 
 # Terraform
 *.tfstate

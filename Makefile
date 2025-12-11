@@ -525,7 +525,7 @@ rollback-force: ## Rollback to previous deployment (skip confirmation)
 	@./scripts/rollback.sh --force
 
 # Database backup/restore targets
-backup-prod-db: ## Backup production database to local_backups/pgsql/
+backup-prod-db: ## Backup production database to local_backups/db/
 	@./scripts/backup-prod-db.sh
 
 prepare-restore-db: ## Prepare to restore a backup to local dev (WARNING: deletes local volume!)

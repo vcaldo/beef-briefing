@@ -9,27 +9,43 @@ import (
 	"log/slog"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"time"
 
 	"beef-briefing/apps/telegram-bot/internal"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type APIClient struct {
 	baseURL    string
 	httpClient *http.Client
+	nrApp      *newrelic.Application
 }
 
-func NewAPIClient(baseURL string) *APIClient {
+func NewAPIClient(baseURL string, nrApp *newrelic.Application) *APIClient {
 	return &APIClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: internal.DefaultHTTPTimeout,
 		},
+		nrApp: nrApp,
 	}
 }
 
 // SendUpdate sends an update with optional media files to the API service
 func (c *APIClient) SendUpdate(ctx context.Context, update interface{}, files map[string][]byte) error {
+	// Get transaction from context
+	txn := newrelic.FromContext(ctx)
+
+	// Start segment for the overall send operation
+	var sendSegment *newrelic.Segment
+	if txn != nil {
+		sendSegment = txn.StartSegment("api:send-update")
+		defer sendSegment.End()
+		txn.AddAttribute("file_attachments", len(files))
+	}
+
 	var lastErr error
 
 	for attempt := 0; attempt < internal.MaxRetryAttempts; attempt++ {
@@ -41,6 +57,9 @@ func (c *APIClient) SendUpdate(ctx context.Context, update interface{}, files ma
 			)
 			select {
 			case <-ctx.Done():
+				if txn != nil {
+					txn.NoticeError(ctx.Err())
+				}
 				return ctx.Err()
 			case <-time.After(delay):
 			}
@@ -50,6 +69,9 @@ func (c *APIClient) SendUpdate(ctx context.Context, update interface{}, files ma
 		if err == nil {
 			if attempt > 0 {
 				slog.Info("API request succeeded after retry", "attempt", attempt+1)
+				if txn != nil {
+					txn.AddAttribute("retry_count", attempt)
+				}
 			}
 			return nil
 		}
@@ -64,14 +86,25 @@ func (c *APIClient) SendUpdate(ctx context.Context, update interface{}, files ma
 
 		// Don't retry on 4xx errors (client errors)
 		if isClientError(err) {
+			if txn != nil {
+				txn.AddAttribute("error_type", "client_error")
+				txn.NoticeError(err)
+			}
 			return fmt.Errorf("client error, not retrying: %w", err)
 		}
 	}
 
+	if txn != nil {
+		txn.AddAttribute("retry_count", internal.MaxRetryAttempts)
+		txn.AddAttribute("error_type", "max_retries_exceeded")
+		txn.NoticeError(lastErr)
+	}
 	return fmt.Errorf("failed after %d attempts: %w", internal.MaxRetryAttempts, lastErr)
 }
 
 func (c *APIClient) sendUpdateOnce(ctx context.Context, update interface{}, files map[string][]byte) error {
+	txn := newrelic.FromContext(ctx)
+
 	// Marshal update to JSON
 	updateJSON, err := json.Marshal(update)
 	if err != nil {
@@ -109,16 +142,41 @@ func (c *APIClient) sendUpdateOnce(ctx context.Context, update interface{}, file
 	}
 
 	// Create HTTP request
-	url := fmt.Sprintf("%s/api/v1/ingest", c.baseURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &buf)
+	apiURL := fmt.Sprintf("%s/api/v1/ingest", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, &buf)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
+	// External segment for API service call
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
 	// Send request
 	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}

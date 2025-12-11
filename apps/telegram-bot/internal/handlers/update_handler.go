@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sync"
 
 	"beef-briefing/apps/telegram-bot/internal"
@@ -13,28 +14,47 @@ import (
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type UpdateHandler struct {
 	apiClient  *client.APIClient
 	httpClient *http.Client
+	nrApp      *newrelic.Application
 }
 
-func NewUpdateHandler(apiClient *client.APIClient) *UpdateHandler {
+func NewUpdateHandler(apiClient *client.APIClient, nrApp *newrelic.Application) *UpdateHandler {
 	return &UpdateHandler{
 		apiClient: apiClient,
 		httpClient: &http.Client{
 			Timeout: internal.FileDownloadTimeout,
 		},
+		nrApp: nrApp,
 	}
 }
 
 // Handle processes all incoming updates
 func (h *UpdateHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
+	// Start New Relic transaction for this update
+	txn := h.startTransaction("telegram:handle-update")
+	if txn != nil {
+		defer txn.End()
+		ctx = newrelic.NewContext(ctx, txn)
+
+		// Add custom attributes
+		txn.AddAttribute("update_id", update.ID)
+		txn.AddAttribute("update_type", h.getUpdateType(update))
+	}
+
 	slog.Info("received update", "update_id", update.ID)
 
-	// Log reaction updates for debugging
+	// Log reaction updates for debugging and add attributes
 	if update.MessageReaction != nil {
+		if txn != nil {
+			txn.AddAttribute("chat_id", update.MessageReaction.Chat.ID)
+			txn.AddAttribute("message_id", update.MessageReaction.MessageID)
+			txn.AddAttribute("user_id", update.MessageReaction.User.ID)
+		}
 		slog.Info("received message reaction",
 			"update_id", update.ID,
 			"chat_id", update.MessageReaction.Chat.ID,
@@ -45,6 +65,10 @@ func (h *UpdateHandler) Handle(ctx context.Context, b *bot.Bot, update *models.U
 		)
 	}
 	if update.MessageReactionCount != nil {
+		if txn != nil {
+			txn.AddAttribute("chat_id", update.MessageReactionCount.Chat.ID)
+			txn.AddAttribute("message_id", update.MessageReactionCount.MessageID)
+		}
 		slog.Info("received message reaction count",
 			"update_id", update.ID,
 			"chat_id", update.MessageReactionCount.Chat.ID,
@@ -53,14 +77,47 @@ func (h *UpdateHandler) Handle(ctx context.Context, b *bot.Bot, update *models.U
 		)
 	}
 
+	// Add message attributes
+	if update.Message != nil {
+		if txn != nil {
+			txn.AddAttribute("chat_id", update.Message.Chat.ID)
+			txn.AddAttribute("message_id", update.Message.ID)
+			if update.Message.From != nil {
+				txn.AddAttribute("user_id", update.Message.From.ID)
+			}
+		}
+	} else if update.EditedMessage != nil {
+		if txn != nil {
+			txn.AddAttribute("chat_id", update.EditedMessage.Chat.ID)
+			txn.AddAttribute("message_id", update.EditedMessage.ID)
+			if update.EditedMessage.From != nil {
+				txn.AddAttribute("user_id", update.EditedMessage.From.ID)
+			}
+		}
+	}
+
 	// Extract file IDs from the update
-	fileIDs := h.extractFileIDs(update)
+	var fileIDs []string
+	if txn != nil {
+		segment := txn.StartSegment("extract-file-ids")
+		fileIDs = h.extractFileIDs(update)
+		segment.End()
+		txn.AddAttribute("file_count", len(fileIDs))
+	} else {
+		fileIDs = h.extractFileIDs(update)
+	}
 
 	// Download all media files concurrently
 	files := h.downloadFiles(ctx, b, fileIDs)
+	if txn != nil {
+		txn.AddAttribute("files_downloaded", len(files))
+	}
 
 	// Send update to API service
 	if err := h.apiClient.SendUpdate(ctx, update, files); err != nil {
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		slog.Error("failed to send update to API",
 			"update_id", update.ID,
 			"error", err,
@@ -89,6 +146,42 @@ func (h *UpdateHandler) Handle(ctx context.Context, b *bot.Bot, update *models.U
 	}
 
 	slog.Info("successfully processed update", logFields...)
+}
+
+// startTransaction starts a New Relic transaction if nrApp is configured
+func (h *UpdateHandler) startTransaction(name string) *newrelic.Transaction {
+	if h.nrApp == nil {
+		return nil
+	}
+	return h.nrApp.StartTransaction(name)
+}
+
+// getUpdateType returns the type of update for transaction attributes
+func (h *UpdateHandler) getUpdateType(update *models.Update) string {
+	switch {
+	case update.Message != nil:
+		return "message"
+	case update.EditedMessage != nil:
+		return "edited_message"
+	case update.MessageReaction != nil:
+		return "message_reaction"
+	case update.MessageReactionCount != nil:
+		return "message_reaction_count"
+	case update.ChannelPost != nil:
+		return "channel_post"
+	case update.EditedChannelPost != nil:
+		return "edited_channel_post"
+	case update.CallbackQuery != nil:
+		return "callback_query"
+	case update.InlineQuery != nil:
+		return "inline_query"
+	case update.Poll != nil:
+		return "poll"
+	case update.PollAnswer != nil:
+		return "poll_answer"
+	default:
+		return "unknown"
+	}
 }
 
 // extractFileIDs extracts all file IDs from an update
@@ -171,6 +264,16 @@ func (h *UpdateHandler) downloadFiles(ctx context.Context, b *bot.Bot, fileIDs [
 		return nil
 	}
 
+	// Get transaction from context for segment tracking
+	txn := newrelic.FromContext(ctx)
+
+	// Start segment for the overall download operation
+	var downloadAllSegment *newrelic.Segment
+	if txn != nil {
+		downloadAllSegment = txn.StartSegment("download-files")
+		defer downloadAllSegment.End()
+	}
+
 	slog.Info("downloading media files", "count", len(fileIDs))
 
 	files := make(map[string][]byte)
@@ -190,6 +293,9 @@ func (h *UpdateHandler) downloadFiles(ctx context.Context, b *bot.Bot, fileIDs [
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
 			case <-ctx.Done():
+				if txn != nil {
+					txn.NoticeError(fmt.Errorf("download cancelled for file %s: %w", fid, ctx.Err()))
+				}
 				slog.Warn("download cancelled", "file_id", fid, "error", ctx.Err())
 				return
 			}
@@ -199,6 +305,9 @@ func (h *UpdateHandler) downloadFiles(ctx context.Context, b *bot.Bot, fileIDs [
 			cancel()
 
 			if err != nil {
+				if txn != nil {
+					txn.NoticeError(fmt.Errorf("failed to download file %s: %w", fid, err))
+				}
 				slog.Error("failed to download file", "file_id", fid, "error", err)
 				return
 			}
@@ -217,9 +326,22 @@ func (h *UpdateHandler) downloadFiles(ctx context.Context, b *bot.Bot, fileIDs [
 
 // downloadFile downloads a file from Telegram
 func (h *UpdateHandler) downloadFile(ctx context.Context, b *bot.Bot, fileID string) ([]byte, error) {
+	txn := newrelic.FromContext(ctx)
+
+	// Segment for getting file info from Telegram API
+	var getFileSegment *newrelic.Segment
+	if txn != nil {
+		getFileSegment = txn.StartSegment("telegram-api:get-file")
+	}
+
 	file, err := b.GetFile(ctx, &bot.GetFileParams{
 		FileID: fileID,
 	})
+
+	if getFileSegment != nil {
+		getFileSegment.End()
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file info: %w", err)
 	}
@@ -231,7 +353,32 @@ func (h *UpdateHandler) downloadFile(ctx context.Context, b *bot.Bot, fileID str
 		return nil, fmt.Errorf("failed to create download request: %w", err)
 	}
 
+	// External segment for downloading from Telegram CDN
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(fileURL)
+		host := "api.telegram.org"
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       fileURL,
+			Host:      host,
+			Procedure: "GET",
+			Library:   "net/http",
+		}
+	}
+
 	resp, err := h.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to download file: %w", err)
 	}
@@ -241,8 +388,19 @@ func (h *UpdateHandler) downloadFile(ctx context.Context, b *bot.Bot, fileID str
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
+	// Segment for reading file data
+	var readSegment *newrelic.Segment
+	if txn != nil {
+		readSegment = txn.StartSegment("read-file-data")
+	}
+
 	limitedReader := io.LimitReader(resp.Body, internal.MaxFileSize)
 	data, err := io.ReadAll(limitedReader)
+
+	if readSegment != nil {
+		readSegment.End()
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file data: %w", err)
 	}

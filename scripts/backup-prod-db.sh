@@ -12,7 +12,7 @@ source "$SCRIPT_DIR/common.sh"
 LOCAL_BACKUP_DIR="$PROJECT_ROOT/local_backups/db"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_FILENAME="backup_${TIMESTAMP}.sql.gz"
-RESTORE_FILE="restore.sql"
+RESTORE_FILE="latest.sql"
 
 # =============================================================================
 # MAIN
@@ -56,7 +56,7 @@ log_step "Cleaning up remote backup file"
 remote_exec "$SSH_HOST" "rm -f /tmp/$BACKUP_FILENAME"
 log_success "Remote backup file removed"
 
-# Unzip and create restore.sql
+# Unzip and create latest.sql
 log_step "Extracting backup to $RESTORE_FILE"
 gunzip -c "$LOCAL_BACKUP_DIR/$BACKUP_FILENAME" > "$LOCAL_BACKUP_DIR/$RESTORE_FILE"
 log_success "Backup extracted to $LOCAL_BACKUP_DIR/$RESTORE_FILE"
@@ -76,5 +76,5 @@ echo "To restore to local dev (deletes existing data):"
 echo ""
 echo "  make down && docker volume rm infrastructure_postgres_data_dev && make up"
 echo "  # Wait for postgres to start, then:"
-echo "  # docker exec -i beef-postgres-dev psql -U \$DB_USER -d \$DB_NAME < local_backups/db/restore.sql"
+echo "  # docker exec -i beef-postgres-dev psql -U \$DB_USER -d \$DB_NAME < local_backups/db/latest.sql"
 echo ""

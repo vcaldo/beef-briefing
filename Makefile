@@ -524,15 +524,9 @@ rollback: ## Rollback to previous deployment
 rollback-force: ## Rollback to previous deployment (skip confirmation)
 	@./scripts/rollback.sh --force
 
-# Database backup/restore targets
+# Database backup target
 backup-prod-db: ## Backup production database to local_backups/db/
 	@./scripts/backup-prod-db.sh
-
-prepare-restore-db: ## Prepare to restore a backup to local dev (WARNING: deletes local volume!)
-	@./scripts/prepare-restore-db.sh $(BACKUP)
-
-disable-restore-db: ## Disable restore mount after restore is complete
-	@./scripts/disable-restore-db.sh
 
 # Phony targets
 .PHONY: help up down restart ps clean prune build build-api build-bot build-postgres build-admin-panel \
@@ -547,4 +541,4 @@ disable-restore-db: ## Disable restore mount after restore is complete
 	tf-ip tf-ssh tf-ssh-user-host tf-root-pass tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage-env mc-setup-prod tf-docs tf-deploy-check \
 	deploy deploy-skip-build deploy-skip-cleanup deploy-regenerate-certs clean-letsencrypt-certs rollback rollback-force \
-	backup-prod-db prepare-restore-db disable-restore-db
+	backup-prod-db

@@ -39,6 +39,9 @@ services:
       MINIO_BUCKET: telegram-media
       MINIO_USE_SSL: false
       ANALYTICS_API_KEY: ${ANALYTICS_API_KEY}
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      NEW_RELIC_REGION: ${NEW_RELIC_REGION:-EU}
       ENVIRONMENT: development
       LOG_LEVEL: debug
     ports:

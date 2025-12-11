@@ -40,6 +40,10 @@ type Config struct {
 	// Analytics API Configuration
 	AnalyticsAPIKey     string `envconfig:"ANALYTICS_API_KEY"`
 	AnalyticsAPIKeyFile string `envconfig:"ANALYTICS_API_KEY_FILE"`
+
+	// New Relic APM Configuration
+	NewRelicAppName    string `envconfig:"NEW_RELIC_APP_NAME"`
+	NewRelicLicenseKey string `envconfig:"NEW_RELIC_LICENSE_KEY"`
 }
 
 // DSN returns PostgreSQL connection string
@@ -56,6 +60,11 @@ func (c *Config) IsProduction() bool {
 // MaxUploadSizeBytes returns the max upload size in bytes
 func (c *Config) MaxUploadSizeBytes() int64 {
 	return int64(c.MaxUploadSizeMB) * 1024 * 1024
+}
+
+// NewRelicEnabled returns true if New Relic APM is configured
+func (c *Config) NewRelicEnabled() bool {
+	return c.NewRelicAppName != "" && c.NewRelicLicenseKey != ""
 }
 
 // LoadConfig loads configuration from environment variables

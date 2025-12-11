@@ -10,14 +10,16 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type MinIOClient struct {
 	client *minio.Client
 	bucket string
+	nrApp  *newrelic.Application
 }
 
-func NewMinIOClient(endpoint, accessKey, secretKey, bucket string, useSSL bool) (*MinIOClient, error) {
+func NewMinIOClient(endpoint, accessKey, secretKey, bucket string, useSSL bool, nrApp *newrelic.Application) (*MinIOClient, error) {
 	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: useSSL,
@@ -29,6 +31,7 @@ func NewMinIOClient(endpoint, accessKey, secretKey, bucket string, useSSL bool) 
 	mc := &MinIOClient{
 		client: client,
 		bucket: bucket,
+		nrApp:  nrApp,
 	}
 
 	// Create bucket if it doesn't exist
@@ -73,6 +76,12 @@ func GenerateObjectKey(mediaType, fileHash string) string {
 // UploadMedia uploads media file to MinIO using content-addressable storage.
 // Returns the object key and file hash. Deduplicates files with same hash.
 func (mc *MinIOClient) UploadMedia(ctx context.Context, fileID string, data []byte, mimeType string, mediaType string) (string, string, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("storage:upload-media")
+		defer segment.End()
+	}
+
 	// Compute SHA256 hash of file content
 	fileHash := ComputeFileHash(data)
 
@@ -104,6 +113,9 @@ func (mc *MinIOClient) UploadMedia(ctx context.Context, fileID string, data []by
 		},
 	)
 	if err != nil {
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		return "", "", fmt.Errorf("failed to upload to MinIO: %w", err)
 	}
 

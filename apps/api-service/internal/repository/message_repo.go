@@ -7,18 +7,27 @@ import (
 	"time"
 
 	"beef-briefing/apps/api-service/internal/models"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type MessageRepository struct {
-	db *sql.DB
+	db    *sql.DB
+	nrApp *newrelic.Application
 }
 
-func NewMessageRepository(db *sql.DB) *MessageRepository {
-	return &MessageRepository{db: db}
+func NewMessageRepository(db *sql.DB, nrApp *newrelic.Application) *MessageRepository {
+	return &MessageRepository{db: db, nrApp: nrApp}
 }
 
 // InsertMessage inserts a new message and returns its database ID
 func (r *MessageRepository) InsertMessage(ctx context.Context, tx *sql.Tx, msg *models.Message) (int64, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:insert-message")
+		defer segment.End()
+	}
+
 	var replyToMessageID sql.NullInt64
 	if msg.ReplyToMessage != nil {
 		replyToMessageID = sql.NullInt64{Int64: msg.ReplyToMessage.MessageID, Valid: true}

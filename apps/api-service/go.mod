@@ -7,6 +7,8 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/lib/pq v1.10.9
 	github.com/minio/minio-go/v7 v7.0.82
+	github.com/newrelic/go-agent/v3 v3.42.0
+	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.3
 )
 
 require (
@@ -26,6 +28,9 @@ require (
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/text v0.19.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240528184218-531527333157 // indirect
+	google.golang.org/grpc v1.65.0 // indirect
+	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 

@@ -37,12 +37,15 @@ import (
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/storage"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 // IngestService handles the business logic for processing Telegram updates.
 type IngestService struct {
 	db            *sql.DB
 	storageClient *storage.MinIOClient
+	nrApp         *newrelic.Application
 	updateRepo    *repository.UpdateRepository
 	chatRepo      *repository.ChatRepository
 	userRepo      *repository.UserRepository
@@ -52,21 +55,30 @@ type IngestService struct {
 }
 
 // NewIngestService creates a new IngestService with all required dependencies.
-func NewIngestService(db *sql.DB, storageClient *storage.MinIOClient) *IngestService {
+func NewIngestService(db *sql.DB, storageClient *storage.MinIOClient, nrApp *newrelic.Application) *IngestService {
 	return &IngestService{
 		db:            db,
 		storageClient: storageClient,
-		updateRepo:    repository.NewUpdateRepository(db),
-		chatRepo:      repository.NewChatRepository(db),
-		userRepo:      repository.NewUserRepository(db),
-		messageRepo:   repository.NewMessageRepository(db),
-		reactionRepo:  repository.NewReactionRepository(db),
-		mediaRepo:     repository.NewMediaRepository(db),
+		nrApp:         nrApp,
+		updateRepo:    repository.NewUpdateRepository(db, nrApp),
+		chatRepo:      repository.NewChatRepository(db, nrApp),
+		userRepo:      repository.NewUserRepository(db, nrApp),
+		messageRepo:   repository.NewMessageRepository(db, nrApp),
+		reactionRepo:  repository.NewReactionRepository(db, nrApp),
+		mediaRepo:     repository.NewMediaRepository(db, nrApp),
 	}
 }
 
 // ProcessUpdate handles a Telegram update within a database transaction.
 func (s *IngestService) ProcessUpdate(ctx context.Context, update *models.Update, files map[string][]byte) error {
+	txn := newrelic.FromContext(ctx)
+
+	// Start segment for transaction management
+	if txn != nil {
+		segment := txn.StartSegment("service:process-update")
+		defer segment.End()
+	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -209,6 +221,12 @@ func (s *IngestService) processMessage(ctx context.Context, tx *sql.Tx, msg *mod
 }
 
 func (s *IngestService) processMedia(ctx context.Context, tx *sql.Tx, messageID int64, msg *models.Message, files map[string][]byte) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:process-media")
+		defer segment.End()
+	}
+
 	// Track processed file IDs to prevent duplicates (e.g., GIFs with both Document and Animation fields)
 	processedFileIDs := make(map[string]bool)
 

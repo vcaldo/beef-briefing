@@ -83,6 +83,7 @@ packages:
   - bash-completion
   - jq
   - yq
+  - unzip
 
 # Commands to run after package installation
 runcmd:

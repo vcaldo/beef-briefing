@@ -140,6 +140,11 @@ go-build-import-cli: ## Build import-cli binary locally
 	cd $(IMPORT_CLI_DIR) && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/import-cli ./cmd
 	@echo "Binary created at $(IMPORT_CLI_DIR)/bin/import-cli"
 
+go-build-legacy-export: ## Build legacy-export-generator binary locally
+	@echo "Building legacy-export-generator..."
+	cd $(LEGACY_EXPORT_DIR) && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/legacy-export-generator ./cmd
+	@echo "Binary created at $(LEGACY_EXPORT_DIR)/bin/legacy-export-generator"
+
 go-build-import-cli-prod: ## Build import-cli for remote architecture and deploy to production server
 	@echo "Building import-cli for remote server..."
 	@SSH_HOST=$$($(MAKE) -s tf-ssh-user-host); \
@@ -163,7 +168,7 @@ go-build-import-cli-prod: ## Build import-cli for remote architecture and deploy
 	@ssh $$($(MAKE) -s tf-ssh-user-host) 'chmod +x ~/beef-briefing/apps/import-cli/bin/import-cli'
 	@echo "✓ Binary deployed to $$($(MAKE) -s tf-ssh-user-host):~/beef-briefing/apps/import-cli/bin/import-cli"
 
-go-build: go-build-api go-build-bot go-build-admin-panel go-build-import-cli ## Build all Go binaries locally
+go-build: go-build-api go-build-bot go-build-admin-panel go-build-import-cli go-build-legacy-export ## Build all Go binaries locally
 
 go-clean: ## Remove Go build artifacts
 	@echo "Cleaning build artifacts..."

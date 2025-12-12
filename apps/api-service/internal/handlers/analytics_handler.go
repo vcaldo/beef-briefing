@@ -36,6 +36,16 @@ func (h *AnalyticsHandler) parseChatID(r *http.Request) (int64, error) {
 	return chatID, nil
 }
 
+// Helper to parse user ID from URL
+func (h *AnalyticsHandler) parseUserID(r *http.Request) (int64, error) {
+	vars := mux.Vars(r)
+	userID, err := strconv.ParseInt(vars["user_id"], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return userID, nil
+}
+
 // Helper to parse and validate time range from query params
 func (h *AnalyticsHandler) parseTimeRange(r *http.Request) (time.Time, time.Time, error) {
 	startDateStr := r.URL.Query().Get("start_date")
@@ -470,6 +480,60 @@ func (h *AnalyticsHandler) HandleGetChat(w http.ResponseWriter, r *http.Request)
 		"metadata": map[string]interface{}{
 			"chat_id":      chatID,
 			"generated_at": time.Now(),
+		},
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		slog.Error("failed to encode response", "error", err)
+	}
+}
+
+// HandleUserActiveChats - GET /api/v1/analytics/users/{user_id}/active-chats
+// Returns list of chat IDs where the user has been active (messages or reactions)
+func (h *AnalyticsHandler) HandleUserActiveChats(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+
+	userID, err := h.parseUserID(r)
+	if err != nil {
+		h.writeError(w, "invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("user_id", userID)
+	}
+
+	startDate, endDate, err := h.parseTimeRange(r)
+	if err != nil {
+		h.writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	chatIDs, err := h.analyticsService.GetUserActiveChats(ctx, userID, startDate, endDate)
+	if err != nil {
+		slog.Error("failed to get user active chats", "user_id", userID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		h.writeError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("active_chats_count", len(chatIDs))
+	}
+
+	// Write response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	response := map[string]interface{}{
+		"data": chatIDs,
+		"metadata": map[string]interface{}{
+			"user_id":      userID,
+			"start_date":   startDate,
+			"end_date":     endDate,
+			"generated_at": time.Now(),
+			"total_count":  len(chatIDs),
 		},
 	}
 	if err := json.NewEncoder(w).Encode(response); err != nil {

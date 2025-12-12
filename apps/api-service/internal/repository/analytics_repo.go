@@ -788,6 +788,51 @@ func (r *AnalyticsRepository) ListChats(ctx context.Context) ([]models.ChatSumma
 	return chats, rows.Err()
 }
 
+// ============================================
+// USER ACTIVITY QUERIES
+// ============================================
+
+// GetUserActiveChats returns all chat IDs where a user has been active
+// (sent messages or given reactions) within the specified time range
+func (r *AnalyticsRepository) GetUserActiveChats(ctx context.Context, userID int64, startDate, endDate time.Time) ([]int64, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-user-active-chats")
+		defer segment.End()
+	}
+
+	query := `
+		SELECT DISTINCT chat_id
+		FROM (
+			SELECT chat_id FROM messages
+			WHERE user_id = $1 AND date >= $2 AND date < $3
+
+			UNION
+
+			SELECT chat_id FROM message_reactions
+			WHERE user_id = $1 AND date >= $2 AND date < $3 AND is_removed = false
+		) AS active_chats
+		ORDER BY chat_id
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, userID, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query user active chats: %w", err)
+	}
+	defer rows.Close()
+
+	var chatIDs []int64
+	for rows.Next() {
+		var chatID int64
+		if err := rows.Scan(&chatID); err != nil {
+			return nil, fmt.Errorf("failed to scan chat_id: %w", err)
+		}
+		chatIDs = append(chatIDs, chatID)
+	}
+
+	return chatIDs, rows.Err()
+}
+
 // GetChat returns detailed information about a single chat (no time range required)
 func (r *AnalyticsRepository) GetChat(ctx context.Context, chatID int64) (*models.ChatDetail, error) {
 	query := `

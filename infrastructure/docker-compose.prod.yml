@@ -10,7 +10,6 @@ services:
     # PostgreSQL only accessible via internal Docker network (no external port exposure)
     volumes:
       - ${POSTGRES_DATA_PATH:-/mnt/postgres-data}/pgdata:/var/lib/postgresql/data
-      - ./postgres/migrations:/docker-entrypoint-initdb.d:ro
     networks:
       - beef-prod-network
     restart: unless-stopped

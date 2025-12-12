@@ -49,8 +49,6 @@ log_step "Running pre-flight checks..."
 require_file "$PROD_COMPOSE_FILE" "Production docker-compose file"
 require_file "$PROD_ENV_FILE" "Production environment file"
 require_dir "$SECRETS_DIR" "Secrets directory"
-require_dir "$MIGRATIONS_DIR" "Migrations directory"
-require_dir "$SEEDS_DIR" "Seeds directory"
 
 # Check for letsencrypt directory (optional - created on first run if missing)
 LETSENCRYPT_DIR="$PROJECT_ROOT/infrastructure/letsencrypt"
@@ -169,14 +167,6 @@ remote_copy "$PROD_ENV_FILE" "$SSH_HOST" "/tmp/.env"
 log_info "Transferring secrets..."
 remote_copy "$SECRETS_DIR" "$SSH_HOST" "/tmp/"
 
-# Transfer migrations
-log_info "Transferring migrations..."
-remote_copy "$MIGRATIONS_DIR" "$SSH_HOST" "/tmp/postgres-migrations"
-
-# Transfer seeds
-log_info "Transferring seeds..."
-remote_copy "$SEEDS_DIR" "$SSH_HOST" "/tmp/postgres-seeds"
-
 # Transfer letsencrypt directory if it exists
 if [[ "$HAS_LETSENCRYPT" == "true" ]]; then
     log_info "Transferring letsencrypt certificates..."
@@ -198,14 +188,12 @@ remote_exec "$SSH_HOST" "
     set -e
 
     # Create directories
-    mkdir -p ~/beef-briefing/postgres
+    mkdir -p ~/beef-briefing
 
     # Move files to app directory
     mv /tmp/docker-compose.yml ~/beef-briefing/
     mv /tmp/.env ~/beef-briefing/
     rm -rf ~/beef-briefing/secrets && mv /tmp/apps/ ~/beef-briefing/secrets/
-    rm -rf ~/beef-briefing/postgres/migrations && mv /tmp/postgres-migrations ~/beef-briefing/postgres/migrations
-    rm -rf ~/beef-briefing/postgres/seeds && mv /tmp/postgres-seeds ~/beef-briefing/postgres/seeds
 
     # Setup letsencrypt directory if transferred
     if [ -d /tmp/letsencrypt ]; then

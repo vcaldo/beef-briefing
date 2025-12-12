@@ -12,8 +12,6 @@ TERRAFORM_DIR="$PROJECT_ROOT/infrastructure/terraform"
 PROD_COMPOSE_FILE="$PROJECT_ROOT/infrastructure/docker-compose.prod.yml"
 PROD_ENV_FILE="$PROJECT_ROOT/infrastructure/.env.prod"
 SECRETS_DIR="$PROJECT_ROOT/infrastructure/secrets/apps"
-MIGRATIONS_DIR="$PROJECT_ROOT/apps/postgres/migrations"
-SEEDS_DIR="$PROJECT_ROOT/apps/postgres/seeds"
 
 # Remote paths
 REMOTE_APP_DIR="~/beef-briefing"

@@ -7,7 +7,7 @@ import logging
 import secrets
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 from sqlalchemy import text
@@ -34,7 +34,7 @@ class SessionData:
 
     def is_expired(self) -> bool:
         """Check if session has expired."""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     def get_allowed_chat_ids(self) -> list[int]:
         """Get list of allowed chat IDs."""
@@ -76,7 +76,7 @@ class SessionManager:
             The session ID
         """
         session_id = self._generate_session_id()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expires_at = now + self.session_lifetime
         chat_ids_str = ",".join(str(cid) for cid in allowed_chat_ids)
 
@@ -168,7 +168,7 @@ class SessionManager:
         with self.engine.connect() as conn:
             conn.execute(query, {
                 "session_id": session_id,
-                "now": datetime.utcnow(),
+                "now": datetime.now(timezone.utc),
             })
             conn.commit()
 
@@ -216,7 +216,7 @@ class SessionManager:
         """)
 
         with self.engine.connect() as conn:
-            result = conn.execute(query, {"now": datetime.utcnow()})
+            result = conn.execute(query, {"now": datetime.now(timezone.utc)})
             conn.commit()
             count = result.rowcount
 
@@ -237,7 +237,7 @@ class SessionManager:
         """)
 
         with self.engine.connect() as conn:
-            result = conn.execute(query, {"now": datetime.utcnow()}).fetchone()
+            result = conn.execute(query, {"now": datetime.now(timezone.utc)}).fetchone()
             return result.count if result else 0
 
 

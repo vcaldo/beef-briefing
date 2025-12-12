@@ -29,11 +29,20 @@ type Config struct {
 	// Application
 	Environment string `envconfig:"ENVIRONMENT" default:"development"`
 	LogLevel    string `envconfig:"LOG_LEVEL" default:"info"`
+
+	// New Relic APM (optional - leave empty to disable)
+	NewRelicAppName    string `envconfig:"NEW_RELIC_APP_NAME"`
+	NewRelicLicenseKey string `envconfig:"NEW_RELIC_LICENSE_KEY"`
 }
 
 // IsProduction returns true if running in production environment
 func (c *Config) IsProduction() bool {
 	return c.Environment == "production"
+}
+
+// NewRelicEnabled returns true if New Relic is configured
+func (c *Config) NewRelicEnabled() bool {
+	return c.NewRelicAppName != "" && c.NewRelicLicenseKey != ""
 }
 
 // SessionSecretBytes returns the session secret decoded from base64

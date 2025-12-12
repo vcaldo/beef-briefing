@@ -578,6 +578,17 @@ body {
   margin-bottom: var(--space-xl);
 }
 
+.login-logo {
+  font-size: 4rem;
+  margin-bottom: var(--space-md);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
 .login-button,
 .back-link {
   display: inline-block;

@@ -366,6 +366,7 @@ def create_login_required_layout() -> html.Div:
             html.Div(
                 className="login-card",
                 children=[
+                    html.Div("🥩", className="login-logo"),
                     html.H1("Beef Dashboard"),
                     html.P("Please log in to access the dashboard."),
                     html.A(

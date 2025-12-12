@@ -69,6 +69,9 @@ def create_app(config: Config) -> dash.Dash:
         ],
     )
 
+    # Set custom favicon
+    app._favicon = "favicon.svg"
+
     # Store references for use in callbacks (on Flask server config, not Dash config)
     server.config["db"] = db
     server.config["queries"] = queries

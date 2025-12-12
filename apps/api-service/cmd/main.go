@@ -222,6 +222,11 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		analyticsRouter.HandleFunc("/top-content", analyticsHandler.HandleTopContent).Methods("GET")
 		analyticsRouter.HandleFunc("/compare", analyticsHandler.HandleCompare).Methods("GET")
 
+		// User-centric analytics routes
+		usersRouter := api.PathPrefix("/analytics/users/{user_id}").Subrouter()
+		usersRouter.Use(apiKeyAuth.Authenticate)
+		usersRouter.HandleFunc("/active-chats", analyticsHandler.HandleUserActiveChats).Methods("GET")
+
 		slog.Info("analytics endpoints enabled", "path_prefix", "/api/v1/analytics")
 	} else {
 		slog.Warn("analytics endpoints disabled (ANALYTICS_API_KEY not configured)")

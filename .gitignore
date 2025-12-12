@@ -111,7 +111,8 @@ yarn-error.log
 secrets.json
 credentials/
 private_keys/
-infrastructure/secrets/
+infrastructure/secrets/*
+!infrastructure/secrets/README.md
 
 # Let's Encrypt certificates (SSL)
 infrastructure/letsencrypt/

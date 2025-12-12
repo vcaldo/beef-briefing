@@ -101,10 +101,21 @@ def create_period_selector() -> html.Div:
     )
 
 
+def truncate_title(title: str, max_length: int = 30) -> str:
+    """Truncate title to max length with ellipsis."""
+    if len(title) <= max_length:
+        return title
+    return title[:max_length - 1].rstrip() + "…"
+
+
 def create_chat_selector(chats: List[Dict[str, Any]]) -> html.Div:
     """Create the chat/group selector dropdown."""
     options = [
-        {"label": f"{chat['title']} ({chat['message_count']:,} msgs)", "value": chat["id"]}
+        {
+            "label": f"{truncate_title(chat['title'])} ({chat['message_count']:,} msgs)",
+            "value": chat["id"],
+            "title": chat["title"],  # Full title shown on hover
+        }
         for chat in chats
     ]
 

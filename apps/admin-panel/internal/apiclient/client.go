@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 // Config holds API client configuration
@@ -24,10 +26,11 @@ type Client struct {
 	httpClient *http.Client
 	baseURL    string
 	apiKey     string
+	nrApp      *newrelic.Application
 }
 
 // NewClient creates a new analytics API client
-func NewClient(cfg Config) *Client {
+func NewClient(cfg Config, nrApp *newrelic.Application) *Client {
 	timeout := cfg.Timeout
 	if timeout == 0 {
 		timeout = 30 * time.Second
@@ -37,6 +40,7 @@ func NewClient(cfg Config) *Client {
 		httpClient: &http.Client{Timeout: timeout},
 		baseURL:    strings.TrimSuffix(cfg.BaseURL, "/"),
 		apiKey:     cfg.APIKey,
+		nrApp:      nrApp,
 	}
 }
 
@@ -66,8 +70,25 @@ func (c *Client) doRequest(ctx context.Context, endpoint string, params url.Valu
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Accept", "application/json")
 
+	// Create external segment for New Relic if transaction exists in context
+	txn := newrelic.FromContext(ctx)
+	var segment *newrelic.ExternalSegment
+	if txn != nil {
+		segment = newrelic.StartExternalSegment(txn, req)
+	}
+
 	resp, err := c.httpClient.Do(req)
+
+	// End segment after request completes
+	if segment != nil {
+		segment.Response = resp
+		segment.End()
+	}
+
 	if err != nil {
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		return fmt.Errorf("executing request: %w", err)
 	}
 	defer resp.Body.Close()
@@ -82,11 +103,15 @@ func (c *Client) doRequest(ctx context.Context, endpoint string, params url.Valu
 			Error string `json:"error"`
 		}
 		json.Unmarshal(body, &errResp)
-		return &APIError{
+		apiErr := &APIError{
 			StatusCode: resp.StatusCode,
 			Message:    errResp.Error,
 			Endpoint:   endpoint,
 		}
+		if txn != nil {
+			txn.NoticeError(apiErr)
+		}
+		return apiErr
 	}
 
 	// Parse response wrapper

@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/newrelic/go-agent/v3/integrations/nrgorilla"
+	"github.com/newrelic/go-agent/v3/newrelic"
 
 	"beef-briefing/apps/admin-panel/internal/apiclient"
 	"beef-briefing/apps/admin-panel/internal/auth"
@@ -35,12 +37,36 @@ func main() {
 		"environment", cfg.Environment,
 	)
 
+	// Initialize New Relic (optional - continues without instrumentation if disabled or fails)
+	var nrApp *newrelic.Application
+	if cfg.NewRelicEnabled() {
+		appName := fmt.Sprintf("%s-admin-panel-%s", cfg.NewRelicAppName, cfg.Environment)
+		nrApp, err = newrelic.NewApplication(
+			newrelic.ConfigAppName(appName),
+			newrelic.ConfigLicense(cfg.NewRelicLicenseKey),
+			newrelic.ConfigDistributedTracerEnabled(true),
+			newrelic.ConfigAppLogForwardingEnabled(true),
+		)
+		if err != nil {
+			slog.Warn("failed to initialize New Relic, continuing without instrumentation",
+				"error", err,
+			)
+			nrApp = nil
+		} else {
+			slog.Info("New Relic initialized successfully",
+				"app_name", appName,
+			)
+		}
+	} else {
+		slog.Info("New Relic not configured, running without APM instrumentation")
+	}
+
 	// Initialize API client
 	apiClient := apiclient.NewClient(apiclient.Config{
 		BaseURL: cfg.APIServiceURL,
 		APIKey:  cfg.AnalyticsAPIKey,
 		Timeout: 30 * time.Second,
-	})
+	}, nrApp)
 
 	slog.Info("configured API client",
 		"api_url", cfg.APIServiceURL,
@@ -53,10 +79,10 @@ func main() {
 		os.Exit(1)
 	}
 	rateLimiter := middleware.NewRateLimiter()
-	h := handler.NewHandler(authManager, apiClient)
+	h := handler.NewHandler(authManager, apiClient, nrApp)
 
 	// Setup router
-	router := setupRouter(h, authManager, rateLimiter)
+	router := setupRouter(h, authManager, rateLimiter, nrApp)
 
 	// Create server
 	server := &http.Server{
@@ -92,6 +118,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Flush New Relic data before exit
+	if nrApp != nil {
+		nrApp.Shutdown(5 * time.Second)
+		slog.Info("New Relic shutdown complete")
+	}
+
 	slog.Info("server stopped gracefully")
 }
 
@@ -119,8 +151,14 @@ func setupLogger(cfg *config.Config) {
 	slog.SetDefault(slog.New(handler))
 }
 
-func setupRouter(h *handler.Handler, authManager *auth.Auth, rateLimiter *middleware.RateLimiter) *mux.Router {
+func setupRouter(h *handler.Handler, authManager *auth.Auth, rateLimiter *middleware.RateLimiter, nrApp *newrelic.Application) *mux.Router {
 	r := mux.NewRouter()
+
+	// Add New Relic instrumentation middleware (if available)
+	// nrgorilla automatically creates transactions for all routes
+	if nrApp != nil {
+		r.Use(nrgorilla.Middleware(nrApp))
+	}
 
 	// Static files
 	staticFS := http.FileServer(http.Dir("./static"))

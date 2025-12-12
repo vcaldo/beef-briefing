@@ -11,9 +11,8 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
-      - ../apps/postgres/migrations:/docker-entrypoint-initdb.d:ro
-      # To restore a backup on dev environment startup, make clean
-      # uncomment the line below and comment the line above and make up
+      # To restore a backup on dev environment startup, run: make clean
+      # then uncomment the line below and run: make up
       # - ../local_backups/db/latest.sql:/docker-entrypoint-initdb.d/99-restore.sql:ro
     networks:
       - beef-dev-network

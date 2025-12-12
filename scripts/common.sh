@@ -24,6 +24,7 @@ IMAGES=(
     "beef-briefing/api-service"
     "beef-briefing/telegram-bot"
     "beef-briefing/admin-panel"
+    "beef-briefing/dashboard"
 )
 
 # Required environment variables for deployment

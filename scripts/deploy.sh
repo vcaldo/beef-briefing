@@ -149,6 +149,7 @@ docker save \
     "beef-briefing/api-service:$COMMIT_HASH" \
     "beef-briefing/telegram-bot:$COMMIT_HASH" \
     "beef-briefing/admin-panel:$COMMIT_HASH" \
+    "beef-briefing/dashboard:$COMMIT_HASH" \
     | gzip > "$IMAGE_TARBALL"
 
 TARBALL_SIZE=$(du -h "$IMAGE_TARBALL" | cut -f1)

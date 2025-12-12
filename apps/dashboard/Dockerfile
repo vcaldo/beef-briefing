@@ -1,5 +1,5 @@
 # Build stage
-FROM python:3.12-slim AS builder
+FROM python:3.14.2-slim AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ COPY apps/dashboard/requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Production stage
-FROM python:3.12-slim
+FROM python:3.14.2-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \

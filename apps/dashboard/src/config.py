@@ -48,6 +48,7 @@ class Config:
 
     # Telegram Configuration
     telegram_bot_token: str = field(default_factory=lambda: os.getenv('TELEGRAM_BOT_TOKEN', ''))
+    telegram_bot_username: str = field(default_factory=lambda: os.getenv('TELEGRAM_BOT_USERNAME', ''))
     allowed_chat_ids: List[int] = field(default_factory=lambda: _parse_chat_ids(os.getenv('ALLOWED_CHAT_IDS', '')))
 
     # Session Configuration
@@ -77,6 +78,8 @@ class Config:
         # Validate required fields
         if not self.telegram_bot_token:
             raise ValueError("TELEGRAM_BOT_TOKEN is required")
+        if not self.telegram_bot_username and self.is_production():
+            raise ValueError("TELEGRAM_BOT_USERNAME is required in production")
 
     @property
     def database_url(self) -> str:

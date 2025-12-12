@@ -58,16 +58,41 @@ def register_callbacks(app) -> None:
             create_login_required_layout,
             create_error_layout,
         )
+        from src.auth.session import SessionData
+        from datetime import datetime, timedelta
 
         if pathname in ["/beef-dashboard/", "/beef-dashboard"]:
-            # Check authentication
+            app_config = app.server.config.get("app_config")
+            queries = app.server.config.get("queries")
+
+            # In development, bypass authentication
+            if app_config and app_config.is_development():
+                logger.info("Development mode: bypassing authentication")
+                # Create a mock session for development
+                mock_session = SessionData(
+                    session_id="dev-session",
+                    user_id=0,
+                    username="dev_user",
+                    first_name="Developer",
+                    photo_url=None,
+                    allowed_chat_ids="",  # Empty means all chats in dev
+                    created_at=datetime.utcnow(),
+                    expires_at=datetime.utcnow() + timedelta(days=365),
+                    last_accessed_at=datetime.utcnow(),
+                )
+                # Get all available chats (no filtering in dev)
+                chats = []
+                if queries:
+                    chats = queries.get_available_chats()
+                return create_dashboard_layout(session=mock_session, chats=chats)
+
+            # Production: Check authentication
             session_id = request.cookies.get("dashboard_session")
             if not session_id:
                 return create_login_required_layout()
 
             # Get session data
             session_manager = app.server.config.get("session_manager")
-            queries = app.server.config.get("queries")
 
             if session_manager:
                 session_data = session_manager.get_session(session_id)

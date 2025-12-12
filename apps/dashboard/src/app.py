@@ -69,12 +69,12 @@ def create_app(config: Config) -> dash.Dash:
         ],
     )
 
-    # Store references for use in callbacks
-    app.config["db"] = db
-    app.config["queries"] = queries
-    app.config["session_manager"] = session_manager
-    app.config["membership_cache"] = membership_cache
-    app.config["app_config"] = config
+    # Store references for use in callbacks (on Flask server config, not Dash config)
+    server.config["db"] = db
+    server.config["queries"] = queries
+    server.config["session_manager"] = session_manager
+    server.config["membership_cache"] = membership_cache
+    server.config["app_config"] = config
 
     # Define the app layout
     app.layout = html.Div(
@@ -120,16 +120,12 @@ def register_auth_routes(
             if session_data:
                 return redirect("/beef-dashboard/")
 
-        # Get bot username from token (format: 123456:ABC-DEF)
-        bot_username = config.telegram_bot_token.split(":")[0]
-        # Note: You'll need to set the actual bot username in config
-
         callback_url = f"https://{config.dashboard_domain}/beef-dashboard/auth/callback"
         if config.is_development():
             callback_url = f"http://localhost:{config.dashboard_port}/beef-dashboard/auth/callback"
 
         widget_html = generate_telegram_widget_html(
-            bot_username=bot_username,  # This should be the bot's @username
+            bot_username=config.telegram_bot_username,
             callback_url=callback_url,
         )
 

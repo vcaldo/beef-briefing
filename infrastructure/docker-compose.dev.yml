@@ -11,9 +11,8 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
-      - ../apps/postgres/migrations:/docker-entrypoint-initdb.d:ro
-      # To restore a backup on dev environment startup, make clean
-      # uncomment the line below and comment the line above and make up
+      # To restore a backup on dev environment startup, run: make clean
+      # then uncomment the line below and run: make up
       # - ../local_backups/db/latest.sql:/docker-entrypoint-initdb.d/99-restore.sql:ro
     networks:
       - beef-dev-network
@@ -29,7 +28,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
-      DB_PORT: 5432
+      DB_PORT: ${DB_PORT}
       DB_SSL_MODE: disable
       API_PORT: ${API_PORT}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
@@ -108,6 +107,39 @@ services:
       - "${ADMIN_PANEL_PORT:-8081}:${ADMIN_PANEL_PORT:-8081}"
     depends_on:
       - api-service
+    networks:
+      - beef-dev-network
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: apps/dashboard/Dockerfile
+    container_name: beef-dashboard-dev
+    environment:
+      DB_HOST: postgres
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_PORT: ${DB_PORT}
+      DB_SSL_MODE: disable
+      DASHBOARD_PORT: ${DASHBOARD_PORT:-8050}
+      DASHBOARD_DOMAIN: localhost
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
+      ALLOWED_CHAT_IDS: ${ALLOWED_CHAT_IDS}
+      SESSION_LIFETIME_DAYS: ${SESSION_LIFETIME_DAYS:-7}
+      FLASK_SECRET_KEY_FILE: /app/secrets/flask_secret_key
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      ENVIRONMENT: development
+      LOG_LEVEL: debug
+    volumes:
+      - ./secrets/apps/dashboard:/app/secrets:ro
+    ports:
+      - "${DASHBOARD_PORT:-8050}:${DASHBOARD_PORT:-8050}"
+    depends_on:
+      - postgres
     networks:
       - beef-dev-network
     restart: unless-stopped

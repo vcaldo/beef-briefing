@@ -13,6 +13,7 @@ import (
 
 	"beef-briefing/apps/api-service/internal/handlers"
 	"beef-briefing/apps/api-service/internal/middleware"
+	"beef-briefing/apps/api-service/internal/migrations"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/apps/api-service/internal/storage"
 	"beef-briefing/pkg/config"
@@ -72,6 +73,14 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
+
+	// Run database migrations
+	migrationCtx, migrationCancel := context.WithTimeout(context.Background(), 60*time.Second)
+	if err := migrations.Run(migrationCtx, db); err != nil {
+		slog.Error("failed to run database migrations", "error", err)
+		os.Exit(1)
+	}
+	migrationCancel()
 
 	// Initialize MinIO client with New Relic instrumentation
 	minioClient, err := storage.NewMinIOClient(

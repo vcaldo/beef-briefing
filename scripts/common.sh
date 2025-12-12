@@ -189,3 +189,23 @@ remote_copy() {
     local dest="$3"
     scp -r "$src" "${ssh_host}:${dest}"
 }
+
+# Get value from environment file
+get_env_value() {
+    local env_file="$1"
+    local key="$2"
+    local default="${3:-}"
+
+    local value
+    if [[ -f "$env_file" ]]; then
+        value=$(grep "^${key}=" "$env_file" 2>/dev/null | cut -d'=' -f2- | tr -d '\n\r' | sed 's/^"//' | sed 's/"$//')
+    fi
+
+    echo "${value:-$default}"
+}
+
+# Get domain name from env file
+get_domain_from_env() {
+    local env_file="${1:-$PROD_ENV_FILE}"
+    get_env_value "$env_file" "DOMAIN_NAME" "example.com"
+}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/newrelic/go-agent/v3/newrelic"
 
 	"beef-briefing/apps/admin-panel/internal/apiclient"
 	"beef-briefing/apps/admin-panel/internal/auth"
@@ -16,15 +17,17 @@ import (
 
 // Handler handles all HTTP requests
 type Handler struct {
-	auth *auth.Auth
-	api  *apiclient.Client
+	auth  *auth.Auth
+	api   *apiclient.Client
+	nrApp *newrelic.Application
 }
 
 // NewHandler creates a new Handler
-func NewHandler(a *auth.Auth, api *apiclient.Client) *Handler {
+func NewHandler(a *auth.Auth, api *apiclient.Client, nrApp *newrelic.Application) *Handler {
 	return &Handler{
-		auth: a,
-		api:  api,
+		auth:  a,
+		api:   api,
+		nrApp: nrApp,
 	}
 }
 
@@ -44,14 +47,24 @@ func (h *Handler) LoginPage(w http.ResponseWriter, r *http.Request) {
 
 // Login handles the login form submission
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	txn := newrelic.FromContext(r.Context())
+
 	if err := r.ParseForm(); err != nil {
 		slog.Error("failed to parse login form", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		renderLoginError(w, r, "Invalid form data")
 		return
 	}
 
 	username := r.FormValue("username")
 	password := r.FormValue("password")
+
+	// Add username attribute for tracking (not password!)
+	if txn != nil {
+		txn.AddAttribute("username", username)
+	}
 
 	// Validate input
 	if username == "" || password == "" {
@@ -67,6 +80,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	// Verify credentials
 	if !h.auth.VerifyCredentials(username, password) {
 		slog.Warn("failed login attempt", "username", username)
+		if txn != nil {
+			txn.AddAttribute("login_success", false)
+		}
 		renderLoginError(w, r, "Invalid username or password")
 		return
 	}
@@ -74,10 +90,16 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	// Create session
 	if err := h.auth.CreateSession(w, r); err != nil {
 		slog.Error("failed to create session", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
+	if txn != nil {
+		txn.AddAttribute("login_success", true)
+	}
 	slog.Info("user logged in", "username", username)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -95,13 +117,23 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 // Dashboard renders the main dashboard with chat list
 func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 	theme := h.auth.GetTheme(r)
 
 	chats, err := h.api.ListChats(ctx)
 	if err != nil {
 		slog.Error("failed to get chats from API", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "Failed to load chats", http.StatusInternalServerError)
 		return
+	}
+
+	// Add custom attributes
+	if txn != nil {
+		txn.AddAttribute("chat_count", len(chats))
+		txn.AddAttribute("theme", theme)
 	}
 
 	// Convert API chats to template chats
@@ -120,6 +152,9 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	if err := templates.Dashboard(templateChats, theme).Render(ctx, w); err != nil {
 		slog.Error("failed to render dashboard", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -127,6 +162,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 // ChatDetail renders the chat detail page
 func (h *Handler) ChatDetail(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 	theme := h.auth.GetTheme(r)
 
 	vars := mux.Vars(r)
@@ -134,6 +170,12 @@ func (h *Handler) ChatDetail(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Invalid chat ID", http.StatusBadRequest)
 		return
+	}
+
+	// Add custom attributes for tracking
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("theme", theme)
 	}
 
 	// Parse filter parameters
@@ -150,6 +192,13 @@ func (h *Handler) ChatDetail(w http.ResponseWriter, r *http.Request) {
 	timezone := r.URL.Query().Get("tz")
 	if timezone == "" {
 		timezone = "UTC"
+	}
+
+	// Add filter attributes
+	if txn != nil {
+		txn.AddAttribute("filter_year", year)
+		txn.AddAttribute("filter_month", month)
+		txn.AddAttribute("filter_timezone", timezone)
 	}
 
 	// Calculate date range based on year and month
@@ -181,6 +230,9 @@ func (h *Handler) ChatDetail(w http.ResponseWriter, r *http.Request) {
 	chat, err := h.api.GetChat(ctx, chatID)
 	if err != nil {
 		slog.Error("failed to get chat from API", "error", err, "chat_id", chatID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "Chat not found", http.StatusNotFound)
 		return
 	}
@@ -276,6 +328,9 @@ func (h *Handler) ChatDetail(w http.ResponseWriter, r *http.Request) {
 
 	if err := templates.ChatDetailPage(templateChat, &templateOverview, templateLeaderboard, templateHeatmap, filter, theme).Render(ctx, w); err != nil {
 		slog.Error("failed to render chat detail", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -283,6 +338,7 @@ func (h *Handler) ChatDetail(w http.ResponseWriter, r *http.Request) {
 // LeaderboardPartial returns the leaderboard table partial for HTMX
 func (h *Handler) LeaderboardPartial(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	vars := mux.Vars(r)
 	chatID, err := strconv.ParseInt(vars["id"], 10, 64)
@@ -301,6 +357,13 @@ func (h *Handler) LeaderboardPartial(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	if limit == 0 {
 		limit = 50
+	}
+
+	// Add custom attributes
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("metric", metric)
+		txn.AddAttribute("limit", limit)
 	}
 
 	leaderboard, err := h.api.GetLeaderboard(ctx, chatID, filter.StartDate, filter.EndDate, metric, limit)
@@ -323,6 +386,9 @@ func (h *Handler) LeaderboardPartial(w http.ResponseWriter, r *http.Request) {
 
 	if err := templates.LeaderboardTable(templateLeaderboard, chatID, filter.Year, filter.Month, filter.Timezone).Render(ctx, w); err != nil {
 		slog.Error("failed to render leaderboard table", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -330,6 +396,7 @@ func (h *Handler) LeaderboardPartial(w http.ResponseWriter, r *http.Request) {
 // HeatmapPartial returns the heatmap partial for HTMX
 func (h *Handler) HeatmapPartial(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	vars := mux.Vars(r)
 	chatID, err := strconv.ParseInt(vars["id"], 10, 64)
@@ -339,6 +406,11 @@ func (h *Handler) HeatmapPartial(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filter := parseFilterParams(r)
+
+	// Add custom attributes
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+	}
 
 	heatmap, err := h.api.GetHeatmap(ctx, chatID, filter.StartDate, filter.EndDate)
 	if err != nil {
@@ -356,6 +428,9 @@ func (h *Handler) HeatmapPartial(w http.ResponseWriter, r *http.Request) {
 
 	if err := templates.HeatmapChart(templateHeatmap, filter.Year, filter.Month, filter.Timezone).Render(ctx, w); err != nil {
 		slog.Error("failed to render heatmap", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -363,6 +438,7 @@ func (h *Handler) HeatmapPartial(w http.ResponseWriter, r *http.Request) {
 // TimelinePartial returns the timeline chart data for HTMX
 func (h *Handler) TimelinePartial(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	vars := mux.Vars(r)
 	chatID, err := strconv.ParseInt(vars["id"], 10, 64)
@@ -376,6 +452,12 @@ func (h *Handler) TimelinePartial(w http.ResponseWriter, r *http.Request) {
 	granularity := r.URL.Query().Get("granularity")
 	if granularity == "" {
 		granularity = "day"
+	}
+
+	// Add custom attributes
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("granularity", granularity)
 	}
 
 	timeline, err := h.api.GetTimeline(ctx, chatID, filter.StartDate, filter.EndDate, granularity)
@@ -396,6 +478,9 @@ func (h *Handler) TimelinePartial(w http.ResponseWriter, r *http.Request) {
 
 	if err := templates.TimelineChart(templateTimeline, granularity, filter.Timezone).Render(ctx, w); err != nil {
 		slog.Error("failed to render timeline", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -403,6 +488,7 @@ func (h *Handler) TimelinePartial(w http.ResponseWriter, r *http.Request) {
 // TopContentPartial returns the top content list for HTMX
 func (h *Handler) TopContentPartial(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	vars := mux.Vars(r)
 	chatID, err := strconv.ParseInt(vars["id"], 10, 64)
@@ -421,6 +507,13 @@ func (h *Handler) TopContentPartial(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	if limit == 0 {
 		limit = 10
+	}
+
+	// Add custom attributes
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("metric", metric)
+		txn.AddAttribute("limit", limit)
 	}
 
 	topContent, err := h.api.GetTopContent(ctx, chatID, filter.StartDate, filter.EndDate, metric, limit)
@@ -449,6 +542,9 @@ func (h *Handler) TopContentPartial(w http.ResponseWriter, r *http.Request) {
 
 	if err := templates.TopContentList(templateTopContent, metric).Render(ctx, w); err != nil {
 		slog.Error("failed to render top content", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -456,6 +552,7 @@ func (h *Handler) TopContentPartial(w http.ResponseWriter, r *http.Request) {
 // UserDetailPartial returns the user detail modal for HTMX
 func (h *Handler) UserDetailPartial(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	vars := mux.Vars(r)
 	chatID, err := strconv.ParseInt(vars["id"], 10, 64)
@@ -468,6 +565,12 @@ func (h *Handler) UserDetailPartial(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
+	}
+
+	// Add custom attributes
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("user_id", userID)
 	}
 
 	filter := parseFilterParams(r)
@@ -537,6 +640,9 @@ func (h *Handler) UserDetailPartial(w http.ResponseWriter, r *http.Request) {
 
 	if err := templates.UserDetailContent(templateUser, filter.Timezone).Render(ctx, w); err != nil {
 		slog.Error("failed to render user detail modal", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -544,6 +650,7 @@ func (h *Handler) UserDetailPartial(w http.ResponseWriter, r *http.Request) {
 // CompareUsersPartial returns the user comparison table for HTMX
 func (h *Handler) CompareUsersPartial(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
 
 	vars := mux.Vars(r)
 	chatID, err := strconv.ParseInt(vars["id"], 10, 64)
@@ -575,6 +682,12 @@ func (h *Handler) CompareUsersPartial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Add custom attributes
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("user_count", len(userIDs))
+	}
+
 	comparisons, err := h.api.CompareUsers(ctx, chatID, userIDs, filter.StartDate, filter.EndDate)
 	if err != nil {
 		slog.Error("failed to compare users from API", "error", err, "chat_id", chatID)
@@ -598,6 +711,9 @@ func (h *Handler) CompareUsersPartial(w http.ResponseWriter, r *http.Request) {
 
 	if err := templates.CompareUsersTable(templateComparisons).Render(ctx, w); err != nil {
 		slog.Error("failed to render user comparison", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }

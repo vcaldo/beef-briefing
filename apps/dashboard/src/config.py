@@ -49,7 +49,13 @@ class Config:
     # Telegram Configuration
     telegram_bot_token: str = field(default_factory=lambda: os.getenv('TELEGRAM_BOT_TOKEN', ''))
     telegram_bot_username: str = field(default_factory=lambda: os.getenv('TELEGRAM_BOT_USERNAME', ''))
-    allowed_chat_ids: List[int] = field(default_factory=lambda: _parse_chat_ids(os.getenv('ALLOWED_CHAT_IDS', '')))
+
+    # Access Control
+    admin_user_ids: List[int] = field(default_factory=lambda: _parse_chat_ids(os.getenv('ADMIN_USER_IDS', '')))
+
+    # API Service Configuration
+    api_service_url: str = field(default_factory=lambda: os.getenv('API_SERVICE_URL', 'http://api-service:8080'))
+    analytics_api_key: str = field(default_factory=lambda: os.getenv('ANALYTICS_API_KEY', ''))
 
     # Session Configuration
     session_lifetime_days: int = field(default_factory=lambda: int(os.getenv('SESSION_LIFETIME_DAYS', '7')))
@@ -98,6 +104,10 @@ class Config:
     def is_development(self) -> bool:
         """Check if running in development environment."""
         return self.environment == 'development'
+
+    def is_admin(self, user_id: int) -> bool:
+        """Check if user is an admin (can see all chats)."""
+        return user_id in self.admin_user_ids
 
     def new_relic_enabled(self) -> bool:
         """Check if New Relic APM is configured."""

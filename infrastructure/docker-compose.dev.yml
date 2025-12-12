@@ -112,6 +112,38 @@ services:
       - beef-dev-network
     restart: unless-stopped
 
+  dashboard:
+    build:
+      context: ..
+      dockerfile: apps/dashboard/Dockerfile
+    container_name: beef-dashboard-dev
+    environment:
+      DB_HOST: postgres
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_PORT: 5432
+      DB_SSL_MODE: disable
+      DASHBOARD_PORT: ${DASHBOARD_PORT:-8050}
+      DASHBOARD_DOMAIN: localhost
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      ALLOWED_CHAT_IDS: ${ALLOWED_CHAT_IDS}
+      SESSION_LIFETIME_DAYS: ${SESSION_LIFETIME_DAYS:-7}
+      FLASK_SECRET_KEY_FILE: /app/secrets/flask_secret_key
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      ENVIRONMENT: development
+      LOG_LEVEL: debug
+    volumes:
+      - ./secrets/apps/dashboard:/app/secrets:ro
+    ports:
+      - "${DASHBOARD_PORT:-8050}:${DASHBOARD_PORT:-8050}"
+    depends_on:
+      - postgres
+    networks:
+      - beef-dev-network
+    restart: unless-stopped
+
 volumes:
   postgres_data_dev:
   minio_data_dev:

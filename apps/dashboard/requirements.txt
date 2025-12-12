@@ -1,0 +1,32 @@
+# Beef Dashboard - Python Dependencies
+
+# Dashboard framework
+dash>=2.14.0
+plotly>=5.18.0
+
+# Web framework (underlying Dash)
+flask>=3.0.0
+werkzeug>=3.0.0
+
+# Database
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+
+# Data processing
+pandas>=2.1.0
+numpy>=1.26.0
+
+# HTTP client (for Telegram Bot API)
+requests>=2.31.0
+
+# Environment and config
+python-dotenv>=1.0.0
+
+# Production server
+gunicorn>=21.0.0
+
+# Monitoring (optional)
+newrelic>=9.0.0
+
+# Security
+flask-limiter>=3.5.0

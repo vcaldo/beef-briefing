@@ -11,6 +11,7 @@ TELEGRAM_BOT := telegram-bot
 POSTGRES_SERVICE := postgres
 MINIO_SERVICE := minio
 ADMIN_PANEL := admin-panel
+DASHBOARD := dashboard
 NEWRELIC_INFRA := newrelic-infra
 
 # Go directories
@@ -19,6 +20,9 @@ BOT_DIR := apps/telegram-bot
 ADMIN_PANEL_DIR := apps/admin-panel
 IMPORT_CLI_DIR := apps/import-cli
 PKG_DIR := pkg/config
+
+# Python directories
+DASHBOARD_DIR := apps/dashboard
 
 # Default target
 .DEFAULT_GOAL := help
@@ -68,6 +72,9 @@ build-bot: ## Rebuild telegram-bot image
 build-admin-panel: ## Rebuild admin-panel image
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) build $(ADMIN_PANEL)
 
+build-dashboard: ## Rebuild dashboard image
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) build $(DASHBOARD)
+
 # Logging targets
 logs: ## Tail logs from all services
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f
@@ -86,6 +93,9 @@ logs-minio: ## Tail logs from minio
 
 logs-admin-panel: ## Tail logs from admin-panel
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f $(ADMIN_PANEL)
+
+logs-dashboard: ## Tail logs from dashboard
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f $(DASHBOARD)
 
 logs-newrelic: ## Tail logs from newrelic-infra
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) logs -f $(NEWRELIC_INFRA)
@@ -114,6 +124,9 @@ shell-minio: ## Open shell in minio container
 
 shell-admin-panel: ## Open shell in admin-panel container
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec $(ADMIN_PANEL) /bin/bash
+
+shell-dashboard: ## Open shell in dashboard container
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec $(DASHBOARD) /bin/bash
 
 shell-newrelic: ## Open shell in newrelic-infra container
 	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) exec $(NEWRELIC_INFRA) /bin/sh
@@ -233,6 +246,16 @@ generate-analytics-api-key: ## Generate analytics API key and save to secrets di
 	@echo ""
 	@echo "Generated key:"
 	@cat infrastructure/secrets/apps/api-service/analytics_api_key
+	@echo ""
+	@echo "This key will be automatically deployed to production when you run 'make deploy'"
+
+# Dashboard secret generation
+generate-dashboard-secrets: ## Generate Flask secret key for dashboard
+	@echo "Generating dashboard secrets..."
+	@mkdir -p infrastructure/secrets/apps/dashboard
+	@openssl rand -base64 32 > infrastructure/secrets/apps/dashboard/flask_secret_key
+	@chmod 600 infrastructure/secrets/apps/dashboard/flask_secret_key
+	@echo "✓ Flask secret key generated at infrastructure/secrets/apps/dashboard/flask_secret_key"
 	@echo ""
 	@echo "This key will be automatically deployed to production when you run 'make deploy'"
 
@@ -529,13 +552,13 @@ backup-prod-db: ## Backup production database to local_backups/db/
 	@./scripts/backup-prod-db.sh
 
 # Phony targets
-.PHONY: help up down restart ps clean prune build build-api build-bot build-postgres build-admin-panel \
-	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel logs-newrelic logs-traefik \
-	shell-api shell-bot shell-postgres shell-minio shell-admin-panel shell-newrelic \
+.PHONY: help up down restart ps clean prune build build-api build-bot build-postgres build-admin-panel build-dashboard \
+	logs logs-api logs-bot logs-postgres logs-minio logs-admin-panel logs-dashboard logs-newrelic logs-traefik \
+	shell-api shell-bot shell-postgres shell-minio shell-admin-panel shell-dashboard shell-newrelic \
 	go-build-api go-build-bot go-build-admin-panel go-build-import-cli go-build go-clean fmt fmt-check \
 	admin-panel-set-secrets admin-panel-set-password admin-panel-set-session \
 	admin-panel-set-secrets-files admin-panel-set-password-file admin-panel-set-session-file \
-	generate-traefik-password generate-analytics-api-key \
+	generate-traefik-password generate-analytics-api-key generate-dashboard-secrets \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-root-pass tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \

@@ -267,3 +267,8 @@ func (s *AnalyticsService) ListChats(ctx context.Context) ([]models.ChatSummary,
 func (s *AnalyticsService) GetChat(ctx context.Context, chatID int64) (*models.ChatDetail, error) {
 	return s.analyticsRepo.GetChat(ctx, chatID)
 }
+
+// GetUserActiveChats returns chat IDs where a user has been active within the time range
+func (s *AnalyticsService) GetUserActiveChats(ctx context.Context, userID int64, startDate, endDate time.Time) ([]int64, error) {
+	return s.analyticsRepo.GetUserActiveChats(ctx, userID, startDate, endDate)
+}

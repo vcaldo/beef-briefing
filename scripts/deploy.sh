@@ -270,14 +270,6 @@ log_success "Local cleanup complete"
 # =============================================================================
 # SUMMARY
 # =============================================================================
-echo ""
-echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}  DEPLOYMENT SUCCESSFUL${NC}"
-echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
-echo ""
-echo "  Image tag:     $COMMIT_HASH"
-echo "  Previous tag:  ${PREVIOUS_TAG:-N/A}"
-echo "  Server:        $SSH_HOST"
-echo ""
-echo "  To rollback:   make rollback"
-echo ""
+DOMAIN=$(get_domain_from_env "$PROD_ENV_FILE")
+DOMAIN="$DOMAIN" IMAGE_TAG="$COMMIT_HASH" SSH_HOST="$SSH_HOST" PREVIOUS_TAG="${PREVIOUS_TAG:-N/A}" \
+    "$SCRIPT_DIR/show-summary.sh" prod

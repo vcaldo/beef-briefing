@@ -214,16 +214,19 @@ def register_callbacks(app) -> None:
             top_reactions = queries.get_top_reactions(chat_id, start, end, limit=TOP_REACTIONS_LIMIT)
 
             # Build reaction badges
-            badges = [
-                html.Span(
-                    className="reaction-badge",
-                    children=[
-                        html.Span(r['emoji'], className="reaction-emoji"),
-                        html.Span(f"{r['count']:,}", className="reaction-count"),
-                    ]
+            badges = []
+            for r in top_reactions:
+                is_custom = r['emoji'] == '$'
+                emoji_class = "reaction-emoji reaction-emoji--custom" if is_custom else "reaction-emoji"
+                badges.append(
+                    html.Span(
+                        className="reaction-badge",
+                        children=[
+                            html.Span(r['emoji'], className=emoji_class),
+                            html.Span(f"{r['count']:,}", className="reaction-count"),
+                        ]
+                    )
                 )
-                for r in top_reactions
-            ]
 
             return (
                 f"{stats['total_messages']:,}",

@@ -466,6 +466,11 @@ body {
   line-height: 1;
 }
 
+.reaction-emoji--custom {
+  color: #22c55e;
+  font-weight: 700;
+}
+
 .reaction-count {
   font-size: 0.875rem;
   color: var(--color-text-secondary);

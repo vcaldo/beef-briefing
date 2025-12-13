@@ -20,7 +20,6 @@ from src.auth.telegram_oauth import (
     TelegramAuthData,
 )
 from src.auth.session import SessionManager
-from src.api.api_client import ApiServiceClient
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +43,6 @@ def create_app(config: Config) -> dash.Dash:
 
     # Initialize session manager
     session_manager = SessionManager(db.engine, config.session_lifetime_days)
-
-    # Initialize API client for api-service
-    api_client = ApiServiceClient(
-        base_url=config.api_service_url,
-        api_key=config.analytics_api_key if config.analytics_api_key else None,
-    )
 
     # Initialize queries
     queries = DashboardQueries(db.engine)
@@ -91,7 +84,6 @@ def create_app(config: Config) -> dash.Dash:
     server.config["db"] = db
     server.config["queries"] = queries
     server.config["session_manager"] = session_manager
-    server.config["api_client"] = api_client
     server.config["app_config"] = config
 
     # Define the app layout
@@ -105,7 +97,7 @@ def create_app(config: Config) -> dash.Dash:
     )
 
     # Register Flask routes for authentication
-    register_auth_routes(server, config, queries, session_manager, api_client, limiter)
+    register_auth_routes(server, config, queries, session_manager, limiter)
 
     # Register health check route
     @server.route("/beef-dashboard/health")
@@ -124,7 +116,6 @@ def register_auth_routes(
     config: Config,
     queries: DashboardQueries,
     session_manager: SessionManager,
-    api_client: ApiServiceClient,
     limiter: Limiter,
 ) -> None:
     """Register authentication routes on the Flask server."""
@@ -254,12 +245,12 @@ def register_auth_routes(
             )
         else:
             # Regular users: fetch chats where they've been active
-            accessible_chat_ids = api_client.get_user_active_chats(
+            accessible_chat_ids = queries.get_user_active_chats(
                 user_id=validated.id,
                 days=ACTIVITY_LOOKBACK_DAYS
             )
             logger.info(
-                "User authenticated, fetched active chats",
+                "User authenticated, fetched active chats from database",
                 extra={"user_id": validated.id, "chat_count": len(accessible_chat_ids)}
             )
 

@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from dash import dcc, html
 
 from src.auth.session import SessionData
+from src.theme import THEME
 
 
 def create_header(
@@ -346,7 +347,7 @@ def create_main_charts() -> html.Div:
                     dcc.Loading(
                         id="loading-timeline",
                         type="circle",
-                        color="#00d9ff",
+                        color=THEME["colors"]["accent_primary"],
                         children=[
                             dcc.Graph(
                                 id="message-timeline-chart",
@@ -365,7 +366,7 @@ def create_main_charts() -> html.Div:
                     dcc.Loading(
                         id="loading-users",
                         type="circle",
-                        color="#00d9ff",
+                        color=THEME["colors"]["accent_primary"],
                         children=[
                             dcc.Graph(
                                 id="active-users-chart",
@@ -384,7 +385,7 @@ def create_main_charts() -> html.Div:
                     dcc.Loading(
                         id="loading-heatmap",
                         type="circle",
-                        color="#00d9ff",
+                        color=THEME["colors"]["accent_primary"],
                         children=[
                             dcc.Graph(
                                 id="activity-heatmap-chart",
@@ -403,7 +404,7 @@ def create_main_charts() -> html.Div:
                     dcc.Loading(
                         id="loading-media",
                         type="circle",
-                        color="#00d9ff",
+                        color=THEME["colors"]["accent_primary"],
                         children=[
                             dcc.Graph(
                                 id="media-chart",
@@ -451,7 +452,7 @@ def create_top_users_section() -> html.Div:
                     dcc.Loading(
                         id="loading-leaderboard",
                         type="circle",
-                        color="#00d9ff",
+                        color=THEME["colors"]["accent_primary"],
                         children=[
                             html.Div(id="leaderboard-table", className="leaderboard"),
                         ],
@@ -494,7 +495,7 @@ def create_dashboard_layout(
     default_end = today.isoformat()
 
     return html.Div(
-        className="dashboard-wrapper",
+        className="dashboard-wrapper gradient-background scanline-overlay",
         children=[
             create_header(session, show_back_link=show_back_link),
             html.Main(
@@ -712,7 +713,7 @@ def create_welcome_layout(
     chat_cards = [create_chat_card(chat) for chat in chats]
 
     return html.Div(
-        className="welcome-wrapper",
+        className="welcome-wrapper gradient-background scanline-overlay",
         children=[
             create_header(session),
             html.Main(

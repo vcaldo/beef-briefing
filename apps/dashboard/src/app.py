@@ -20,6 +20,7 @@ from src.auth.telegram_oauth import (
     TelegramAuthData,
 )
 from src.auth.session import SessionManager
+from src.theme import THEME
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +140,10 @@ def register_auth_routes(
             callback_url=callback_url,
         )
 
+        # Use theme colors for consistency
+        c = THEME["colors"]
+        f = THEME["fonts"]
+
         return f"""
         <!DOCTYPE html>
         <html>
@@ -146,33 +151,22 @@ def register_auth_routes(
             <title>Login - Beef Dashboard</title>
             <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
             <style>
-                :root {{
-                    --color-bg-primary: #0a0e1a;
-                    --color-bg-secondary: #141822;
-                    --color-accent-primary: #00d9ff;
-                    --color-text-primary: #e8eaed;
-                    --color-text-secondary: #9aa0a6;
-                }}
-                * {{
-                    margin: 0;
-                    padding: 0;
-                    box-sizing: border-box;
-                }}
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
                 body {{
-                    font-family: 'Space Grotesk', sans-serif;
+                    font-family: {f["body"]};
                     background: radial-gradient(circle at 20% 80%, rgba(0,217,255,0.08) 0%, transparent 50%),
                                 radial-gradient(circle at 80% 20%, rgba(255,107,107,0.06) 0%, transparent 50%),
-                                linear-gradient(180deg, #0a0e1a 0%, #0d1117 100%);
+                                linear-gradient(180deg, {c["bg_primary"]} 0%, #0d1117 100%);
                     min-height: 100vh;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    color: var(--color-text-primary);
+                    color: {c["text_primary"]};
                 }}
                 .login-container {{
-                    background: rgba(20, 24, 34, 0.7);
+                    background: {c["bg_card"]};
                     backdrop-filter: blur(12px) saturate(180%);
-                    border: 1px solid rgba(255,255,255,0.1);
+                    border: 1px solid {c["border"]};
                     border-radius: 16px;
                     padding: 48px;
                     text-align: center;
@@ -180,34 +174,21 @@ def register_auth_routes(
                     animation: fadeInScale 0.6s ease-out;
                 }}
                 @keyframes fadeInScale {{
-                    from {{
-                        opacity: 0;
-                        transform: scale(0.95) translateY(10px);
-                    }}
-                    to {{
-                        opacity: 1;
-                        transform: scale(1) translateY(0);
-                    }}
+                    from {{ opacity: 0; transform: scale(0.95) translateY(10px); }}
+                    to {{ opacity: 1; transform: scale(1) translateY(0); }}
                 }}
                 h1 {{
-                    font-family: 'JetBrains Mono', monospace;
+                    font-family: {f["display"]};
                     font-size: 2rem;
                     font-weight: 700;
                     margin-bottom: 8px;
-                    background: linear-gradient(135deg, var(--color-accent-primary), #ff6b6b);
+                    background: linear-gradient(135deg, {c["accent_primary"]}, {c["accent_secondary"]});
                     -webkit-background-clip: text;
                     -webkit-text-fill-color: transparent;
                     background-clip: text;
                 }}
-                p {{
-                    color: var(--color-text-secondary);
-                    margin-bottom: 32px;
-                    font-size: 1rem;
-                }}
-                .widget-container {{
-                    display: flex;
-                    justify-content: center;
-                }}
+                p {{ color: {c["text_secondary"]}; margin-bottom: 32px; font-size: 1rem; }}
+                .widget-container {{ display: flex; justify-content: center; }}
             </style>
         </head>
         <body>

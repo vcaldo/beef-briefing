@@ -44,7 +44,7 @@ CHART_LAYOUT = {
 }
 
 # Constants
-TOP_REACTIONS_LIMIT = 12
+TOP_REACTIONS_LIMIT = 20
 
 
 def parse_date_range(
@@ -217,7 +217,10 @@ def register_callbacks(app) -> None:
             badges = [
                 html.Span(
                     className="reaction-badge",
-                    children=f"{r['emoji']} {r['count']:,}"
+                    children=[
+                        html.Span(r['emoji'], className="reaction-emoji"),
+                        html.Span(f"{r['count']:,}", className="reaction-count"),
+                    ]
                 )
                 for r in top_reactions
             ]

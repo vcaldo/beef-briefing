@@ -104,7 +104,7 @@ services:
       ALLOWED_CHAT_IDS: ${ALLOWED_CHAT_IDS}
       SESSION_LIFETIME_DAYS: ${SESSION_LIFETIME_DAYS:-7}
       FLASK_SECRET_KEY_FILE: /app/secrets/flask_secret_key
-      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}-dashboard-development
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: development
       LOG_LEVEL: debug

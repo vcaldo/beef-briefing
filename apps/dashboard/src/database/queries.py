@@ -354,15 +354,18 @@ class DashboardQueries:
         """
         query = text("""
             SELECT
-                COALESCE(emoji_value, custom_emoji_id, 'paid') as emoji_value,
-                reaction_type,
+                CASE WHEN reaction_type = 'custom_emoji' THEN '$' ELSE emoji_value END as emoji_value,
                 COUNT(*) as count
             FROM message_reactions
             WHERE chat_id = :chat_id
               AND date >= :start_date
               AND date < :end_date
               AND is_removed = FALSE
-            GROUP BY emoji_value, custom_emoji_id, reaction_type
+              AND (
+                reaction_type = 'custom_emoji'
+                OR (reaction_type = 'emoji' AND emoji_value IS NOT NULL AND emoji_value != '')
+              )
+            GROUP BY CASE WHEN reaction_type = 'custom_emoji' THEN '$' ELSE emoji_value END
             ORDER BY count DESC
             LIMIT :limit
         """)

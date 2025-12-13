@@ -44,7 +44,7 @@ CHART_LAYOUT = {
 }
 
 # Constants
-TOP_REACTIONS_LIMIT = 12
+TOP_REACTIONS_LIMIT = 20
 
 
 def parse_date_range(
@@ -214,13 +214,25 @@ def register_callbacks(app) -> None:
             top_reactions = queries.get_top_reactions(chat_id, start, end, limit=TOP_REACTIONS_LIMIT)
 
             # Build reaction badges
-            badges = [
-                html.Span(
-                    className="reaction-badge",
-                    children=f"{r['emoji']} {r['count']:,}"
+            badges = []
+            for r in top_reactions:
+                is_custom = r['emoji'] == '$'
+                if is_custom:
+                    emoji_content = html.Span(
+                        className="reaction-emoji reaction-emoji--custom",
+                        children=[html.Span("pa"), html.Span("id")]
+                    )
+                else:
+                    emoji_content = html.Span(r['emoji'], className="reaction-emoji")
+                badges.append(
+                    html.Span(
+                        className="reaction-badge",
+                        children=[
+                            emoji_content,
+                            html.Span(f"{r['count']:,}", className="reaction-count"),
+                        ]
+                    )
                 )
-                for r in top_reactions
-            ]
 
             return (
                 f"{stats['total_messages']:,}",
@@ -924,3 +936,32 @@ def register_callbacks(app) -> None:
             classes[0] = "lb-btn active"
 
         return classes
+
+    @app.callback(
+        [
+            Output("group-icon", "children"),
+            Output("group-name", "children"),
+            Output("group-name", "title"),
+        ],
+        Input("selected-chat", "data"),
+    )
+    def update_group_title(chat_id: Optional[int]):
+        """Update group title display with chat name and icon."""
+        queries = app.server.config.get("queries")
+        if not chat_id:
+            return "", "Select a group", ""
+
+        chat_info = queries.get_chat_info(chat_id)
+        if not chat_info:
+            return "", "Unknown", ""
+
+        # Icon based on chat type
+        chat_type = chat_info.get("type", "group")
+        icon = "🏛" if chat_type == "supergroup" else "👥"
+
+        # Truncate title for display
+        title = chat_info.get("title", "Unknown")
+        max_length = 25
+        truncated = title if len(title) <= max_length else title[:max_length - 1].rstrip() + "…"
+
+        return icon, truncated, title

@@ -165,10 +165,22 @@ def create_period_selector() -> html.Div:
     )
 
 
-def truncate_title(title: str, max_length: int = 30) -> str:
+def truncate_title(title: str, max_length: int = 45) -> str:
     if len(title) <= max_length:
         return title
     return title[:max_length - 1].rstrip() + "…"
+
+
+def create_group_title() -> html.Div:
+    """Create group title display (populated by callback)."""
+    return html.Div(
+        id="group-title-display",
+        className="group-title-display",
+        children=[
+            html.Span(id="group-icon", className="group-icon"),
+            html.H2(id="group-name", className="group-name"),
+        ],
+    )
 
 
 def create_chat_selector(
@@ -485,6 +497,7 @@ def create_dashboard_layout(
                     html.Div(
                         className="controls-bar",
                         children=[
+                            create_group_title(),
                             create_period_selector(),
                         ],
                     ),

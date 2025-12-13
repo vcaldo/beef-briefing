@@ -244,6 +244,30 @@ body {
   min-width: 250px;
 }
 
+/* Group Title Display */
+.group-title-display {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.group-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.group-name {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
 /* Dash dropdown styling */
 .Select-control {
   background: var(--color-bg-card) !important;
@@ -452,11 +476,35 @@ body {
   background: rgba(0, 217, 255, 0.1);
   border: 1px solid rgba(0, 217, 255, 0.3);
   border-radius: var(--radius-md);
-  padding: var(--space-xs) var(--space-md);
+  padding: var(--space-sm) var(--space-md);
   font-family: var(--font-display);
-  font-size: 0.875rem;
   color: var(--color-text-primary);
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.reaction-emoji {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.reaction-emoji--custom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.65rem;
+  line-height: 1.1;
+  font-weight: 700;
+  color: #22c55e;
+  text-transform: uppercase;
+  margin-right: var(--space-xs);
+}
+
+.reaction-count {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
 }
 
 /* =====================================================
@@ -1005,6 +1053,10 @@ body {
   .period-selector {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .group-title-display {
+    justify-content: center;
   }
 
   .overview-cards {

@@ -1,0 +1,19 @@
+# Web Framework
+Flask>=3.0.0
+dash>=2.14.0
+dash-bootstrap-components>=1.5.0
+dash-mantine-components>=0.14.0
+
+# Database
+SQLAlchemy>=2.0.0
+psycopg2-binary>=2.9.0
+
+# Configuration
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+
+# Monitoring
+newrelic>=9.0.0
+
+# Production WSGI server
+gunicorn>=21.0.0

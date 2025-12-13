@@ -85,6 +85,32 @@ services:
       - beef-dev-network
     restart: unless-stopped
 
+  leaderboard:
+    build:
+      context: ..
+      dockerfile: apps/leaderboard/Dockerfile
+    container_name: beef-leaderboard-dev
+    environment:
+      DB_HOST: postgres
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_PORT: ${DB_PORT}
+      DB_SSL_MODE: disable
+      LEADERBOARD_PORT: ${LEADERBOARD_PORT:-8050}
+      LEADERBOARD_PATH: ${LEADERBOARD_PATH:-/leaderboard}
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      ENVIRONMENT: development
+      LOG_LEVEL: debug
+    ports:
+      - "${LEADERBOARD_PORT:-8050}:8050"
+    depends_on:
+      - postgres
+    networks:
+      - beef-dev-network
+    restart: unless-stopped
+
 volumes:
   postgres_data_dev:
   minio_data_dev:

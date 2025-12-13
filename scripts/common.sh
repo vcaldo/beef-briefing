@@ -21,6 +21,7 @@ REMOTE_PREVIOUS_TAG_FILE="$REMOTE_APP_DIR/.previous_tag"
 IMAGES=(
     "beef-briefing/api-service"
     "beef-briefing/telegram-bot"
+    "beef-briefing/leaderboard"
 )
 
 # Required environment variables for deployment

@@ -20,6 +20,7 @@ DC_PROD := docker compose -f $(PROD_COMPOSE_FILE) --env-file $(PROD_ENV_FILE)
 # Service names
 API_SERVICE := api-service
 TELEGRAM_BOT := telegram-bot
+LEADERBOARD := leaderboard
 POSTGRES_SERVICE := postgres
 MINIO_SERVICE := minio
 NEWRELIC_INFRA := newrelic-infra
@@ -30,6 +31,9 @@ API_DIR := apps/api-service
 BOT_DIR := apps/telegram-bot
 IMPORT_CLI_DIR := apps/import-cli
 PKG_DIR := pkg/config
+
+# Python directories
+LEADERBOARD_DIR := apps/leaderboard
 
 # Git
 COMMIT_HASH ?= $(shell git rev-parse --short HEAD)
@@ -144,6 +148,9 @@ docker-build-api: ## Rebuild api-service image
 docker-build-bot: ## Rebuild telegram-bot image
 	$(DC) build $(TELEGRAM_BOT)
 
+docker-build-leaderboard: ## Rebuild leaderboard image
+	$(DC) build $(LEADERBOARD)
+
 # =============================================================================
 # DOCKER LOGS (docker-logs-*)
 # =============================================================================
@@ -165,6 +172,9 @@ docker-logs-minio: ## Tail logs from minio
 docker-logs-newrelic: ## Tail logs from newrelic-infra
 	$(DC) logs -f $(NEWRELIC_INFRA)
 
+docker-logs-leaderboard: ## Tail logs from leaderboard
+	$(DC) logs -f $(LEADERBOARD)
+
 # =============================================================================
 # DOCKER SHELL (docker-shell-*)
 # =============================================================================
@@ -182,6 +192,9 @@ docker-shell-minio: ## Open shell in minio container
 
 docker-shell-newrelic: ## Open shell in newrelic-infra container
 	$(DC) exec $(NEWRELIC_INFRA) /bin/sh
+
+docker-shell-leaderboard: ## Open shell in leaderboard container
+	$(DC) exec $(LEADERBOARD) /bin/sh
 
 # =============================================================================
 # GO BUILD (go-build-*)
@@ -392,11 +405,11 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	dev-up dev-up-build dev-up-logs dev-down dev-restart dev-ps dev-clean dev-prune \
 	prod-deploy prod-deploy-skip-build prod-deploy-skip-cleanup prod-deploy-regenerate-certs \
 	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik \
-	docker-build docker-build-api docker-build-bot \
+	docker-build docker-build-api docker-build-bot docker-build-leaderboard \
 	docker-logs docker-logs-api docker-logs-bot docker-logs-postgres docker-logs-minio \
-	docker-logs-newrelic \
+	docker-logs-newrelic docker-logs-leaderboard \
 	docker-shell-api docker-shell-bot docker-shell-postgres docker-shell-minio \
-	docker-shell-newrelic \
+	docker-shell-newrelic docker-shell-leaderboard \
 	go-build go-build-api go-build-bot go-build-import-cli go-build-import-cli-prod go-clean \
 	go-fmt go-fmt-check \
 	secrets-traefik-password secrets-analytics-api-key \

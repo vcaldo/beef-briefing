@@ -68,6 +68,39 @@ services:
       - beef-prod-network
     restart: unless-stopped
 
+  leaderboard:
+    build:
+      context: ..
+      dockerfile: apps/leaderboard/Dockerfile
+    image: beef-briefing/leaderboard:${IMAGE_TAG}
+    container_name: beef-leaderboard-prod
+    environment:
+      DB_HOST: postgres
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_PORT: 5432
+      DB_SSL_MODE: disable
+      LEADERBOARD_PORT: 8050
+      LEADERBOARD_PATH: ${LEADERBOARD_PATH:-/leaderboard}
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      ENVIRONMENT: production
+      LOG_LEVEL: info
+    depends_on:
+      - postgres
+    networks:
+      - beef-prod-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.leaderboard.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`${LEADERBOARD_PATH:-/leaderboard}`)"
+      - "traefik.http.routers.leaderboard.entrypoints=websecure"
+      - "traefik.http.routers.leaderboard.tls.certresolver=letsencrypt"
+      - "traefik.http.services.leaderboard.loadbalancer.server.port=8050"
+      - "traefik.http.middlewares.leaderboard-strip.stripprefix.prefixes=${LEADERBOARD_PATH:-/leaderboard}"
+      - "traefik.http.routers.leaderboard.middlewares=leaderboard-strip"
+    restart: unless-stopped
+
   traefik:
     image: traefik:v3.6.4
     container_name: beef-traefik-prod

@@ -165,9 +165,9 @@ def register_callbacks(app) -> None:
             Output("top-reactions-badges", "children"),
         ],
         [
-            Input("chat-selector", "value"),
-            Input("date-range-picker", "start_date"),
-            Input("date-range-picker", "end_date"),
+            Input("selected-chat", "data"),
+            Input("computed-start-date", "data"),
+            Input("computed-end-date", "data"),
         ],
     )
     def update_overview_stats(
@@ -217,9 +217,9 @@ def register_callbacks(app) -> None:
     @app.callback(
         Output("message-timeline-chart", "figure"),
         [
-            Input("chat-selector", "value"),
-            Input("date-range-picker", "start_date"),
-            Input("date-range-picker", "end_date"),
+            Input("selected-chat", "data"),
+            Input("computed-start-date", "data"),
+            Input("computed-end-date", "data"),
         ],
     )
     def update_timeline_chart(
@@ -310,9 +310,9 @@ def register_callbacks(app) -> None:
     @app.callback(
         Output("activity-heatmap-chart", "figure"),
         [
-            Input("chat-selector", "value"),
-            Input("date-range-picker", "start_date"),
-            Input("date-range-picker", "end_date"),
+            Input("selected-chat", "data"),
+            Input("computed-start-date", "data"),
+            Input("computed-end-date", "data"),
         ],
     )
     def update_heatmap_chart(
@@ -379,9 +379,9 @@ def register_callbacks(app) -> None:
     @app.callback(
         Output("reaction-chart", "figure"),
         [
-            Input("chat-selector", "value"),
-            Input("date-range-picker", "start_date"),
-            Input("date-range-picker", "end_date"),
+            Input("selected-chat", "data"),
+            Input("computed-start-date", "data"),
+            Input("computed-end-date", "data"),
         ],
     )
     def update_reaction_chart(
@@ -433,9 +433,9 @@ def register_callbacks(app) -> None:
     @app.callback(
         Output("media-chart", "figure"),
         [
-            Input("chat-selector", "value"),
-            Input("date-range-picker", "start_date"),
-            Input("date-range-picker", "end_date"),
+            Input("selected-chat", "data"),
+            Input("computed-start-date", "data"),
+            Input("computed-end-date", "data"),
         ],
     )
     def update_media_chart(
@@ -509,9 +509,9 @@ def register_callbacks(app) -> None:
             Output("leaderboard-limit", "data"),
         ],
         [
-            Input("chat-selector", "value"),
-            Input("date-range-picker", "start_date"),
-            Input("date-range-picker", "end_date"),
+            Input("selected-chat", "data"),
+            Input("computed-start-date", "data"),
+            Input("computed-end-date", "data"),
             Input("lb-10", "n_clicks"),
             Input("lb-25", "n_clicks"),
             Input("lb-50", "n_clicks"),
@@ -559,7 +559,7 @@ def register_callbacks(app) -> None:
             page = max(1, page - 1)
         elif triggered == "lb-next":
             page = page + 1
-        elif triggered in ["chat-selector", "date-range-picker"]:
+        elif triggered in ["selected-chat", "computed-start-date", "computed-end-date"]:
             # Reset page on chat/date change
             page = 1
 
@@ -724,55 +724,147 @@ def register_callbacks(app) -> None:
                 limit,
             )
 
+    # Callback: Update dates when month/year dropdowns change
     @app.callback(
         [
-            Output("date-range-picker", "start_date"),
-            Output("date-range-picker", "end_date"),
-            Output("period-today", "className"),
-            Output("period-week", "className"),
-            Output("period-month", "className"),
-            Output("period-quarter", "className"),
+            Output("computed-start-date", "data", allow_duplicate=True),
+            Output("computed-end-date", "data", allow_duplicate=True),
+            Output("selection-mode", "data", allow_duplicate=True),
         ],
         [
-            Input("period-today", "n_clicks"),
-            Input("period-week", "n_clicks"),
-            Input("period-month", "n_clicks"),
-            Input("period-quarter", "n_clicks"),
+            Input("month-selector", "value"),
+            Input("year-selector", "value"),
+        ],
+        prevent_initial_call=True,
+    )
+    def update_dates_from_month_year(month: int, year: int):
+        """Compute date range from month/year selection."""
+        import calendar
+
+        if not month or not year:
+            return no_update, no_update, no_update
+
+        # First day of month
+        start_date = datetime(year, month, 1).date()
+
+        # Last day of month
+        _, last_day = calendar.monthrange(year, month)
+        end_date = datetime(year, month, last_day).date()
+
+        return start_date.isoformat(), end_date.isoformat(), "month"
+
+    # Callback: Update dates when period buttons are clicked
+    @app.callback(
+        [
+            Output("computed-start-date", "data", allow_duplicate=True),
+            Output("computed-end-date", "data", allow_duplicate=True),
+            Output("selection-mode", "data", allow_duplicate=True),
+            Output("period-24h", "className"),
+            Output("period-7d", "className"),
+            Output("period-30d", "className"),
+            Output("period-90d", "className"),
+            Output("period-180d", "className"),
+            Output("period-365d", "className"),
+            Output("period-ytd", "className"),
+        ],
+        [
+            Input("period-24h", "n_clicks"),
+            Input("period-7d", "n_clicks"),
+            Input("period-30d", "n_clicks"),
+            Input("period-90d", "n_clicks"),
+            Input("period-180d", "n_clicks"),
+            Input("period-365d", "n_clicks"),
+            Input("period-ytd", "n_clicks"),
         ],
         prevent_initial_call=True,
     )
     def update_period(
-        today_clicks: int,
-        week_clicks: int,
-        month_clicks: int,
-        quarter_clicks: int,
+        clicks_24h: int,
+        clicks_7d: int,
+        clicks_30d: int,
+        clicks_90d: int,
+        clicks_180d: int,
+        clicks_365d: int,
+        clicks_ytd: int,
     ):
-        """Update date range based on period selection."""
+        """Update date range based on period button selection."""
         from dash import ctx
 
         triggered = ctx.triggered_id
         today = datetime.now().date()
 
-        # Default classes
-        classes = ["period-tab", "period-tab", "period-tab", "period-tab"]
+        # Default classes (7 buttons)
+        classes = ["period-tab"] * 7
 
-        if triggered == "period-today":
-            start = today
-            classes[0] = "period-tab active"
-        elif triggered == "period-week":
-            start = today - timedelta(days=7)
-            classes[1] = "period-tab active"
-        elif triggered == "period-month":
-            start = today - timedelta(days=30)
-            classes[2] = "period-tab active"
-        elif triggered == "period-quarter":
-            start = today - timedelta(days=90)
-            classes[3] = "period-tab active"
+        # Period mapping: (days_back, class_index)
+        periods = {
+            "period-24h": (1, 0),
+            "period-7d": (7, 1),
+            "period-30d": (30, 2),
+            "period-90d": (90, 3),
+            "period-180d": (180, 4),
+            "period-365d": (365, 5),
+            "period-ytd": ("ytd", 6),
+        }
+
+        if triggered in periods:
+            days_or_ytd, idx = periods[triggered]
+            classes[idx] = "period-tab active"
+
+            if days_or_ytd == "ytd":
+                # Year to date: Jan 1 of current year to today
+                start = datetime(today.year, 1, 1).date()
+            else:
+                start = today - timedelta(days=days_or_ytd)
         else:
+            # Default to 7d
             start = today - timedelta(days=7)
             classes[1] = "period-tab active"
 
-        return start, today, *classes
+        return start.isoformat(), today.isoformat(), "preset", *classes
+
+    # Callback: Update visual styling based on selection mode
+    @app.callback(
+        Output("month-year-selector", "className"),
+        Input("selection-mode", "data"),
+    )
+    def update_selector_styling(mode: str):
+        """Update month/year selector styling based on selection mode."""
+        if mode == "month":
+            return "month-year-selector active-selector"
+        return "month-year-selector dimmed"
+
+    # Callback: Populate year dropdown with available years from database
+    @app.callback(
+        [
+            Output("year-selector", "options"),
+            Output("year-selector", "value"),
+        ],
+        Input("selected-chat", "data"),
+    )
+    def populate_year_options(chat_id: Optional[int]):
+        """Populate year dropdown with years that have data for the selected chat."""
+        if not chat_id:
+            return [], None
+
+        # Get queries from app config
+        queries = app.server.config.get("queries")
+        if not queries:
+            current_year = datetime.now().year
+            return [{"label": str(current_year), "value": current_year}], current_year
+
+        # Ensure chat_id is int (might come as string from JSON store)
+        chat_id = int(chat_id)
+
+        years = queries.get_available_years(chat_id)
+        if not years:
+            # Fallback to current year if no data
+            current_year = datetime.now().year
+            return [{"label": str(current_year), "value": current_year}], current_year
+
+        options = [{"label": str(y), "value": y} for y in years]
+        # Default to most recent year
+        return options, years[0]
 
     @app.callback(
         [

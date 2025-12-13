@@ -225,6 +225,8 @@ body {
   gap: var(--space-lg);
   margin-bottom: var(--space-xl);
   flex-wrap: wrap;
+  position: relative;
+  z-index: 10;
 }
 
 .chat-selector {
@@ -257,6 +259,7 @@ body {
 .Select-menu-outer {
   background: var(--color-bg-secondary) !important;
   border: 1px solid var(--color-border) !important;
+  z-index: 1000 !important;
 }
 
 .VirtualizedSelectOption {
@@ -285,16 +288,17 @@ body {
 }
 
 .period-tab {
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-xs) var(--space-sm);
   border: none;
   background: transparent;
   color: var(--color-text-secondary);
   font-family: var(--font-body);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: var(--transition-fast);
+  white-space: nowrap;
 }
 
 .period-tab:hover {
@@ -306,23 +310,33 @@ body {
   color: var(--color-bg-primary);
 }
 
-/* Date Picker */
-.date-picker-container {
+/* Month/Year Selector */
+.month-year-selector {
   display: flex;
   align-items: center;
+  gap: var(--space-sm);
+  transition: var(--transition-fast);
 }
 
-.DateRangePicker {
-  background: transparent !important;
+.month-year-selector.dimmed {
+  opacity: 0.95;
 }
 
-.DateInput_input {
-  background: var(--color-bg-card) !important;
-  color: var(--color-text-primary) !important;
-  border: 1px solid var(--color-border) !important;
-  border-radius: var(--radius-md) !important;
-  padding: var(--space-sm) var(--space-md) !important;
-  font-family: var(--font-body) !important;
+.month-year-selector.active-selector {
+  opacity: 1;
+}
+
+.month-year-selector.active-selector .Select-control {
+  border-color: var(--color-accent-primary) !important;
+  box-shadow: 0 0 0 1px var(--color-accent-primary);
+}
+
+.month-dropdown {
+  min-width: 80px;
+}
+
+.year-dropdown {
+  min-width: 90px;
 }
 
 /* =====================================================
@@ -1059,6 +1073,18 @@ body {
   }
 }
 
+@media (max-width: 640px) {
+  .period-selector {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .month-year-selector {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 @media (max-width: 480px) {
   .overview-cards {
     grid-template-columns: 1fr;
@@ -1067,9 +1093,12 @@ body {
   .period-tabs {
     flex-wrap: wrap;
     justify-content: center;
+    gap: var(--space-xs);
   }
 
   .period-tab {
-    flex: 1 1 45%;
+    flex: 0 0 auto;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.75rem;
   }
 }

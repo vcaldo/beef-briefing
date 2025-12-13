@@ -296,44 +296,20 @@ def register_callbacks(app) -> None:
 
             fig = go.Figure()
 
-            # Messages line
+            # Messages bar chart
             fig.add_trace(
-                go.Scatter(
+                go.Bar(
                     x=df["period"],
                     y=df["message_count"],
-                    mode="lines+markers",
                     name="Messages",
-                    line={"color": COLORS["primary"], "width": 2},
-                    marker={"size": 6},
-                    fill="tozeroy",
-                    fillcolor="rgba(0, 217, 255, 0.1)",
-                )
-            )
-
-            # Active users line
-            fig.add_trace(
-                go.Scatter(
-                    x=df["period"],
-                    y=df["user_count"],
-                    mode="lines+markers",
-                    name="Active Users",
-                    line={"color": COLORS["secondary"], "width": 2},
-                    marker={"size": 6},
-                    yaxis="y2",
+                    marker={"color": COLORS["primary"]},
+                    hovertemplate="<b>%{x}</b><br>Messages: %{y}<extra></extra>",
                 )
             )
 
             fig.update_layout(
                 **CHART_LAYOUT,
-                showlegend=True,
-                legend={"orientation": "h", "y": 1.1},
-                yaxis2={
-                    "overlaying": "y",
-                    "side": "right",
-                    "gridcolor": COLORS["grid"],
-                    "title": "Users",
-                },
-                yaxis={"title": "Messages"},
+                showlegend=False,
                 hovermode="x unified",
             )
 
@@ -341,6 +317,75 @@ def register_callbacks(app) -> None:
 
         except Exception as e:
             logger.error(f"Error creating timeline chart: {e}")
+            return fig
+
+    @app.callback(
+        Output("active-users-chart", "figure"),
+        [
+            Input("selected-chat", "data"),
+            Input("computed-start-date", "data"),
+            Input("computed-end-date", "data"),
+        ],
+    )
+    def update_active_users_chart(
+        chat_id: Optional[int],
+        start_date: Optional[str],
+        end_date: Optional[str],
+    ) -> go.Figure:
+        """Update active users bar chart."""
+        fig = go.Figure()
+        fig.update_layout(**CHART_LAYOUT)
+
+        if not chat_id:
+            return fig
+
+        date_range = parse_date_range(start_date, end_date)
+        if not date_range:
+            return fig
+
+        queries = app.server.config.get("queries")
+        if not queries:
+            return fig
+
+        try:
+            start, end = date_range
+
+            # Determine granularity based on date range
+            days_diff = (end - start).days
+            if days_diff <= 2:
+                granularity = "hour"
+            elif days_diff <= 31:
+                granularity = "day"
+            elif days_diff <= 90:
+                granularity = "week"
+            else:
+                granularity = "month"
+
+            df = queries.get_message_timeline(chat_id, start, end, granularity)
+
+            if df.empty:
+                return fig
+
+            fig.add_trace(
+                go.Bar(
+                    x=df["period"],
+                    y=df["user_count"],
+                    name="Active Users",
+                    marker={"color": COLORS["secondary"]},
+                    hovertemplate="<b>%{x}</b><br>Users: %{y}<extra></extra>",
+                )
+            )
+
+            fig.update_layout(
+                **CHART_LAYOUT,
+                showlegend=False,
+                hovermode="x unified",
+            )
+
+            return fig
+
+        except Exception as e:
+            logger.error(f"Error creating active users chart: {e}")
             return fig
 
     @app.callback(
@@ -394,80 +439,39 @@ def register_callbacks(app) -> None:
                     x=[f"{h:02d}:00" for h in range(24)],
                     y=[day_names[int(i)] for i in pivot.index],
                     colorscale=[
-                        [0, "rgba(0, 217, 255, 0.1)"],
-                        [0.5, "rgba(0, 217, 255, 0.5)"],
+                        [0, COLORS["bg"]],
+                        [0.3, "rgba(0, 217, 255, 0.3)"],
+                        [0.6, "rgba(0, 217, 255, 0.6)"],
                         [1, COLORS["primary"]],
                     ],
                     showscale=False,
+                    xgap=2,
+                    ygap=2,
                     hovertemplate="<b>%{y} %{x}</b><br>Messages: %{z}<extra></extra>",
                 )
             )
 
             fig.update_layout(
-                **CHART_LAYOUT,
-                xaxis={"dtick": 4, **CHART_LAYOUT["xaxis"]},
+                paper_bgcolor=COLORS["bg"],
+                plot_bgcolor=COLORS["bg"],
+                font={"color": COLORS["text"], "family": "Space Grotesk, sans-serif"},
+                margin={"l": 40, "r": 20, "t": 10, "b": 60},
+                xaxis={
+                    "dtick": 4,
+                    "gridcolor": COLORS["bg"],
+                    "zerolinecolor": COLORS["bg"],
+                    "tickangle": 45,
+                },
+                yaxis={
+                    "gridcolor": COLORS["bg"],
+                    "zerolinecolor": COLORS["bg"],
+                },
             )
 
             return fig
 
         except Exception as e:
             logger.error(f"Error creating heatmap: {e}")
-            return fig
-
-    @app.callback(
-        Output("reaction-chart", "figure"),
-        [
-            Input("selected-chat", "data"),
-            Input("computed-start-date", "data"),
-            Input("computed-end-date", "data"),
-        ],
-    )
-    def update_reaction_chart(
-        chat_id: Optional[int],
-        start_date: Optional[str],
-        end_date: Optional[str],
-    ) -> go.Figure:
-        """Update reaction distribution chart."""
-        fig = go.Figure()
-        fig.update_layout(**CHART_LAYOUT)
-
-        if not chat_id:
-            return fig
-
-        date_range = parse_date_range(start_date, end_date)
-        if not date_range:
-            return fig
-
-        queries = app.server.config.get("queries")
-        if not queries:
-            return fig
-
-        try:
-            start, end = date_range
-            df = queries.get_reaction_distribution(chat_id, start, end, limit=10)
-
-            if df.empty:
-                return fig
-
-            fig = go.Figure(
-                data=go.Bar(
-                    x=df["count"],
-                    y=df["emoji_value"],
-                    orientation="h",
-                    marker={"color": COLORS["primary"]},
-                    hovertemplate="<b>%{y}</b><br>Count: %{x}<extra></extra>",
-                )
-            )
-
-            fig.update_layout(
-                **CHART_LAYOUT,
-                yaxis={"categoryorder": "total ascending"},
-            )
-
-            return fig
-
-        except Exception as e:
-            logger.error(f"Error creating reaction chart: {e}")
             return fig
 
     @app.callback(
@@ -810,6 +814,7 @@ def register_callbacks(app) -> None:
             Output("period-180d", "className"),
             Output("period-365d", "className"),
             Output("period-ytd", "className"),
+            Output("period-max", "className"),
         ],
         [
             Input("period-24h", "n_clicks"),
@@ -819,6 +824,7 @@ def register_callbacks(app) -> None:
             Input("period-180d", "n_clicks"),
             Input("period-365d", "n_clicks"),
             Input("period-ytd", "n_clicks"),
+            Input("period-max", "n_clicks"),
         ],
         prevent_initial_call=True,
     )
@@ -830,15 +836,16 @@ def register_callbacks(app) -> None:
         clicks_180d: int,
         clicks_365d: int,
         clicks_ytd: int,
+        clicks_max: int,
     ):
         """Update date range based on period button selection."""
         triggered = ctx.triggered_id
         today = datetime.now().date()
 
-        # Default classes (7 buttons)
-        classes = ["period-tab"] * 7
+        # Default classes (8 buttons)
+        classes = ["period-tab"] * 8
 
-        # Period mapping: (days_back, class_index)
+        # Period mapping: (days_back_or_special, class_index)
         periods = {
             "period-24h": (1, 0),
             "period-7d": (7, 1),
@@ -847,17 +854,21 @@ def register_callbacks(app) -> None:
             "period-180d": (180, 4),
             "period-365d": (365, 5),
             "period-ytd": ("ytd", 6),
+            "period-max": ("max", 7),
         }
 
         if triggered in periods:
-            days_or_ytd, idx = periods[triggered]
+            days_or_special, idx = periods[triggered]
             classes[idx] = "period-tab active"
 
-            if days_or_ytd == "ytd":
+            if days_or_special == "ytd":
                 # Year to date: Jan 1 of current year to today
                 start = datetime(today.year, 1, 1).date()
+            elif days_or_special == "max":
+                # All time: use a date far in the past
+                start = datetime(1970, 1, 1).date()
             else:
-                start = today - timedelta(days=days_or_ytd)
+                start = today - timedelta(days=days_or_special)
         else:
             # Default to 7d
             start = today - timedelta(days=7)

@@ -137,6 +137,12 @@ def create_period_selector() -> html.Div:
                         className="period-tab",
                         n_clicks=0,
                     ),
+                    html.Button(
+                        "MAX",
+                        id="period-max",
+                        className="period-tab",
+                        n_clicks=0,
+                    ),
                 ],
             ),
             html.Div(
@@ -332,9 +338,9 @@ def create_main_charts() -> html.Div:
     return html.Div(
         className="charts-grid",
         children=[
-            # Message Timeline (full width)
+            # Message Activity
             html.Div(
-                className="chart-container full-width",
+                className="chart-container",
                 children=[
                     html.H3("Message Activity", className="chart-title"),
                     dcc.Loading(
@@ -344,6 +350,25 @@ def create_main_charts() -> html.Div:
                         children=[
                             dcc.Graph(
                                 id="message-timeline-chart",
+                                config={"displayModeBar": False},
+                                className="chart",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            # Active Users
+            html.Div(
+                className="chart-container",
+                children=[
+                    html.H3("Active Users", className="chart-title"),
+                    dcc.Loading(
+                        id="loading-users",
+                        type="circle",
+                        color="#00d9ff",
+                        children=[
+                            dcc.Graph(
+                                id="active-users-chart",
                                 config={"displayModeBar": False},
                                 className="chart",
                             ),
@@ -363,25 +388,6 @@ def create_main_charts() -> html.Div:
                         children=[
                             dcc.Graph(
                                 id="activity-heatmap-chart",
-                                config={"displayModeBar": False},
-                                className="chart",
-                            ),
-                        ],
-                    ),
-                ],
-            ),
-            # Reaction Distribution
-            html.Div(
-                className="chart-container",
-                children=[
-                    html.H3("Top Reactions", className="chart-title"),
-                    dcc.Loading(
-                        id="loading-reactions",
-                        type="circle",
-                        color="#00d9ff",
-                        children=[
-                            dcc.Graph(
-                                id="reaction-chart",
                                 config={"displayModeBar": False},
                                 className="chart",
                             ),

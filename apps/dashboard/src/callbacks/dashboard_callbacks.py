@@ -217,12 +217,18 @@ def register_callbacks(app) -> None:
             badges = []
             for r in top_reactions:
                 is_custom = r['emoji'] == '$'
-                emoji_class = "reaction-emoji reaction-emoji--custom" if is_custom else "reaction-emoji"
+                if is_custom:
+                    emoji_content = html.Span(
+                        className="reaction-emoji reaction-emoji--custom",
+                        children=[html.Span("pa"), html.Span("id")]
+                    )
+                else:
+                    emoji_content = html.Span(r['emoji'], className="reaction-emoji")
                 badges.append(
                     html.Span(
                         className="reaction-badge",
                         children=[
-                            html.Span(r['emoji'], className=emoji_class),
+                            emoji_content,
                             html.Span(f"{r['count']:,}", className="reaction-count"),
                         ]
                     )

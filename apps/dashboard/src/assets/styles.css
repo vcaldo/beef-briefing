@@ -467,8 +467,15 @@ body {
 }
 
 .reaction-emoji--custom {
-  color: #22c55e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.65rem;
+  line-height: 1.1;
   font-weight: 700;
+  color: #22c55e;
+  text-transform: uppercase;
+  margin-right: var(--space-xs);
 }
 
 .reaction-count {

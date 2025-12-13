@@ -53,10 +53,6 @@ class Config:
     # Access Control
     admin_user_ids: List[int] = field(default_factory=lambda: _parse_chat_ids(os.getenv('ADMIN_USER_IDS', '')))
 
-    # API Service Configuration
-    api_service_url: str = field(default_factory=lambda: os.getenv('API_SERVICE_URL', 'http://api-service:8080'))
-    analytics_api_key: str = field(default_factory=lambda: os.getenv('ANALYTICS_API_KEY', ''))
-
     # Session Configuration
     session_lifetime_days: int = field(default_factory=lambda: int(os.getenv('SESSION_LIFETIME_DAYS', '7')))
     flask_secret_key: str = field(default='')

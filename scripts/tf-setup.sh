@@ -84,7 +84,6 @@ LINODE_REGION=$(get_env "LINODE_REGION")
 LINODE_INSTANCE_TYPE=$(get_env "LINODE_INSTANCE_TYPE")
 LINODE_HOSTNAME=$(get_env "LINODE_HOSTNAME")
 DOMAIN_NAME=$(get_env "DOMAIN_NAME")
-ADMIN_PANEL_DOMAIN_SUFFIX=$(get_env "ADMIN_PANEL_DOMAIN_SUFFIX")
 NEW_RELIC_KEY=$(get_env "NEW_RELIC_API_KEY")
 NEW_RELIC_ACCOUNT=$(get_env "NEW_RELIC_ACCOUNT_ID")
 NEW_RELIC_REGION=$(get_env "NEW_RELIC_REGION")
@@ -120,7 +119,6 @@ if [[ -n "$DOMAIN_NAME" ]]; then
     log_success "Populated domain_email as admin@$DOMAIN_NAME"
 fi
 
-update_tfvar '# admin_panel_domain_suffix = ".*"' "admin_panel_domain_suffix = \"$ADMIN_PANEL_DOMAIN_SUFFIX\"" "admin_panel_domain_suffix" "$ADMIN_PANEL_DOMAIN_SUFFIX"
 update_tfvar '# new_relic_license_key = ".*"' "new_relic_license_key = \"$NEW_RELIC_KEY\"" "new_relic_license_key" "$NEW_RELIC_KEY"
 update_tfvar '# new_relic_account_id = ".*"' "new_relic_account_id = \"$NEW_RELIC_ACCOUNT\"" "new_relic_account_id" "$NEW_RELIC_ACCOUNT"
 update_tfvar '# new_relic_region = ".*"' "new_relic_region = \"$NEW_RELIC_REGION\"" "new_relic_region" "$NEW_RELIC_REGION"

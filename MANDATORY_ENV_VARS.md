@@ -51,29 +51,19 @@
 
 ### Secrets (Must Generate)
 
-- [ ] `ADMIN_PASSWORD_HASH_FILE` or `ADMIN_PASSWORD_HASH`
-  - **Description:** Bcrypt hash of admin password
+- [ ] `FLASK_SECRET_KEY_FILE`
+  - **Description:** Flask session secret key for dashboard
   - **Files:**
-    - `apps/admin-panel/internal/config/config.go:22-23`
-    - `infrastructure/.env.prod.example:65`
-  - **Generate:** `make admin-panel-set-secrets-files`
-  - **Validation:** Must set one of the two options
-
-- [ ] `SESSION_SECRET_FILE` or `SESSION_SECRET`
-  - **Description:** Base64-encoded 32-byte session secret
-  - **Files:**
-    - `apps/admin-panel/internal/config/config.go:24-25`
-    - `infrastructure/.env.prod.example:66`
-  - **Generate:** `make admin-panel-set-secrets-files`
-  - **Validation:** Must be at least 32 bytes when decoded
+    - `apps/dashboard/app.py`
+    - `infrastructure/.env.prod.example`
+  - **Generate:** `make secrets-dashboard`
 
 - [ ] `ANALYTICS_API_KEY_FILE` or `ANALYTICS_API_KEY`
   - **Description:** API key for analytics endpoints
   - **Files:**
     - `pkg/config/config.go:41-42`
-    - `apps/admin-panel/internal/config/config.go:17-18`
     - `infrastructure/.env.prod.example:54`
-  - **Generate:** `make generate-analytics-api-key`
+  - **Generate:** `make secrets-analytics-api-key`
 
 - [ ] `TRAEFIK_DASHBOARD_USERS`
   - **Description:** Htpasswd credentials for Traefik dashboard (bcrypt)
@@ -100,7 +90,7 @@
 - [ ] `ENVIRONMENT` - Default: `development` | `production`
 - [ ] `LOG_LEVEL` - Default: `info` | Options: `debug`, `info`, `warn`, `error`
 - [ ] `API_PORT` - Default: `8080`
-- [ ] `ADMIN_PANEL_PORT` - Default: `8081`
+- [ ] `DASHBOARD_PORT` - Default: `8050`
 - [ ] `MAX_UPLOAD_SIZE_MB` - Default: `100`
 
 ### New Relic (Optional)

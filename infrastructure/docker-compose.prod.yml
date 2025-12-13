@@ -190,8 +190,8 @@ services:
       - "traefik.http.routers.traefik-api.middlewares=traefik-auth"
       - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_USERS}"
     restart: unless-stopped
-    depends_on:
-      - dashboard
+    # depends_on:
+    #   - dashboard
 
 networks:
   beef-prod-network:

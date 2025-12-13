@@ -889,7 +889,7 @@ def register_callbacks(app) -> None:
 
         # Truncate title for display
         title = chat_info.get("title", "Unknown")
-        max_length = 25
+        max_length = 45
         truncated = title if len(title) <= max_length else title[:max_length - 1].rstrip() + "…"
 
         return icon, truncated, title

@@ -11,7 +11,6 @@ A Go-based Telegram bot system for managing beef briefing subscriptions with RES
 - **Database**: PostgreSQL 17 with PostGIS 3.4
 - **Storage**: MinIO (dev) / Linode Object Storage (prod)
 - **Reverse Proxy**: Traefik v3 with Let's Encrypt SSL
-- **Frontend**: Flask, Jinja2, Tailwind CSS, ECharts (Dashboard)
 - **Infrastructure**: Terraform (Linode), Docker Compose
 
 ## Architecture
@@ -56,12 +55,10 @@ The system consists of 3 main Go services:
 
 ```
 Internet (443/80) → Traefik (SSL termination)
-                         ├─→ Dashboard (/beef-dashboard)
                          └─→ Traefik Dashboard (/dashboard)
 
 Internal Docker Network:
   ├─ API Service (8080) ←→ Telegram Bot
-  ├─ Dashboard (8050)
   └─ PostgreSQL (5432)
 ```
 
@@ -78,7 +75,6 @@ make down            # Stop all services
 make logs            # Tail logs from all services
 make logs-api        # Tail specific service logs
 make logs-bot
-make logs-dashboard
 make clean           # Stop and remove volumes
 ```
 
@@ -124,7 +120,6 @@ make tf-ip            # Point domain A record to this IP
 
 # 4. Generate secrets
 make secrets-traefik-password
-make secrets-dashboard
 make secrets-analytics-api-key
 
 # 5. Deploy
@@ -194,13 +189,6 @@ make secrets-traefik-password
 ```
 
 Updates `TRAEFIK_DASHBOARD_USERS` in `.env.prod` with bcrypt hash ($$2y$$ escaping for docker-compose).
-
-**Dashboard** (Flask secret key):
-```bash
-make secrets-dashboard
-```
-
-Generates Flask secret key at `infrastructure/secrets/apps/dashboard/flask_secret_key`.
 
 **Analytics API Key**:
 ```bash
@@ -274,9 +262,6 @@ curl http://localhost:8080/health
 curl -X POST http://localhost:8080/api/v1/ingest \
   -F 'update={"update_id":1,"message":{"message_id":1,"chat":{"id":-100123,"type":"supergroup"},"from":{"id":456,"first_name":"User"},"date":1733611200,"text":"Test"}}'
 
-# Access dashboard
-# Visit http://localhost:8050
-
 # Test Telegram bot
 # Send a message to your bot in Telegram
 # Check logs: make logs-bot
@@ -288,7 +273,6 @@ curl -X POST http://localhost:8080/api/v1/ingest \
 beef-briefing/
 ├── apps/
 │   ├── api-service/       # REST API for Telegram data ingestion (includes embedded migrations)
-│   ├── dashboard/         # Flask analytics dashboard
 │   ├── telegram-bot/      # Telegram bot client
 │   └── import-cli/        # CLI for importing Telegram exports
 ├── infrastructure/
@@ -335,7 +319,6 @@ All Go services use `log/slog`:
 ### Traefik Configuration
 
 Production routing rules in `docker-compose.prod.yml`:
-- Dashboard: `https://yourdomain.com/beef-dashboard`
 - Traefik dashboard: `https://yourdomain.com/dashboard` (basic auth)
 - All HTTP traffic redirects to HTTPS
 - Let's Encrypt certificates stored in `infrastructure/letsencrypt/acme.json`

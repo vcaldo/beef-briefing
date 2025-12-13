@@ -68,46 +68,6 @@ services:
       - beef-prod-network
     restart: unless-stopped
 
-  dashboard:
-    build:
-      context: ..
-      dockerfile: apps/dashboard/Dockerfile
-    image: beef-briefing/dashboard:${IMAGE_TAG}
-    container_name: beef-dashboard-prod
-    environment:
-      DB_HOST: postgres
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_PORT: 5432
-      DB_SSL_MODE: disable
-      DASHBOARD_PORT: ${DASHBOARD_PORT:-8050}
-      DASHBOARD_DOMAIN: ${DOMAIN_NAME}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
-      ALLOWED_CHAT_IDS: ${ALLOWED_CHAT_IDS}
-      SESSION_LIFETIME_DAYS: ${SESSION_LIFETIME_DAYS:-7}
-      FLASK_SECRET_KEY_FILE: /app/secrets/flask_secret_key
-      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}-dashboard-production
-      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
-      ENVIRONMENT: production
-      LOG_LEVEL: info
-    volumes:
-      - ./secrets/dashboard:/app/secrets:ro
-    depends_on:
-      - postgres
-    networks:
-      - beef-prod-network
-    labels:
-      - "traefik.enable=true"
-      # Router configuration
-      - 'traefik.http.routers.dashboard.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/beef-dashboard`)'
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
-      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
-      # Service configuration
-      - "traefik.http.services.dashboard.loadbalancer.server.port=${DASHBOARD_PORT:-8050}"
-    restart: unless-stopped
-
   traefik:
     image: traefik:v3.6.4
     container_name: beef-traefik-prod
@@ -155,8 +115,6 @@ services:
       - "traefik.http.routers.traefik-api.middlewares=traefik-auth"
       - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_USERS}"
     restart: unless-stopped
-    depends_on:
-      - dashboard
 
 networks:
   beef-prod-network:

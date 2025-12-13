@@ -22,7 +22,6 @@ API_SERVICE := api-service
 TELEGRAM_BOT := telegram-bot
 POSTGRES_SERVICE := postgres
 MINIO_SERVICE := minio
-DASHBOARD := dashboard
 NEWRELIC_INFRA := newrelic-infra
 TRAEFIK := traefik
 
@@ -31,9 +30,6 @@ API_DIR := apps/api-service
 BOT_DIR := apps/telegram-bot
 IMPORT_CLI_DIR := apps/import-cli
 PKG_DIR := pkg/config
-
-# Python directories
-DASHBOARD_DIR := apps/dashboard
 
 # Git
 COMMIT_HASH ?= $(shell git rev-parse --short HEAD)
@@ -148,9 +144,6 @@ docker-build-api: ## Rebuild api-service image
 docker-build-bot: ## Rebuild telegram-bot image
 	$(DC) build $(TELEGRAM_BOT)
 
-docker-build-dashboard: ## Rebuild dashboard image
-	$(DC) build $(DASHBOARD)
-
 # =============================================================================
 # DOCKER LOGS (docker-logs-*)
 # =============================================================================
@@ -169,9 +162,6 @@ docker-logs-postgres: ## Tail logs from postgres
 docker-logs-minio: ## Tail logs from minio
 	$(DC) logs -f $(MINIO_SERVICE)
 
-docker-logs-dashboard: ## Tail logs from dashboard
-	$(DC) logs -f $(DASHBOARD)
-
 docker-logs-newrelic: ## Tail logs from newrelic-infra
 	$(DC) logs -f $(NEWRELIC_INFRA)
 
@@ -189,9 +179,6 @@ docker-shell-postgres: ## Open shell in postgres container
 
 docker-shell-minio: ## Open shell in minio container
 	$(DC) exec $(MINIO_SERVICE) /bin/sh
-
-docker-shell-dashboard: ## Open shell in dashboard container
-	$(DC) exec $(DASHBOARD) /bin/bash
 
 docker-shell-newrelic: ## Open shell in newrelic-infra container
 	$(DC) exec $(NEWRELIC_INFRA) /bin/sh
@@ -267,15 +254,6 @@ secrets-analytics-api-key: ## Generate analytics API key
 	@echo ""
 	@echo "Generated key:"
 	@cat $(SECRETS_DIR)/apps/api-service/analytics_api_key
-	@echo ""
-	@echo "This key will be automatically deployed to production when you run 'make deploy'"
-
-secrets-dashboard: ## Generate Flask secret key for dashboard
-	@echo "Generating dashboard secrets..."
-	@mkdir -p $(SECRETS_DIR)/apps/dashboard
-	@openssl rand -base64 32 > $(SECRETS_DIR)/apps/dashboard/flask_secret_key
-	@chmod 600 $(SECRETS_DIR)/apps/dashboard/flask_secret_key
-	@echo "Flask secret key generated at $(SECRETS_DIR)/apps/dashboard/flask_secret_key"
 	@echo ""
 	@echo "This key will be automatically deployed to production when you run 'make deploy'"
 
@@ -414,14 +392,14 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	dev-up dev-up-build dev-up-logs dev-down dev-restart dev-ps dev-clean dev-prune \
 	prod-deploy prod-deploy-skip-build prod-deploy-skip-cleanup prod-deploy-regenerate-certs \
 	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik \
-	docker-build docker-build-api docker-build-bot docker-build-dashboard \
+	docker-build docker-build-api docker-build-bot \
 	docker-logs docker-logs-api docker-logs-bot docker-logs-postgres docker-logs-minio \
-	docker-logs-dashboard docker-logs-newrelic \
+	docker-logs-newrelic \
 	docker-shell-api docker-shell-bot docker-shell-postgres docker-shell-minio \
-	docker-shell-dashboard docker-shell-newrelic \
+	docker-shell-newrelic \
 	go-build go-build-api go-build-bot go-build-import-cli go-build-import-cli-prod go-clean \
 	go-fmt go-fmt-check \
-	secrets-traefik-password secrets-analytics-api-key secrets-dashboard \
+	secrets-traefik-password secrets-analytics-api-key \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-arch tf-root-pass \

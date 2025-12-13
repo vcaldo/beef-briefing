@@ -478,3 +478,87 @@ class DashboardQueries:
             }
             for row in result
         ]
+
+    def get_chat_card_data(
+        self,
+        chat_ids: Optional[List[int]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get enriched chat data for welcome page cards.
+
+        Args:
+            chat_ids: Optional list of chat IDs to filter by.
+                      If None, returns all groups/supergroups.
+
+        Returns:
+            List of chat data dictionaries with:
+            - id, type, title
+            - message_count
+            - user_count (distinct users who posted)
+            - last_activity (max message date)
+            - avg_messages_per_day
+        """
+        # Build the WHERE clause for chat filtering
+        chat_filter = "c.type IN ('group', 'supergroup')"
+        params = {}
+
+        if chat_ids:
+            chat_filter += " AND c.id = ANY(:chat_ids)"
+            params["chat_ids"] = chat_ids
+
+        query = text(f"""
+            WITH chat_stats AS (
+                SELECT
+                    m.chat_id,
+                    COUNT(*) as message_count,
+                    COUNT(DISTINCT m.user_id) as user_count,
+                    MAX(m.date) as last_activity,
+                    MIN(m.date) as first_activity
+                FROM messages m
+                GROUP BY m.chat_id
+            )
+            SELECT
+                c.id,
+                c.type::text as chat_type,
+                c.title,
+                c.username,
+                COALESCE(cs.message_count, 0) as message_count,
+                COALESCE(cs.user_count, 0) as user_count,
+                cs.last_activity,
+                cs.first_activity,
+                CASE
+                    WHEN cs.first_activity IS NOT NULL
+                         AND cs.last_activity IS NOT NULL
+                         AND cs.last_activity > cs.first_activity
+                    THEN ROUND(
+                        cs.message_count::numeric /
+                        GREATEST(
+                            EXTRACT(EPOCH FROM (cs.last_activity - cs.first_activity)) / 86400,
+                            1
+                        ),
+                        1
+                    )
+                    ELSE cs.message_count
+                END as avg_messages_per_day
+            FROM chats c
+            LEFT JOIN chat_stats cs ON c.id = cs.chat_id
+            WHERE {chat_filter}
+            ORDER BY cs.message_count DESC NULLS LAST
+        """)
+
+        with self.engine.connect() as conn:
+            result = conn.execute(query, params).fetchall()
+
+        return [
+            {
+                "id": row.id,
+                "type": row.chat_type,
+                "title": row.title,
+                "username": row.username,
+                "message_count": row.message_count,
+                "user_count": row.user_count,
+                "last_activity": row.last_activity,
+                "avg_messages_per_day": float(row.avg_messages_per_day) if row.avg_messages_per_day else 0.0,
+            }
+            for row in result
+        ]

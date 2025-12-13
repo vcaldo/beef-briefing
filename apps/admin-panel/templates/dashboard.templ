@@ -28,7 +28,7 @@ templ dashboardContent(chats []Chat) {
 				{ fmt.Sprintf("%d", len(chats)) } chats
 			</div>
 		</div>
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+		<div class="flex flex-wrap justify-center gap-4">
 			for _, chat := range chats {
 				@chatCard(chat)
 			}
@@ -45,7 +45,7 @@ templ dashboardContent(chats []Chat) {
 }
 
 templ chatCard(chat Chat) {
-	<a href={ templ.SafeURL(fmt.Sprintf("/chats/%d", chat.ID)) } class="card glass-card hover:translate-y-[-2px] transition-all duration-200">
+	<a href={ templ.SafeURL(fmt.Sprintf("/chats/%d", chat.ID)) } class="card glass-card hover:translate-y-[-2px] transition-all duration-200 w-full sm:w-80">
 		<div class="card-body">
 			<div class="flex items-start justify-between">
 				<div class="flex-1 min-w-0">

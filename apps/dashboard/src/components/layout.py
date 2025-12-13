@@ -162,6 +162,22 @@ def create_overview_cards() -> html.Div:
     return html.Div(
         className="overview-cards",
         children=[
+            # 1. Top User
+            html.Div(
+                className="stat-card",
+                id="card-topuser",
+                children=[
+                    html.Div(className="stat-icon topuser-icon", children="🏆"),
+                    html.Div(
+                        className="stat-content",
+                        children=[
+                            html.Span("Top User", className="stat-label"),
+                            html.Span("--", id="stat-topuser", className="stat-value"),
+                        ],
+                    ),
+                ],
+            ),
+            # 2. Total Messages
             html.Div(
                 className="stat-card",
                 id="card-messages",
@@ -176,11 +192,12 @@ def create_overview_cards() -> html.Div:
                     ),
                 ],
             ),
+            # 3. Active Users
             html.Div(
                 className="stat-card",
                 id="card-users",
                 children=[
-                    html.Div(className="stat-icon users-icon", children="👥"),
+                    html.Div(className="stat-icon users-icon", children="👪"),
                     html.Div(
                         className="stat-content",
                         children=[
@@ -190,11 +207,12 @@ def create_overview_cards() -> html.Div:
                     ),
                 ],
             ),
+            # 4. Reactions
             html.Div(
                 className="stat-card",
                 id="card-reactions",
                 children=[
-                    html.Div(className="stat-icon reactions-icon", children="❤️"),
+                    html.Div(className="stat-icon reactions-icon", children="🔥"),
                     html.Div(
                         className="stat-content",
                         children=[
@@ -204,11 +222,27 @@ def create_overview_cards() -> html.Div:
                     ),
                 ],
             ),
+            # 5. Msg/Day
+            html.Div(
+                className="stat-card",
+                id="card-msgday",
+                children=[
+                    html.Div(className="stat-icon msgday-icon", children="📈"),
+                    html.Div(
+                        className="stat-content",
+                        children=[
+                            html.Span("Msg/Day", className="stat-label"),
+                            html.Span("--", id="stat-msgday", className="stat-value"),
+                        ],
+                    ),
+                ],
+            ),
+            # 6. Media Shared
             html.Div(
                 className="stat-card",
                 id="card-media",
                 children=[
-                    html.Div(className="stat-icon media-icon", children="📷"),
+                    html.Div(className="stat-icon media-icon", children="📎"),
                     html.Div(
                         className="stat-content",
                         children=[
@@ -218,6 +252,17 @@ def create_overview_cards() -> html.Div:
                     ),
                 ],
             ),
+        ],
+    )
+
+
+def create_top_reactions_row() -> html.Div:
+    """Create the top reactions row with emoji badges."""
+    return html.Div(
+        className="top-reactions-row",
+        children=[
+            html.Span("Top Reactions:", className="reactions-label"),
+            html.Div(id="top-reactions-badges", className="reactions-badges"),
         ],
     )
 
@@ -303,17 +348,38 @@ def create_main_charts() -> html.Div:
                     ),
                 ],
             ),
-            # User Leaderboard (full width)
+        ],
+    )
+
+
+def create_top_users_section() -> html.Div:
+    """Create the top users leaderboard section."""
+    return html.Div(
+        className="top-users-section",
+        children=[
             html.Div(
                 className="chart-container full-width",
                 children=[
-                    html.H3("Top Contributors", className="chart-title"),
+                    html.H3("Top Users", className="chart-title"),
                     html.Div(
                         className="leaderboard-controls",
                         children=[
-                            html.Button("Top 10", id="lb-10", className="lb-btn active", n_clicks=0),
-                            html.Button("Top 20", id="lb-20", className="lb-btn", n_clicks=0),
-                            html.Button("Top 50", id="lb-50", className="lb-btn", n_clicks=0),
+                            html.Div(
+                                className="limit-controls",
+                                children=[
+                                    html.Button("Top 10", id="lb-10", className="lb-btn active", n_clicks=0),
+                                    html.Button("Top 25", id="lb-25", className="lb-btn", n_clicks=0),
+                                    html.Button("Top 50", id="lb-50", className="lb-btn", n_clicks=0),
+                                ],
+                            ),
+                            html.Div(
+                                className="pagination-controls",
+                                children=[
+                                    html.Button("← Prev", id="lb-prev", className="lb-btn pagination-btn", n_clicks=0),
+                                    html.Span(id="pagination-info", className="pagination-info"),
+                                    html.Button("Next →", id="lb-next", className="lb-btn pagination-btn", n_clicks=0),
+                                ],
+                            ),
                         ],
                     ),
                     dcc.Loading(
@@ -371,6 +437,8 @@ def create_dashboard_layout(
                         ],
                     ),
                     create_overview_cards(),
+                    create_top_reactions_row(),
+                    create_top_users_section(),
                     create_main_charts(),
                 ],
             ),
@@ -386,6 +454,7 @@ def create_dashboard_layout(
             dcc.Store(id="selected-period", data="week"),
             dcc.Store(id="selected-chat", data=default_chat_id),
             dcc.Store(id="leaderboard-limit", data=10),
+            dcc.Store(id="leaderboard-page", data=1),
         ],
     )
 

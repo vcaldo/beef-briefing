@@ -165,7 +165,7 @@ def create_period_selector() -> html.Div:
     )
 
 
-def truncate_title(title: str, max_length: int = 30) -> str:
+def truncate_title(title: str, max_length: int = 45) -> str:
     if len(title) <= max_length:
         return title
     return title[:max_length - 1].rstrip() + "…"

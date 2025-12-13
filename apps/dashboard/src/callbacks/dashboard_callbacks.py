@@ -4,7 +4,7 @@ Dashboard callbacks for Dash interactivity.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import plotly.express as px
@@ -160,6 +160,9 @@ def register_callbacks(app) -> None:
             Output("stat-users", "children"),
             Output("stat-reactions", "children"),
             Output("stat-media", "children"),
+            Output("stat-msgday", "children"),
+            Output("stat-topuser", "children"),
+            Output("top-reactions-badges", "children"),
         ],
         [
             Input("chat-selector", "value"),
@@ -171,30 +174,45 @@ def register_callbacks(app) -> None:
         chat_id: Optional[int],
         start_date: Optional[str],
         end_date: Optional[str],
-    ) -> Tuple[str, str, str, str]:
-        """Update overview statistics cards."""
+    ):
+        """Update overview statistics cards and top reactions."""
+        empty_result = ("--", "--", "--", "--", "--", "--", [])
+
         if not chat_id or not start_date or not end_date:
-            return "--", "--", "--", "--"
+            return empty_result
 
         queries = app.server.config.get("queries")
         if not queries:
-            return "--", "--", "--", "--"
+            return empty_result
 
         try:
             start = datetime.fromisoformat(start_date)
             end = datetime.fromisoformat(end_date) + timedelta(days=1)
 
             stats = queries.get_overview_stats(chat_id, start, end)
+            top_reactions = queries.get_top_reactions(chat_id, start, end, limit=8)
+
+            # Build reaction badges
+            badges = [
+                html.Span(
+                    className="reaction-badge",
+                    children=f"{r['emoji']} {r['count']:,}"
+                )
+                for r in top_reactions
+            ]
 
             return (
                 f"{stats['total_messages']:,}",
                 f"{stats['active_users']:,}",
                 f"{stats['total_reactions']:,}",
                 f"{stats['media_count']:,}",
+                f"{stats['msg_per_day']:.1f}",
+                stats['top_user_name'],
+                badges,
             )
         except Exception as e:
             logger.error(f"Error fetching overview stats: {e}")
-            return "--", "--", "--", "--"
+            return empty_result
 
     @app.callback(
         Output("message-timeline-chart", "figure"),
@@ -600,7 +618,7 @@ def register_callbacks(app) -> None:
                 if row["username"]:
                     name += f" @{row['username']}"
                 if row["is_premium"]:
-                    name += " ⭐"
+                    name += " 💎"
 
                 records.append({
                     "rank": rank,

@@ -330,9 +330,9 @@ body {
    ===================================================== */
 .overview-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--space-lg);
-  margin-bottom: var(--space-xl);
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
 }
 
 .stat-card {
@@ -354,6 +354,8 @@ body {
 .stat-card:nth-child(2) { animation-delay: 100ms; }
 .stat-card:nth-child(3) { animation-delay: 150ms; }
 .stat-card:nth-child(4) { animation-delay: 200ms; }
+.stat-card:nth-child(5) { animation-delay: 250ms; }
+.stat-card:nth-child(6) { animation-delay: 300ms; }
 
 @keyframes fadeInScale {
   from {
@@ -399,6 +401,48 @@ body {
   font-size: 1.75rem;
   font-weight: 700;
   color: var(--color-text-primary);
+}
+
+/* =====================================================
+   TOP REACTIONS ROW
+   ===================================================== */
+.top-reactions-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-bg-card);
+  backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-xl);
+  animation: fadeInScale 0.6s ease-out forwards;
+  animation-delay: 350ms;
+  opacity: 0;
+}
+
+.reactions-label {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.reactions-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.reaction-badge {
+  background: rgba(0, 217, 255, 0.1);
+  border: 1px solid rgba(0, 217, 255, 0.3);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs) var(--space-md);
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  white-space: nowrap;
 }
 
 /* =====================================================
@@ -928,6 +972,12 @@ body {
 /* =====================================================
    RESPONSIVE
    ===================================================== */
+@media (max-width: 1400px) {
+  .overview-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 1024px) {
   .charts-grid {
     grid-template-columns: 1fr;
@@ -942,6 +992,14 @@ body {
     flex-direction: column;
     align-items: stretch;
   }
+
+  .overview-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .top-reactions-row {
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 768px) {
@@ -951,7 +1009,7 @@ body {
   }
 
   .overview-cards {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .chat-card {
@@ -963,7 +1021,16 @@ body {
   }
 
   .stat-value {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+  }
+
+  .top-reactions-row {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .reaction-badge {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.8rem;
   }
 
   .header-content {
@@ -993,6 +1060,10 @@ body {
 }
 
 @media (max-width: 480px) {
+  .overview-cards {
+    grid-template-columns: 1fr;
+  }
+
   .period-tabs {
     flex-wrap: wrap;
     justify-content: center;

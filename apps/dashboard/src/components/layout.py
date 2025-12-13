@@ -218,6 +218,45 @@ def create_overview_cards() -> html.Div:
                     ),
                 ],
             ),
+            html.Div(
+                className="stat-card",
+                id="card-msgday",
+                children=[
+                    html.Div(className="stat-icon msgday-icon", children="📊"),
+                    html.Div(
+                        className="stat-content",
+                        children=[
+                            html.Span("Msg/Day", className="stat-label"),
+                            html.Span("--", id="stat-msgday", className="stat-value"),
+                        ],
+                    ),
+                ],
+            ),
+            html.Div(
+                className="stat-card",
+                id="card-topuser",
+                children=[
+                    html.Div(className="stat-icon topuser-icon", children="🏆"),
+                    html.Div(
+                        className="stat-content",
+                        children=[
+                            html.Span("Top User", className="stat-label"),
+                            html.Span("--", id="stat-topuser", className="stat-value"),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def create_top_reactions_row() -> html.Div:
+    """Create the top reactions row with emoji badges."""
+    return html.Div(
+        className="top-reactions-row",
+        children=[
+            html.Span("Top Reactions:", className="reactions-label"),
+            html.Div(id="top-reactions-badges", className="reactions-badges"),
         ],
     )
 
@@ -392,6 +431,7 @@ def create_dashboard_layout(
                         ],
                     ),
                     create_overview_cards(),
+                    create_top_reactions_row(),
                     create_top_users_section(),
                     create_main_charts(),
                 ],

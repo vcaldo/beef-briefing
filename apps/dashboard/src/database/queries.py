@@ -28,7 +28,8 @@ class DashboardQueries:
     ) -> Dict[str, Any]:
         """
         Get overview statistics for a chat within a date range.
-        Returns: total_messages, active_users, total_reactions, media_count
+        Returns: total_messages, active_users, total_reactions, media_count,
+                 msg_per_day, top_user_name
         """
         query = text("""
             WITH period_messages AS (
@@ -55,15 +56,30 @@ class DashboardQueries:
                 WHERE m.chat_id = :chat_id
                   AND m.date >= :start_date
                   AND m.date < :end_date
+            ),
+            top_user AS (
+                SELECT u.first_name, m.user_id, COUNT(*) as msg_count
+                FROM messages m
+                JOIN users u ON u.id = m.user_id
+                WHERE m.chat_id = :chat_id
+                  AND m.date >= :start_date
+                  AND m.date < :end_date
+                  AND m.user_id IS NOT NULL
+                  AND u.is_bot = FALSE
+                GROUP BY m.user_id, u.first_name
+                ORDER BY msg_count DESC
+                LIMIT 1
             )
             SELECT
                 pm.total_messages,
                 pm.active_users,
                 pr.total_reactions,
-                pmed.media_count
+                pmed.media_count,
+                tu.first_name as top_user_name
             FROM period_messages pm
             CROSS JOIN period_reactions pr
             CROSS JOIN period_media pmed
+            LEFT JOIN top_user tu ON TRUE
         """)
 
         with self.engine.connect() as conn:
@@ -73,18 +89,26 @@ class DashboardQueries:
                 "end_date": end_date,
             }).fetchone()
 
+        # Calculate msg_per_day from the date range
+        days = max((end_date - start_date).days, 1)
+
         if result:
+            total_messages = result.total_messages or 0
             return {
-                "total_messages": result.total_messages or 0,
+                "total_messages": total_messages,
                 "active_users": result.active_users or 0,
                 "total_reactions": result.total_reactions or 0,
                 "media_count": result.media_count or 0,
+                "msg_per_day": total_messages / days,
+                "top_user_name": result.top_user_name or "--",
             }
         return {
             "total_messages": 0,
             "active_users": 0,
             "total_reactions": 0,
             "media_count": 0,
+            "msg_per_day": 0.0,
+            "top_user_name": "--",
         }
 
     def get_daily_activity(
@@ -352,6 +376,41 @@ class DashboardQueries:
             })
 
         return df
+
+    def get_top_reactions(
+        self,
+        chat_id: int,
+        start_date: datetime,
+        end_date: datetime,
+        limit: int = 8
+    ) -> List[Dict[str, Any]]:
+        """
+        Get top reactions for the stats bar.
+        Returns list of dicts with emoji and count.
+        """
+        query = text("""
+            SELECT
+                COALESCE(emoji_value, custom_emoji_id, 'paid') as emoji,
+                COUNT(*) as count
+            FROM message_reactions
+            WHERE chat_id = :chat_id
+              AND date >= :start_date
+              AND date < :end_date
+              AND is_removed = FALSE
+            GROUP BY emoji_value, custom_emoji_id
+            ORDER BY count DESC
+            LIMIT :limit
+        """)
+
+        with self.engine.connect() as conn:
+            result = conn.execute(query, {
+                "chat_id": chat_id,
+                "start_date": start_date,
+                "end_date": end_date,
+                "limit": limit,
+            }).fetchall()
+
+        return [{"emoji": row.emoji, "count": row.count} for row in result]
 
     def get_media_distribution(
         self,

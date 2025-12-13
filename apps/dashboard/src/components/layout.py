@@ -624,7 +624,7 @@ def create_chat_card(chat: Dict[str, Any]) -> html.A:
                 children=[
                     html.Span(icon, className="chat-icon"),
                     html.H3(
-                        truncate_title(chat.get("title", "Unknown Chat"), 35),
+                        truncate_title(chat.get("title", "Unknown Chat"), 45),
                         className="chat-title",
                         title=chat.get("title", ""),  # Full title on hover
                     ),

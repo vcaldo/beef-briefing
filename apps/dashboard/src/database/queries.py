@@ -4,7 +4,7 @@ Contains SQL queries for dashboard visualizations.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -698,3 +698,41 @@ class DashboardQueries:
             result = conn.execute(query, {"chat_id": chat_id}).fetchall()
 
         return [row.year for row in result]
+
+    def get_user_active_chats(self, user_id: int, days: int = 15) -> List[int]:
+        """
+        Get chat IDs where user was active (sent messages or reactions) in the last N days.
+
+        Args:
+            user_id: Telegram user ID
+            days: Number of days to look back for activity
+
+        Returns:
+            List of chat IDs where the user has been active
+        """
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=days)
+
+        query = text("""
+            SELECT DISTINCT chat_id
+            FROM (
+                SELECT chat_id FROM messages
+                WHERE user_id = :user_id AND date >= :start_date AND date < :end_date
+
+                UNION
+
+                SELECT chat_id FROM message_reactions
+                WHERE user_id = :user_id AND date >= :start_date AND date < :end_date
+                    AND is_removed = false
+            ) AS active_chats
+            ORDER BY chat_id
+        """)
+
+        with self.engine.connect() as conn:
+            result = conn.execute(query, {
+                "user_id": user_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            }).fetchall()
+
+        return [row.chat_id for row in result]

@@ -355,7 +355,7 @@ class DashboardQueries:
         query = text("""
             SELECT
                 CASE
-                    WHEN reaction_type IN ('custom_emoji', 'paid') THEN '$'
+                    WHEN reaction_type = 'paid' THEN '$'
                     ELSE emoji_value
                 END as emoji_value,
                 COUNT(*) as count
@@ -364,9 +364,13 @@ class DashboardQueries:
               AND date >= :start_date
               AND date < :end_date
               AND is_removed = FALSE
+              AND (
+                (reaction_type = 'emoji' AND emoji_value IS NOT NULL AND emoji_value != '')
+                OR reaction_type = 'paid'
+              )
             GROUP BY
                 CASE
-                    WHEN reaction_type IN ('custom_emoji', 'paid') THEN '$'
+                    WHEN reaction_type = 'paid' THEN '$'
                     ELSE emoji_value
                 END
             ORDER BY count DESC

@@ -245,7 +245,7 @@ cd ~/beef-briefing/apps/import-cli
 
 ### Adding a New Telegram Message Type
 
-1. Update database schema in `apps/postgres/migrations/`
+1. Update database schema in `apps/api-service/internal/migrations/sql/`
 2. Add corresponding structs in `apps/api-service/internal/models/telegram.go`
 3. Update repository layer in `apps/api-service/internal/repository/`
 4. Update service layer in `apps/api-service/internal/services/ingest_service.go`
@@ -287,13 +287,10 @@ curl -X POST http://localhost:8080/api/v1/ingest \
 ```
 beef-briefing/
 ├── apps/
-│   ├── api-service/       # REST API for Telegram data ingestion
+│   ├── api-service/       # REST API for Telegram data ingestion (includes embedded migrations)
 │   ├── dashboard/         # Flask analytics dashboard
 │   ├── telegram-bot/      # Telegram bot client
-│   ├── import-cli/        # CLI for importing Telegram exports
-│   └── postgres/
-│       ├── migrations/    # SQL database migrations
-│       └── seeds/         # SQL seed data
+│   └── import-cli/        # CLI for importing Telegram exports
 ├── infrastructure/
 │   ├── docker-compose.dev.yml     # Development environment
 │   ├── docker-compose.prod.yml    # Production with Traefik
@@ -326,7 +323,7 @@ The bot must be **admin** in groups to receive:
 
 ### Database Migrations
 
-Migrations are in `apps/postgres/migrations/`. They run automatically when the postgres container starts via the Dockerfile's entrypoint script.
+Migrations are embedded in `apps/api-service/internal/migrations/sql/`. They run automatically when the API service starts, tracked via a `schema_migrations` table.
 
 ### Logging Standards
 

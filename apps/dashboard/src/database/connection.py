@@ -15,10 +15,6 @@ from src.config import Config
 
 logger = logging.getLogger(__name__)
 
-# Global engine instance
-_engine: Optional[Engine] = None
-_SessionLocal: Optional[sessionmaker] = None
-
 
 class DatabaseConnection:
     """Database connection manager."""
@@ -89,40 +85,3 @@ class DatabaseConnection:
         if self._engine:
             self._engine.dispose()
             logger.info("Database connection closed")
-
-
-def get_engine(config: Config) -> Engine:
-    """Get or create the global engine instance."""
-    global _engine
-
-    if _engine is None:
-        _engine = create_engine(
-            config.database_url,
-            pool_size=5,
-            max_overflow=10,
-            pool_timeout=30,
-            pool_recycle=1800,
-            pool_pre_ping=True,
-            echo=not config.is_production(),
-        )
-
-    return _engine
-
-
-def get_session(config: Config) -> Generator[Session, None, None]:
-    """Get a database session generator."""
-    global _SessionLocal
-
-    if _SessionLocal is None:
-        engine = get_engine(config)
-        _SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-
-    session = _SessionLocal()
-    try:
-        yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()

@@ -2,7 +2,7 @@
 Main dashboard layout component.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from dash import dcc, html
@@ -166,7 +166,6 @@ def create_period_selector() -> html.Div:
 
 
 def truncate_title(title: str, max_length: int = 30) -> str:
-    """Truncate title to max length with ellipsis."""
     if len(title) <= max_length:
         return title
     return title[:max_length - 1].rstrip() + "…"
@@ -472,7 +471,6 @@ def create_dashboard_layout(
         default_chat_id = chats[0]["id"]
 
     # Calculate default dates (last 7 days)
-    from datetime import datetime, timedelta
     today = datetime.now().date()
     default_start = (today - timedelta(days=7)).isoformat()
     default_end = today.isoformat()
@@ -563,8 +561,6 @@ def format_last_activity(last_activity: Optional[datetime]) -> str:
 
     now = datetime.now()
     if last_activity.tzinfo:
-        # Make now timezone-aware if last_activity is
-        from datetime import timezone
         now = datetime.now(timezone.utc)
 
     diff = now - last_activity
@@ -721,7 +717,7 @@ def create_welcome_layout(
                                 children=[
                                     html.P("No chats available."),
                                     html.P(
-                                        "You need to have activity in a chat within the last 15 days to see it here.",
+                                        "You need to have recent activity in a chat to see it here.",
                                         className="no-chats-hint"
                                     ),
                                 ],

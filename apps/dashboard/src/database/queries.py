@@ -4,8 +4,8 @@ Contains SQL queries for dashboard visualizations.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from sqlalchemy import text
@@ -388,29 +388,10 @@ class DashboardQueries:
         Get top reactions for the stats bar.
         Returns list of dicts with emoji and count.
         """
-        query = text("""
-            SELECT
-                COALESCE(emoji_value, custom_emoji_id, 'paid') as emoji,
-                COUNT(*) as count
-            FROM message_reactions
-            WHERE chat_id = :chat_id
-              AND date >= :start_date
-              AND date < :end_date
-              AND is_removed = FALSE
-            GROUP BY emoji_value, custom_emoji_id
-            ORDER BY count DESC
-            LIMIT :limit
-        """)
-
-        with self.engine.connect() as conn:
-            result = conn.execute(query, {
-                "chat_id": chat_id,
-                "start_date": start_date,
-                "end_date": end_date,
-                "limit": limit,
-            }).fetchall()
-
-        return [{"emoji": row.emoji, "count": row.count} for row in result]
+        df = self.get_reaction_distribution(chat_id, start_date, end_date, limit=limit)
+        if df.empty:
+            return []
+        return [{"emoji": row.emoji_value, "count": row["count"]} for _, row in df.iterrows()]
 
     def get_media_distribution(
         self,
@@ -419,19 +400,30 @@ class DashboardQueries:
         end_date: datetime
     ) -> pd.DataFrame:
         """
-        Get distribution of media types.
+        Get distribution of media types (combining media_files and photos tables).
         Returns DataFrame with columns: media_type, count
         """
         query = text("""
-            SELECT
-                mf.media_type::text as media_type,
-                COUNT(*) as count
-            FROM media_files mf
-            JOIN messages m ON m.id = mf.message_id
-            WHERE m.chat_id = :chat_id
-              AND m.date >= :start_date
-              AND m.date < :end_date
-            GROUP BY mf.media_type
+            SELECT media_type, SUM(count) as count
+            FROM (
+                SELECT mf.media_type::text as media_type, COUNT(*) as count
+                FROM media_files mf
+                JOIN messages m ON m.id = mf.message_id
+                WHERE m.chat_id = :chat_id
+                  AND m.date >= :start_date
+                  AND m.date < :end_date
+                GROUP BY mf.media_type
+
+                UNION ALL
+
+                SELECT 'photo' as media_type, COUNT(*) as count
+                FROM photos p
+                JOIN messages m ON m.id = p.message_id
+                WHERE m.chat_id = :chat_id
+                  AND m.date >= :start_date
+                  AND m.date < :end_date
+            ) combined
+            GROUP BY media_type
             ORDER BY count DESC
         """)
 
@@ -441,27 +433,6 @@ class DashboardQueries:
                 "start_date": start_date,
                 "end_date": end_date,
             })
-
-        # Also count photos separately (they're in a different table)
-        photo_query = text("""
-            SELECT COUNT(*) as count
-            FROM photos p
-            JOIN messages m ON m.id = p.message_id
-            WHERE m.chat_id = :chat_id
-              AND m.date >= :start_date
-              AND m.date < :end_date
-        """)
-
-        with self.engine.connect() as conn:
-            photo_result = conn.execute(photo_query, {
-                "chat_id": chat_id,
-                "start_date": start_date,
-                "end_date": end_date,
-            }).fetchone()
-
-        if photo_result and photo_result.count > 0:
-            photo_row = pd.DataFrame([{"media_type": "photo", "count": photo_result.count}])
-            df = pd.concat([df, photo_row], ignore_index=True)
 
         return df
 
@@ -584,9 +555,25 @@ class DashboardQueries:
             }
         return None
 
-    def get_available_chats(self) -> List[Dict[str, Any]]:
-        """Get list of available chats with message counts."""
-        query = text("""
+    def get_available_chats(
+        self,
+        chat_ids: Optional[List[int]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get list of available chats with message counts.
+
+        Args:
+            chat_ids: Optional list of chat IDs to filter by.
+                      If None, returns all groups/supergroups.
+        """
+        chat_filter = "c.type IN ('group', 'supergroup')"
+        params = {}
+
+        if chat_ids:
+            chat_filter += " AND c.id = ANY(:chat_ids)"
+            params["chat_ids"] = chat_ids
+
+        query = text(f"""
             SELECT
                 c.id,
                 c.type::text as chat_type,
@@ -595,13 +582,13 @@ class DashboardQueries:
                 COUNT(m.id) as message_count
             FROM chats c
             LEFT JOIN messages m ON c.id = m.chat_id
-            WHERE c.type IN ('group', 'supergroup')
+            WHERE {chat_filter}
             GROUP BY c.id, c.type, c.title, c.username
             ORDER BY message_count DESC
         """)
 
         with self.engine.connect() as conn:
-            result = conn.execute(query).fetchall()
+            result = conn.execute(query, params).fetchall()
 
         return [
             {

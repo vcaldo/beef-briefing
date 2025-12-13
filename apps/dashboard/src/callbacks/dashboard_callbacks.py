@@ -12,36 +12,9 @@ import plotly.graph_objects as go
 from dash import Input, Output, State, ctx, dash_table, html, no_update
 from flask import request
 
+from src.theme import COLORS, MEDIA_COLORS, THEME
+
 logger = logging.getLogger(__name__)
-
-# Color scheme matching UX guidelines
-COLORS = {
-    "primary": "#00d9ff",
-    "secondary": "#ff6b6b",
-    "success": "#34d399",
-    "warning": "#fbbf24",
-    "bg": "#0a0e1a",
-    "card_bg": "rgba(20, 24, 34, 0.7)",
-    "text": "#e8eaed",
-    "text_secondary": "#9aa0a6",
-    "grid": "rgba(255, 255, 255, 0.05)",
-}
-
-# Chart layout defaults
-CHART_LAYOUT = {
-    "paper_bgcolor": "rgba(0,0,0,0)",
-    "plot_bgcolor": "rgba(0,0,0,0)",
-    "font": {"color": COLORS["text"], "family": "Space Grotesk, sans-serif"},
-    "margin": {"l": 40, "r": 20, "t": 30, "b": 40},
-    "xaxis": {
-        "gridcolor": COLORS["grid"],
-        "zerolinecolor": COLORS["grid"],
-    },
-    "yaxis": {
-        "gridcolor": COLORS["grid"],
-        "zerolinecolor": COLORS["grid"],
-    },
-}
 
 # Constants
 TOP_REACTIONS_LIMIT = 20
@@ -262,7 +235,6 @@ def register_callbacks(app) -> None:
     ) -> go.Figure:
         """Update message timeline chart."""
         fig = go.Figure()
-        fig.update_layout(**CHART_LAYOUT)
 
         if not chat_id:
             return fig
@@ -307,11 +279,7 @@ def register_callbacks(app) -> None:
                 )
             )
 
-            fig.update_layout(
-                **CHART_LAYOUT,
-                showlegend=False,
-                hovermode="x unified",
-            )
+            fig.update_layout(showlegend=False, hovermode="x unified")
 
             return fig
 
@@ -334,7 +302,6 @@ def register_callbacks(app) -> None:
     ) -> go.Figure:
         """Update active users bar chart."""
         fig = go.Figure()
-        fig.update_layout(**CHART_LAYOUT)
 
         if not chat_id:
             return fig
@@ -376,11 +343,7 @@ def register_callbacks(app) -> None:
                 )
             )
 
-            fig.update_layout(
-                **CHART_LAYOUT,
-                showlegend=False,
-                hovermode="x unified",
-            )
+            fig.update_layout(showlegend=False, hovermode="x unified")
 
             return fig
 
@@ -403,7 +366,6 @@ def register_callbacks(app) -> None:
     ) -> go.Figure:
         """Update activity heatmap chart."""
         fig = go.Figure()
-        fig.update_layout(**CHART_LAYOUT)
 
         if not chat_id:
             return fig
@@ -440,8 +402,8 @@ def register_callbacks(app) -> None:
                     y=[day_names[int(i)] for i in pivot.index],
                     colorscale=[
                         [0, COLORS["bg"]],
-                        [0.3, "rgba(0, 217, 255, 0.3)"],
-                        [0.6, "rgba(0, 217, 255, 0.6)"],
+                        [0.3, COLORS["primary_30"]],
+                        [0.6, COLORS["primary_60"]],
                         [1, COLORS["primary"]],
                     ],
                     showscale=False,
@@ -451,21 +413,13 @@ def register_callbacks(app) -> None:
                 )
             )
 
+            # Heatmap needs custom background to blend with colorscale
             fig.update_layout(
                 paper_bgcolor=COLORS["bg"],
                 plot_bgcolor=COLORS["bg"],
-                font={"color": COLORS["text"], "family": "Space Grotesk, sans-serif"},
                 margin={"l": 40, "r": 20, "t": 10, "b": 60},
-                xaxis={
-                    "dtick": 4,
-                    "gridcolor": COLORS["bg"],
-                    "zerolinecolor": COLORS["bg"],
-                    "tickangle": 45,
-                },
-                yaxis={
-                    "gridcolor": COLORS["bg"],
-                    "zerolinecolor": COLORS["bg"],
-                },
+                xaxis={"dtick": 4, "gridcolor": COLORS["bg"], "tickangle": 45},
+                yaxis={"gridcolor": COLORS["bg"]},
             )
 
             return fig
@@ -489,7 +443,6 @@ def register_callbacks(app) -> None:
     ) -> go.Figure:
         """Update media distribution chart."""
         fig = go.Figure()
-        fig.update_layout(**CHART_LAYOUT)
 
         if not chat_id:
             return fig
@@ -509,19 +462,7 @@ def register_callbacks(app) -> None:
             if df.empty:
                 return fig
 
-            # Define colors for media types
-            media_colors = {
-                "photo": "#00d9ff",
-                "video": "#ff6b6b",
-                "audio": "#34d399",
-                "voice": "#fbbf24",
-                "document": "#a78bfa",
-                "animation": "#f472b6",
-                "video_note": "#60a5fa",
-                "sticker": "#c084fc",
-            }
-
-            colors = [media_colors.get(mt, COLORS["text_secondary"]) for mt in df["media_type"]]
+            colors = [MEDIA_COLORS.get(mt, COLORS["text_secondary"]) for mt in df["media_type"]]
 
             fig = go.Figure(
                 data=go.Pie(
@@ -533,11 +474,7 @@ def register_callbacks(app) -> None:
                 )
             )
 
-            fig.update_layout(
-                **CHART_LAYOUT,
-                showlegend=True,
-                legend={"orientation": "h", "y": -0.1},
-            )
+            fig.update_layout(showlegend=True, legend={"orientation": "h", "y": -0.1})
 
             return fig
 
@@ -681,7 +618,7 @@ def register_callbacks(app) -> None:
                     "media_sent": int(row["media_sent"]),
                 })
 
-            # Dark theme styling for DataTable
+            # Dark theme styling for DataTable using theme colors
             table = dash_table.DataTable(
                 id="leaderboard-datatable",
                 columns=[
@@ -697,24 +634,22 @@ def register_callbacks(app) -> None:
                 data=records,
                 sort_action="native",
                 sort_mode="single",
-                style_table={
-                    "overflowX": "auto",
-                },
+                style_table={"overflowX": "auto"},
                 style_header={
-                    "backgroundColor": "rgba(20, 24, 34, 0.9)",
-                    "color": "#9aa0a6",
+                    "backgroundColor": THEME["colors"]["bg_card"],
+                    "color": THEME["colors"]["text_secondary"],
                     "fontWeight": "500",
                     "fontSize": "0.875rem",
-                    "borderBottom": "1px solid rgba(255, 255, 255, 0.1)",
+                    "borderBottom": f"1px solid {THEME['colors']['border']}",
                     "textAlign": "left",
                     "padding": "12px 16px",
                 },
                 style_cell={
                     "backgroundColor": "transparent",
-                    "color": "#e8eaed",
-                    "fontFamily": "'JetBrains Mono', monospace",
+                    "color": THEME["colors"]["text_primary"],
+                    "fontFamily": THEME["fonts"]["display"],
                     "fontSize": "0.875rem",
-                    "borderBottom": "1px solid rgba(255, 255, 255, 0.1)",
+                    "borderBottom": f"1px solid {THEME['colors']['border']}",
                     "padding": "12px 16px",
                     "textAlign": "right",
                 },
@@ -723,30 +658,12 @@ def register_callbacks(app) -> None:
                     {"if": {"column_id": "user"}, "textAlign": "left", "minWidth": "180px"},
                 ],
                 style_data_conditional=[
-                    # Gold for rank 1
-                    {
-                        "if": {"filter_query": "{rank} = 1", "column_id": "rank"},
-                        "color": "#ffd700",
-                        "fontWeight": "600",
-                    },
-                    # Silver for rank 2
-                    {
-                        "if": {"filter_query": "{rank} = 2", "column_id": "rank"},
-                        "color": "#c0c0c0",
-                        "fontWeight": "600",
-                    },
-                    # Bronze for rank 3
-                    {
-                        "if": {"filter_query": "{rank} = 3", "column_id": "rank"},
-                        "color": "#cd7f32",
-                        "fontWeight": "600",
-                    },
-                    # Hover effect
-                    {
-                        "if": {"state": "active"},
-                        "backgroundColor": "rgba(0, 217, 255, 0.1)",
-                        "border": "none",
-                    },
+                    # Gold, silver, bronze for top 3
+                    {"if": {"filter_query": "{rank} = 1", "column_id": "rank"}, "color": THEME["colors"]["medal_gold"], "fontWeight": "600"},
+                    {"if": {"filter_query": "{rank} = 2", "column_id": "rank"}, "color": THEME["colors"]["medal_silver"], "fontWeight": "600"},
+                    {"if": {"filter_query": "{rank} = 3", "column_id": "rank"}, "color": THEME["colors"]["medal_bronze"], "fontWeight": "600"},
+                    # Hover effect using theme accent
+                    {"if": {"state": "active"}, "backgroundColor": COLORS["primary_10"], "border": "none"},
                 ],
                 style_as_list_view=True,
             )
@@ -972,7 +889,7 @@ def register_callbacks(app) -> None:
 
         # Truncate title for display
         title = chat_info.get("title", "Unknown")
-        max_length = 25
+        max_length = 45
         truncated = title if len(title) <= max_length else title[:max_length - 1].rstrip() + "…"
 
         return icon, truncated, title

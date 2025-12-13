@@ -55,21 +55,23 @@ def register_callbacks(app) -> None:
         """Route to appropriate page based on URL."""
         from src.components.layout import (
             create_dashboard_layout,
+            create_welcome_layout,
             create_login_required_layout,
             create_error_layout,
         )
         from src.auth.session import SessionData
         from datetime import datetime, timedelta
+        import re
 
-        if pathname in ["/beef-dashboard/", "/beef-dashboard"]:
-            app_config = app.server.config.get("app_config")
-            queries = app.server.config.get("queries")
+        app_config = app.server.config.get("app_config")
+        queries = app.server.config.get("queries")
+        session_manager = app.server.config.get("session_manager")
 
-            # In development, bypass authentication
+        # Helper to get session (handles dev mode)
+        def get_session():
             if app_config and app_config.is_development():
                 logger.info("Development mode: bypassing authentication")
-                # Create a mock session for development
-                mock_session = SessionData(
+                return SessionData(
                     session_id="dev-session",
                     user_id=0,
                     username="dev_user",
@@ -79,34 +81,76 @@ def register_callbacks(app) -> None:
                     created_at=datetime.utcnow(),
                     expires_at=datetime.utcnow() + timedelta(days=365),
                     last_accessed_at=datetime.utcnow(),
-                )
-                # Get all available chats (no filtering in dev)
-                chats = []
-                if queries:
-                    chats = queries.get_available_chats()
-                return create_dashboard_layout(session=mock_session, chats=chats)
+                ), True  # is_dev
 
-            # Production: Check authentication
             session_id = request.cookies.get("dashboard_session")
-            if not session_id:
+            if not session_id or not session_manager:
+                return None, False
+
+            session_data = session_manager.get_session(session_id)
+            return session_data, False
+
+        # Route: Welcome page with chat cards
+        if pathname in ["/beef-dashboard/", "/beef-dashboard"]:
+            session_data, is_dev = get_session()
+
+            if session_data is None:
                 return create_login_required_layout()
 
-            # Get session data
-            session_manager = app.server.config.get("session_manager")
-
-            if session_manager:
-                session_data = session_manager.get_session(session_id)
-                if not session_data:
-                    return create_login_required_layout()
-
-                # Get available chats
-                chats = []
-                if queries:
-                    all_chats = queries.get_available_chats()
+            # Get chat card data
+            chats = []
+            if queries:
+                if is_dev:
+                    # Dev mode: show all chats
+                    chats = queries.get_chat_card_data()
+                else:
+                    # Production: filter by allowed chat IDs
                     allowed_ids = session_data.get_allowed_chat_ids()
+                    chats = queries.get_chat_card_data(chat_ids=allowed_ids)
+
+            return create_welcome_layout(session=session_data, chats=chats)
+
+        # Route: Analytics dashboard for specific chat
+        chat_match = re.match(r"^/beef-dashboard/chat/(-?\d+)/?$", pathname or "")
+        if chat_match:
+            session_data, is_dev = get_session()
+
+            if session_data is None:
+                return create_login_required_layout()
+
+            chat_id = int(chat_match.group(1))
+
+            # Verify user has access to this chat (unless dev mode)
+            if not is_dev:
+                allowed_ids = session_data.get_allowed_chat_ids()
+                if chat_id not in allowed_ids:
+                    logger.warning(
+                        "User attempted to access unauthorized chat",
+                        extra={"user_id": session_data.user_id, "chat_id": chat_id}
+                    )
+                    return create_error_layout("Access denied")
+
+            # Get chat info and available chats for the dropdown
+            chats = []
+            if queries:
+                if is_dev:
+                    chats = queries.get_available_chats()
+                else:
+                    allowed_ids = session_data.get_allowed_chat_ids()
+                    all_chats = queries.get_available_chats()
                     chats = [c for c in all_chats if c["id"] in allowed_ids]
 
-                return create_dashboard_layout(session=session_data, chats=chats)
+            # Verify the chat exists in the available chats
+            chat_exists = any(c["id"] == chat_id for c in chats)
+            if not chat_exists:
+                return create_error_layout("Chat not found")
+
+            return create_dashboard_layout(
+                session=session_data,
+                chats=chats,
+                selected_chat_id=chat_id,
+                show_back_link=True,
+            )
 
         return create_error_layout("Page not found")
 

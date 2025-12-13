@@ -18,8 +18,8 @@ from src.auth.telegram_oauth import (
     generate_telegram_widget_html,
     TelegramAuthData,
 )
-from src.auth.membership import verify_membership_any_chat, MembershipCache
 from src.auth.session import SessionManager
+from src.api.api_client import ApiServiceClient
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +41,11 @@ def create_app(config: Config) -> dash.Dash:
     # Initialize session manager
     session_manager = SessionManager(db.engine, config.session_lifetime_days)
 
-    # Initialize membership cache
-    membership_cache = MembershipCache()
+    # Initialize API client for api-service
+    api_client = ApiServiceClient(
+        base_url=config.api_service_url,
+        api_key=config.analytics_api_key if config.analytics_api_key else None,
+    )
 
     # Initialize queries
     queries = DashboardQueries(db.engine)
@@ -76,7 +79,7 @@ def create_app(config: Config) -> dash.Dash:
     server.config["db"] = db
     server.config["queries"] = queries
     server.config["session_manager"] = session_manager
-    server.config["membership_cache"] = membership_cache
+    server.config["api_client"] = api_client
     server.config["app_config"] = config
 
     # Define the app layout
@@ -90,7 +93,7 @@ def create_app(config: Config) -> dash.Dash:
     )
 
     # Register Flask routes for authentication
-    register_auth_routes(server, config, db, session_manager, membership_cache)
+    register_auth_routes(server, config, queries, session_manager, api_client)
 
     # Register health check route
     @server.route("/beef-dashboard/health")
@@ -107,9 +110,9 @@ def create_app(config: Config) -> dash.Dash:
 def register_auth_routes(
     server: Flask,
     config: Config,
-    db: DatabaseConnection,
+    queries: DashboardQueries,
     session_manager: SessionManager,
-    membership_cache: MembershipCache,
+    api_client: ApiServiceClient,
 ) -> None:
     """Register authentication routes on the Flask server."""
 
@@ -227,28 +230,42 @@ def register_auth_routes(
             logger.warning("Invalid Telegram auth data received")
             return redirect("/beef-dashboard/login?error=invalid_auth")
 
-        # Verify group membership
-        membership = verify_membership_any_chat(
-            user_id=validated.id,
-            allowed_chat_ids=config.allowed_chat_ids,
-            bot_token=config.telegram_bot_token,
-            cache=membership_cache,
-        )
+        # Determine accessible chats based on user role
+        is_admin = config.is_admin(validated.id)
 
-        if not membership.is_member:
-            logger.warning(
-                "User not a member of any allowed group",
-                extra={"user_id": validated.id, "error": membership.error}
+        if is_admin:
+            # Admins get access to all chats in the database
+            all_chats = queries.get_available_chats()
+            accessible_chat_ids = [c["id"] for c in all_chats]
+            logger.info(
+                "Admin user authenticated, granting access to all chats",
+                extra={"user_id": validated.id, "chat_count": len(accessible_chat_ids)}
             )
-            return redirect("/beef-dashboard/login?error=not_member")
+        else:
+            # Regular users: fetch chats where they've been active (last 15 days)
+            accessible_chat_ids = api_client.get_user_active_chats(
+                user_id=validated.id,
+                days=15
+            )
+            logger.info(
+                "User authenticated, fetched active chats",
+                extra={"user_id": validated.id, "chat_count": len(accessible_chat_ids)}
+            )
 
-        # Create session
+        if not accessible_chat_ids:
+            logger.warning(
+                "User has no active chats in the last 15 days",
+                extra={"user_id": validated.id}
+            )
+            return redirect("/beef-dashboard/login?error=no_activity")
+
+        # Create session with accessible chats
         session_id = session_manager.create_session(
             user_id=validated.id,
             username=validated.username,
             first_name=validated.first_name,
             photo_url=validated.photo_url,
-            allowed_chat_ids=config.allowed_chat_ids,
+            allowed_chat_ids=accessible_chat_ids,
         )
 
         # Set cookie and redirect

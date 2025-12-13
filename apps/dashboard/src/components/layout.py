@@ -10,7 +10,10 @@ from dash import dcc, html
 from src.auth.session import SessionData
 
 
-def create_header(session: Optional[SessionData] = None) -> html.Div:
+def create_header(
+    session: Optional[SessionData] = None,
+    show_back_link: bool = False,
+) -> html.Div:
     """Create the dashboard header."""
     user_info = []
     if session:
@@ -31,6 +34,17 @@ def create_header(session: Optional[SessionData] = None) -> html.Div:
             )
         ]
 
+    # Back link for analytics pages
+    back_link = []
+    if show_back_link:
+        back_link = [
+            html.A(
+                "← Back to Groups",
+                href="/beef-dashboard/",
+                className="back-link"
+            ),
+        ]
+
     return html.Header(
         className="dashboard-header",
         children=[
@@ -40,6 +54,7 @@ def create_header(session: Optional[SessionData] = None) -> html.Div:
                     html.Div(
                         className="logo-section",
                         children=[
+                            *back_link,
                             html.H1("Beef Dashboard", className="logo-text"),
                             html.Span("Analytics", className="logo-subtitle"),
                         ],
@@ -108,7 +123,10 @@ def truncate_title(title: str, max_length: int = 30) -> str:
     return title[:max_length - 1].rstrip() + "…"
 
 
-def create_chat_selector(chats: List[Dict[str, Any]]) -> html.Div:
+def create_chat_selector(
+    chats: List[Dict[str, Any]],
+    selected_id: Optional[int] = None,
+) -> html.Div:
     """Create the chat/group selector dropdown."""
     options = [
         {
@@ -119,6 +137,11 @@ def create_chat_selector(chats: List[Dict[str, Any]]) -> html.Div:
         for chat in chats
     ]
 
+    # Determine default value
+    default_value = selected_id
+    if default_value is None and chats:
+        default_value = chats[0]["id"]
+
     return html.Div(
         className="chat-selector",
         children=[
@@ -126,7 +149,7 @@ def create_chat_selector(chats: List[Dict[str, Any]]) -> html.Div:
             dcc.Dropdown(
                 id="chat-selector",
                 options=options,
-                value=chats[0]["id"] if chats else None,
+                value=default_value,
                 clearable=False,
                 className="chat-dropdown",
             ),
@@ -310,6 +333,8 @@ def create_main_charts() -> html.Div:
 def create_dashboard_layout(
     session: Optional[SessionData] = None,
     chats: Optional[List[Dict[str, Any]]] = None,
+    selected_chat_id: Optional[int] = None,
+    show_back_link: bool = False,
 ) -> html.Div:
     """
     Create the complete dashboard layout.
@@ -317,6 +342,8 @@ def create_dashboard_layout(
     Args:
         session: Current user session data
         chats: List of available chats
+        selected_chat_id: ID of the currently selected chat
+        show_back_link: Whether to show back navigation link
 
     Returns:
         Dash HTML Div with complete layout
@@ -324,17 +351,22 @@ def create_dashboard_layout(
     if chats is None:
         chats = []
 
+    # Determine which chat to select
+    default_chat_id = selected_chat_id
+    if default_chat_id is None and chats:
+        default_chat_id = chats[0]["id"]
+
     return html.Div(
         className="dashboard-wrapper",
         children=[
-            create_header(session),
+            create_header(session, show_back_link=show_back_link),
             html.Main(
                 className="dashboard-main",
                 children=[
                     html.Div(
                         className="controls-bar",
                         children=[
-                            create_chat_selector(chats) if chats else html.Div(),
+                            create_chat_selector(chats, selected_id=selected_chat_id) if chats else html.Div(),
                             create_period_selector(),
                         ],
                     ),
@@ -352,7 +384,7 @@ def create_dashboard_layout(
             ),
             # Hidden stores for state management
             dcc.Store(id="selected-period", data="week"),
-            dcc.Store(id="selected-chat", data=chats[0]["id"] if chats else None),
+            dcc.Store(id="selected-chat", data=default_chat_id),
             dcc.Store(id="leaderboard-limit", data=10),
         ],
     )
@@ -391,6 +423,192 @@ def create_error_layout(message: str) -> html.Div:
                     html.H2("Oops!"),
                     html.P(message),
                     html.A("Go Back", href="/beef-dashboard/", className="back-link"),
+                ],
+            ),
+        ],
+    )
+
+
+def format_last_activity(last_activity: Optional[datetime]) -> str:
+    """Format last activity timestamp for display."""
+    if not last_activity:
+        return "No activity"
+
+    now = datetime.now()
+    if last_activity.tzinfo:
+        # Make now timezone-aware if last_activity is
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+
+    diff = now - last_activity
+
+    if diff.days == 0:
+        hours = diff.seconds // 3600
+        if hours == 0:
+            minutes = diff.seconds // 60
+            return f"{minutes}m ago" if minutes > 0 else "Just now"
+        return f"{hours}h ago"
+    elif diff.days == 1:
+        return "Yesterday"
+    elif diff.days < 7:
+        return f"{diff.days}d ago"
+    else:
+        return last_activity.strftime("%b %d, %Y")
+
+
+def create_chat_card(chat: Dict[str, Any]) -> html.A:
+    """
+    Create a single chat card for the welcome page.
+
+    Args:
+        chat: Chat data dictionary with id, type, title, message_count,
+              user_count, last_activity, avg_messages_per_day
+    """
+    chat_type = chat.get("type", "group")
+    is_supergroup = chat_type == "supergroup"
+
+    # Icon based on chat type (building for supergroup, users for group)
+    icon = "🏛" if is_supergroup else "👥"
+
+    # Type badge
+    type_badge = html.Span(
+        chat_type,
+        className=f"chat-type-badge {'supergroup' if is_supergroup else 'group'}"
+    )
+
+    # Format last activity
+    last_activity_str = format_last_activity(chat.get("last_activity"))
+
+    return html.A(
+        href=f"/beef-dashboard/chat/{chat['id']}",
+        className="chat-card",
+        children=[
+            html.Div(
+                className="chat-card-header",
+                children=[
+                    html.Span(icon, className="chat-icon"),
+                    html.H3(
+                        truncate_title(chat.get("title", "Unknown Chat"), 35),
+                        className="chat-title",
+                        title=chat.get("title", ""),  # Full title on hover
+                    ),
+                    type_badge,
+                ],
+            ),
+            html.Div(className="chat-card-divider"),
+            html.Div(
+                className="chat-card-stats",
+                children=[
+                    html.Div(
+                        className="chat-stat",
+                        children=[
+                            html.Span("Messages", className="chat-stat-label"),
+                            html.Span(
+                                f"{chat.get('message_count', 0):,}",
+                                className="chat-stat-value"
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        className="chat-stat",
+                        children=[
+                            html.Span("Users", className="chat-stat-label"),
+                            html.Span(
+                                str(chat.get("user_count", 0)),
+                                className="chat-stat-value"
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            html.Div(
+                className="chat-card-stats",
+                children=[
+                    html.Div(
+                        className="chat-stat",
+                        children=[
+                            html.Span("Avg/day", className="chat-stat-label"),
+                            html.Span(
+                                f"{chat.get('avg_messages_per_day', 0):.1f}",
+                                className="chat-stat-value"
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            html.Div(
+                className="chat-card-footer",
+                children=[
+                    html.Span(
+                        f"Last activity: {last_activity_str}",
+                        className="chat-last-activity"
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def create_welcome_layout(
+    session: Optional[SessionData] = None,
+    chats: Optional[List[Dict[str, Any]]] = None,
+) -> html.Div:
+    """
+    Create the welcome page layout with chat cards grid.
+
+    Args:
+        session: Current user session data
+        chats: List of chat data for cards
+
+    Returns:
+        Dash HTML Div with welcome page layout
+    """
+    if chats is None:
+        chats = []
+
+    # Create chat cards
+    chat_cards = [create_chat_card(chat) for chat in chats]
+
+    return html.Div(
+        className="welcome-wrapper",
+        children=[
+            create_header(session),
+            html.Main(
+                className="welcome-main",
+                children=[
+                    html.Div(
+                        className="welcome-header",
+                        children=[
+                            html.H2("Chats", className="welcome-title"),
+                            html.Span(
+                                f"{len(chats)} chats",
+                                className="chat-count-badge"
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        className="chat-cards-grid",
+                        children=chat_cards if chat_cards else [
+                            html.Div(
+                                className="no-chats-message",
+                                children=[
+                                    html.P("No chats available."),
+                                    html.P(
+                                        "You need to have activity in a chat within the last 15 days to see it here.",
+                                        className="no-chats-hint"
+                                    ),
+                                ],
+                            )
+                        ],
+                    ),
+                ],
+            ),
+            html.Footer(
+                className="dashboard-footer",
+                children=[
+                    html.Span("Beef Dashboard"),
+                    html.Span(" · "),
+                    html.Span("Powered by Plotly Dash"),
                 ],
             ),
         ],

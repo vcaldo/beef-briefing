@@ -752,10 +752,12 @@ body {
   align-items: center;
   gap: var(--space-sm);
   margin-bottom: var(--space-md);
+  flex-wrap: nowrap;
 }
 
 .chat-icon {
   font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
 .chat-title {
@@ -764,12 +766,14 @@ body {
   font-weight: 600;
   color: var(--color-text-primary);
   flex: 1;
+  min-width: 0; /* Required for text truncation in flexbox */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .chat-type-badge {
+  flex-shrink: 0; /* Prevent badge from shrinking */
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-sm);
   font-size: 0.75rem;

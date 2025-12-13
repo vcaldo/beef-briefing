@@ -26,14 +26,12 @@ def init_new_relic(config: Config) -> None:
         import os
         import newrelic.agent
 
-        # New Relic agent reads from environment variables
-        app_name = f"{config.new_relic_app_name}-dashboard-{config.environment}"
-        os.environ["NEW_RELIC_APP_NAME"] = app_name
-        os.environ["NEW_RELIC_LICENSE_KEY"] = config.new_relic_license_key
+        # App name is already set in docker-compose with full suffix
+        # e.g., "beef-briefing-dashboard-production"
         os.environ["NEW_RELIC_LOG_LEVEL"] = "info" if config.is_production() else "debug"
 
         newrelic.agent.initialize()
-        logger.info(f"New Relic initialized: {app_name}")
+        logger.info(f"New Relic initialized: {config.new_relic_app_name}")
     except ImportError:
         logger.warning("newrelic package not installed, skipping APM initialization")
     except Exception as e:

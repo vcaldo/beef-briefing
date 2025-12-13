@@ -445,15 +445,27 @@ def register_callbacks(app) -> None:
                         [1, COLORS["primary"]],
                     ],
                     showscale=False,
+                    xgap=2,
+                    ygap=2,
                     hovertemplate="<b>%{y} %{x}</b><br>Messages: %{z}<extra></extra>",
                 )
             )
 
             fig.update_layout(
-                **CHART_LAYOUT,
                 paper_bgcolor=COLORS["bg"],
                 plot_bgcolor=COLORS["bg"],
-                xaxis={"dtick": 4, **CHART_LAYOUT["xaxis"]},
+                font={"color": COLORS["text"], "family": "Space Grotesk, sans-serif"},
+                margin={"l": 40, "r": 20, "t": 10, "b": 60},
+                xaxis={
+                    "dtick": 4,
+                    "gridcolor": COLORS["bg"],
+                    "zerolinecolor": COLORS["bg"],
+                    "tickangle": 45,
+                },
+                yaxis={
+                    "gridcolor": COLORS["bg"],
+                    "zerolinecolor": COLORS["bg"],
+                },
             )
 
             return fig

@@ -697,3 +697,17 @@ class DashboardQueries:
             }
             for row in result
         ]
+
+    def get_available_years(self, chat_id: int) -> List[int]:
+        """Get distinct years that have messages for a chat, ordered most recent first."""
+        query = text("""
+            SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year
+            FROM messages
+            WHERE chat_id = :chat_id
+            ORDER BY year DESC
+        """)
+
+        with self.engine.connect() as conn:
+            result = conn.execute(query, {"chat_id": chat_id}).fetchall()
+
+        return [row.year for row in result]

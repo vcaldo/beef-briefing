@@ -376,25 +376,6 @@ def create_main_charts() -> html.Div:
                     ),
                 ],
             ),
-            # Reaction Distribution
-            html.Div(
-                className="chart-container",
-                children=[
-                    html.H3("Top Reactions", className="chart-title"),
-                    dcc.Loading(
-                        id="loading-reactions",
-                        type="circle",
-                        color="#00d9ff",
-                        children=[
-                            dcc.Graph(
-                                id="reaction-chart",
-                                config={"displayModeBar": False},
-                                className="chart",
-                            ),
-                        ],
-                    ),
-                ],
-            ),
             # Media Distribution
             html.Div(
                 className="chart-container",

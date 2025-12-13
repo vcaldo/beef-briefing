@@ -415,62 +415,6 @@ def register_callbacks(app) -> None:
             return fig
 
     @app.callback(
-        Output("reaction-chart", "figure"),
-        [
-            Input("selected-chat", "data"),
-            Input("computed-start-date", "data"),
-            Input("computed-end-date", "data"),
-        ],
-    )
-    def update_reaction_chart(
-        chat_id: Optional[int],
-        start_date: Optional[str],
-        end_date: Optional[str],
-    ) -> go.Figure:
-        """Update reaction distribution chart."""
-        fig = go.Figure()
-        fig.update_layout(**CHART_LAYOUT)
-
-        if not chat_id:
-            return fig
-
-        date_range = parse_date_range(start_date, end_date)
-        if not date_range:
-            return fig
-
-        queries = app.server.config.get("queries")
-        if not queries:
-            return fig
-
-        try:
-            start, end = date_range
-            df = queries.get_reaction_distribution(chat_id, start, end, limit=10)
-
-            if df.empty:
-                return fig
-
-            fig = go.Figure(
-                data=go.Bar(
-                    x=df["count"],
-                    y=df["emoji_value"],
-                    orientation="h",
-                    marker={"color": COLORS["primary"]},
-                    hovertemplate="<b>%{y}</b><br>Count: %{x}<extra></extra>",
-                )
-            )
-
-            fig.update_layout(
-                **CHART_LAYOUT,
-                yaxis={"categoryorder": "total ascending"},
-            )
-
-            return fig
-
-        except Exception as e:
-            logger.error(f"Error creating reaction chart: {e}")
-            return fig
-
-    @app.callback(
         Output("media-chart", "figure"),
         [
             Input("selected-chat", "data"),

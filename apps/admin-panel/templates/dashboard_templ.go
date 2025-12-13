@@ -87,7 +87,7 @@ func dashboardContent(chats []Chat) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " chats</div></div><div class=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " chats</div></div><div class=\"flex flex-wrap justify-center gap-4\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -149,7 +149,7 @@ func chatCard(chat Chat) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"card glass-card hover:translate-y-[-2px] transition-all duration-200\"><div class=\"card-body\"><div class=\"flex items-start justify-between\"><div class=\"flex-1 min-w-0\"><h2 class=\"card-title font-heading text-lg truncate\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"card glass-card hover:translate-y-[-2px] transition-all duration-200 w-full sm:w-80\"><div class=\"card-body\"><div class=\"flex items-start justify-between\"><div class=\"flex-1 min-w-0\"><h2 class=\"card-title font-heading text-lg truncate\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

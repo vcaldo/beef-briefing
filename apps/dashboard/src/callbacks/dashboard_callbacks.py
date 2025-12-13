@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from dash import Input, Output, State, callback, html, no_update
+from dash import Input, Output, State, callback, dash_table, html, no_update
 from flask import request
 
 logger = logging.getLogger(__name__)
@@ -517,7 +517,7 @@ def register_callbacks(app) -> None:
         current_page: int,
         current_limit: int,
     ):
-        """Update user leaderboard with pagination."""
+        """Update user leaderboard with DataTable (native sorting)."""
         from dash import ctx
 
         # Initialize defaults
@@ -590,58 +590,97 @@ def register_callbacks(app) -> None:
                     limit,
                 )
 
-            # Build leaderboard rows
-            rows = []
+            # Prepare data for DataTable
+            records = []
             for idx, row in df.iterrows():
                 rank = offset + idx + 1
-                rank_class = "rank-gold" if rank == 1 else ("rank-silver" if rank == 2 else ("rank-bronze" if rank == 3 else ""))
-
                 name = row["first_name"]
                 if row["last_name"]:
                     name += f" {row['last_name']}"
+                if row["username"]:
+                    name += f" @{row['username']}"
+                if row["is_premium"]:
+                    name += " ⭐"
 
-                username = f"@{row['username']}" if row['username'] else ""
+                records.append({
+                    "rank": rank,
+                    "user": name,
+                    "message_count": int(row["message_count"]),
+                    "reactions_sent": int(row["reactions_sent"]),
+                    "reactions_received": int(row["reactions_received"]),
+                    "replies_sent": int(row["replies_sent"]),
+                    "replies_received": int(row["replies_received"]),
+                    "media_sent": int(row["media_sent"]),
+                })
 
-                rows.append(
-                    html.Tr(
-                        className=f"leaderboard-row {rank_class}",
-                        children=[
-                            html.Td(f"#{rank}", className="rank-cell"),
-                            html.Td(
-                                children=[
-                                    html.Span(name, className="user-name"),
-                                    html.Span(username, className="username") if username else None,
-                                    html.Span("⭐", className="premium-badge") if row["is_premium"] else None,
-                                ],
-                                className="name-cell",
-                            ),
-                            html.Td(f"{int(row['message_count']):,}", className="stat-cell"),
-                            html.Td(f"{int(row['reactions_sent']):,}", className="stat-cell"),
-                            html.Td(f"{int(row['reactions_received']):,}", className="stat-cell"),
-                            html.Td(f"{int(row['replies_sent']):,}", className="stat-cell"),
-                            html.Td(f"{int(row['replies_received']):,}", className="stat-cell"),
-                            html.Td(f"{int(row['media_sent']):,}", className="stat-cell"),
-                        ],
-                    )
-                )
-
-            table = html.Table(
-                className="leaderboard-table",
-                children=[
-                    html.Thead(
-                        html.Tr([
-                            html.Th("Rank"),
-                            html.Th("User"),
-                            html.Th("Messages"),
-                            html.Th("Reactions Given"),
-                            html.Th("Reactions Received"),
-                            html.Th("Replies Sent"),
-                            html.Th("Replies Received"),
-                            html.Th("Media Sent"),
-                        ])
-                    ),
-                    html.Tbody(rows),
+            # Dark theme styling for DataTable
+            table = dash_table.DataTable(
+                id="leaderboard-datatable",
+                columns=[
+                    {"name": "#", "id": "rank", "type": "numeric"},
+                    {"name": "User", "id": "user", "type": "text"},
+                    {"name": "Messages", "id": "message_count", "type": "numeric"},
+                    {"name": "Reactions Given", "id": "reactions_sent", "type": "numeric"},
+                    {"name": "Reactions Received", "id": "reactions_received", "type": "numeric"},
+                    {"name": "Replies Sent", "id": "replies_sent", "type": "numeric"},
+                    {"name": "Replies Received", "id": "replies_received", "type": "numeric"},
+                    {"name": "Media Sent", "id": "media_sent", "type": "numeric"},
                 ],
+                data=records,
+                sort_action="native",
+                sort_mode="single",
+                style_table={
+                    "overflowX": "auto",
+                },
+                style_header={
+                    "backgroundColor": "rgba(20, 24, 34, 0.9)",
+                    "color": "#9aa0a6",
+                    "fontWeight": "500",
+                    "fontSize": "0.875rem",
+                    "borderBottom": "1px solid rgba(255, 255, 255, 0.1)",
+                    "textAlign": "left",
+                    "padding": "12px 16px",
+                },
+                style_cell={
+                    "backgroundColor": "transparent",
+                    "color": "#e8eaed",
+                    "fontFamily": "'JetBrains Mono', monospace",
+                    "fontSize": "0.875rem",
+                    "borderBottom": "1px solid rgba(255, 255, 255, 0.1)",
+                    "padding": "12px 16px",
+                    "textAlign": "right",
+                },
+                style_cell_conditional=[
+                    {"if": {"column_id": "rank"}, "width": "60px", "textAlign": "center"},
+                    {"if": {"column_id": "user"}, "textAlign": "left", "minWidth": "180px"},
+                ],
+                style_data_conditional=[
+                    # Gold for rank 1
+                    {
+                        "if": {"filter_query": "{rank} = 1", "column_id": "rank"},
+                        "color": "#ffd700",
+                        "fontWeight": "600",
+                    },
+                    # Silver for rank 2
+                    {
+                        "if": {"filter_query": "{rank} = 2", "column_id": "rank"},
+                        "color": "#c0c0c0",
+                        "fontWeight": "600",
+                    },
+                    # Bronze for rank 3
+                    {
+                        "if": {"filter_query": "{rank} = 3", "column_id": "rank"},
+                        "color": "#cd7f32",
+                        "fontWeight": "600",
+                    },
+                    # Hover effect
+                    {
+                        "if": {"state": "active"},
+                        "backgroundColor": "rgba(0, 217, 255, 0.1)",
+                        "border": "none",
+                    },
+                ],
+                style_as_list_view=True,
             )
 
             # Pagination info

@@ -330,9 +330,9 @@ body {
    ===================================================== */
 .overview-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--space-lg);
-  margin-bottom: var(--space-xl);
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
 }
 
 .stat-card {
@@ -354,6 +354,8 @@ body {
 .stat-card:nth-child(2) { animation-delay: 100ms; }
 .stat-card:nth-child(3) { animation-delay: 150ms; }
 .stat-card:nth-child(4) { animation-delay: 200ms; }
+.stat-card:nth-child(5) { animation-delay: 250ms; }
+.stat-card:nth-child(6) { animation-delay: 300ms; }
 
 @keyframes fadeInScale {
   from {
@@ -402,6 +404,48 @@ body {
 }
 
 /* =====================================================
+   TOP REACTIONS ROW
+   ===================================================== */
+.top-reactions-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-bg-card);
+  backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-xl);
+  animation: fadeInScale 0.6s ease-out forwards;
+  animation-delay: 350ms;
+  opacity: 0;
+}
+
+.reactions-label {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.reactions-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.reaction-badge {
+  background: rgba(0, 217, 255, 0.1);
+  border: 1px solid rgba(0, 217, 255, 0.3);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs) var(--space-md);
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+/* =====================================================
    CHARTS GRID
    ===================================================== */
 .charts-grid {
@@ -440,12 +484,41 @@ body {
 }
 
 /* =====================================================
+   TOP USERS SECTION
+   ===================================================== */
+.top-users-section {
+  margin-bottom: var(--space-xl);
+}
+
+/* =====================================================
    LEADERBOARD
    ===================================================== */
 .leaderboard-controls {
   display: flex;
-  gap: var(--space-sm);
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md);
   margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.limit-controls {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.pagination-info {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  padding: 0 var(--space-sm);
+  min-width: 150px;
+  text-align: center;
 }
 
 .lb-btn {
@@ -460,7 +533,7 @@ body {
   transition: var(--transition-fast);
 }
 
-.lb-btn:hover {
+.lb-btn:hover:not(:disabled) {
   border-color: var(--color-accent-primary);
   color: var(--color-accent-primary);
 }
@@ -471,9 +544,24 @@ body {
   color: var(--color-bg-primary);
 }
 
+.lb-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-btn {
+  min-width: 80px;
+}
+
+/* Table wrapper for horizontal scroll on mobile */
+.leaderboard {
+  overflow-x: auto;
+}
+
 .leaderboard-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 800px;
 }
 
 .leaderboard-table th {
@@ -483,6 +571,7 @@ body {
   font-weight: 500;
   font-size: 0.875rem;
   border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
 }
 
 .leaderboard-table td {
@@ -513,6 +602,7 @@ body {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  min-width: 150px;
 }
 
 .name-cell .user-name {
@@ -531,6 +621,7 @@ body {
 .stat-cell {
   font-family: var(--font-display);
   text-align: right;
+  white-space: nowrap;
 }
 
 /* =====================================================
@@ -710,8 +801,9 @@ body {
 
 /* Chat Cards Grid */
 .chat-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: var(--space-lg);
 }
 
@@ -729,6 +821,7 @@ body {
   transition: var(--transition-normal);
   animation: fadeInScale 0.6s ease-out forwards;
   opacity: 0;
+  width: 340px;
 }
 
 .chat-card:nth-child(1) { animation-delay: 50ms; }
@@ -879,13 +972,15 @@ body {
 /* =====================================================
    RESPONSIVE
    ===================================================== */
+@media (max-width: 1400px) {
+  .overview-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 1024px) {
   .charts-grid {
     grid-template-columns: 1fr;
-  }
-
-  .chat-cards-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 
   .controls-bar {
@@ -897,6 +992,14 @@ body {
     flex-direction: column;
     align-items: stretch;
   }
+
+  .overview-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .top-reactions-row {
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 768px) {
@@ -906,11 +1009,11 @@ body {
   }
 
   .overview-cards {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
-  .chat-cards-grid {
-    grid-template-columns: 1fr;
+  .chat-card {
+    width: 100%;
   }
 
   .stat-card {
@@ -918,7 +1021,16 @@ body {
   }
 
   .stat-value {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+  }
+
+  .top-reactions-row {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .reaction-badge {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.8rem;
   }
 
   .header-content {
@@ -948,6 +1060,10 @@ body {
 }
 
 @media (max-width: 480px) {
+  .overview-cards {
+    grid-template-columns: 1fr;
+  }
+
   .period-tabs {
     flex-wrap: wrap;
     justify-content: center;

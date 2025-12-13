@@ -244,6 +244,30 @@ body {
   min-width: 250px;
 }
 
+/* Group Title Display */
+.group-title-display {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.group-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.group-name {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
 /* Dash dropdown styling */
 .Select-control {
   background: var(--color-bg-card) !important;
@@ -1029,6 +1053,10 @@ body {
   .period-selector {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .group-title-display {
+    justify-content: center;
   }
 
   .overview-cards {

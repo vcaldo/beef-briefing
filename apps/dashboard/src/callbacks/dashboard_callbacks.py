@@ -936,3 +936,32 @@ def register_callbacks(app) -> None:
             classes[0] = "lb-btn active"
 
         return classes
+
+    @app.callback(
+        [
+            Output("group-icon", "children"),
+            Output("group-name", "children"),
+            Output("group-name", "title"),
+        ],
+        Input("selected-chat", "data"),
+    )
+    def update_group_title(chat_id: Optional[int]):
+        """Update group title display with chat name and icon."""
+        queries = app.server.config.get("queries")
+        if not chat_id:
+            return "", "Select a group", ""
+
+        chat_info = queries.get_chat_info(chat_id)
+        if not chat_info:
+            return "", "Unknown", ""
+
+        # Icon based on chat type
+        chat_type = chat_info.get("type", "group")
+        icon = "🏛" if chat_type == "supergroup" else "👥"
+
+        # Truncate title for display
+        title = chat_info.get("title", "Unknown")
+        max_length = 25
+        truncated = title if len(title) <= max_length else title[:max_length - 1].rstrip() + "…"
+
+        return icon, truncated, title

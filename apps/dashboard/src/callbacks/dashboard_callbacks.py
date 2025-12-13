@@ -482,14 +482,27 @@ def register_callbacks(app) -> None:
             return fig
 
     @app.callback(
-        Output("leaderboard-table", "children"),
+        [
+            Output("leaderboard-table", "children"),
+            Output("pagination-info", "children"),
+            Output("lb-prev", "disabled"),
+            Output("lb-next", "disabled"),
+            Output("leaderboard-page", "data"),
+            Output("leaderboard-limit", "data"),
+        ],
         [
             Input("chat-selector", "value"),
             Input("date-range-picker", "start_date"),
             Input("date-range-picker", "end_date"),
             Input("lb-10", "n_clicks"),
-            Input("lb-20", "n_clicks"),
+            Input("lb-25", "n_clicks"),
             Input("lb-50", "n_clicks"),
+            Input("lb-prev", "n_clicks"),
+            Input("lb-next", "n_clicks"),
+        ],
+        [
+            State("leaderboard-page", "data"),
+            State("leaderboard-limit", "data"),
         ],
     )
     def update_leaderboard(
@@ -497,41 +510,90 @@ def register_callbacks(app) -> None:
         start_date: Optional[str],
         end_date: Optional[str],
         clicks_10: int,
-        clicks_20: int,
+        clicks_25: int,
         clicks_50: int,
-    ) -> html.Div:
-        """Update user leaderboard."""
+        clicks_prev: int,
+        clicks_next: int,
+        current_page: int,
+        current_limit: int,
+    ):
+        """Update user leaderboard with pagination."""
         from dash import ctx
 
-        # Determine limit based on which button was clicked
+        # Initialize defaults
+        page = current_page or 1
+        limit = current_limit or 10
+
+        # Determine what was triggered
         triggered = ctx.triggered_id
-        if triggered == "lb-20":
-            limit = 20
+
+        # Handle limit button clicks - reset to page 1
+        if triggered == "lb-10":
+            limit = 10
+            page = 1
+        elif triggered == "lb-25":
+            limit = 25
+            page = 1
         elif triggered == "lb-50":
             limit = 50
-        else:
-            limit = 10
+            page = 1
+        elif triggered == "lb-prev":
+            page = max(1, page - 1)
+        elif triggered == "lb-next":
+            page = page + 1
+        elif triggered in ["chat-selector", "date-range-picker"]:
+            # Reset page on chat/date change
+            page = 1
 
         if not chat_id or not start_date or not end_date:
-            return html.Div("Select a chat and date range", className="empty-state")
+            return (
+                html.Div("Select a chat and date range", className="empty-state"),
+                "",
+                True,
+                True,
+                1,
+                limit,
+            )
 
         queries = app.server.config.get("queries")
         if not queries:
-            return html.Div("Error loading data", className="error-state")
+            return (
+                html.Div("Error loading data", className="error-state"),
+                "",
+                True,
+                True,
+                1,
+                limit,
+            )
 
         try:
             start = datetime.fromisoformat(start_date)
             end = datetime.fromisoformat(end_date) + timedelta(days=1)
 
-            df = queries.get_user_rankings(chat_id, start, end, limit=limit)
+            # Get total count for pagination
+            total = queries.get_user_rankings_total(chat_id, start, end)
+            total_pages = max(1, (total + limit - 1) // limit)
+
+            # Ensure page is valid
+            page = min(page, total_pages)
+            offset = (page - 1) * limit
+
+            df = queries.get_user_rankings(chat_id, start, end, limit=limit, offset=offset)
 
             if df.empty:
-                return html.Div("No data for selected period", className="empty-state")
+                return (
+                    html.Div("No data for selected period", className="empty-state"),
+                    "",
+                    True,
+                    True,
+                    1,
+                    limit,
+                )
 
             # Build leaderboard rows
             rows = []
             for idx, row in df.iterrows():
-                rank = idx + 1
+                rank = offset + idx + 1
                 rank_class = "rank-gold" if rank == 1 else ("rank-silver" if rank == 2 else ("rank-bronze" if rank == 3 else ""))
 
                 name = row["first_name"]
@@ -554,13 +616,16 @@ def register_callbacks(app) -> None:
                                 className="name-cell",
                             ),
                             html.Td(f"{int(row['message_count']):,}", className="stat-cell"),
-                            html.Td(f"{int(row['active_days'])}", className="stat-cell"),
+                            html.Td(f"{int(row['reactions_sent']):,}", className="stat-cell"),
                             html.Td(f"{int(row['reactions_received']):,}", className="stat-cell"),
+                            html.Td(f"{int(row['replies_sent']):,}", className="stat-cell"),
+                            html.Td(f"{int(row['replies_received']):,}", className="stat-cell"),
+                            html.Td(f"{int(row['media_sent']):,}", className="stat-cell"),
                         ],
                     )
                 )
 
-            return html.Table(
+            table = html.Table(
                 className="leaderboard-table",
                 children=[
                     html.Thead(
@@ -568,17 +633,39 @@ def register_callbacks(app) -> None:
                             html.Th("Rank"),
                             html.Th("User"),
                             html.Th("Messages"),
-                            html.Th("Active Days"),
-                            html.Th("Reactions"),
+                            html.Th("Reactions Given"),
+                            html.Th("Reactions Received"),
+                            html.Th("Replies Sent"),
+                            html.Th("Replies Received"),
+                            html.Th("Media Sent"),
                         ])
                     ),
                     html.Tbody(rows),
                 ],
             )
 
+            # Pagination info
+            pagination_text = f"Page {page} of {total_pages} ({total} users)"
+
+            return (
+                table,
+                pagination_text,
+                page <= 1,  # Disable prev if on first page
+                page >= total_pages,  # Disable next if on last page
+                page,
+                limit,
+            )
+
         except Exception as e:
             logger.error(f"Error creating leaderboard: {e}")
-            return html.Div("Error loading leaderboard", className="error-state")
+            return (
+                html.Div("Error loading leaderboard", className="error-state"),
+                "",
+                True,
+                True,
+                1,
+                limit,
+            )
 
     @app.callback(
         [
@@ -633,17 +720,17 @@ def register_callbacks(app) -> None:
     @app.callback(
         [
             Output("lb-10", "className"),
-            Output("lb-20", "className"),
+            Output("lb-25", "className"),
             Output("lb-50", "className"),
         ],
         [
             Input("lb-10", "n_clicks"),
-            Input("lb-20", "n_clicks"),
+            Input("lb-25", "n_clicks"),
             Input("lb-50", "n_clicks"),
         ],
         prevent_initial_call=True,
     )
-    def update_leaderboard_buttons(clicks_10: int, clicks_20: int, clicks_50: int):
+    def update_leaderboard_buttons(clicks_10: int, clicks_25: int, clicks_50: int):
         """Update leaderboard button states."""
         from dash import ctx
 
@@ -652,7 +739,7 @@ def register_callbacks(app) -> None:
 
         if triggered == "lb-10":
             classes[0] = "lb-btn active"
-        elif triggered == "lb-20":
+        elif triggered == "lb-25":
             classes[1] = "lb-btn active"
         elif triggered == "lb-50":
             classes[2] = "lb-btn active"

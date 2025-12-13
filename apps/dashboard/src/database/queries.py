@@ -166,7 +166,8 @@ class DashboardQueries:
         chat_id: int,
         start_date: datetime,
         end_date: datetime,
-        limit: int = 20
+        limit: int = 20,
+        offset: int = 0
     ) -> pd.DataFrame:
         """
         Get user leaderboard with message counts and statistics.
@@ -210,6 +211,44 @@ class DashboardQueries:
                   AND mr.is_removed = FALSE
                   AND m.user_id IS NOT NULL
                 GROUP BY m.user_id
+            ),
+            user_replies_sent AS (
+                SELECT
+                    m.user_id,
+                    COUNT(*) as replies_sent
+                FROM messages m
+                WHERE m.chat_id = :chat_id
+                  AND m.date >= :start_date
+                  AND m.date < :end_date
+                  AND m.reply_to_message_id IS NOT NULL
+                  AND m.user_id IS NOT NULL
+                GROUP BY m.user_id
+            ),
+            user_replies_received AS (
+                SELECT
+                    orig.user_id,
+                    COUNT(*) as replies_received
+                FROM messages m
+                JOIN messages orig ON orig.chat_id = m.chat_id
+                                  AND orig.message_id = m.reply_to_message_id
+                WHERE m.chat_id = :chat_id
+                  AND m.date >= :start_date
+                  AND m.date < :end_date
+                  AND m.reply_to_message_id IS NOT NULL
+                  AND orig.user_id IS NOT NULL
+                GROUP BY orig.user_id
+            ),
+            user_media_sent AS (
+                SELECT
+                    m.user_id,
+                    COUNT(*) as media_sent
+                FROM messages m
+                JOIN media_files mf ON mf.message_id = m.id
+                WHERE m.chat_id = :chat_id
+                  AND m.date >= :start_date
+                  AND m.date < :end_date
+                  AND m.user_id IS NOT NULL
+                GROUP BY m.user_id
             )
             SELECT
                 u.id as user_id,
@@ -221,14 +260,21 @@ class DashboardQueries:
                 COALESCE(um.avg_message_length, 0) as avg_message_length,
                 COALESCE(um.active_days, 0) as active_days,
                 COALESCE(urs.reactions_sent, 0) as reactions_sent,
-                COALESCE(urr.reactions_received, 0) as reactions_received
+                COALESCE(urr.reactions_received, 0) as reactions_received,
+                COALESCE(urps.replies_sent, 0) as replies_sent,
+                COALESCE(urpr.replies_received, 0) as replies_received,
+                COALESCE(ums.media_sent, 0) as media_sent
             FROM users u
             JOIN user_messages um ON u.id = um.user_id
             LEFT JOIN user_reactions_sent urs ON u.id = urs.user_id
             LEFT JOIN user_reactions_received urr ON u.id = urr.user_id
+            LEFT JOIN user_replies_sent urps ON u.id = urps.user_id
+            LEFT JOIN user_replies_received urpr ON u.id = urpr.user_id
+            LEFT JOIN user_media_sent ums ON u.id = ums.user_id
             WHERE u.is_bot = FALSE
             ORDER BY um.message_count DESC
             LIMIT :limit
+            OFFSET :offset
         """)
 
         with self.engine.connect() as conn:
@@ -237,9 +283,39 @@ class DashboardQueries:
                 "start_date": start_date,
                 "end_date": end_date,
                 "limit": limit,
+                "offset": offset,
             })
 
         return df
+
+    def get_user_rankings_total(
+        self,
+        chat_id: int,
+        start_date: datetime,
+        end_date: datetime
+    ) -> int:
+        """
+        Get total count of users with messages for pagination.
+        """
+        query = text("""
+            SELECT COUNT(DISTINCT m.user_id) as total
+            FROM messages m
+            JOIN users u ON u.id = m.user_id
+            WHERE m.chat_id = :chat_id
+              AND m.date >= :start_date
+              AND m.date < :end_date
+              AND m.user_id IS NOT NULL
+              AND u.is_bot = FALSE
+        """)
+
+        with self.engine.connect() as conn:
+            result = conn.execute(query, {
+                "chat_id": chat_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            }).fetchone()
+
+        return result.total if result else 0
 
     def get_reaction_distribution(
         self,

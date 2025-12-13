@@ -303,17 +303,38 @@ def create_main_charts() -> html.Div:
                     ),
                 ],
             ),
-            # User Leaderboard (full width)
+        ],
+    )
+
+
+def create_top_users_section() -> html.Div:
+    """Create the top users leaderboard section."""
+    return html.Div(
+        className="top-users-section",
+        children=[
             html.Div(
                 className="chart-container full-width",
                 children=[
-                    html.H3("Top Contributors", className="chart-title"),
+                    html.H3("Top Users", className="chart-title"),
                     html.Div(
                         className="leaderboard-controls",
                         children=[
-                            html.Button("Top 10", id="lb-10", className="lb-btn active", n_clicks=0),
-                            html.Button("Top 20", id="lb-20", className="lb-btn", n_clicks=0),
-                            html.Button("Top 50", id="lb-50", className="lb-btn", n_clicks=0),
+                            html.Div(
+                                className="limit-controls",
+                                children=[
+                                    html.Button("Top 10", id="lb-10", className="lb-btn active", n_clicks=0),
+                                    html.Button("Top 25", id="lb-25", className="lb-btn", n_clicks=0),
+                                    html.Button("Top 50", id="lb-50", className="lb-btn", n_clicks=0),
+                                ],
+                            ),
+                            html.Div(
+                                className="pagination-controls",
+                                children=[
+                                    html.Button("← Prev", id="lb-prev", className="lb-btn pagination-btn", n_clicks=0),
+                                    html.Span(id="pagination-info", className="pagination-info"),
+                                    html.Button("Next →", id="lb-next", className="lb-btn pagination-btn", n_clicks=0),
+                                ],
+                            ),
                         ],
                     ),
                     dcc.Loading(
@@ -371,6 +392,7 @@ def create_dashboard_layout(
                         ],
                     ),
                     create_overview_cards(),
+                    create_top_users_section(),
                     create_main_charts(),
                 ],
             ),
@@ -386,6 +408,7 @@ def create_dashboard_layout(
             dcc.Store(id="selected-period", data="week"),
             dcc.Store(id="selected-chat", data=default_chat_id),
             dcc.Store(id="leaderboard-limit", data=10),
+            dcc.Store(id="leaderboard-page", data=1),
         ],
     )
 

@@ -148,7 +148,7 @@ IMAGE_TARBALL="/tmp/images-${COMMIT_HASH}.tar.gz"
 docker save \
     "beef-briefing/api-service:$COMMIT_HASH" \
     "beef-briefing/telegram-bot:$COMMIT_HASH" \
-    "beef-briefing/admin-panel:$COMMIT_HASH" \
+    "beef-briefing/dashboard:$COMMIT_HASH" \
     | gzip > "$IMAGE_TARBALL"
 
 TARBALL_SIZE=$(du -h "$IMAGE_TARBALL" | cut -f1)
@@ -253,7 +253,7 @@ if [[ "$SKIP_CLEANUP" == "false" && -n "$PREVIOUS_TAG" ]]; then
         PREVIOUS_TAG='$PREVIOUS_TAG'
 
         # Find and remove old images (keep only current and previous)
-        for repo in beef-briefing/api-service beef-briefing/telegram-bot beef-briefing/admin-panel; do
+        for repo in beef-briefing/api-service beef-briefing/telegram-bot beef-briefing/dashboard; do
             docker images \"\$repo\" --format '{{.Tag}}' | while read tag; do
                 if [[ \"\$tag\" != \"\$CURRENT_TAG\" && \"\$tag\" != \"\$PREVIOUS_TAG\" && \"\$tag\" != '<none>' ]]; then
                     echo \"Removing \$repo:\$tag\"

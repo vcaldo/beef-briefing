@@ -4,60 +4,31 @@ This guide covers all secrets that must be generated for the beef-briefing appli
 
 ## Prerequisites
 
-- Go 1.25+ installed (for admin panel secrets)
 - `htpasswd` command available (for Traefik password)
   - Debian/Ubuntu: `sudo apt install apache2-utils`
   - macOS: Pre-installed
   - RHEL/CentOS: `sudo yum install httpd-tools`
-- `openssl` command available (for analytics API key)
+- `openssl` command available (for secrets generation)
 
-## 1. Admin Panel Secrets
+## 1. Dashboard Flask Secret
 
-**Purpose:** Generate bcrypt password hash and session secret for admin panel authentication.
+**Purpose:** Generate secure random key for Flask session encryption.
 
-**Make Target (Recommended):**
+**Make Target:**
 ```bash
-# Generate both password hash and session secret to files
-make admin-panel-set-secrets-files
-
-# Or specify environment file explicitly
-make admin-panel-set-secrets-files ENV_FILE=infrastructure/.env.prod
-```
-
-**Individual Secrets:**
-```bash
-# Password hash only
-make admin-panel-set-password-file
-
-# Session secret only
-make admin-panel-set-session-file
+make secrets-dashboard
 ```
 
 **Output Location:**
 ```
-infrastructure/secrets/apps/admin-panel/
-├── admin_password_hash    # Bcrypt hash (permissions: 600)
-└── session_secret         # Base64-encoded 32-byte key (permissions: 600)
+infrastructure/secrets/apps/dashboard/flask_secret_key
 ```
 
-**Interactive Process:**
-1. Prompts for admin password
-2. Prompts for password confirmation
-3. Generates bcrypt hash (cost factor 10)
-4. Generates 32 random bytes for session secret
-5. Base64 encodes session secret
-6. Writes files with 600 permissions
-
-**Legacy Mode (environment file):**
-```bash
-# Update .env file directly (not recommended for production)
-make admin-panel-set-secrets ENV_FILE=infrastructure/.env.dev
-```
-
-**Scripted/Non-Interactive Mode:**
-```bash
-echo "mypassword" | make admin-panel-set-password-file
-```
+**Process:**
+1. Creates directory `infrastructure/secrets/apps/dashboard/` if needed
+2. Generates 32 random bytes using OpenSSL
+3. Base64 encodes the bytes
+4. Saves to file with 600 permissions
 
 ---
 
@@ -67,7 +38,7 @@ echo "mypassword" | make admin-panel-set-password-file
 
 **Make Target:**
 ```bash
-make generate-traefik-password
+make secrets-traefik-password
 ```
 
 **Output:** Updates `TRAEFIK_DASHBOARD_USERS` in `infrastructure/.env.prod`
@@ -98,7 +69,7 @@ TRAEFIK_DASHBOARD_USERS=admin:$$2y$$05$$gHL5l9SFHfFGrJm4gVQ65OrLFsMfSrZK7GwDPFJR
 
 **Make Target:**
 ```bash
-make generate-analytics-api-key
+make secrets-analytics-api-key
 ```
 
 **Output Location:**
@@ -131,11 +102,9 @@ This key will be deployed when you run 'make deploy'
 
 | Secret | Make Target | Output | Prerequisites |
 |--------|-------------|--------|---------------|
-| Admin password + session | `make admin-panel-set-secrets-files` | `infrastructure/secrets/apps/admin-panel/` | Go 1.25+ |
-| Admin password only | `make admin-panel-set-password-file` | `admin_password_hash` file | Go 1.25+ |
-| Session secret only | `make admin-panel-set-session-file` | `session_secret` file | Go 1.25+ |
-| Traefik password | `make generate-traefik-password` | `.env.prod` line | htpasswd |
-| Analytics API key | `make generate-analytics-api-key` | `analytics_api_key` file | openssl |
+| Dashboard Flask secret | `make secrets-dashboard` | `flask_secret_key` file | openssl |
+| Traefik password | `make secrets-traefik-password` | `.env.prod` line | htpasswd |
+| Analytics API key | `make secrets-analytics-api-key` | `analytics_api_key` file | openssl |
 
 ---
 
@@ -146,13 +115,11 @@ This key will be deployed when you run 'make deploy'
 # 1. Copy environment template
 cp infrastructure/.env.dev.example infrastructure/.env.dev
 
-# 2. Generate admin secrets
-make admin-panel-set-secrets-files
+# 2. Generate secrets
+make secrets-dashboard
+make secrets-analytics-api-key
 
-# 3. (Optional) Generate analytics key for testing
-make generate-analytics-api-key
-
-# 4. Start services
+# 3. Start services
 make up-build
 ```
 
@@ -169,9 +136,9 @@ cp infrastructure/.env.prod.example infrastructure/.env.prod
 #    - LINODE_TOKEN
 
 # 3. Generate all secrets
-make admin-panel-set-secrets-files ENV_FILE=infrastructure/.env.prod
-make generate-traefik-password
-make generate-analytics-api-key
+make secrets-dashboard
+make secrets-traefik-password
+make secrets-analytics-api-key
 
 # 4. Deploy
 make tf-setup && make tf-init && make tf-apply
@@ -186,7 +153,6 @@ make deploy
 2. **Git Exclusion:** `infrastructure/secrets/` is in `.gitignore`
 3. **Docker Mounts:** Secrets are mounted read-only in containers
 4. **Password Strength:** Traefik password generator warns for passwords < 8 characters
-5. **Bcrypt Cost:** Admin password uses bcrypt cost factor 10 (secure but fast enough for login)
 
 ---
 
@@ -207,14 +173,10 @@ sudo yum install httpd-tools
 **"Permission denied" when generating secrets**
 ```bash
 # Ensure secrets directory exists with correct permissions
-mkdir -p infrastructure/secrets/apps/admin-panel
 mkdir -p infrastructure/secrets/apps/api-service
+mkdir -p infrastructure/secrets/apps/dashboard
 chmod 700 infrastructure/secrets
 ```
-
-**Session secret validation fails**
-- Session secret must be at least 32 bytes when base64-decoded
-- Regenerate with `make admin-panel-set-session-file`
 
 **Traefik 401 Unauthorized after password change**
 1. Verify `$$` escaping in `.env.prod`: `grep TRAEFIK_DASHBOARD_USERS infrastructure/.env.prod`

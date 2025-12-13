@@ -22,7 +22,6 @@ API_SERVICE := api-service
 TELEGRAM_BOT := telegram-bot
 POSTGRES_SERVICE := postgres
 MINIO_SERVICE := minio
-ADMIN_PANEL := admin-panel
 DASHBOARD := dashboard
 NEWRELIC_INFRA := newrelic-infra
 TRAEFIK := traefik
@@ -30,7 +29,6 @@ TRAEFIK := traefik
 # Go directories
 API_DIR := apps/api-service
 BOT_DIR := apps/telegram-bot
-ADMIN_PANEL_DIR := apps/admin-panel
 IMPORT_CLI_DIR := apps/import-cli
 PKG_DIR := pkg/config
 
@@ -150,9 +148,6 @@ docker-build-api: ## Rebuild api-service image
 docker-build-bot: ## Rebuild telegram-bot image
 	$(DC) build $(TELEGRAM_BOT)
 
-docker-build-admin-panel: ## Rebuild admin-panel image
-	$(DC) build $(ADMIN_PANEL)
-
 docker-build-dashboard: ## Rebuild dashboard image
 	$(DC) build $(DASHBOARD)
 
@@ -173,9 +168,6 @@ docker-logs-postgres: ## Tail logs from postgres
 
 docker-logs-minio: ## Tail logs from minio
 	$(DC) logs -f $(MINIO_SERVICE)
-
-docker-logs-admin-panel: ## Tail logs from admin-panel
-	$(DC) logs -f $(ADMIN_PANEL)
 
 docker-logs-dashboard: ## Tail logs from dashboard
 	$(DC) logs -f $(DASHBOARD)
@@ -198,9 +190,6 @@ docker-shell-postgres: ## Open shell in postgres container
 docker-shell-minio: ## Open shell in minio container
 	$(DC) exec $(MINIO_SERVICE) /bin/sh
 
-docker-shell-admin-panel: ## Open shell in admin-panel container
-	$(DC) exec $(ADMIN_PANEL) /bin/bash
-
 docker-shell-dashboard: ## Open shell in dashboard container
 	$(DC) exec $(DASHBOARD) /bin/bash
 
@@ -210,7 +199,7 @@ docker-shell-newrelic: ## Open shell in newrelic-infra container
 # =============================================================================
 # GO BUILD (go-build-*)
 # =============================================================================
-go-build: go-build-api go-build-bot go-build-admin-panel go-build-import-cli ## Build all Go binaries locally
+go-build: go-build-api go-build-bot go-build-import-cli ## Build all Go binaries locally
 
 go-build-api: ## Build api-service binary locally
 	@echo "Building api-service..."
@@ -221,11 +210,6 @@ go-build-bot: ## Build telegram-bot binary locally
 	@echo "Building telegram-bot..."
 	cd $(BOT_DIR) && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/telegram-bot ./cmd
 	@echo "Binary created at $(BOT_DIR)/bin/telegram-bot"
-
-go-build-admin-panel: ## Build admin-panel binary locally
-	@echo "Building admin-panel..."
-	cd $(ADMIN_PANEL_DIR) && templ generate && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/admin-panel ./cmd
-	@echo "Binary created at $(ADMIN_PANEL_DIR)/bin/admin-panel"
 
 go-build-import-cli: ## Build import-cli binary locally
 	@echo "Building import-cli..."
@@ -239,7 +223,6 @@ go-clean: ## Remove Go build artifacts
 	@echo "Cleaning build artifacts..."
 	rm -rf $(API_DIR)/bin
 	rm -rf $(BOT_DIR)/bin
-	rm -rf $(ADMIN_PANEL_DIR)/bin
 	rm -rf $(IMPORT_CLI_DIR)/bin
 	@echo "Done!"
 
@@ -251,8 +234,6 @@ go-fmt: ## Format all Go code
 	cd $(API_DIR) && gofmt -w -s .
 	@echo "Formatting telegram-bot..."
 	cd $(BOT_DIR) && gofmt -w -s .
-	@echo "Formatting admin-panel..."
-	cd $(ADMIN_PANEL_DIR) && gofmt -w -s .
 	@echo "Formatting import-cli..."
 	cd $(IMPORT_CLI_DIR) && gofmt -w -s .
 	@echo "Formatting pkg/config..."
@@ -264,8 +245,6 @@ go-fmt-check: ## Check if Go code is formatted
 	@cd $(API_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(API_DIR):" && gofmt -l . && exit 1)
 	@echo "Checking telegram-bot formatting..."
 	@cd $(BOT_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(BOT_DIR):" && gofmt -l . && exit 1)
-	@echo "Checking admin-panel formatting..."
-	@cd $(ADMIN_PANEL_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(ADMIN_PANEL_DIR):" && gofmt -l . && exit 1)
 	@echo "Checking import-cli formatting..."
 	@cd $(IMPORT_CLI_DIR) && test -z "$$(gofmt -l .)" || (echo "Files need formatting in $(IMPORT_CLI_DIR):" && gofmt -l . && exit 1)
 	@echo "Checking pkg/config formatting..."
@@ -275,24 +254,6 @@ go-fmt-check: ## Check if Go code is formatted
 # =============================================================================
 # SECRETS (secrets-*)
 # =============================================================================
-secrets-admin-panel: ## Generate admin panel secrets (to .env file)
-	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -file ../../../$(ENV_FILE)
-
-secrets-admin-panel-password: ## Generate only admin panel password hash
-	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -file ../../../$(ENV_FILE) -password-only
-
-secrets-admin-panel-session: ## Generate only admin panel session secret
-	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -file ../../../$(ENV_FILE) -session-only
-
-secrets-admin-panel-files: ## Generate admin panel secrets (to files, recommended)
-	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../$(SECRETS_DIR)/apps/admin-panel
-
-secrets-admin-panel-password-file: ## Generate admin panel password hash (to file)
-	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../$(SECRETS_DIR)/apps/admin-panel -password-only
-
-secrets-admin-panel-session-file: ## Generate admin panel session secret (to file)
-	@cd $(ADMIN_PANEL_DIR)/tools && go run update_secrets.go -mode=files -secrets-dir ../../../$(SECRETS_DIR)/apps/admin-panel -session-only
-
 secrets-traefik-password: ## Generate Traefik dashboard password
 	@chmod +x $(SCRIPTS_DIR)/generate-traefik-password.sh
 	@$(SCRIPTS_DIR)/generate-traefik-password.sh
@@ -453,15 +414,13 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	dev-up dev-up-build dev-up-logs dev-down dev-restart dev-ps dev-clean dev-prune \
 	prod-deploy prod-deploy-skip-build prod-deploy-skip-cleanup prod-deploy-regenerate-certs \
 	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik \
-	docker-build docker-build-api docker-build-bot docker-build-admin-panel docker-build-dashboard \
+	docker-build docker-build-api docker-build-bot docker-build-dashboard \
 	docker-logs docker-logs-api docker-logs-bot docker-logs-postgres docker-logs-minio \
-	docker-logs-admin-panel docker-logs-dashboard docker-logs-newrelic \
+	docker-logs-dashboard docker-logs-newrelic \
 	docker-shell-api docker-shell-bot docker-shell-postgres docker-shell-minio \
-	docker-shell-admin-panel docker-shell-dashboard docker-shell-newrelic \
-	go-build go-build-api go-build-bot go-build-admin-panel go-build-import-cli go-build-import-cli-prod go-clean \
+	docker-shell-dashboard docker-shell-newrelic \
+	go-build go-build-api go-build-bot go-build-import-cli go-build-import-cli-prod go-clean \
 	go-fmt go-fmt-check \
-	secrets-admin-panel secrets-admin-panel-password secrets-admin-panel-session \
-	secrets-admin-panel-files secrets-admin-panel-password-file secrets-admin-panel-session-file \
 	secrets-traefik-password secrets-analytics-api-key secrets-dashboard \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \

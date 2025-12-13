@@ -15,7 +15,7 @@ Deployed via Docker Compose (`docker-compose.prod.yml`):
 - **postgres**: PostGIS 17-3.4 (PostgreSQL with geographic extensions)
 - **api-service**: Go REST API for data access and Telegram integration
 - **telegram-bot**: Go Telegram bot for group interaction
-- **admin-panel**: Go web dashboard with templ templates
+- **dashboard**: Python Flask dashboard with analytics
 - **newrelic-infra**: New Relic infrastructure monitoring (optional)
 
 ### Storage Resources
@@ -362,10 +362,8 @@ DB_NAME=beef_briefing
 API_PORT=8080
 TELEGRAM_BOT_TOKEN=<your-telegram-bot-token>
 
-# Admin Panel
-ADMIN_PANEL_PORT=8081
-ADMIN_PASSWORD_HASH_FILE=/app/secrets/password.hash
-SESSION_SECRET_FILE=/app/secrets/session.secret
+# Dashboard
+DASHBOARD_PORT=8050
 
 # Object Storage (Linode S3-compatible)
 # Use: terraform output object_storage_endpoint
@@ -383,19 +381,14 @@ IMAGE_TAG=latest
 POSTGRES_DATA_PATH=/mnt/postgres-data
 ```
 
-### 4. Set Up Admin Panel Secrets
+### 4. Set Up Dashboard Secrets
 
 ```bash
-cd ~/beef-briefing/infrastructure/secrets/apps/admin-panel
+cd ~/beef-briefing/infrastructure/secrets/apps/dashboard
 
-# Generate password hash (follow instructions in infrastructure/secrets/README.md)
-# You'll need to use the admin-panel tools or bcrypt to generate the hash
-
-# Create password.hash file
-echo '<bcrypt-hash-of-your-password>' > password.hash
-
-# Generate session secret
-openssl rand -base64 32 > session.secret
+# Generate Flask secret key
+openssl rand -base64 32 > flask_secret_key
+chmod 600 flask_secret_key
 
 # Verify files
 ls -la
@@ -706,9 +699,9 @@ Check your usage in Linode Cloud Manager:
 │  │  │  └──────┬───────┘  └──────┬───────┘  └─────────────┘  │ │  │
 │  │  │         │                   │                           │ │  │
 │  │  │         │                   │   ┌──────────────────┐   │ │  │
-│  │  │         │                   └──►│  admin-panel     │   │ │  │
-│  │  │         │                       │  (Go/templ)      │   │ │  │
-│  │  │         │                       │  :8081           │   │ │  │
+│  │  │         │                   └──►│  dashboard       │   │ │  │
+│  │  │         │                       │  (Python/Flask)  │   │ │  │
+│  │  │         │                       │  :8050           │   │ │  │
 │  │  │         │                       └──────────────────┘   │ │  │
 │  │  │         │                                               │ │  │
 │  │  │  Internal Network: beef-prod-network (bridge)          │ │  │
@@ -748,7 +741,7 @@ Check your usage in Linode Cloud Manager:
 
 External Connections:
   ↕ Telegram Bot API (telegram-bot receives updates)
-  ↕ User browsers (admin-panel web interface)
+  ↕ User browsers (dashboard web interface)
   ↕ API clients (api-service REST endpoints)
 ```
 
@@ -758,14 +751,14 @@ External Connections:
    - Telegram Bot API → `telegram-bot` → `api-service` → `postgres`
    - Media files → `api-service` → Linode Object Storage (S3)
 
-2. **Admin Dashboard**:
-   - User browser → `admin-panel` → `postgres` (read-only queries)
-   - Authentication via session secrets (file-based)
+2. **Dashboard**:
+   - User browser → `dashboard` → `postgres` (read-only queries)
+   - Authentication via Telegram OAuth
 
 3. **Storage**:
    - Database: PostGIS on persistent block storage volume
    - Media: Content-addressable storage in Object Storage bucket
-   - Secrets: Mounted as read-only volumes in admin-panel container
+   - Secrets: Mounted as read-only volumes in containers
 
 4. **Security**:
    - PostgreSQL not exposed externally (internal Docker network only)
@@ -776,9 +769,10 @@ External Connections:
 ## Related Documentation
 
 - [Docker Compose Configuration](../docker-compose.prod.yml)
-- [Admin Panel Secrets Setup](../secrets/README.md)
+- [Secrets Setup](../secrets/README.md)
 - [Database Migrations](../../apps/postgres/migrations/)
 - [API Service Documentation](../../apps/api-service/README.md)
+- [Dashboard Documentation](../../apps/dashboard/README.md)
 - [Deployment Scripts](../../scripts/)
 
 ## Support

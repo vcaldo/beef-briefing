@@ -1,6 +1,6 @@
 # Beef Briefing
 
-Go-based Telegram bot system for managing beef briefing subscriptions. Includes REST API, PostgreSQL backend, and Linode deployment with Traefik SSL.
+Go-based Telegram bot system for managing beef briefing subscriptions. Includes admin panel, REST API, PostgreSQL backend, and Linode deployment with Traefik SSL.
 
 ## Quick Start (Development)
 
@@ -10,8 +10,8 @@ cp infrastructure/.env.dev.example infrastructure/.env.dev
 # Edit .env.dev: set TELEGRAM_BOT_TOKEN (required)
 
 # 2. Generate secrets
-make secrets-dashboard
-make secrets-analytics-api-key
+make admin-panel-set-secrets-files
+make generate-analytics-api-key
 
 # 3. Start services
 make up-build
@@ -21,7 +21,7 @@ make logs
 ```
 
 **Access:**
-- Dashboard: http://localhost:8050
+- Admin Panel: http://localhost:8081
 - API Service: http://localhost:8080
 - MinIO Console: http://localhost:9001
 
@@ -31,6 +31,8 @@ make logs
 |----------|-------------|--------|
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot API token from @BotFather | `infrastructure/.env.dev` |
 | `DB_PASSWORD` | PostgreSQL password | `infrastructure/.env.dev` |
+| `ADMIN_PASSWORD_HASH_FILE` | Path to admin bcrypt password hash | `infrastructure/secrets/apps/admin-panel/admin_password_hash` |
+| `SESSION_SECRET_FILE` | Path to session secret (base64, 32+ bytes) | `infrastructure/secrets/apps/admin-panel/session_secret` |
 | `ANALYTICS_API_KEY_FILE` | API key for analytics endpoints | `infrastructure/secrets/apps/api-service/analytics_api_key` |
 
 **Production-only:**
@@ -48,9 +50,11 @@ make logs
 
 | Secret | Make Target | Output Path |
 |--------|-------------|-------------|
-| Dashboard Flask secret | `make secrets-dashboard` | `infrastructure/secrets/apps/dashboard/flask_secret_key` |
-| Traefik dashboard password | `make secrets-traefik-password` | Updates `TRAEFIK_DASHBOARD_USERS` in `.env.prod` |
-| Analytics API key | `make secrets-analytics-api-key` | `infrastructure/secrets/apps/api-service/analytics_api_key` |
+| Admin password + session | `make admin-panel-set-secrets-files` | `infrastructure/secrets/apps/admin-panel/` |
+| Admin password only | `make admin-panel-set-password-file` | `infrastructure/secrets/apps/admin-panel/admin_password_hash` |
+| Session secret only | `make admin-panel-set-session-file` | `infrastructure/secrets/apps/admin-panel/session_secret` |
+| Traefik dashboard password | `make generate-traefik-password` | Updates `TRAEFIK_DASHBOARD_USERS` in `.env.prod` |
+| Analytics API key | `make generate-analytics-api-key` | `infrastructure/secrets/apps/api-service/analytics_api_key` |
 
 ## Service Documentation
 
@@ -58,7 +62,7 @@ make logs
 |---------|-------------|
 | [api-service](apps/api-service/README.md) | REST API for ingesting Telegram updates with media uploads |
 | [telegram-bot](apps/telegram-bot/README.md) | Telegram bot client that forwards group messages to the API |
-| [dashboard](apps/dashboard/README.md) | Web dashboard with analytics and visualizations |
+| [admin-panel](apps/admin-panel/README.md) | Web admin interface with authentication, stats, and calendar heatmap |
 | [import-cli](apps/import-cli/README.md) | CLI tool to import Telegram Desktop exports |
 | [postgres](apps/postgres/README.md) | Database schema with 22 tables modeling Telegram data |
 
@@ -105,6 +109,7 @@ make tf-ip           # Get server IP
 ## Troubleshooting
 
 - **Bot not receiving messages**: Ensure bot is admin in the group and privacy mode is disabled via @BotFather `/setprivacy`
+- **Admin panel login fails**: Regenerate secrets with `make admin-panel-set-secrets-files`
 - **SSL certificate not issued**: Check DNS points to server IP (`make tf-ip`) and port 80 is open
 - **Missing `htpasswd`**: Install `apache2-utils` (Debian/Ubuntu) or `httpd-tools` (RHEL/CentOS)
-- **Analytics API 401**: Generate API key with `make secrets-analytics-api-key`
+- **Analytics API 401**: Generate API key with `make generate-analytics-api-key`

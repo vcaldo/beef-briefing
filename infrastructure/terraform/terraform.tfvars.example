@@ -38,9 +38,6 @@ linode_token = "your-linode-api-token-here"
 # Email address for domain SOA record (default: admin@mydomain.example)
 # domain_email = "admin@mydomain.example"
 
-# Admin panel subdomain prefix (default: admin)
-# admin_panel_domain_suffix = "admin"
-
 # =============================================================================
 # POSTGRESQL BLOCK STORAGE
 # =============================================================================

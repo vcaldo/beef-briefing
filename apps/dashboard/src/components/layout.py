@@ -162,6 +162,22 @@ def create_overview_cards() -> html.Div:
     return html.Div(
         className="overview-cards",
         children=[
+            # 1. Top User
+            html.Div(
+                className="stat-card",
+                id="card-topuser",
+                children=[
+                    html.Div(className="stat-icon topuser-icon", children="👑"),
+                    html.Div(
+                        className="stat-content",
+                        children=[
+                            html.Span("Top User", className="stat-label"),
+                            html.Span("--", id="stat-topuser", className="stat-value"),
+                        ],
+                    ),
+                ],
+            ),
+            # 2. Total Messages
             html.Div(
                 className="stat-card",
                 id="card-messages",
@@ -176,11 +192,12 @@ def create_overview_cards() -> html.Div:
                     ),
                 ],
             ),
+            # 3. Active Users
             html.Div(
                 className="stat-card",
                 id="card-users",
                 children=[
-                    html.Div(className="stat-icon users-icon", children="👥"),
+                    html.Div(className="stat-icon users-icon", children="👪"),
                     html.Div(
                         className="stat-content",
                         children=[
@@ -190,11 +207,12 @@ def create_overview_cards() -> html.Div:
                     ),
                 ],
             ),
+            # 4. Reactions
             html.Div(
                 className="stat-card",
                 id="card-reactions",
                 children=[
-                    html.Div(className="stat-icon reactions-icon", children="❤️"),
+                    html.Div(className="stat-icon reactions-icon", children="🔥"),
                     html.Div(
                         className="stat-content",
                         children=[
@@ -204,25 +222,12 @@ def create_overview_cards() -> html.Div:
                     ),
                 ],
             ),
-            html.Div(
-                className="stat-card",
-                id="card-media",
-                children=[
-                    html.Div(className="stat-icon media-icon", children="📷"),
-                    html.Div(
-                        className="stat-content",
-                        children=[
-                            html.Span("Media Shared", className="stat-label"),
-                            html.Span("--", id="stat-media", className="stat-value"),
-                        ],
-                    ),
-                ],
-            ),
+            # 5. Msg/Day
             html.Div(
                 className="stat-card",
                 id="card-msgday",
                 children=[
-                    html.Div(className="stat-icon msgday-icon", children="📊"),
+                    html.Div(className="stat-icon msgday-icon", children="📈"),
                     html.Div(
                         className="stat-content",
                         children=[
@@ -232,16 +237,17 @@ def create_overview_cards() -> html.Div:
                     ),
                 ],
             ),
+            # 6. Media Shared
             html.Div(
                 className="stat-card",
-                id="card-topuser",
+                id="card-media",
                 children=[
-                    html.Div(className="stat-icon topuser-icon", children="🏆"),
+                    html.Div(className="stat-icon media-icon", children="📎"),
                     html.Div(
                         className="stat-content",
                         children=[
-                            html.Span("Top User", className="stat-label"),
-                            html.Span("--", id="stat-topuser", className="stat-value"),
+                            html.Span("Media Shared", className="stat-label"),
+                            html.Span("--", id="stat-media", className="stat-value"),
                         ],
                     ),
                 ],

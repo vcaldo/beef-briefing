@@ -190,7 +190,7 @@ def register_callbacks(app) -> None:
             end = datetime.fromisoformat(end_date) + timedelta(days=1)
 
             stats = queries.get_overview_stats(chat_id, start, end)
-            top_reactions = queries.get_top_reactions(chat_id, start, end, limit=8)
+            top_reactions = queries.get_top_reactions(chat_id, start, end, limit=12)
 
             # Build reaction badges
             badges = [

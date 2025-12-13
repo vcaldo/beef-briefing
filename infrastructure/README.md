@@ -12,8 +12,8 @@ infrastructure/
 ├── .env.prod.example         # Production environment template
 ├── secrets/                  # Secret files (gitignored)
 │   └── apps/
+│       ├── admin-panel/      # Admin password hash & session secret
 │       ├── api-service/      # Analytics API key
-│       ├── dashboard/        # Flask secret key
 │       └── new-relic/        # New Relic configuration
 ├── terraform/                # Linode infrastructure as code
 │   └── README.md             # Detailed Terraform documentation
@@ -35,8 +35,8 @@ cp .env.dev.example .env.dev
 #    - DB_PASSWORD
 
 # 3. Generate secrets (from repo root)
-make secrets-dashboard
-make secrets-analytics-api-key
+make admin-panel-set-secrets-files
+make generate-analytics-api-key
 
 # 4. Start services
 make up-build
@@ -60,9 +60,9 @@ make tf-apply
 make tf-ip
 
 # 5. Generate secrets
-make secrets-dashboard
-make secrets-traefik-password
-make secrets-analytics-api-key
+make admin-panel-set-secrets-files
+make generate-traefik-password
+make generate-analytics-api-key
 
 # 6. Deploy
 make deploy
@@ -87,8 +87,9 @@ make deploy
 | `DB_PASSWORD` | PostgreSQL password |
 
 Secrets are loaded from files in `secrets/apps/`:
+- `admin-panel/admin_password_hash`
+- `admin-panel/session_secret`
 - `api-service/analytics_api_key`
-- `dashboard/flask_secret_key`
 
 ### Production
 
@@ -114,7 +115,7 @@ All development variables plus:
 | minio | 9000/9001 | S3-compatible object storage |
 | api-service | 8080 | REST API for Telegram data ingestion |
 | telegram-bot | - | Telegram bot client |
-| dashboard | 8050 | Python Flask dashboard |
+| admin-panel | 8081 | Web admin interface |
 
 ### Production (`docker-compose.prod.yml`)
 
@@ -124,7 +125,7 @@ All development variables plus:
 | postgres | 5432 (internal) | PostgreSQL with PostGIS |
 | api-service | 8080 (internal) | REST API |
 | telegram-bot | - | Telegram bot client |
-| dashboard | 8050 (internal) | Dashboard (via Traefik at `/beef-dashboard`) |
+| admin-panel | 8081 (internal) | Admin interface (via Traefik at `/admin`) |
 | newrelic-infra | - | Infrastructure monitoring (optional) |
 
 ## Secrets Management
@@ -134,14 +135,14 @@ See [secrets/README.md](secrets/README.md) for detailed secrets documentation.
 **Quick reference:**
 
 ```bash
-# Generate dashboard Flask secret
-make secrets-dashboard
+# Generate all admin panel secrets
+make admin-panel-set-secrets-files
 
 # Generate Traefik dashboard password (production)
-make secrets-traefik-password
+make generate-traefik-password
 
 # Generate analytics API key
-make secrets-analytics-api-key
+make generate-analytics-api-key
 ```
 
 ## Terraform (Linode)
@@ -171,7 +172,7 @@ Production uses Traefik with automatic Let's Encrypt certificates.
 
 | URL | Service |
 |-----|---------|
-| `https://{domain}/beef-dashboard` | Dashboard |
+| `https://{domain}/admin` | Admin Panel |
 | `https://{domain}/traefik-dashboard` | Traefik Dashboard (basic auth) |
 
 ### Troubleshooting SSL
@@ -192,12 +193,12 @@ make deploy-regenerate-certs
 ```
 Internet (443/80) --> Traefik (SSL termination)
                            |
-                           +--> Dashboard (/beef-dashboard)
+                           +--> Admin Panel (/admin)
                            +--> Traefik Dashboard (/traefik-dashboard)
 
 Internal Docker Network (beef-prod-network):
   +-- API Service (8080) <--> Telegram Bot
-  +-- Dashboard (8050)
+  +-- Admin Panel (8081)
   +-- PostgreSQL (5432) - NOT exposed externally
 ```
 
@@ -206,5 +207,5 @@ Internal Docker Network (beef-prod-network):
 - [Terraform Infrastructure](terraform/README.md) - Linode provisioning details
 - [Secrets Management](secrets/README.md) - Secret generation and storage
 - [API Service](../apps/api-service/README.md) - REST API documentation
-- [Dashboard](../apps/dashboard/README.md) - Dashboard documentation
+- [Admin Panel](../apps/admin-panel/README.md) - Web interface documentation
 - [Telegram Bot](../apps/telegram-bot/README.md) - Bot configuration

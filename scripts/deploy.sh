@@ -146,7 +146,6 @@ IMAGE_TARBALL="/tmp/images-${COMMIT_HASH}.tar.gz"
 docker save \
     "beef-briefing/api-service:$COMMIT_HASH" \
     "beef-briefing/telegram-bot:$COMMIT_HASH" \
-    "beef-briefing/admin-panel:$COMMIT_HASH" \
     "beef-briefing/dashboard:$COMMIT_HASH" \
     | gzip > "$IMAGE_TARBALL"
 
@@ -190,10 +189,16 @@ remote_exec "$SSH_HOST" "
     # Create directories
     mkdir -p ~/beef-briefing
 
+    # Stop containers that may have secrets mounted (prevents permission issues)
+    cd ~/beef-briefing && docker compose down 2>/dev/null || true
+
     # Move files to app directory
     mv /tmp/docker-compose.yml ~/beef-briefing/
     mv /tmp/.env ~/beef-briefing/
-    rm -rf ~/beef-briefing/secrets && mv /tmp/apps/ ~/beef-briefing/secrets/
+
+    # Remove old secrets with fallback for permission issues
+    rm -rf ~/beef-briefing/secrets 2>/dev/null || sudo rm -rf ~/beef-briefing/secrets
+    mv /tmp/apps/ ~/beef-briefing/secrets/
 
     # Setup letsencrypt directory if transferred
     if [ -d /tmp/letsencrypt ]; then
@@ -242,7 +247,7 @@ if [[ "$SKIP_CLEANUP" == "false" && -n "$PREVIOUS_TAG" ]]; then
         PREVIOUS_TAG='$PREVIOUS_TAG'
 
         # Find and remove old images (keep only current and previous)
-        for repo in beef-briefing/api-service beef-briefing/telegram-bot beef-briefing/admin-panel; do
+        for repo in beef-briefing/api-service beef-briefing/telegram-bot beef-briefing/dashboard; do
             docker images \"\$repo\" --format '{{.Tag}}' | while read tag; do
                 if [[ \"\$tag\" != \"\$CURRENT_TAG\" && \"\$tag\" != \"\$PREVIOUS_TAG\" && \"\$tag\" != '<none>' ]]; then
                     echo \"Removing \$repo:\$tag\"

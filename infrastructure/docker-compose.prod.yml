@@ -68,40 +68,40 @@ services:
       - beef-prod-network
     restart: unless-stopped
 
-  admin-panel:
-    build:
-      context: ..
-      dockerfile: apps/admin-panel/Dockerfile
-    image: beef-briefing/admin-panel:${IMAGE_TAG}
-    container_name: beef-admin-panel-prod
-    environment:
-      API_SERVICE_URL: http://api-service:${API_PORT}
-      ANALYTICS_API_KEY_FILE: ${ANALYTICS_API_KEY_FILE}
-      ADMIN_PANEL_PORT: ${ADMIN_PANEL_PORT:-8081}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD_HASH_FILE: ${ADMIN_PASSWORD_HASH_FILE}
-      SESSION_SECRET_FILE: ${SESSION_SECRET_FILE}
-      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
-      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
-      SECURE_COOKIES: true
-      ENVIRONMENT: production
-      LOG_LEVEL: info
-    volumes:
-      - ./secrets/admin-panel:/app/secrets:ro
-      - ./secrets/api-service:/app/secrets-api:ro
-    depends_on:
-      - api-service
-    networks:
-      - beef-prod-network
-    labels:
-      - "traefik.enable=true"
-      # Router configuration
-      - 'traefik.http.routers.admin-panel.rule=Host(`${ADMIN_PANEL_DOMAIN_SUFFIX}.${DOMAIN_NAME}`)'
-      - "traefik.http.routers.admin-panel.entrypoints=websecure"
-      - "traefik.http.routers.admin-panel.tls.certresolver=letsencrypt"
-      # Service configuration
-      - "traefik.http.services.admin-panel.loadbalancer.server.port=${ADMIN_PANEL_PORT:-8081}"
-    restart: unless-stopped
+  # admin-panel:
+  #   build:
+  #     context: ..
+  #     dockerfile: apps/admin-panel/Dockerfile
+  #   image: beef-briefing/admin-panel:${IMAGE_TAG}
+  #   container_name: beef-admin-panel-prod
+  #   environment:
+  #     API_SERVICE_URL: http://api-service:${API_PORT}
+  #     ANALYTICS_API_KEY_FILE: ${ANALYTICS_API_KEY_FILE}
+  #     ADMIN_PANEL_PORT: ${ADMIN_PANEL_PORT:-8081}
+  #     ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+  #     ADMIN_PASSWORD_HASH_FILE: ${ADMIN_PASSWORD_HASH_FILE}
+  #     SESSION_SECRET_FILE: ${SESSION_SECRET_FILE}
+  #     NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
+  #     NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+  #     SECURE_COOKIES: true
+  #     ENVIRONMENT: production
+  #     LOG_LEVEL: info
+  #   volumes:
+  #     - ./secrets/admin-panel:/app/secrets:ro
+  #     # - ./secrets/api-service:/app/secrets-api:ro
+  #   depends_on:
+  #     - api-service
+  #   networks:
+  #     - beef-prod-network
+  #   labels:
+  #     - "traefik.enable=true"
+  #     # Router configuration
+  #     - 'traefik.http.routers.admin-panel.rule=Host(`${ADMIN_PANEL_DOMAIN_SUFFIX}.${DOMAIN_NAME}`)'
+  #     - "traefik.http.routers.admin-panel.entrypoints=websecure"
+  #     - "traefik.http.routers.admin-panel.tls.certresolver=letsencrypt"
+  #     # Service configuration
+  #     - "traefik.http.services.admin-panel.loadbalancer.server.port=${ADMIN_PANEL_PORT:-8081}"
+  #   restart: unless-stopped
 
   dashboard:
     build:
@@ -191,7 +191,6 @@ services:
       - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_USERS}"
     restart: unless-stopped
     depends_on:
-      - admin-panel
       - dashboard
 
 networks:

@@ -146,7 +146,6 @@ IMAGE_TARBALL="/tmp/images-${COMMIT_HASH}.tar.gz"
 docker save \
     "beef-briefing/api-service:$COMMIT_HASH" \
     "beef-briefing/telegram-bot:$COMMIT_HASH" \
-    "beef-briefing/admin-panel:$COMMIT_HASH" \
     "beef-briefing/dashboard:$COMMIT_HASH" \
     | gzip > "$IMAGE_TARBALL"
 
@@ -190,12 +189,11 @@ remote_exec "$SSH_HOST" "
     # Create directories
     mkdir -p ~/beef-briefing
 
-    # Move files to app directory
+    # Move config files (can be done while containers are running)
     mv /tmp/docker-compose.yml ~/beef-briefing/
     mv /tmp/.env ~/beef-briefing/
-    rm -rf ~/beef-briefing/secrets && mv /tmp/apps/ ~/beef-briefing/secrets/
 
-    # Setup letsencrypt directory if transferred
+    # Setup letsencrypt directory if transferred (can be done while containers are running)
     if [ -d /tmp/letsencrypt ]; then
         echo 'Setting up letsencrypt directory...'
         mkdir -p ~/beef-briefing/letsencrypt
@@ -214,11 +212,19 @@ remote_exec "$SSH_HOST" "
         echo 'Created acme.json for Let'\''s Encrypt'
     fi
 
-    # Load Docker images
+    # Load Docker images WHILE containers are still running (minimizes downtime)
     echo 'Loading Docker images...'
     gunzip -c /tmp/images-${COMMIT_HASH}.tar.gz | docker load
 
-    # Start services
+    # NOW stop containers (just before replacing secrets - minimizes downtime)
+    echo 'Stopping containers for secrets update...'
+    cd ~/beef-briefing && docker compose down 2>/dev/null || true
+
+    # Remove old secrets with fallback for permission issues
+    rm -rf ~/beef-briefing/secrets 2>/dev/null || sudo rm -rf ~/beef-briefing/secrets
+    mv /tmp/apps/ ~/beef-briefing/secrets/
+
+    # Start services immediately after secrets are in place
     echo 'Starting services...'
     cd ~/beef-briefing && docker compose up -d
 
@@ -242,7 +248,7 @@ if [[ "$SKIP_CLEANUP" == "false" && -n "$PREVIOUS_TAG" ]]; then
         PREVIOUS_TAG='$PREVIOUS_TAG'
 
         # Find and remove old images (keep only current and previous)
-        for repo in beef-briefing/api-service beef-briefing/telegram-bot beef-briefing/admin-panel; do
+        for repo in beef-briefing/api-service beef-briefing/telegram-bot beef-briefing/dashboard; do
             docker images \"\$repo\" --format '{{.Tag}}' | while read tag; do
                 if [[ \"\$tag\" != \"\$CURRENT_TAG\" && \"\$tag\" != \"\$PREVIOUS_TAG\" && \"\$tag\" != '<none>' ]]; then
                     echo \"Removing \$repo:\$tag\"

@@ -18,6 +18,7 @@ shift || true
 # Service configuration (name, port, url_path)
 declare -A DEV_SERVICES=(
     ["api-service"]="8080|http://localhost:8080|/health"
+    ["admin-panel"]="8081|http://localhost:8081|"
     ["dashboard"]="8050|http://localhost:8050|"
     ["telegram-bot"]="-|-|"
     ["postgres"]="5432|localhost:5432|"
@@ -26,6 +27,7 @@ declare -A DEV_SERVICES=(
 
 declare -A PROD_SERVICES=(
     ["api-service"]="-|(internal)|"
+    ["admin-panel"]="-|https://\${DOMAIN}/admin|"
     ["dashboard"]="-|https://dashboard.\${DOMAIN}|"
     ["telegram-bot"]="-|-|"
     ["traefik"]="-|https://\${DOMAIN}/traefik-dashboard|"
@@ -37,12 +39,14 @@ declare -A PROD_SERVICES=(
 # In prod: beef-briefing/{service}:{tag}
 DEV_IMAGES=(
     "infrastructure-api-service"
+    "infrastructure-admin-panel"
     "infrastructure-telegram-bot"
     "infrastructure-dashboard"
 )
 
 PROD_IMAGES=(
     "beef-briefing/api-service"
+    "beef-briefing/admin-panel"
     "beef-briefing/telegram-bot"
     "beef-briefing/dashboard"
 )
@@ -195,7 +199,7 @@ show_dev_summary() {
     echo -e "${GREEN}| Service          | Status    | Port  | URL                    |${NC}"
     echo -e "${GREEN}+==================+===========+=======+========================+${NC}"
 
-    for service in api-service dashboard telegram-bot postgres minio; do
+    for service in api-service admin-panel dashboard telegram-bot postgres minio; do
         local info="${DEV_SERVICES[$service]}"
         IFS='|' read -r port url _ <<< "$info"
 
@@ -228,6 +232,8 @@ show_prod_summary() {
 
     printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
         "api-service" "deployed" "(internal)"
+    printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
+        "admin-panel" "deployed" "https://${domain}/admin"
     printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
         "dashboard" "deployed" "https://dashboard.${domain}"
     printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \

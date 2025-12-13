@@ -319,7 +319,7 @@ body {
 }
 
 .month-year-selector.dimmed {
-  opacity: 0.75;
+  opacity: 0.95;
 }
 
 .month-year-selector.active-selector {

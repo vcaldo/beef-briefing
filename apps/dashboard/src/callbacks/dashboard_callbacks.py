@@ -834,6 +834,38 @@ def register_callbacks(app) -> None:
             return "month-year-selector active-selector"
         return "month-year-selector dimmed"
 
+    # Callback: Populate year dropdown with available years from database
+    @app.callback(
+        [
+            Output("year-selector", "options"),
+            Output("year-selector", "value"),
+        ],
+        Input("selected-chat", "data"),
+    )
+    def populate_year_options(chat_id: Optional[int]):
+        """Populate year dropdown with years that have data for the selected chat."""
+        if not chat_id:
+            return [], None
+
+        # Get queries from app config
+        queries = app.server.config.get("queries")
+        if not queries:
+            current_year = datetime.now().year
+            return [{"label": str(current_year), "value": current_year}], current_year
+
+        # Ensure chat_id is int (might come as string from JSON store)
+        chat_id = int(chat_id)
+
+        years = queries.get_available_years(chat_id)
+        if not years:
+            # Fallback to current year if no data
+            current_year = datetime.now().year
+            return [{"label": str(current_year), "value": current_year}], current_year
+
+        options = [{"label": str(y), "value": y} for y in years]
+        # Default to most recent year
+        return options, years[0]
+
     @app.callback(
         [
             Output("lb-10", "className"),

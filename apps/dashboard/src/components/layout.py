@@ -70,9 +70,8 @@ def create_period_selector() -> html.Div:
     """Create the time period selector with preset buttons and month/year dropdowns."""
     today = datetime.now()
     current_month = today.month
-    current_year = today.year
 
-    # Month options
+    # Month options (all 12 months, always available)
     month_options = [
         {"label": "Jan", "value": 1},
         {"label": "Feb", "value": 2},
@@ -88,11 +87,7 @@ def create_period_selector() -> html.Div:
         {"label": "Dec", "value": 12},
     ]
 
-    # Year options (last 5 years + current)
-    year_options = [
-        {"label": str(y), "value": y}
-        for y in range(current_year - 5, current_year + 1)
-    ]
+    # Year options: populated dynamically by callback based on available data
 
     return html.Div(
         className="period-selector",
@@ -158,8 +153,8 @@ def create_period_selector() -> html.Div:
                     ),
                     dcc.Dropdown(
                         id="year-selector",
-                        options=year_options,
-                        value=current_year,
+                        options=[],  # Populated dynamically by callback
+                        value=None,
                         clearable=False,
                         searchable=False,
                         className="year-dropdown",

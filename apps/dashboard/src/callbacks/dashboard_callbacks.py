@@ -2,14 +2,14 @@
 Dashboard callbacks for Dash interactivity.
 """
 
+import calendar
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
-from dash import Input, Output, State, callback, dash_table, html, no_update
+from dash import Input, Output, State, ctx, dash_table, html, no_update
 from flask import request
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,28 @@ CHART_LAYOUT = {
     },
 }
 
+# Constants
+TOP_REACTIONS_LIMIT = 12
+
+
+def parse_date_range(
+    start_date: Optional[str],
+    end_date: Optional[str]
+) -> Optional[tuple[datetime, datetime]]:
+    """
+    Parse date strings and return datetime range.
+    End date is incremented by 1 day for inclusive range.
+    Returns None if either date is missing or invalid.
+    """
+    if not start_date or not end_date:
+        return None
+    try:
+        start = datetime.fromisoformat(start_date)
+        end = datetime.fromisoformat(end_date) + timedelta(days=1)
+        return start, end
+    except (ValueError, TypeError):
+        return None
+
 
 def register_callbacks(app) -> None:
     """Register all dashboard callbacks."""
@@ -60,8 +82,6 @@ def register_callbacks(app) -> None:
             create_error_layout,
         )
         from src.auth.session import SessionData
-        from datetime import datetime, timedelta
-        import re
 
         app_config = app.server.config.get("app_config")
         queries = app.server.config.get("queries")
@@ -137,8 +157,7 @@ def register_callbacks(app) -> None:
                     chats = queries.get_available_chats()
                 else:
                     allowed_ids = session_data.get_allowed_chat_ids()
-                    all_chats = queries.get_available_chats()
-                    chats = [c for c in all_chats if c["id"] in allowed_ids]
+                    chats = queries.get_available_chats(chat_ids=allowed_ids)
 
             # Verify the chat exists in the available chats
             chat_exists = any(c["id"] == chat_id for c in chats)
@@ -178,7 +197,11 @@ def register_callbacks(app) -> None:
         """Update overview statistics cards and top reactions."""
         empty_result = ("--", "--", "--", "--", "--", "--", [])
 
-        if not chat_id or not start_date or not end_date:
+        if not chat_id:
+            return empty_result
+
+        date_range = parse_date_range(start_date, end_date)
+        if not date_range:
             return empty_result
 
         queries = app.server.config.get("queries")
@@ -186,11 +209,9 @@ def register_callbacks(app) -> None:
             return empty_result
 
         try:
-            start = datetime.fromisoformat(start_date)
-            end = datetime.fromisoformat(end_date) + timedelta(days=1)
-
+            start, end = date_range
             stats = queries.get_overview_stats(chat_id, start, end)
-            top_reactions = queries.get_top_reactions(chat_id, start, end, limit=12)
+            top_reactions = queries.get_top_reactions(chat_id, start, end, limit=TOP_REACTIONS_LIMIT)
 
             # Build reaction badges
             badges = [
@@ -231,7 +252,11 @@ def register_callbacks(app) -> None:
         fig = go.Figure()
         fig.update_layout(**CHART_LAYOUT)
 
-        if not chat_id or not start_date or not end_date:
+        if not chat_id:
+            return fig
+
+        date_range = parse_date_range(start_date, end_date)
+        if not date_range:
             return fig
 
         queries = app.server.config.get("queries")
@@ -239,8 +264,7 @@ def register_callbacks(app) -> None:
             return fig
 
         try:
-            start = datetime.fromisoformat(start_date)
-            end = datetime.fromisoformat(end_date) + timedelta(days=1)
+            start, end = date_range
 
             # Determine granularity based on date range
             days_diff = (end - start).days
@@ -324,7 +348,11 @@ def register_callbacks(app) -> None:
         fig = go.Figure()
         fig.update_layout(**CHART_LAYOUT)
 
-        if not chat_id or not start_date or not end_date:
+        if not chat_id:
+            return fig
+
+        date_range = parse_date_range(start_date, end_date)
+        if not date_range:
             return fig
 
         queries = app.server.config.get("queries")
@@ -332,9 +360,7 @@ def register_callbacks(app) -> None:
             return fig
 
         try:
-            start = datetime.fromisoformat(start_date)
-            end = datetime.fromisoformat(end_date) + timedelta(days=1)
-
+            start, end = date_range
             df = queries.get_hourly_heatmap_data(chat_id, start, end)
 
             if df.empty:
@@ -393,7 +419,11 @@ def register_callbacks(app) -> None:
         fig = go.Figure()
         fig.update_layout(**CHART_LAYOUT)
 
-        if not chat_id or not start_date or not end_date:
+        if not chat_id:
+            return fig
+
+        date_range = parse_date_range(start_date, end_date)
+        if not date_range:
             return fig
 
         queries = app.server.config.get("queries")
@@ -401,9 +431,7 @@ def register_callbacks(app) -> None:
             return fig
 
         try:
-            start = datetime.fromisoformat(start_date)
-            end = datetime.fromisoformat(end_date) + timedelta(days=1)
-
+            start, end = date_range
             df = queries.get_reaction_distribution(chat_id, start, end, limit=10)
 
             if df.empty:
@@ -447,7 +475,11 @@ def register_callbacks(app) -> None:
         fig = go.Figure()
         fig.update_layout(**CHART_LAYOUT)
 
-        if not chat_id or not start_date or not end_date:
+        if not chat_id:
+            return fig
+
+        date_range = parse_date_range(start_date, end_date)
+        if not date_range:
             return fig
 
         queries = app.server.config.get("queries")
@@ -455,9 +487,7 @@ def register_callbacks(app) -> None:
             return fig
 
         try:
-            start = datetime.fromisoformat(start_date)
-            end = datetime.fromisoformat(end_date) + timedelta(days=1)
-
+            start, end = date_range
             df = queries.get_media_distribution(chat_id, start, end)
 
             if df.empty:
@@ -536,7 +566,6 @@ def register_callbacks(app) -> None:
         current_limit: int,
     ):
         """Update user leaderboard with DataTable (native sorting)."""
-        from dash import ctx
 
         # Initialize defaults
         page = current_page or 1
@@ -563,15 +592,21 @@ def register_callbacks(app) -> None:
             # Reset page on chat/date change
             page = 1
 
-        if not chat_id or not start_date or not end_date:
-            return (
-                html.Div("Select a chat and date range", className="empty-state"),
-                "",
-                True,
-                True,
-                1,
-                limit,
-            )
+        empty_state = (
+            html.Div("Select a chat and date range", className="empty-state"),
+            "",
+            True,
+            True,
+            1,
+            limit,
+        )
+
+        if not chat_id:
+            return empty_state
+
+        date_range = parse_date_range(start_date, end_date)
+        if not date_range:
+            return empty_state
 
         queries = app.server.config.get("queries")
         if not queries:
@@ -585,8 +620,7 @@ def register_callbacks(app) -> None:
             )
 
         try:
-            start = datetime.fromisoformat(start_date)
-            end = datetime.fromisoformat(end_date) + timedelta(days=1)
+            start, end = date_range
 
             # Get total count for pagination
             total = queries.get_user_rankings_total(chat_id, start, end)
@@ -739,8 +773,6 @@ def register_callbacks(app) -> None:
     )
     def update_dates_from_month_year(month: int, year: int):
         """Compute date range from month/year selection."""
-        import calendar
-
         if not month or not year:
             return no_update, no_update, no_update
 
@@ -788,8 +820,6 @@ def register_callbacks(app) -> None:
         clicks_ytd: int,
     ):
         """Update date range based on period button selection."""
-        from dash import ctx
-
         triggered = ctx.triggered_id
         today = datetime.now().date()
 
@@ -881,8 +911,6 @@ def register_callbacks(app) -> None:
     )
     def update_leaderboard_buttons(clicks_10: int, clicks_25: int, clicks_50: int):
         """Update leaderboard button states."""
-        from dash import ctx
-
         triggered = ctx.triggered_id
         classes = ["lb-btn", "lb-btn", "lb-btn"]
 

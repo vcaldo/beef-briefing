@@ -4,8 +4,8 @@ Telegram group membership verification using the Bot API.
 
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from dataclasses import dataclass
+from typing import Dict, Optional
 
 import requests
 
@@ -215,47 +215,3 @@ def verify_group_membership(
             is_member=False,
             error=f"Invalid API response: {e}",
         )
-
-
-def verify_membership_any_chat(
-    user_id: int,
-    allowed_chat_ids: List[int],
-    bot_token: str,
-    cache: Optional[MembershipCache] = None
-) -> MembershipResult:
-    """
-    Verify if a user is a member of any of the allowed chats.
-
-    Args:
-        user_id: The Telegram user ID
-        allowed_chat_ids: List of allowed chat IDs
-        bot_token: The bot token for API authentication
-        cache: Optional membership cache instance
-
-    Returns:
-        MembershipResult for the first chat where user is a member
-    """
-    if not allowed_chat_ids:
-        logger.warning("No allowed chat IDs configured")
-        return MembershipResult(
-            is_member=False,
-            error="No allowed chats configured",
-        )
-
-    for chat_id in allowed_chat_ids:
-        result = verify_group_membership(user_id, chat_id, bot_token, cache)
-        if result.is_member:
-            return result
-
-    logger.info(
-        "User is not a member of any allowed chat",
-        extra={
-            "user_id": user_id,
-            "checked_chats": allowed_chat_ids,
-        }
-    )
-
-    return MembershipResult(
-        is_member=False,
-        error="Not a member of any allowed group",
-    )

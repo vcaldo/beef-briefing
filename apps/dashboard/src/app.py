@@ -3,12 +3,13 @@ Dash application factory for Beef Dashboard.
 """
 
 import logging
-from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Optional
 
 import dash
 from dash import dcc, html
-from flask import Flask, redirect, request, session, url_for, make_response
+from flask import Flask, redirect, request, make_response
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from src.config import Config
 from src.database.connection import DatabaseConnection
@@ -22,6 +23,9 @@ from src.auth.session import SessionManager
 from src.api.api_client import ApiServiceClient
 
 logger = logging.getLogger(__name__)
+
+# User activity lookback period for determining accessible chats (in days)
+ACTIVITY_LOOKBACK_DAYS = 15
 
 
 def create_app(config: Config) -> dash.Dash:
@@ -56,6 +60,14 @@ def create_app(config: Config) -> dash.Dash:
     server.config["SESSION_COOKIE_SECURE"] = config.is_production()
     server.config["SESSION_COOKIE_HTTPONLY"] = True
     server.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+    # Initialize rate limiter
+    limiter = Limiter(
+        key_func=get_remote_address,
+        app=server,
+        default_limits=["200 per day", "50 per hour"],
+        storage_uri="memory://",
+    )
 
     # Create Dash app
     app = dash.Dash(
@@ -93,7 +105,7 @@ def create_app(config: Config) -> dash.Dash:
     )
 
     # Register Flask routes for authentication
-    register_auth_routes(server, config, queries, session_manager, api_client)
+    register_auth_routes(server, config, queries, session_manager, api_client, limiter)
 
     # Register health check route
     @server.route("/beef-dashboard/health")
@@ -113,13 +125,14 @@ def register_auth_routes(
     queries: DashboardQueries,
     session_manager: SessionManager,
     api_client: ApiServiceClient,
+    limiter: Limiter,
 ) -> None:
     """Register authentication routes on the Flask server."""
 
     @server.route("/beef-dashboard/login")
+    @limiter.limit("30 per minute")
     def login_page():
         """Display Telegram login widget."""
-        # Check if already authenticated
         session_id = request.cookies.get("dashboard_session")
         if session_id:
             session_data = session_manager.get_session(session_id)
@@ -219,12 +232,10 @@ def register_auth_routes(
         """
 
     @server.route("/beef-dashboard/auth/callback")
+    @limiter.limit("10 per minute")
     def auth_callback():
         """Handle Telegram OAuth callback."""
-        # Get auth data from query parameters
         auth_data = request.args.to_dict()
-
-        # Validate the authentication
         validated = validate_telegram_auth(auth_data, config.telegram_bot_token)
         if validated is None:
             logger.warning("Invalid Telegram auth data received")
@@ -242,10 +253,10 @@ def register_auth_routes(
                 extra={"user_id": validated.id, "chat_count": len(accessible_chat_ids)}
             )
         else:
-            # Regular users: fetch chats where they've been active (last 15 days)
+            # Regular users: fetch chats where they've been active
             accessible_chat_ids = api_client.get_user_active_chats(
                 user_id=validated.id,
-                days=15
+                days=ACTIVITY_LOOKBACK_DAYS
             )
             logger.info(
                 "User authenticated, fetched active chats",
@@ -254,8 +265,8 @@ def register_auth_routes(
 
         if not accessible_chat_ids:
             logger.warning(
-                "User has no active chats in the last 15 days",
-                extra={"user_id": validated.id}
+                "User has no active chats in the configured lookback period",
+                extra={"user_id": validated.id, "days": ACTIVITY_LOOKBACK_DAYS}
             )
             return redirect("/beef-dashboard/login?error=no_activity")
 
@@ -296,27 +307,3 @@ def register_auth_routes(
         response = make_response(redirect("/beef-dashboard/login"))
         response.delete_cookie("dashboard_session")
         return response
-
-
-def require_auth(f: Callable) -> Callable:
-    """
-    Decorator to require authentication for Dash callbacks.
-    Use with Flask request context.
-    """
-    @wraps(f)
-    def decorated_function(*args: Any, **kwargs: Any) -> Any:
-        from flask import current_app
-
-        session_id = request.cookies.get("dashboard_session")
-        if not session_id:
-            return redirect("/beef-dashboard/login")
-
-        session_manager = current_app.config.get("session_manager")
-        if session_manager:
-            session_data = session_manager.get_session(session_id)
-            if not session_data:
-                return redirect("/beef-dashboard/login")
-
-        return f(*args, **kwargs)
-
-    return decorated_function

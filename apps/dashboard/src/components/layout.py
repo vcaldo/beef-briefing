@@ -67,7 +67,33 @@ def create_header(
 
 
 def create_period_selector() -> html.Div:
-    """Create the time period selector."""
+    """Create the time period selector with preset buttons and month/year dropdowns."""
+    today = datetime.now()
+    current_month = today.month
+    current_year = today.year
+
+    # Month options
+    month_options = [
+        {"label": "Jan", "value": 1},
+        {"label": "Feb", "value": 2},
+        {"label": "Mar", "value": 3},
+        {"label": "Apr", "value": 4},
+        {"label": "May", "value": 5},
+        {"label": "Jun", "value": 6},
+        {"label": "Jul", "value": 7},
+        {"label": "Aug", "value": 8},
+        {"label": "Sep", "value": 9},
+        {"label": "Oct", "value": 10},
+        {"label": "Nov", "value": 11},
+        {"label": "Dec", "value": 12},
+    ]
+
+    # Year options (last 5 years + current)
+    year_options = [
+        {"label": str(y), "value": y}
+        for y in range(current_year - 5, current_year + 1)
+    ]
+
     return html.Div(
         className="period-selector",
         children=[
@@ -75,40 +101,68 @@ def create_period_selector() -> html.Div:
                 className="period-tabs",
                 children=[
                     html.Button(
-                        "Today",
-                        id="period-today",
+                        "24h",
+                        id="period-24h",
                         className="period-tab",
                         n_clicks=0,
                     ),
                     html.Button(
-                        "Week",
-                        id="period-week",
+                        "7d",
+                        id="period-7d",
                         className="period-tab active",
                         n_clicks=0,
                     ),
                     html.Button(
-                        "Month",
-                        id="period-month",
+                        "30d",
+                        id="period-30d",
                         className="period-tab",
                         n_clicks=0,
                     ),
                     html.Button(
-                        "Quarter",
-                        id="period-quarter",
+                        "90d",
+                        id="period-90d",
+                        className="period-tab",
+                        n_clicks=0,
+                    ),
+                    html.Button(
+                        "180d",
+                        id="period-180d",
+                        className="period-tab",
+                        n_clicks=0,
+                    ),
+                    html.Button(
+                        "365d",
+                        id="period-365d",
+                        className="period-tab",
+                        n_clicks=0,
+                    ),
+                    html.Button(
+                        "YTD",
+                        id="period-ytd",
                         className="period-tab",
                         n_clicks=0,
                     ),
                 ],
             ),
             html.Div(
-                className="date-picker-container",
+                id="month-year-selector",
+                className="month-year-selector",
                 children=[
-                    dcc.DatePickerRange(
-                        id="date-range-picker",
-                        start_date=(datetime.now() - timedelta(days=7)).date(),
-                        end_date=datetime.now().date(),
-                        display_format="MMM D, YYYY",
-                        className="date-picker",
+                    dcc.Dropdown(
+                        id="month-selector",
+                        options=month_options,
+                        value=current_month,
+                        clearable=False,
+                        searchable=False,
+                        className="month-dropdown",
+                    ),
+                    dcc.Dropdown(
+                        id="year-selector",
+                        options=year_options,
+                        value=current_year,
+                        clearable=False,
+                        searchable=False,
+                        className="year-dropdown",
                     ),
                 ],
             ),
@@ -422,6 +476,12 @@ def create_dashboard_layout(
     if default_chat_id is None and chats:
         default_chat_id = chats[0]["id"]
 
+    # Calculate default dates (last 7 days)
+    from datetime import datetime, timedelta
+    today = datetime.now().date()
+    default_start = (today - timedelta(days=7)).isoformat()
+    default_end = today.isoformat()
+
     return html.Div(
         className="dashboard-wrapper",
         children=[
@@ -432,7 +492,6 @@ def create_dashboard_layout(
                     html.Div(
                         className="controls-bar",
                         children=[
-                            create_chat_selector(chats, selected_id=selected_chat_id) if chats else html.Div(),
                             create_period_selector(),
                         ],
                     ),
@@ -451,10 +510,14 @@ def create_dashboard_layout(
                 ],
             ),
             # Hidden stores for state management
-            dcc.Store(id="selected-period", data="week"),
+            dcc.Store(id="selected-period", data="7d"),
             dcc.Store(id="selected-chat", data=default_chat_id),
             dcc.Store(id="leaderboard-limit", data=10),
             dcc.Store(id="leaderboard-page", data=1),
+            # Date computation stores
+            dcc.Store(id="computed-start-date", data=default_start),
+            dcc.Store(id="computed-end-date", data=default_end),
+            dcc.Store(id="selection-mode", data="preset"),  # "preset" or "month"
         ],
     )
 

@@ -402,8 +402,8 @@ def register_callbacks(app) -> None:
                     y=[day_names[int(i)] for i in pivot.index],
                     colorscale=[
                         [0, COLORS["bg"]],
-                        [0.3, "rgba(0, 217, 255, 0.3)"],
-                        [0.6, "rgba(0, 217, 255, 0.6)"],
+                        [0.3, COLORS["primary_30"]],
+                        [0.6, COLORS["primary_60"]],
                         [1, COLORS["primary"]],
                     ],
                     showscale=False,
@@ -659,11 +659,11 @@ def register_callbacks(app) -> None:
                 ],
                 style_data_conditional=[
                     # Gold, silver, bronze for top 3
-                    {"if": {"filter_query": "{rank} = 1", "column_id": "rank"}, "color": "#ffd700", "fontWeight": "600"},
-                    {"if": {"filter_query": "{rank} = 2", "column_id": "rank"}, "color": "#c0c0c0", "fontWeight": "600"},
-                    {"if": {"filter_query": "{rank} = 3", "column_id": "rank"}, "color": "#cd7f32", "fontWeight": "600"},
+                    {"if": {"filter_query": "{rank} = 1", "column_id": "rank"}, "color": THEME["colors"]["medal_gold"], "fontWeight": "600"},
+                    {"if": {"filter_query": "{rank} = 2", "column_id": "rank"}, "color": THEME["colors"]["medal_silver"], "fontWeight": "600"},
+                    {"if": {"filter_query": "{rank} = 3", "column_id": "rank"}, "color": THEME["colors"]["medal_bronze"], "fontWeight": "600"},
                     # Hover effect using theme accent
-                    {"if": {"state": "active"}, "backgroundColor": f"rgba(0, 217, 255, 0.1)", "border": "none"},
+                    {"if": {"state": "active"}, "backgroundColor": COLORS["primary_10"], "border": "none"},
                 ],
                 style_as_list_view=True,
             )

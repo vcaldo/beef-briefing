@@ -8,6 +8,13 @@ CSS variables in styles.css should mirror these values.
 import plotly.graph_objects as go
 import plotly.io as pio
 
+
+def hex_to_rgba(hex_color: str, alpha: float) -> str:
+    """Convert hex color to rgba string with specified alpha."""
+    hex_color = hex_color.lstrip("#")
+    r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+    return f"rgba({r}, {g}, {b}, {alpha})"
+
 # Theme configuration - single source of truth
 THEME = {
     "colors": {
@@ -23,6 +30,9 @@ THEME = {
         "text_secondary": "#9aa0a6",
         "border": "rgba(255, 255, 255, 0.1)",
         "grid": "rgba(255, 255, 255, 0.05)",
+        "medal_gold": "#ffd700",
+        "medal_silver": "#c0c0c0",
+        "medal_bronze": "#cd7f32",
     },
     "fonts": {
         "display": "'JetBrains Mono', monospace",
@@ -51,6 +61,10 @@ COLORS = {
     "text": THEME["colors"]["text_primary"],
     "text_secondary": THEME["colors"]["text_secondary"],
     "grid": THEME["colors"]["grid"],
+    # Pre-computed opacity variants for accent_primary
+    "primary_10": hex_to_rgba(THEME["colors"]["accent_primary"], 0.1),
+    "primary_30": hex_to_rgba(THEME["colors"]["accent_primary"], 0.3),
+    "primary_60": hex_to_rgba(THEME["colors"]["accent_primary"], 0.6),
 }
 
 # Media type color mapping

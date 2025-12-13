@@ -137,6 +137,12 @@ def create_period_selector() -> html.Div:
                         className="period-tab",
                         n_clicks=0,
                     ),
+                    html.Button(
+                        "MAX",
+                        id="period-max",
+                        className="period-tab",
+                        n_clicks=0,
+                    ),
                 ],
             ),
             html.Div(

@@ -810,6 +810,7 @@ def register_callbacks(app) -> None:
             Output("period-180d", "className"),
             Output("period-365d", "className"),
             Output("period-ytd", "className"),
+            Output("period-max", "className"),
         ],
         [
             Input("period-24h", "n_clicks"),
@@ -819,6 +820,7 @@ def register_callbacks(app) -> None:
             Input("period-180d", "n_clicks"),
             Input("period-365d", "n_clicks"),
             Input("period-ytd", "n_clicks"),
+            Input("period-max", "n_clicks"),
         ],
         prevent_initial_call=True,
     )
@@ -830,15 +832,16 @@ def register_callbacks(app) -> None:
         clicks_180d: int,
         clicks_365d: int,
         clicks_ytd: int,
+        clicks_max: int,
     ):
         """Update date range based on period button selection."""
         triggered = ctx.triggered_id
         today = datetime.now().date()
 
-        # Default classes (7 buttons)
-        classes = ["period-tab"] * 7
+        # Default classes (8 buttons)
+        classes = ["period-tab"] * 8
 
-        # Period mapping: (days_back, class_index)
+        # Period mapping: (days_back_or_special, class_index)
         periods = {
             "period-24h": (1, 0),
             "period-7d": (7, 1),
@@ -847,17 +850,21 @@ def register_callbacks(app) -> None:
             "period-180d": (180, 4),
             "period-365d": (365, 5),
             "period-ytd": ("ytd", 6),
+            "period-max": ("max", 7),
         }
 
         if triggered in periods:
-            days_or_ytd, idx = periods[triggered]
+            days_or_special, idx = periods[triggered]
             classes[idx] = "period-tab active"
 
-            if days_or_ytd == "ytd":
+            if days_or_special == "ytd":
                 # Year to date: Jan 1 of current year to today
                 start = datetime(today.year, 1, 1).date()
+            elif days_or_special == "max":
+                # All time: use a date far in the past
+                start = datetime(1970, 1, 1).date()
             else:
-                start = today - timedelta(days=days_or_ytd)
+                start = today - timedelta(days=days_or_special)
         else:
             # Default to 7d
             start = today - timedelta(days=7)

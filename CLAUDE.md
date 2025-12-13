@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Go-based Telegram bot system for managing beef briefing subscriptions with admin panel, REST API, and PostgreSQL backend. Deployed on Linode with automatic SSL certificates via Traefik and Let's Encrypt.
+A Go-based Telegram bot system for managing beef briefing subscriptions with REST API, dashboard, and PostgreSQL backend. Deployed on Linode with automatic SSL certificates via Traefik and Let's Encrypt.
 
 **Technology Stack:**
 - **Backend**: Go 1.25+
@@ -18,7 +18,7 @@ A Go-based Telegram bot system for managing beef briefing subscriptions with adm
 
 ### Services
 
-The system consists of 4 main Go services:
+The system consists of 3 main Go services and a Python dashboard:
 
 1. **api-service** (port 8080): REST API for ingesting Telegram updates with media uploads
    - Handles multipart uploads with JSON metadata + binary files
@@ -31,10 +31,9 @@ The system consists of 4 main Go services:
    - Exponential backoff retry logic
    - 100MB file size limit
 
-3. **admin-panel** (port 8081): Web-based admin interface
-   - Session-based authentication with bcrypt
-   - Real-time statistics and activity calendar heatmap
-   - 5 themes (Light, Dark, Business, Cyberpunk, Forest)
+3. **dashboard** (port 8050): Python Flask dashboard with analytics
+   - Telegram-based authentication
+   - Real-time statistics and visualizations
 
 4. **import-cli**: CLI tool to import Telegram Desktop exports
    - Streaming parser for large datasets (1M+ messages)
@@ -61,12 +60,12 @@ The system consists of 4 main Go services:
 
 ```
 Internet (443/80) → Traefik (SSL termination)
-                         ├─→ Admin Panel (/admin)
+                         ├─→ Dashboard (/beef-dashboard)
                          └─→ Traefik Dashboard (/traefik-dashboard)
 
 Internal Docker Network:
   ├─ API Service (8080) ←→ Telegram Bot
-  ├─ Admin Panel (8081)
+  ├─ Dashboard (8050)
   └─ PostgreSQL (5432)
 ```
 
@@ -81,9 +80,9 @@ make up              # Start all services (dev environment)
 make up-build        # Rebuild images and start
 make down            # Stop all services
 make logs            # Tail logs from all services
-make logs-api        # Tail specific service logs
-make logs-bot
-make logs-admin-panel
+make docker-logs-api        # Tail specific service logs
+make docker-logs-bot
+make docker-logs-dashboard
 make clean           # Stop and remove volumes
 ```
 
@@ -96,7 +95,6 @@ make go-build
 # Build specific service
 make go-build-api
 make go-build-bot
-make go-build-admin-panel
 make go-build-import-cli
 
 # Clean build artifacts
@@ -109,23 +107,6 @@ make go-clean
 make fmt              # Format all Go code with gofmt
 make fmt-check        # Check if code is formatted
 ```
-
-### Admin Panel Development
-
-The admin panel uses **templ** for type-safe Go templates:
-
-```bash
-# Generate templates (required after editing .templ files)
-cd apps/admin-panel && templ generate
-
-# Generate secrets (file-based, recommended)
-make admin-panel-set-secrets-files ENV_FILE=infrastructure/.env.dev
-
-# Or update .env directly (legacy)
-make admin-panel-set-secrets ENV_FILE=infrastructure/.env.dev
-```
-
-**Important**: Always run `templ generate` before building the admin panel after modifying template files.
 
 ## Production Deployment
 
@@ -146,8 +127,8 @@ make tf-apply
 make tf-ip            # Point domain A record to this IP
 
 # 4. Generate secrets
-make admin-panel-set-secrets-files ENV_FILE=infrastructure/.env.prod
-make generate-traefik-password
+make secrets-dashboard
+make secrets-traefik-password
 
 # 5. Deploy
 make deploy           # Full deployment
@@ -210,25 +191,23 @@ make tf-deploy-check      # Pre-deployment validation
 
 ### Secrets Management
 
-**Admin Panel** (file-based, recommended):
+**Dashboard** (Flask secret key):
 ```bash
-make admin-panel-set-secrets-files ENV_FILE=infrastructure/.env.prod
+make secrets-dashboard
 ```
 
-This creates files in `infrastructure/secrets/apps/admin-panel/`:
-- `admin_password_hash` - Bcrypt hash
-- `session_secret` - Base64-encoded 32-byte key
+Creates `infrastructure/secrets/apps/dashboard/flask_secret_key`.
 
 **Traefik Dashboard**:
 ```bash
-make generate-traefik-password
+make secrets-traefik-password
 ```
 
 Updates `TRAEFIK_DASHBOARD_USERS` in `.env.prod` with bcrypt hash ($$2y$$ escaping for docker-compose).
 
 **Analytics API Key**:
 ```bash
-make generate-analytics-api-key
+make secrets-analytics-api-key
 ```
 
 Generates a secure random API key and saves it to `infrastructure/secrets/apps/api-service/analytics_api_key`. This key is automatically deployed to production when you run `make deploy`. The key is used for authenticating requests to the analytics endpoints.
@@ -275,13 +254,6 @@ cd ~/beef-briefing/apps/import-cli
 4. Update service layer in `apps/api-service/internal/services/ingest_service.go`
 5. Test with curl using multipart form data
 
-### Updating Admin Panel UI
-
-1. Edit templates in `apps/admin-panel/templates/*.templ`
-2. Run `cd apps/admin-panel && templ generate`
-3. Test locally: `make up-build`
-4. Deploy: `make deploy`
-
 ### Adding New Environment Variables
 
 1. Add to both `.env.dev.example` and `.env.prod.example`
@@ -305,13 +277,12 @@ curl http://localhost:8080/health
 curl -X POST http://localhost:8080/api/v1/ingest \
   -F 'update={"update_id":1,"message":{"message_id":1,"chat":{"id":-100123,"type":"supergroup"},"from":{"id":456,"first_name":"User"},"date":1733611200,"text":"Test"}}'
 
-# Access admin panel
-# Visit http://localhost:8081
-# Login: admin / (password from secrets file)
+# Access dashboard
+# Visit http://localhost:8050
 
 # Test Telegram bot
 # Send a message to your bot in Telegram
-# Check logs: make logs-bot
+# Check logs: make docker-logs-bot
 ```
 
 ## Project Structure
@@ -320,8 +291,8 @@ curl -X POST http://localhost:8080/api/v1/ingest \
 beef-briefing/
 ├── apps/
 │   ├── api-service/       # REST API for Telegram data ingestion
-│   ├── admin-panel/       # Web admin interface (templ templates)
 │   ├── telegram-bot/      # Telegram bot client
+│   ├── dashboard/         # Python Flask dashboard
 │   ├── import-cli/        # CLI for importing Telegram exports
 │   └── postgres/
 │       ├── migrations/    # SQL database migrations
@@ -370,7 +341,7 @@ All Go services use `log/slog`:
 ### Traefik Configuration
 
 Production routing rules in `docker-compose.prod.yml`:
-- Admin panel: `https://yourdomain.com/admin`
+- Dashboard: `https://yourdomain.com/beef-dashboard`
 - Traefik dashboard: `https://yourdomain.com/traefik-dashboard` (basic auth)
 - All HTTP traffic redirects to HTTPS
 - Let's Encrypt certificates stored in `infrastructure/letsencrypt/acme.json`

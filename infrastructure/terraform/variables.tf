@@ -22,12 +22,6 @@ variable "domain_email" {
   default     = "admin@mydomain.example"
 }
 
-variable "admin_panel_domain_suffix" {
-  description = "Subdomain prefix for admin panel (e.g., 'admin' creates 'admin.yourdomain.com')"
-  type        = string
-  default     = "admin"
-}
-
 variable "ssh_public_key_path" {
   description = "Path to SSH public key file"
   type        = string

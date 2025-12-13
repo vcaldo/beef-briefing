@@ -710,8 +710,9 @@ body {
 
 /* Chat Cards Grid */
 .chat-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: var(--space-lg);
 }
 
@@ -729,6 +730,7 @@ body {
   transition: var(--transition-normal);
   animation: fadeInScale 0.6s ease-out forwards;
   opacity: 0;
+  width: 340px;
 }
 
 .chat-card:nth-child(1) { animation-delay: 50ms; }
@@ -884,10 +886,6 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .chat-cards-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
   .controls-bar {
     flex-direction: column;
     align-items: stretch;
@@ -909,8 +907,8 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .chat-cards-grid {
-    grid-template-columns: 1fr;
+  .chat-card {
+    width: 100%;
   }
 
   .stat-card {

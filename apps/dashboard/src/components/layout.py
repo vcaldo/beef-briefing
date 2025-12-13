@@ -167,7 +167,7 @@ def create_overview_cards() -> html.Div:
                 className="stat-card",
                 id="card-topuser",
                 children=[
-                    html.Div(className="stat-icon topuser-icon", children="👑"),
+                    html.Div(className="stat-icon topuser-icon", children="🏆"),
                     html.Div(
                         className="stat-content",
                         children=[

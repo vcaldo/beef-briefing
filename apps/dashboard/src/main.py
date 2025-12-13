@@ -57,7 +57,6 @@ def main() -> None:
         extra={
             "port": config.dashboard_port,
             "environment": config.environment,
-            "allowed_chats": len(config.allowed_chat_ids),
         }
     )
 
@@ -95,7 +94,6 @@ def create_server():
         "Initializing Beef Dashboard for production",
         extra={
             "environment": config.environment,
-            "allowed_chats": len(config.allowed_chat_ids),
         }
     )
 

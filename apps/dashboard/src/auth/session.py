@@ -2,13 +2,11 @@
 PostgreSQL-backed session management for Beef Dashboard.
 """
 
-import hashlib
 import logging
 import secrets
-import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -239,29 +237,3 @@ class SessionManager:
         with self.engine.connect() as conn:
             result = conn.execute(query, {"now": datetime.now(timezone.utc)}).fetchone()
             return result.count if result else 0
-
-
-def create_session_table_sql() -> str:
-    """
-    Return SQL to create the dashboard_sessions table.
-    This is included in the migration file.
-    """
-    return """
-    CREATE TABLE IF NOT EXISTS dashboard_sessions (
-        session_id VARCHAR(64) PRIMARY KEY,
-        user_id BIGINT NOT NULL,
-        username VARCHAR(255),
-        first_name VARCHAR(255) NOT NULL,
-        photo_url TEXT,
-        allowed_chat_ids TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        expires_at TIMESTAMPTZ NOT NULL,
-        last_accessed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_user_id
-    ON dashboard_sessions(user_id);
-
-    CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_expires_at
-    ON dashboard_sessions(expires_at);
-    """

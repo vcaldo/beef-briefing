@@ -21,7 +21,7 @@ func NewMediaRepository(db *sql.DB, nrApp *newrelic.Application) *MediaRepositor
 
 // GetObjectKeyByHash checks if a file with the given hash already exists in any media table.
 // Returns the existing object key if found, empty string if not found.
-// This enables complete deduplication across all media types (photos, media_files, stickers, game_photos).
+// This enables complete deduplication across all media types (photos, media_files, stickers, game_photos, profile_photos).
 func (r *MediaRepository) GetObjectKeyByHash(ctx context.Context, tx *sql.Tx, fileHash string) (string, error) {
 	query := `
 		SELECT minio_object_key FROM media_files WHERE file_hash = $1
@@ -29,6 +29,10 @@ func (r *MediaRepository) GetObjectKeyByHash(ctx context.Context, tx *sql.Tx, fi
 		SELECT minio_object_key FROM photos WHERE file_hash = $1
 		UNION
 		SELECT minio_object_key FROM game_photos WHERE file_hash = $1
+		UNION
+		SELECT minio_object_key FROM user_profile_photos WHERE file_hash = $1
+		UNION
+		SELECT minio_object_key FROM chat_profile_photos WHERE file_hash = $1
 		LIMIT 1
 	`
 

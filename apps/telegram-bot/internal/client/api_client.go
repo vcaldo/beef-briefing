@@ -242,3 +242,289 @@ func isClientError(err error) bool {
 
 	return false
 }
+
+// ProfilePhotoMeta represents metadata for a profile photo
+type ProfilePhotoMeta struct {
+	FileID       string `json:"file_id"`
+	FileUniqueID string `json:"file_unique_id"`
+	Width        int    `json:"width,omitempty"`
+	Height       int    `json:"height,omitempty"`
+	FileSize     *int64 `json:"file_size,omitempty"`
+	PhotoSize    string `json:"photo_size,omitempty"` // For chat photos: "small" or "big"
+}
+
+// GetAllUsers returns all user IDs from the database
+func (c *APIClient) GetAllUsers(ctx context.Context) ([]int64, error) {
+	txn := newrelic.FromContext(ctx)
+
+	apiURL := fmt.Sprintf("%s/api/v1/users", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "GET",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result struct {
+		UserIDs []int64 `json:"user_ids"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.UserIDs, nil
+}
+
+// GetAllChats returns all chat IDs from the database
+func (c *APIClient) GetAllChats(ctx context.Context) ([]int64, error) {
+	txn := newrelic.FromContext(ctx)
+
+	apiURL := fmt.Sprintf("%s/api/v1/chats", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "GET",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result struct {
+		ChatIDs []int64 `json:"chat_ids"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.ChatIDs, nil
+}
+
+// SendUserProfilePhotos uploads user profile photos to the API
+func (c *APIClient) SendUserProfilePhotos(ctx context.Context, userID int64, photos []ProfilePhotoMeta, files map[string][]byte) error {
+	txn := newrelic.FromContext(ctx)
+
+	metadata := struct {
+		UserID int64              `json:"user_id"`
+		Photos []ProfilePhotoMeta `json:"photos"`
+	}{
+		UserID: userID,
+		Photos: photos,
+	}
+
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	if err := writer.WriteField("metadata", string(metadataJSON)); err != nil {
+		return fmt.Errorf("failed to write metadata field: %w", err)
+	}
+
+	for fileID, fileData := range files {
+		part, err := writer.CreateFormFile(fileID, fileID)
+		if err != nil {
+			return fmt.Errorf("failed to create form file for %s: %w", fileID, err)
+		}
+		if _, err := part.Write(fileData); err != nil {
+			return fmt.Errorf("failed to write file data for %s: %w", fileID, err)
+		}
+	}
+
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("failed to close multipart writer: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v1/profile-photos/user", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, &buf)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	return nil
+}
+
+// SendChatProfilePhotos uploads chat profile photos to the API
+func (c *APIClient) SendChatProfilePhotos(ctx context.Context, chatID int64, photos []ProfilePhotoMeta, files map[string][]byte) error {
+	txn := newrelic.FromContext(ctx)
+
+	metadata := struct {
+		ChatID int64              `json:"chat_id"`
+		Photos []ProfilePhotoMeta `json:"photos"`
+	}{
+		ChatID: chatID,
+		Photos: photos,
+	}
+
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	if err := writer.WriteField("metadata", string(metadataJSON)); err != nil {
+		return fmt.Errorf("failed to write metadata field: %w", err)
+	}
+
+	for fileID, fileData := range files {
+		part, err := writer.CreateFormFile(fileID, fileID)
+		if err != nil {
+			return fmt.Errorf("failed to create form file for %s: %w", fileID, err)
+		}
+		if _, err := part.Write(fileData); err != nil {
+			return fmt.Errorf("failed to write file data for %s: %w", fileID, err)
+		}
+	}
+
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("failed to close multipart writer: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v1/profile-photos/chat", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, &buf)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	return nil
+}

@@ -69,12 +69,12 @@ services:
       - beef-prod-network
     restart: unless-stopped
 
-  dashboard:
+  leaderboard:
     build:
       context: ..
-      dockerfile: apps/dashboard/Dockerfile
-    image: beef-briefing/dashboard:${IMAGE_TAG}
-    container_name: beef-dashboard-prod
+      dockerfile: apps/leaderboard/Dockerfile
+    image: beef-briefing/leaderboard:${IMAGE_TAG}
+    container_name: beef-leaderboard-prod
     environment:
       DB_HOST: postgres
       DB_USER: ${DB_USER}
@@ -82,31 +82,24 @@ services:
       DB_NAME: ${DB_NAME}
       DB_PORT: 5432
       DB_SSL_MODE: disable
-      DASHBOARD_PORT: ${DASHBOARD_PORT:-8050}
-      DASHBOARD_DOMAIN: ${DOMAIN_NAME}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
-      ALLOWED_CHAT_IDS: ${ALLOWED_CHAT_IDS}
-      SESSION_LIFETIME_DAYS: ${SESSION_LIFETIME_DAYS:-7}
-      FLASK_SECRET_KEY_FILE: /app/secrets/flask_secret_key
-      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}-dashboard-production
+      LEADERBOARD_PORT: 8050
+      LEADERBOARD_PATH: ${LEADERBOARD_PATH:-/leaderboard}
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: production
       LOG_LEVEL: info
-    volumes:
-      - ./secrets/dashboard:/app/secrets:ro
     depends_on:
       - postgres
     networks:
       - beef-prod-network
     labels:
       - "traefik.enable=true"
-      # Router configuration
-      - 'traefik.http.routers.dashboard.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/beef-dashboard`)'
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
-      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
-      # Service configuration
-      - "traefik.http.services.dashboard.loadbalancer.server.port=${DASHBOARD_PORT:-8050}"
+      - "traefik.http.routers.leaderboard.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`${LEADERBOARD_PATH:-/leaderboard}`)"
+      - "traefik.http.routers.leaderboard.entrypoints=websecure"
+      - "traefik.http.routers.leaderboard.tls.certresolver=letsencrypt"
+      - "traefik.http.services.leaderboard.loadbalancer.server.port=8050"
+      - "traefik.http.middlewares.leaderboard-strip.stripprefix.prefixes=${LEADERBOARD_PATH:-/leaderboard}"
+      - "traefik.http.routers.leaderboard.middlewares=leaderboard-strip"
     restart: unless-stopped
 
   traefik:
@@ -156,8 +149,6 @@ services:
       - "traefik.http.routers.traefik-api.middlewares=traefik-auth"
       - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_USERS}"
     restart: unless-stopped
-    depends_on:
-      - dashboard
 
 networks:
   beef-prod-network:

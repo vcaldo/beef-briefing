@@ -7,8 +7,6 @@ This directory contains secret files used by the Beef Briefing services. All fil
 ```
 secrets/
 └── apps/
-    ├── dashboard/
-    │   └── flask_secret_key      # Flask session secret key
     ├── api-service/
     │   └── analytics_api_key     # API key for analytics endpoints
     └── new-relic/
@@ -21,7 +19,6 @@ From the repository root:
 
 ```bash
 # Generate all secrets at once
-make secrets-dashboard
 make secrets-analytics-api-key
 
 # For production, also generate Traefik password
@@ -29,24 +26,6 @@ make secrets-traefik-password
 ```
 
 ## Secret Files
-
-### Dashboard
-
-#### `flask_secret_key`
-
-Flask session secret key for the analytics dashboard.
-
-**Generate:**
-```bash
-make secrets-dashboard
-```
-
-**Format:** Base64-encoded 32 bytes
-
-**Example:**
-```
-K7gNU3sdo+OL0wNhqoVWhr3g6s1xYv72ol/pe/Unols=
-```
 
 ### API Service
 
@@ -72,7 +51,6 @@ Services read secrets from files using `*_FILE` environment variables:
 
 | Service | Environment Variable | Default Path |
 |---------|---------------------|--------------|
-| dashboard | `FLASK_SECRET_KEY_FILE` | `/app/secrets/flask_secret_key` |
 | api-service | `ANALYTICS_API_KEY_FILE` | `/app/secrets-api/analytics_api_key` |
 
 ## Docker Volume Mounts
@@ -81,10 +59,6 @@ Secrets are mounted read-only into containers via docker-compose:
 
 ```yaml
 # docker-compose.dev.yml / docker-compose.prod.yml
-dashboard:
-  volumes:
-    - ./secrets/apps/dashboard:/app/secrets:ro
-
 api-service:
   volumes:
     - ./secrets/apps/api-service:/app/secrets-api:ro
@@ -93,14 +67,6 @@ api-service:
 ## Manual Generation
 
 If Make targets are unavailable, generate secrets manually:
-
-### Flask Secret Key
-
-```bash
-mkdir -p secrets/apps/dashboard
-openssl rand -base64 32 > secrets/apps/dashboard/flask_secret_key
-chmod 600 secrets/apps/dashboard/flask_secret_key
-```
 
 ### Analytics API Key
 
@@ -115,7 +81,6 @@ chmod 600 secrets/apps/api-service/analytics_api_key
 All secret files should have `600` permissions (owner read/write only):
 
 ```bash
-chmod 600 secrets/apps/dashboard/*
 chmod 600 secrets/apps/api-service/*
 ```
 
@@ -138,13 +103,6 @@ The analytics API key file is missing.
 
 **Fix:** Generate with `make secrets-analytics-api-key`
 
-### Dashboard session issues
-
-The Flask secret key may be missing or invalid.
-
-**Fix:** Regenerate with `make secrets-dashboard`
-
 ## Related Documentation
 
-- [Dashboard](../../apps/dashboard/README.md) - Dashboard documentation
 - [Infrastructure README](../README.md) - Overall infrastructure setup

@@ -51,13 +51,6 @@
 
 ### Secrets (Must Generate)
 
-- [ ] `FLASK_SECRET_KEY_FILE`
-  - **Description:** Flask session secret key for dashboard
-  - **Files:**
-    - `apps/dashboard/app.py`
-    - `infrastructure/.env.prod.example`
-  - **Generate:** `make secrets-dashboard`
-
 - [ ] `ANALYTICS_API_KEY_FILE` or `ANALYTICS_API_KEY`
   - **Description:** API key for analytics endpoints
   - **Files:**
@@ -90,7 +83,6 @@
 - [ ] `ENVIRONMENT` - Default: `development` | `production`
 - [ ] `LOG_LEVEL` - Default: `info` | Options: `debug`, `info`, `warn`, `error`
 - [ ] `API_PORT` - Default: `8080`
-- [ ] `DASHBOARD_PORT` - Default: `8050`
 - [ ] `MAX_UPLOAD_SIZE_MB` - Default: `100`
 
 ### New Relic (Optional)

@@ -10,29 +10,7 @@ This guide covers all secrets that must be generated for the beef-briefing appli
   - RHEL/CentOS: `sudo yum install httpd-tools`
 - `openssl` command available (for other secrets)
 
-## 1. Dashboard Flask Secret
-
-**Purpose:** Generate Flask session secret key for the analytics dashboard.
-
-**Make Target:**
-```bash
-make secrets-dashboard
-```
-
-**Output Location:**
-```
-infrastructure/secrets/apps/dashboard/flask_secret_key
-```
-
-**Process:**
-1. Creates directory `infrastructure/secrets/apps/dashboard/` if needed
-2. Generates 32 random bytes using OpenSSL
-3. Base64 encodes the bytes
-4. Saves to file with 600 permissions
-
----
-
-## 2. Traefik Dashboard Password
+## 1. Traefik Dashboard Password
 
 **Purpose:** Generate htpasswd credentials for Traefik dashboard basic auth.
 
@@ -63,7 +41,7 @@ TRAEFIK_DASHBOARD_USERS=admin:$$2y$$05$$gHL5l9SFHfFGrJm4gVQ65OrLFsMfSrZK7GwDPFJR
 
 ---
 
-## 3. Analytics API Key
+## 2. Analytics API Key
 
 **Purpose:** Generate secure random API key for analytics endpoints.
 
@@ -102,7 +80,6 @@ This key will be deployed when you run 'make deploy'
 
 | Secret | Make Target | Output | Prerequisites |
 |--------|-------------|--------|---------------|
-| Dashboard Flask secret | `make secrets-dashboard` | `infrastructure/secrets/apps/dashboard/flask_secret_key` | openssl |
 | Traefik password | `make secrets-traefik-password` | `.env.prod` line | htpasswd |
 | Analytics API key | `make secrets-analytics-api-key` | `analytics_api_key` file | openssl |
 
@@ -115,13 +92,10 @@ This key will be deployed when you run 'make deploy'
 # 1. Copy environment template
 cp infrastructure/.env.dev.example infrastructure/.env.dev
 
-# 2. Generate dashboard secret
-make secrets-dashboard
-
-# 3. (Optional) Generate analytics key for testing
+# 2. (Optional) Generate analytics key for testing
 make secrets-analytics-api-key
 
-# 4. Start services
+# 3. Start services
 make up-build
 ```
 
@@ -138,7 +112,6 @@ cp infrastructure/.env.prod.example infrastructure/.env.prod
 #    - LINODE_TOKEN
 
 # 3. Generate all secrets
-make secrets-dashboard
 make secrets-traefik-password
 make secrets-analytics-api-key
 
@@ -175,7 +148,6 @@ sudo yum install httpd-tools
 **"Permission denied" when generating secrets**
 ```bash
 # Ensure secrets directory exists with correct permissions
-mkdir -p infrastructure/secrets/apps/dashboard
 mkdir -p infrastructure/secrets/apps/api-service
 chmod 700 infrastructure/secrets
 ```

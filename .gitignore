@@ -145,7 +145,6 @@ local_backups/db/*.sql.gz
 local_backups/db/*.sql
 
 # Ignore all backup files
-*.sql
 *.sql.gz
 *.dump
 

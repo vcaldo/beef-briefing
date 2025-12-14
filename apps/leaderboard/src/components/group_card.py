@@ -33,10 +33,6 @@ def create_group_card(
     # Format last activity as relative time
     last_activity_str = _format_relative_time(last_activity)
 
-    # Badge color based on chat type
-    badge_color = "blue" if chat_type == "supergroup" else "gray"
-    badge_text = "Supergroup" if chat_type == "supergroup" else "Group"
-
     # Format numbers
     message_count_str = _format_number(message_count)
     user_count_str = _format_number(user_count)
@@ -60,18 +56,7 @@ def create_group_card(
                         radius="md",
                         color="blue",
                     ),
-                    dmc.Stack(
-                        [
-                            dmc.Text(display_title, fw=500, size="md", lineClamp=1),
-                            dmc.Badge(
-                                badge_text,
-                                color=badge_color,
-                                variant="light",
-                                size="sm",
-                            ),
-                        ],
-                        gap=4,
-                    ),
+                    dmc.Text(display_title, fw=500, size="md", lineClamp=1),
                 ],
                 gap="sm",
             ),

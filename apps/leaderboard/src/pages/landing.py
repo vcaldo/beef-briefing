@@ -53,7 +53,7 @@ def create_landing_page(chats: list[dict], user: dict, base_url: str) -> html.Di
                             [
                                 dmc.Stack(
                                     [
-                                        dmc.Title("Beef Briefing", order=1),
+                                        dmc.Title("🥩 Beef Briefing", order=1),
                                         dmc.Text(greeting, c="dimmed", size="lg"),
                                     ],
                                     gap=4,
@@ -91,7 +91,7 @@ def create_landing_page(chats: list[dict], user: dict, base_url: str) -> html.Di
                         # Section title
                         dmc.Group(
                             [
-                                DashIconify(icon="mdi:forum", width=24, color="blue"),
+                                DashIconify(icon="mdi:telegram", width=24, color="blue"),
                                 dmc.Title("Your Groups", order=2),
                             ],
                             gap="sm",

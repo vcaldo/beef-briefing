@@ -254,3 +254,108 @@ func (r *ProfilePhotoRepository) GetAllChatIDs(ctx context.Context) ([]int64, er
 
 	return ids, nil
 }
+
+// GetUserPhotoBySize returns a user photo by size (small/medium/large)
+// Photos are ordered by width DESC, so:
+//   - large = index 0 (largest)
+//   - medium = index len/2 (middle)
+//   - small = index len-1 (smallest)
+//
+// Returns nil if user has no photos.
+func (r *ProfilePhotoRepository) GetUserPhotoBySize(ctx context.Context, userID int64, size string) (*models.DBUserProfilePhoto, error) {
+	photos, err := r.GetUserPhotos(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(photos) == 0 {
+		return nil, nil
+	}
+
+	var index int
+	switch size {
+	case "large":
+		index = 0
+	case "medium":
+		index = len(photos) / 2
+	case "small":
+		index = len(photos) - 1
+	default:
+		index = 0 // default to large
+	}
+
+	return &photos[index], nil
+}
+
+// GetChatPhotoBySize returns a chat photo by size
+// Maps large/medium → "big", small → "small"
+// Falls back to available size if requested not found
+// Returns nil if chat has no photos.
+func (r *ProfilePhotoRepository) GetChatPhotoBySize(ctx context.Context, chatID int64, size string) (*models.DBChatProfilePhoto, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-chat-photo-by-size")
+		defer segment.End()
+	}
+
+	// Map size to database photo_size
+	dbSize := "big"
+	if size == "small" {
+		dbSize = "small"
+	}
+
+	query := `
+		SELECT id, chat_id, photo_size, telegram_file_id, telegram_file_unique_id,
+			minio_object_key, file_hash, width, height, file_size, created_at
+		FROM chat_profile_photos
+		WHERE chat_id = $1 AND photo_size = $2
+	`
+
+	var photo models.DBChatProfilePhoto
+	err := r.db.QueryRowContext(ctx, query, chatID, dbSize).Scan(
+		&photo.ID,
+		&photo.ChatID,
+		&photo.PhotoSize,
+		&photo.TelegramFileID,
+		&photo.TelegramFileUniqueID,
+		&photo.MinIOObjectKey,
+		&photo.FileHash,
+		&photo.Width,
+		&photo.Height,
+		&photo.FileSize,
+		&photo.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		// Try fallback to the other size
+		fallbackSize := "small"
+		if dbSize == "small" {
+			fallbackSize = "big"
+		}
+
+		err = r.db.QueryRowContext(ctx, query, chatID, fallbackSize).Scan(
+			&photo.ID,
+			&photo.ChatID,
+			&photo.PhotoSize,
+			&photo.TelegramFileID,
+			&photo.TelegramFileUniqueID,
+			&photo.MinIOObjectKey,
+			&photo.FileHash,
+			&photo.Width,
+			&photo.Height,
+			&photo.FileSize,
+			&photo.CreatedAt,
+		)
+
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to query chat photo fallback: %w", err)
+		}
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to query chat photo: %w", err)
+	}
+
+	return &photo, nil
+}

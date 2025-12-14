@@ -2,14 +2,17 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
 
+	"github.com/gorilla/mux"
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
@@ -236,4 +239,165 @@ func (h *ProfilePhotoHandler) extractFiles(r *http.Request) map[string][]byte {
 	}
 
 	return files
+}
+
+// validSizes contains the allowed size parameter values.
+var validSizes = map[string]bool{
+	"small":  true,
+	"medium": true,
+	"large":  true,
+}
+
+// HandleGetUserPhoto serves a user's profile photo.
+// GET /api/v1/users/{id}/photo?size=small|medium|large
+func (h *ProfilePhotoHandler) HandleGetUserPhoto(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+
+	// Extract user ID from path
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	userID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		slog.Warn("invalid user ID", "id", idStr, "error", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid user ID"})
+		return
+	}
+
+	// Get size parameter, default to "large"
+	size := r.URL.Query().Get("size")
+	if size == "" {
+		size = "large"
+	}
+
+	// Validate size parameter
+	if !validSizes[size] {
+		slog.Warn("invalid size parameter", "size", size)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid size parameter, must be small, medium, or large"})
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("user_id", userID)
+		txn.AddAttribute("size", size)
+	}
+
+	// Get photo from service
+	reader, contentLength, contentType, err := h.profilePhotoService.GetUserPhoto(ctx, userID, size)
+	if err != nil {
+		if errors.Is(err, services.ErrPhotoNotFound) {
+			slog.Debug("user photo not found", "user_id", userID, "size", size)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "photo not found"})
+			return
+		}
+
+		slog.Error("failed to get user photo", "user_id", userID, "size", size, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "internal server error"})
+		return
+	}
+	defer reader.Close()
+
+	// Set response headers
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", strconv.FormatInt(contentLength, 10))
+
+	// Stream the photo data
+	if _, err := io.Copy(w, reader); err != nil {
+		slog.Error("failed to stream user photo", "user_id", userID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		// Can't write error response as headers are already sent
+		return
+	}
+
+	slog.Debug("served user photo", "user_id", userID, "size", size, "content_length", contentLength)
+}
+
+// HandleGetChatPhoto serves a chat's profile photo.
+// GET /api/v1/chats/{id}/photo?size=small|medium|large
+func (h *ProfilePhotoHandler) HandleGetChatPhoto(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+
+	// Extract chat ID from path
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	chatID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		slog.Warn("invalid chat ID", "id", idStr, "error", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid chat ID"})
+		return
+	}
+
+	// Get size parameter, default to "large"
+	size := r.URL.Query().Get("size")
+	if size == "" {
+		size = "large"
+	}
+
+	// Validate size parameter
+	if !validSizes[size] {
+		slog.Warn("invalid size parameter", "size", size)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid size parameter, must be small, medium, or large"})
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("size", size)
+	}
+
+	// Get photo from service
+	reader, contentLength, contentType, err := h.profilePhotoService.GetChatPhoto(ctx, chatID, size)
+	if err != nil {
+		if errors.Is(err, services.ErrPhotoNotFound) {
+			slog.Debug("chat photo not found", "chat_id", chatID, "size", size)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "photo not found"})
+			return
+		}
+
+		slog.Error("failed to get chat photo", "chat_id", chatID, "size", size, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "internal server error"})
+		return
+	}
+	defer reader.Close()
+
+	// Set response headers
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", strconv.FormatInt(contentLength, 10))
+
+	// Stream the photo data
+	if _, err := io.Copy(w, reader); err != nil {
+		slog.Error("failed to stream chat photo", "chat_id", chatID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		// Can't write error response as headers are already sent
+		return
+	}
+
+	slog.Debug("served chat photo", "chat_id", chatID, "size", size, "content_length", contentLength)
 }

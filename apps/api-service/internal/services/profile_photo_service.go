@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 
 	"beef-briefing/apps/api-service/internal/models"
@@ -12,6 +14,9 @@ import (
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
+
+// ErrPhotoNotFound is returned when no photo exists for a user or chat.
+var ErrPhotoNotFound = errors.New("photo not found")
 
 // ProfilePhotoService handles profile photo processing for users and chats.
 type ProfilePhotoService struct {
@@ -196,4 +201,84 @@ func (s *ProfilePhotoService) uploadOrReuseMedia(ctx context.Context, tx *sql.Tx
 	}
 
 	return objectKey, fileHash, nil
+}
+
+// GetUserPhoto retrieves a user's profile photo by size.
+// Size can be "small", "medium", or "large" (default).
+// Returns the photo data stream, content length, content type, and error.
+// The caller is responsible for closing the returned reader.
+func (s *ProfilePhotoService) GetUserPhoto(ctx context.Context, userID int64, size string) (io.ReadCloser, int64, string, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:get-user-photo")
+		defer segment.End()
+	}
+
+	photo, err := s.profilePhotoRepo.GetUserPhotoBySize(ctx, userID, size)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to get user photo: %w", err)
+	}
+
+	if photo == nil {
+		return nil, 0, "", ErrPhotoNotFound
+	}
+
+	reader, contentLength, contentType, err := s.storageClient.GetObject(ctx, photo.MinIOObjectKey)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to get photo from storage: %w", err)
+	}
+
+	// Default to image/jpeg if content type is empty
+	if contentType == "" {
+		contentType = "image/jpeg"
+	}
+
+	slog.Debug("retrieved user photo",
+		"user_id", userID,
+		"size", size,
+		"object_key", photo.MinIOObjectKey,
+		"content_length", contentLength,
+	)
+
+	return reader, contentLength, contentType, nil
+}
+
+// GetChatPhoto retrieves a chat's profile photo by size.
+// Size can be "small", "medium", or "large" (default).
+// Returns the photo data stream, content length, content type, and error.
+// The caller is responsible for closing the returned reader.
+func (s *ProfilePhotoService) GetChatPhoto(ctx context.Context, chatID int64, size string) (io.ReadCloser, int64, string, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:get-chat-photo")
+		defer segment.End()
+	}
+
+	photo, err := s.profilePhotoRepo.GetChatPhotoBySize(ctx, chatID, size)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to get chat photo: %w", err)
+	}
+
+	if photo == nil {
+		return nil, 0, "", ErrPhotoNotFound
+	}
+
+	reader, contentLength, contentType, err := s.storageClient.GetObject(ctx, photo.MinIOObjectKey)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to get photo from storage: %w", err)
+	}
+
+	// Default to image/jpeg if content type is empty
+	if contentType == "" {
+		contentType = "image/jpeg"
+	}
+
+	slog.Debug("retrieved chat photo",
+		"chat_id", chatID,
+		"size", size,
+		"object_key", photo.MinIOObjectKey,
+		"content_length", contentLength,
+	)
+
+	return reader, contentLength, contentType, nil
 }

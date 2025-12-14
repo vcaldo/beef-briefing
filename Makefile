@@ -258,17 +258,13 @@ secrets-traefik-password: ## Generate Traefik dashboard password
 	@chmod +x $(SCRIPTS_DIR)/generate-traefik-password.sh
 	@$(SCRIPTS_DIR)/generate-traefik-password.sh
 
-secrets-analytics-api-key: ## Generate analytics API key
-	@echo "Generating analytics API key..."
-	@mkdir -p $(SECRETS_DIR)/apps/api-service
-	@openssl rand -base64 32 > $(SECRETS_DIR)/apps/api-service/analytics_api_key
-	@chmod 600 $(SECRETS_DIR)/apps/api-service/analytics_api_key
-	@echo "Analytics API key generated at $(SECRETS_DIR)/apps/api-service/analytics_api_key"
-	@echo ""
-	@echo "Generated key:"
-	@cat $(SECRETS_DIR)/apps/api-service/analytics_api_key
-	@echo ""
-	@echo "This key will be automatically deployed to production when you run 'make deploy'"
+secrets-service-api: ## Generate API key for an app (APP=telegram-bot required)
+	@if [ -z "$(APP)" ]; then \
+		echo "Error: APP variable is required. Usage: make secrets-service-api APP=telegram-bot"; \
+		exit 1; \
+	fi
+	@chmod +x $(SCRIPTS_DIR)/generate-api-service-key.sh
+	@$(SCRIPTS_DIR)/generate-api-service-key.sh "$(APP)" "$(SECRETS_DIR)"
 
 # =============================================================================
 # TERRAFORM (tf-*)
@@ -412,7 +408,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	docker-shell-newrelic docker-shell-leaderboard \
 	go-build go-build-api go-build-bot go-build-import-cli go-build-import-cli-prod go-clean \
 	go-fmt go-fmt-check \
-	secrets-traefik-password secrets-analytics-api-key \
+	secrets-traefik-password secrets-service-api \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-arch tf-root-pass \

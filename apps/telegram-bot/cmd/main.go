@@ -49,12 +49,18 @@ func main() {
 		slog.Debug("New Relic not configured, skipping APM initialization")
 	}
 
+	// Validate API key is configured
+	if cfg.APIKey == "" {
+		slog.Error("API_KEY or API_KEY_FILE is required for authenticating with api-service")
+		os.Exit(1)
+	}
+
 	// Create context for graceful shutdown
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	// Initialize API client
-	apiClient := client.NewAPIClient(cfg.APIServiceURL, nrApp)
+	// Initialize API client with authentication
+	apiClient := client.NewAPIClient(cfg.APIServiceURL, cfg.APIKey, nrApp)
 
 	// Initialize handlers
 	updateHandler := handlers.NewUpdateHandler(apiClient, nrApp)

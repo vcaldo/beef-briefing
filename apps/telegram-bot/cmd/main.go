@@ -56,8 +56,9 @@ func main() {
 	// Initialize API client
 	apiClient := client.NewAPIClient(cfg.APIServiceURL, nrApp)
 
-	// Initialize update handler once (reused for all updates)
+	// Initialize handlers
 	updateHandler := handlers.NewUpdateHandler(apiClient, nrApp)
+	photoUpdateHandler := handlers.NewPhotoUpdateHandler(apiClient, cfg, nrApp)
 
 	// Create bot instance with allowed updates including reactions
 	opts := []bot.Option{
@@ -91,6 +92,9 @@ func main() {
 		slog.Error("failed to create bot", "error", err)
 		os.Exit(1)
 	}
+
+	// Register command handlers
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/update_photos", bot.MatchTypePrefix, photoUpdateHandler.Handle)
 
 	slog.Info("bot initialized successfully, starting long polling...")
 

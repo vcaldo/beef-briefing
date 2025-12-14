@@ -75,6 +75,7 @@ services:
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       API_SERVICE_URL: http://api-service:${API_PORT}
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS}
       NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: development

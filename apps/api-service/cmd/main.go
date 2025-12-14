@@ -196,9 +196,18 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	analyticsService := services.NewAnalyticsService(db, nrApp)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 
+	profilePhotoService := services.NewProfilePhotoService(db, minioClient, nrApp)
+	profilePhotoHandler := handlers.NewProfilePhotoHandler(profilePhotoService, cfg)
+
 	// API v1 routes (public)
 	api := router.PathPrefix("/api/v1").Subrouter()
 	api.HandleFunc("/ingest", ingestHandler.HandleIngest).Methods("POST")
+
+	// Profile photo routes
+	api.HandleFunc("/profile-photos/user", profilePhotoHandler.HandleUserPhotos).Methods("POST")
+	api.HandleFunc("/profile-photos/chat", profilePhotoHandler.HandleChatPhotos).Methods("POST")
+	api.HandleFunc("/users", profilePhotoHandler.HandleGetUsers).Methods("GET")
+	api.HandleFunc("/chats", profilePhotoHandler.HandleGetChats).Methods("GET")
 
 	// Analytics routes (authenticated with API key)
 	if cfg.AnalyticsAPIKey != "" {

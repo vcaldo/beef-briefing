@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -44,6 +45,9 @@ type Config struct {
 	// New Relic APM Configuration
 	NewRelicAppName    string `envconfig:"NEW_RELIC_APP_NAME"`
 	NewRelicLicenseKey string `envconfig:"NEW_RELIC_LICENSE_KEY"`
+
+	// Admin Configuration
+	AdminUserIDs string `envconfig:"ADMIN_USER_IDS"` // Comma-separated list of admin user IDs
 }
 
 // DSN returns PostgreSQL connection string
@@ -65,6 +69,20 @@ func (c *Config) MaxUploadSizeBytes() int64 {
 // NewRelicEnabled returns true if New Relic APM is configured
 func (c *Config) NewRelicEnabled() bool {
 	return c.NewRelicAppName != "" && c.NewRelicLicenseKey != ""
+}
+
+// IsAdmin checks if the given user ID is in the admin list
+func (c *Config) IsAdmin(userID int64) bool {
+	if c.AdminUserIDs == "" {
+		return false
+	}
+	for _, idStr := range strings.Split(c.AdminUserIDs, ",") {
+		idStr = strings.TrimSpace(idStr)
+		if id, err := strconv.ParseInt(idStr, 10, 64); err == nil && id == userID {
+			return true
+		}
+	}
+	return false
 }
 
 // LoadConfig loads configuration from environment variables

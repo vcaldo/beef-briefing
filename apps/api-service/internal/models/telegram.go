@@ -496,3 +496,54 @@ type DBDice struct {
 	DiceValue int
 	CreatedAt time.Time
 }
+
+// DBUserProfilePhoto represents a user profile photo row in the database
+type DBUserProfilePhoto struct {
+	ID                   int64
+	UserID               int64
+	TelegramFileID       string
+	TelegramFileUniqueID string
+	MinIOObjectKey       string
+	FileHash             string
+	Width                int
+	Height               int
+	FileSize             sql.NullInt64
+	CreatedAt            time.Time
+}
+
+// DBChatProfilePhoto represents a chat profile photo row in the database
+type DBChatProfilePhoto struct {
+	ID                   int64
+	ChatID               int64
+	PhotoSize            string // "small" or "big"
+	TelegramFileID       string
+	TelegramFileUniqueID string
+	MinIOObjectKey       string
+	FileHash             string
+	Width                sql.NullInt32
+	Height               sql.NullInt32
+	FileSize             sql.NullInt64
+	CreatedAt            time.Time
+}
+
+// ProfilePhotoMeta represents metadata for a profile photo upload
+type ProfilePhotoMeta struct {
+	FileID       string `json:"file_id"`
+	FileUniqueID string `json:"file_unique_id"`
+	Width        int    `json:"width,omitempty"`
+	Height       int    `json:"height,omitempty"`
+	FileSize     *int64 `json:"file_size,omitempty"`
+	PhotoSize    string `json:"photo_size,omitempty"` // For chat photos: "small" or "big"
+}
+
+// UserProfilePhotosRequest represents a request to upload user profile photos
+type UserProfilePhotosRequest struct {
+	UserID int64              `json:"user_id"`
+	Photos []ProfilePhotoMeta `json:"photos"`
+}
+
+// ChatProfilePhotosRequest represents a request to upload chat profile photos
+type ChatProfilePhotosRequest struct {
+	ChatID int64              `json:"chat_id"`
+	Photos []ProfilePhotoMeta `json:"photos"`
+}

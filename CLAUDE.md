@@ -8,6 +8,7 @@ A Go-based Telegram bot system for managing beef briefing subscriptions with RES
 
 **Technology Stack:**
 - **Backend**: Go 1.25+
+- **Dashboard/Analytics**: Python 3.14, Dash, DMC, DBC
 - **Database**: PostgreSQL 17 with PostGIS 3.4
 - **Storage**: MinIO (dev) / Linode Object Storage (prod)
 - **Reverse Proxy**: Traefik v3 with Let's Encrypt SSL
@@ -34,6 +35,11 @@ The system consists of 3 main Go services:
    - Streaming parser for large datasets (1M+ messages)
    - Resume support with state tracking
    - Handles group→supergroup migration
+
+4. **leaderboard** (port 8050): Analytics dashboard for chat statistics
+   - Built with Dash + Dash Mantine Components (DMC)
+   - Responsive layout with Dash Bootstrap Components (DBC)
+   - Real-time data from PostgreSQL via SQLAlchemy
 
 ### Database Architecture
 
@@ -99,6 +105,23 @@ make go-clean
 make fmt              # Format all Go code with gofmt
 make fmt-check        # Check if code is formatted
 ```
+
+### Python/Dash Development
+
+For Dash-based apps (leaderboard), follow these guidelines:
+
+```bash
+# Format Python code
+black apps/leaderboard/
+ruff check apps/leaderboard/
+```
+
+**Component Libraries:**
+- Use **Dash Mantine Components (DMC)** for all UI elements
+- Use **Dash Bootstrap Components (DBC)** for layout grid only
+- **Never use custom CSS** - style through component props
+
+See `agents.md` for comprehensive Python/Dash component guidelines.
 
 ## Production Deployment
 

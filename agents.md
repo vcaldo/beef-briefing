@@ -747,3 +747,171 @@ tmp/
 - Optional: `golangci-lint` for linting (when tooling is set up)
 - No trailing whitespace
 - Use meaningful commit messages following conventional commits when possible
+
+## Python/Dash Components
+
+### Component Libraries
+
+Dash-based apps (leaderboard, dashboards) use these component libraries:
+
+- **Dash Bootstrap Components (DBC)**: https://dash-bootstrap-components.opensource.faculty.ai/
+- **Dash Mantine Components (DMC)**: https://www.dash-mantine-components.com/
+
+**Full DMC documentation**: https://www.dash-mantine-components.com/assets/llms.txt
+
+### Core Principles
+
+1. **Always use native components** - Never create custom HTML/CSS when a native DBC or DMC component exists
+2. **Avoid CSS overrides** - Use component props for styling (color, size, variant, radius, etc.)
+3. **Prefer DMC for UI elements** - Buttons, inputs, modals, alerts, cards, tables
+4. **Use DBC for layout structure** - Container, Row, Col for responsive grid system
+5. **No inline styles** - Configure appearance through component props or theme
+
+### MantineProvider Setup (Required)
+
+All DMC components must be wrapped in MantineProvider:
+
+```python
+import dash_mantine_components as dmc
+from dash import Dash
+
+app = Dash(__name__)
+
+app.layout = dmc.MantineProvider(
+    children=[
+        # All content here
+    ]
+)
+```
+
+### Component Selection Guidelines
+
+| Need | Use | Avoid |
+|------|-----|-------|
+| Buttons | `dmc.Button` | `html.Button` + CSS |
+| Text inputs | `dmc.TextInput` | `dcc.Input` + CSS |
+| Dropdowns | `dmc.Select` | `dcc.Dropdown` + CSS |
+| Modals | `dmc.Modal` | Custom div overlays |
+| Cards | `dmc.Card` | `html.Div` + CSS |
+| Alerts | `dmc.Alert` | `html.Div` + CSS |
+| Layout grid | `dbc.Container/Row/Col` | Manual flexbox/CSS grid |
+| Tables | `dmc.Table` | `html.Table` + CSS |
+| Loading states | `dmc.LoadingOverlay` | Custom spinners |
+| Notifications | `dmc.Notification` | Custom toast divs |
+| Tooltips | `dmc.Tooltip` | Title attributes |
+| Progress | `dmc.Progress` | Custom progress bars |
+| Badges | `dmc.Badge` | Styled spans |
+| Icons | `DashIconify` | Font icons or SVGs |
+
+### Styling Best Practices
+
+**DO** - Use component props:
+```python
+dmc.Button("Submit", color="blue", variant="filled", size="md", radius="sm")
+dmc.Alert("Success!", color="green", variant="light", radius="md")
+dmc.Card(withBorder=True, shadow="sm", radius="md", p="lg")
+dmc.Text("Hello", size="lg", fw=500, c="dimmed")
+```
+
+**DON'T** - Avoid inline styles and CSS:
+```python
+# Bad: inline styles
+html.Button("Submit", style={"background": "blue", "color": "white", "padding": "10px"})
+html.Div("Success!", className="custom-alert", style={"border": "1px solid green"})
+
+# Bad: CSS class overrides
+dmc.Button("Submit", className="my-custom-button")  # Avoid custom CSS classes
+```
+
+### Theme Configuration
+
+Configure theme in MantineProvider instead of CSS files:
+
+```python
+app.layout = dmc.MantineProvider(
+    theme={
+        "primaryColor": "blue",
+        "fontFamily": "Inter, sans-serif",
+        "defaultRadius": "md",
+        "colors": {
+            "brand": ["#f0f0f0", "#d9d9d9", "#bfbfbf", "#a6a6a6", "#8c8c8c",
+                      "#737373", "#595959", "#404040", "#262626", "#0d0d0d"]
+        },
+    },
+    children=[...]
+)
+```
+
+### Dark/Light Mode
+
+Use DMC's built-in color scheme support:
+
+```python
+dmc.MantineProvider(
+    forceColorScheme="dark",  # "light", "dark", or None for system preference
+    children=[...]
+)
+```
+
+For user-toggleable themes, use `dmc.ColorSchemeScript` and callbacks.
+
+### Layout Patterns
+
+Use DBC for responsive grid layout:
+
+```python
+import dash_bootstrap_components as dbc
+
+dbc.Container([
+    dbc.Row([
+        dbc.Col(dmc.Card(...), md=6, lg=4),
+        dbc.Col(dmc.Card(...), md=6, lg=4),
+        dbc.Col(dmc.Card(...), md=12, lg=4),
+    ], className="g-3"),  # g-3 for gutter spacing
+], fluid=True)
+```
+
+### Data Visualization
+
+For charts and graphs, use Plotly components with DMC theming:
+
+```python
+from dash import dcc
+import plotly.express as px
+
+# Charts use dcc.Graph (Plotly)
+dcc.Graph(
+    figure=px.bar(df, x="category", y="value"),
+    config={"displayModeBar": False}
+)
+```
+
+### Common Patterns
+
+#### Page Header
+```python
+dmc.Group([
+    dmc.Title("Dashboard", order=1),
+    dmc.Badge("Live", color="green", variant="filled"),
+], justify="space-between", mb="lg")
+```
+
+#### Loading State
+```python
+dmc.LoadingOverlay(
+    visible=True,
+    loaderProps={"type": "bars", "color": "blue"},
+    children=[...]
+)
+```
+
+#### Empty State
+```python
+dmc.Center(
+    dmc.Stack([
+        DashIconify(icon="mdi:inbox-outline", width=48, color="gray"),
+        dmc.Text("No data available", c="dimmed"),
+    ], align="center", gap="sm"),
+    style={"minHeight": 200}
+)
+```

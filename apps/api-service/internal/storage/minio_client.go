@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -170,4 +171,28 @@ func (mc *MinIOClient) GetObject(ctx context.Context, objectKey string) (io.Read
 	)
 
 	return obj, info.Size, info.ContentType, nil
+}
+
+// GetPresignedURL generates a time-limited URL for accessing an object.
+func (mc *MinIOClient) GetPresignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("storage:get-presigned-url")
+		defer segment.End()
+	}
+
+	url, err := mc.client.PresignedGetObject(ctx, mc.bucket, objectKey, expiry, nil)
+	if err != nil {
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
+	}
+
+	slog.Debug("generated presigned URL",
+		"object_key", objectKey,
+		"expiry", expiry,
+	)
+
+	return url.String(), nil
 }

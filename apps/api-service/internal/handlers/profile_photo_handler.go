@@ -22,6 +22,12 @@ type ProfilePhotoHandler struct {
 	config              *config.Config
 }
 
+// PhotoURLResponse is the JSON response for photo URL endpoints.
+type PhotoURLResponse struct {
+	URL       string `json:"url"`
+	ExpiresIn int    `json:"expires_in"`
+}
+
 // NewProfilePhotoHandler creates a new ProfilePhotoHandler.
 func NewProfilePhotoHandler(profilePhotoService *services.ProfilePhotoService, cfg *config.Config) *ProfilePhotoHandler {
 	return &ProfilePhotoHandler{
@@ -286,8 +292,8 @@ func (h *ProfilePhotoHandler) HandleGetUserPhoto(w http.ResponseWriter, r *http.
 		txn.AddAttribute("size", size)
 	}
 
-	// Get photo from service
-	reader, contentLength, contentType, err := h.profilePhotoService.GetUserPhoto(ctx, userID, size)
+	// Get photo URL from service
+	url, err := h.profilePhotoService.GetUserPhoto(ctx, userID, size)
 	if err != nil {
 		if errors.Is(err, services.ErrPhotoNotFound) {
 			slog.Debug("user photo not found", "user_id", userID, "size", size)
@@ -306,23 +312,14 @@ func (h *ProfilePhotoHandler) HandleGetUserPhoto(w http.ResponseWriter, r *http.
 		json.NewEncoder(w).Encode(map[string]string{"error": "internal server error"})
 		return
 	}
-	defer reader.Close()
 
-	// Set response headers
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Length", strconv.FormatInt(contentLength, 10))
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(PhotoURLResponse{
+		URL:       url,
+		ExpiresIn: 3600,
+	})
 
-	// Stream the photo data
-	if _, err := io.Copy(w, reader); err != nil {
-		slog.Error("failed to stream user photo", "user_id", userID, "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		// Can't write error response as headers are already sent
-		return
-	}
-
-	slog.Debug("served user photo", "user_id", userID, "size", size, "content_length", contentLength)
+	slog.Debug("served user photo URL", "user_id", userID, "size", size)
 }
 
 // HandleGetChatPhoto serves a chat's profile photo.
@@ -363,8 +360,8 @@ func (h *ProfilePhotoHandler) HandleGetChatPhoto(w http.ResponseWriter, r *http.
 		txn.AddAttribute("size", size)
 	}
 
-	// Get photo from service
-	reader, contentLength, contentType, err := h.profilePhotoService.GetChatPhoto(ctx, chatID, size)
+	// Get photo URL from service
+	url, err := h.profilePhotoService.GetChatPhoto(ctx, chatID, size)
 	if err != nil {
 		if errors.Is(err, services.ErrPhotoNotFound) {
 			slog.Debug("chat photo not found", "chat_id", chatID, "size", size)
@@ -383,21 +380,12 @@ func (h *ProfilePhotoHandler) HandleGetChatPhoto(w http.ResponseWriter, r *http.
 		json.NewEncoder(w).Encode(map[string]string{"error": "internal server error"})
 		return
 	}
-	defer reader.Close()
 
-	// Set response headers
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Length", strconv.FormatInt(contentLength, 10))
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(PhotoURLResponse{
+		URL:       url,
+		ExpiresIn: 3600,
+	})
 
-	// Stream the photo data
-	if _, err := io.Copy(w, reader); err != nil {
-		slog.Error("failed to stream chat photo", "chat_id", chatID, "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		// Can't write error response as headers are already sent
-		return
-	}
-
-	slog.Debug("served chat photo", "chat_id", chatID, "size", size, "content_length", contentLength)
+	slog.Debug("served chat photo URL", "chat_id", chatID, "size", size)
 }

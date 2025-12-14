@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
+	"time"
 
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/repository"
@@ -205,9 +205,8 @@ func (s *ProfilePhotoService) uploadOrReuseMedia(ctx context.Context, tx *sql.Tx
 
 // GetUserPhoto retrieves a user's profile photo by size.
 // Size can be "small", "medium", or "large" (default).
-// Returns the photo data stream, content length, content type, and error.
-// The caller is responsible for closing the returned reader.
-func (s *ProfilePhotoService) GetUserPhoto(ctx context.Context, userID int64, size string) (io.ReadCloser, int64, string, error) {
+// Returns a pre-signed URL for the photo with 1-hour expiry.
+func (s *ProfilePhotoService) GetUserPhoto(ctx context.Context, userID int64, size string) (string, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("service:get-user-photo")
@@ -216,38 +215,31 @@ func (s *ProfilePhotoService) GetUserPhoto(ctx context.Context, userID int64, si
 
 	photo, err := s.profilePhotoRepo.GetUserPhotoBySize(ctx, userID, size)
 	if err != nil {
-		return nil, 0, "", fmt.Errorf("failed to get user photo: %w", err)
+		return "", fmt.Errorf("failed to get user photo: %w", err)
 	}
 
 	if photo == nil {
-		return nil, 0, "", ErrPhotoNotFound
+		return "", ErrPhotoNotFound
 	}
 
-	reader, contentLength, contentType, err := s.storageClient.GetObject(ctx, photo.MinIOObjectKey)
+	url, err := s.storageClient.GetPresignedURL(ctx, photo.MinIOObjectKey, time.Hour)
 	if err != nil {
-		return nil, 0, "", fmt.Errorf("failed to get photo from storage: %w", err)
+		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
 
-	// Default to image/jpeg if content type is empty
-	if contentType == "" {
-		contentType = "image/jpeg"
-	}
-
-	slog.Debug("retrieved user photo",
+	slog.Debug("retrieved user photo URL",
 		"user_id", userID,
 		"size", size,
 		"object_key", photo.MinIOObjectKey,
-		"content_length", contentLength,
 	)
 
-	return reader, contentLength, contentType, nil
+	return url, nil
 }
 
 // GetChatPhoto retrieves a chat's profile photo by size.
 // Size can be "small", "medium", or "large" (default).
-// Returns the photo data stream, content length, content type, and error.
-// The caller is responsible for closing the returned reader.
-func (s *ProfilePhotoService) GetChatPhoto(ctx context.Context, chatID int64, size string) (io.ReadCloser, int64, string, error) {
+// Returns a pre-signed URL for the photo with 1-hour expiry.
+func (s *ProfilePhotoService) GetChatPhoto(ctx context.Context, chatID int64, size string) (string, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("service:get-chat-photo")
@@ -256,29 +248,23 @@ func (s *ProfilePhotoService) GetChatPhoto(ctx context.Context, chatID int64, si
 
 	photo, err := s.profilePhotoRepo.GetChatPhotoBySize(ctx, chatID, size)
 	if err != nil {
-		return nil, 0, "", fmt.Errorf("failed to get chat photo: %w", err)
+		return "", fmt.Errorf("failed to get chat photo: %w", err)
 	}
 
 	if photo == nil {
-		return nil, 0, "", ErrPhotoNotFound
+		return "", ErrPhotoNotFound
 	}
 
-	reader, contentLength, contentType, err := s.storageClient.GetObject(ctx, photo.MinIOObjectKey)
+	url, err := s.storageClient.GetPresignedURL(ctx, photo.MinIOObjectKey, time.Hour)
 	if err != nil {
-		return nil, 0, "", fmt.Errorf("failed to get photo from storage: %w", err)
+		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
 
-	// Default to image/jpeg if content type is empty
-	if contentType == "" {
-		contentType = "image/jpeg"
-	}
-
-	slog.Debug("retrieved chat photo",
+	slog.Debug("retrieved chat photo URL",
 		"chat_id", chatID,
 		"size", size,
 		"object_key", photo.MinIOObjectKey,
-		"content_length", contentLength,
 	)
 
-	return reader, contentLength, contentType, nil
+	return url, nil
 }

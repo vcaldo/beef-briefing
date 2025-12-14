@@ -21,22 +21,8 @@ def create_login_page(bot_username: str, callback_url: str) -> html.Div:
     Returns:
         Dash layout component for login page
     """
-    # Minimal CSS for pulsating animation only
-    pulse_css = """
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.15); }
-        100% { transform: scale(1); }
-    }
-    .pulse-emoji {
-        animation: pulse 2s ease-in-out infinite;
-        display: inline-block;
-    }
-    """
-
     return html.Div(
         [
-            html.Style(pulse_css),
             dmc.MantineProvider(
                 dbc.Container(
                     [
@@ -46,11 +32,10 @@ def create_login_page(bot_username: str, callback_url: str) -> html.Div:
                                     [
                                         dmc.Paper(
                                             [
-                                                # Pulsating beef emoji
+                                                # Beef emoji
                                                 dmc.Center(
                                                     html.Span(
                                                         "\U0001F969",  # Beef emoji
-                                                        className="pulse-emoji",
                                                         style={"fontSize": "72px"},
                                                     )
                                                 ),

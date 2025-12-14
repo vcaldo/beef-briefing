@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log/slog"
 
 	"github.com/minio/minio-go/v7"
@@ -132,4 +133,41 @@ func (mc *MinIOClient) UploadMedia(ctx context.Context, fileID string, data []by
 // GetObjectURL returns the URL to access an object
 func (mc *MinIOClient) GetObjectURL(objectKey string) string {
 	return fmt.Sprintf("%s/%s/%s", mc.client.EndpointURL(), mc.bucket, objectKey)
+}
+
+// GetObject retrieves an object from MinIO by its key.
+// Returns the object reader, content length, content type, and error.
+// The caller is responsible for closing the returned reader.
+func (mc *MinIOClient) GetObject(ctx context.Context, objectKey string) (io.ReadCloser, int64, string, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("storage:get-object")
+		defer segment.End()
+	}
+
+	obj, err := mc.client.GetObject(ctx, mc.bucket, objectKey, minio.GetObjectOptions{})
+	if err != nil {
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		return nil, 0, "", fmt.Errorf("failed to get object from MinIO: %w", err)
+	}
+
+	// Get object info for content-length and content-type
+	info, err := obj.Stat()
+	if err != nil {
+		obj.Close()
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		return nil, 0, "", fmt.Errorf("failed to stat object: %w", err)
+	}
+
+	slog.Debug("retrieved object from MinIO",
+		"object_key", objectKey,
+		"size", info.Size,
+		"content_type", info.ContentType,
+	)
+
+	return obj, info.Size, info.ContentType, nil
 }

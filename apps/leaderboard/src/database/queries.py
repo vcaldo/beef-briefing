@@ -185,6 +185,52 @@ class DashboardQueries:
                 "messages_per_day": round(total_msgs / days, 2),
             }
 
+    def get_overview_stats_comparison(
+        self,
+        chat_id: int,
+        current_start: date,
+        current_end: date,
+        previous_start: date,
+        previous_end: date,
+    ) -> dict:
+        """
+        Get overview stats with comparison to previous period.
+
+        Returns:
+            {
+                'current': {...stats for current period...},
+                'previous': {...stats for previous period...},
+                'changes': {...percentage changes...}
+            }
+        """
+        current = self.get_overview_stats(chat_id, current_start, current_end)
+        previous = self.get_overview_stats(chat_id, previous_start, previous_end)
+
+        def calc_change(curr: float, prev: float) -> float | None:
+            """Calculate percentage change."""
+            if prev == 0:
+                return None if curr == 0 else 100.0
+            return round(((curr - prev) / prev) * 100, 1)
+
+        changes = {
+            "total_messages": calc_change(
+                current["total_messages"], previous["total_messages"]
+            ),
+            "total_users": calc_change(current["total_users"], previous["total_users"]),
+            "total_reactions": calc_change(
+                current["total_reactions"], previous["total_reactions"]
+            ),
+            "total_media": calc_change(
+                current["total_media"], previous["total_media"]
+            ),
+        }
+
+        return {
+            "current": current,
+            "previous": previous,
+            "changes": changes,
+        }
+
     def get_chat_info(self, chat_id: int) -> dict | None:
         """
         Get detailed information about a chat.
@@ -811,3 +857,275 @@ class DashboardQueries:
             ORDER BY count DESC
         """
         return self._execute_df(query, {"chat_id": chat_id})
+
+    # =========================================
+    # USER-SPECIFIC METHODS (for My Stats page)
+    # =========================================
+
+    def get_user_stats(self, chat_id: int, user_id: int) -> dict | None:
+        """
+        Get a specific user's statistics in a chat.
+
+        Uses mv_user_statistics.
+
+        Returns:
+            {
+                'user_id': int,
+                'first_name': str,
+                'username': str | None,
+                'is_premium': bool,
+                'message_count': int,
+                'reactions_sent': int,
+                'reactions_received': int,
+                'active_days': int
+            }
+        """
+        query = """
+            SELECT
+                user_id,
+                first_name,
+                username,
+                is_premium,
+                message_count,
+                reactions_sent,
+                reactions_received,
+                active_days
+            FROM mv_user_statistics
+            WHERE chat_id = :chat_id AND user_id = :user_id
+        """
+        return self._execute_single(query, {"chat_id": chat_id, "user_id": user_id})
+
+    def get_user_rank(
+        self,
+        chat_id: int,
+        user_id: int,
+        metric: str = "message_count",
+    ) -> int | None:
+        """
+        Get a user's rank for a specific metric.
+
+        Returns:
+            Rank (1-based) or None if user not found
+        """
+        query = f"""
+            WITH ranked AS (
+                SELECT
+                    user_id,
+                    ROW_NUMBER() OVER (ORDER BY {metric} DESC) as rank
+                FROM mv_user_statistics
+                WHERE chat_id = :chat_id AND is_bot = false
+            )
+            SELECT rank FROM ranked WHERE user_id = :user_id
+        """
+        result = self._execute_single(query, {"chat_id": chat_id, "user_id": user_id})
+        return result.get("rank") if result else None
+
+    def get_group_averages(self, chat_id: int) -> dict:
+        """
+        Get group average statistics per user.
+
+        Returns:
+            {
+                'avg_messages': float,
+                'avg_reactions_sent': float,
+                'avg_reactions_received': float,
+                'avg_active_days': float,
+                'total_users': int
+            }
+        """
+        query = """
+            SELECT
+                AVG(message_count) as avg_messages,
+                AVG(reactions_sent) as avg_reactions_sent,
+                AVG(reactions_received) as avg_reactions_received,
+                AVG(active_days) as avg_active_days,
+                COUNT(*) as total_users
+            FROM mv_user_statistics
+            WHERE chat_id = :chat_id AND is_bot = false
+        """
+        result = self._execute_single(query, {"chat_id": chat_id})
+        return result or {
+            "avg_messages": 0,
+            "avg_reactions_sent": 0,
+            "avg_reactions_received": 0,
+            "avg_active_days": 0,
+            "total_users": 0,
+        }
+
+    def get_user_daily_activity(
+        self,
+        chat_id: int,
+        user_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get a user's daily message activity.
+
+        Returns DataFrame with columns:
+            date, message_count
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT DATE(date) as date, COUNT(*) as message_count
+                FROM messages
+                WHERE chat_id = :chat_id AND user_id = :user_id
+                GROUP BY DATE(date)
+                ORDER BY date
+            """
+            return self._execute_df(query, {"chat_id": chat_id, "user_id": user_id})
+        else:
+            query = """
+                SELECT DATE(date) as date, COUNT(*) as message_count
+                FROM messages
+                WHERE chat_id = :chat_id
+                    AND user_id = :user_id
+                    AND date >= :start_date
+                    AND date < :end_date
+                GROUP BY DATE(date)
+                ORDER BY date
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "user_id": user_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+    def get_user_reaction_distribution(
+        self,
+        chat_id: int,
+        user_id: int,
+        limit: int = 10,
+    ) -> list[dict]:
+        """
+        Get distribution of reactions a user sends.
+
+        Returns list of:
+            {'emoji': str, 'count': int}
+        """
+        query = """
+            SELECT emoji, COUNT(*) as count
+            FROM message_reactions
+            WHERE chat_id = :chat_id
+                AND user_id = :user_id
+                AND is_removed = false
+            GROUP BY emoji
+            ORDER BY count DESC
+            LIMIT :limit
+        """
+        return self._execute_many(
+            query,
+            {"chat_id": chat_id, "user_id": user_id, "limit": limit},
+        )
+
+    def get_user_reply_stats(
+        self,
+        chat_id: int,
+        user_id: int,
+        limit: int = 5,
+    ) -> dict:
+        """
+        Get user's reply statistics.
+
+        Returns:
+            {
+                'replies_sent': int,
+                'replies_received': int,
+                'top_replied_to': [{'user_id': int, 'first_name': str, 'count': int}],
+                'top_repliers': [{'user_id': int, 'first_name': str, 'count': int}]
+            }
+        """
+        # Replies sent (messages where this user replied to someone)
+        replies_sent_query = """
+            SELECT COUNT(*) as count
+            FROM messages
+            WHERE chat_id = :chat_id
+                AND user_id = :user_id
+                AND reply_to_message_id IS NOT NULL
+        """
+        sent_result = self._execute_single(
+            replies_sent_query, {"chat_id": chat_id, "user_id": user_id}
+        )
+        replies_sent = sent_result.get("count", 0) if sent_result else 0
+
+        # Replies received (messages that reply to this user's messages)
+        replies_received_query = """
+            SELECT COUNT(*) as count
+            FROM messages m
+            JOIN messages original ON original.id = m.reply_to_message_id
+            WHERE m.chat_id = :chat_id
+                AND original.user_id = :user_id
+                AND m.user_id != :user_id
+        """
+        received_result = self._execute_single(
+            replies_received_query, {"chat_id": chat_id, "user_id": user_id}
+        )
+        replies_received = received_result.get("count", 0) if received_result else 0
+
+        # Top users this person replies to
+        top_replied_to_query = """
+            SELECT
+                original.user_id,
+                u.first_name,
+                COUNT(*) as count
+            FROM messages m
+            JOIN messages original ON original.id = m.reply_to_message_id
+            JOIN users u ON u.id = original.user_id
+            WHERE m.chat_id = :chat_id
+                AND m.user_id = :user_id
+                AND original.user_id != :user_id
+            GROUP BY original.user_id, u.first_name
+            ORDER BY count DESC
+            LIMIT :limit
+        """
+        top_replied_to = self._execute_many(
+            top_replied_to_query,
+            {"chat_id": chat_id, "user_id": user_id, "limit": limit},
+        )
+
+        # Top users who reply to this person
+        top_repliers_query = """
+            SELECT
+                m.user_id,
+                u.first_name,
+                COUNT(*) as count
+            FROM messages m
+            JOIN messages original ON original.id = m.reply_to_message_id
+            JOIN users u ON u.id = m.user_id
+            WHERE m.chat_id = :chat_id
+                AND original.user_id = :user_id
+                AND m.user_id != :user_id
+            GROUP BY m.user_id, u.first_name
+            ORDER BY count DESC
+            LIMIT :limit
+        """
+        top_repliers = self._execute_many(
+            top_repliers_query,
+            {"chat_id": chat_id, "user_id": user_id, "limit": limit},
+        )
+
+        return {
+            "replies_sent": replies_sent,
+            "replies_received": replies_received,
+            "top_replied_to": top_replied_to,
+            "top_repliers": top_repliers,
+        }
+
+    def get_user_first_message_date(self, chat_id: int, user_id: int) -> date | None:
+        """
+        Get the date of a user's first message in a chat.
+
+        Returns:
+            Date of first message or None if no messages
+        """
+        query = """
+            SELECT MIN(DATE(date)) as first_date
+            FROM messages
+            WHERE chat_id = :chat_id AND user_id = :user_id
+        """
+        result = self._execute_single(query, {"chat_id": chat_id, "user_id": user_id})
+        return result.get("first_date") if result else None

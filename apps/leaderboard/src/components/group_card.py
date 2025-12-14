@@ -14,6 +14,7 @@ def create_group_card(
     user_count: int,
     last_activity: datetime,
     avg_messages_per_day: float,
+    base_url: str = "",
 ) -> dmc.Card:
     """
     Create a card component for displaying group information.
@@ -26,6 +27,7 @@ def create_group_card(
         user_count: Number of unique users
         last_activity: Timestamp of last message
         avg_messages_per_day: Average messages per day
+        base_url: Base URL path for links
 
     Returns:
         dmc.Card component
@@ -89,12 +91,16 @@ def create_group_card(
             ),
             # View details button
             dmc.Space(h="md"),
-            dmc.Button(
-                "View Details",
-                leftSection=DashIconify(icon="mdi:arrow-right", width=16),
-                variant="light",
-                fullWidth=True,
-                id={"type": "view-group-btn", "index": chat_id},
+            dmc.Anchor(
+                dmc.Button(
+                    "View Details",
+                    leftSection=DashIconify(icon="mdi:arrow-right", width=16),
+                    variant="light",
+                    fullWidth=True,
+                ),
+                href=f"{base_url}/group/{chat_id}/overview",
+                underline="never",
+                style={"width": "100%"},
             ),
         ],
         withBorder=True,

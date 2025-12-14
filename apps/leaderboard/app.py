@@ -206,6 +206,7 @@ def display_page(pathname):
                         dmc.Anchor(
                             dmc.Button("Login", variant="light"),
                             href=f"{cfg.leaderboard_path}/login",
+                            refresh=True,
                         ),
                     ],
                     align="center",
@@ -216,11 +217,12 @@ def display_page(pathname):
         )
 
     # Strip prefix for route matching
+    # Note: pathname comes from dcc.Location which reflects the browser URL,
+    # so it always includes the /leaderboard prefix regardless of environment
     route_path = pathname or "/"
-    if not cfg.is_production():
-        prefix = cfg.leaderboard_path
-        if route_path.startswith(prefix):
-            route_path = route_path[len(prefix) :] or "/"
+    prefix = cfg.leaderboard_path
+    if route_path.startswith(prefix):
+        route_path = route_path[len(prefix):] or "/"
 
     # Route to landing page for root
     if route_path in ["/", ""]:
@@ -239,6 +241,7 @@ def display_page(pathname):
                     dmc.Anchor(
                         dmc.Button("Go Home", variant="light"),
                         href=cfg.leaderboard_path,
+                        refresh=True,
                     ),
                 ],
                 align="center",

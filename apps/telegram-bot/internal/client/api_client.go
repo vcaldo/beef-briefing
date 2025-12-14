@@ -19,17 +19,26 @@ import (
 
 type APIClient struct {
 	baseURL    string
+	apiKey     string
 	httpClient *http.Client
 	nrApp      *newrelic.Application
 }
 
-func NewAPIClient(baseURL string, nrApp *newrelic.Application) *APIClient {
+func NewAPIClient(baseURL string, apiKey string, nrApp *newrelic.Application) *APIClient {
 	return &APIClient{
 		baseURL: baseURL,
+		apiKey:  apiKey,
 		httpClient: &http.Client{
 			Timeout: internal.DefaultHTTPTimeout,
 		},
 		nrApp: nrApp,
+	}
+}
+
+// addAuthHeader adds the Authorization header to the request
+func (c *APIClient) addAuthHeader(req *http.Request) {
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	}
 }
 
@@ -149,6 +158,7 @@ func (c *APIClient) sendUpdateOnce(ctx context.Context, update interface{}, file
 	}
 
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	c.addAuthHeader(req)
 
 	// External segment for API service call
 	var externalSegment *newrelic.ExternalSegment
@@ -262,6 +272,7 @@ func (c *APIClient) GetAllUsers(ctx context.Context) ([]int64, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	c.addAuthHeader(req)
 
 	var externalSegment *newrelic.ExternalSegment
 	if txn != nil {
@@ -317,6 +328,7 @@ func (c *APIClient) GetAllChats(ctx context.Context) ([]int64, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	c.addAuthHeader(req)
 
 	var externalSegment *newrelic.ExternalSegment
 	if txn != nil {
@@ -407,6 +419,7 @@ func (c *APIClient) SendUserProfilePhotos(ctx context.Context, userID int64, pho
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	c.addAuthHeader(req)
 
 	var externalSegment *newrelic.ExternalSegment
 	if txn != nil {
@@ -490,6 +503,7 @@ func (c *APIClient) SendChatProfilePhotos(ctx context.Context, chatID int64, pho
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	c.addAuthHeader(req)
 
 	var externalSegment *newrelic.ExternalSegment
 	if txn != nil {

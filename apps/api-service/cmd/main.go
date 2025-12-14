@@ -184,10 +184,34 @@ func initDatabase(cfg *config.Config) (*sql.DB, error) {
 func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Config, nrApp *newrelic.Application) *mux.Router {
 	router := mux.NewRouter()
 
+	// Health check endpoint - MUST be registered BEFORE auth middleware (unauthenticated)
+	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	}).Methods("GET")
+
 	// Add New Relic middleware for automatic HTTP transaction instrumentation
 	if nrApp != nil {
 		router.Use(nrgorilla.Middleware(nrApp))
 	}
+
+	// Load app keys for authentication
+	appKeys, err := config.LoadAppKeysFromDir(cfg.AppKeysDir)
+	if err != nil {
+		slog.Error("failed to load app keys", "error", err, "dir", cfg.AppKeysDir)
+		os.Exit(1)
+	}
+
+	if len(appKeys) == 0 {
+		slog.Error("no app keys configured - all API endpoints will be inaccessible",
+			"app_keys_dir", cfg.AppKeysDir)
+		os.Exit(1)
+	}
+
+	slog.Info("app keys loaded", "count", len(appKeys), "apps", getAppNames(appKeys))
+
+	// Create multi-key auth middleware
+	multiKeyAuth := middleware.NewMultiAPIKeyAuth(appKeys)
 
 	// Create services and handlers with New Relic instrumentation
 	ingestService := services.NewIngestService(db, minioClient, nrApp)
@@ -199,8 +223,11 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	profilePhotoService := services.NewProfilePhotoService(db, minioClient, nrApp)
 	profilePhotoHandler := handlers.NewProfilePhotoHandler(profilePhotoService, cfg)
 
-	// API v1 routes (public)
+	// API v1 routes - ALL AUTHENTICATED
 	api := router.PathPrefix("/api/v1").Subrouter()
+	api.Use(multiKeyAuth.Authenticate)
+
+	// Ingest routes
 	api.HandleFunc("/ingest", ingestHandler.HandleIngest).Methods("POST")
 
 	// Profile photo routes
@@ -209,43 +236,32 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	api.HandleFunc("/users", profilePhotoHandler.HandleGetUsers).Methods("GET")
 	api.HandleFunc("/chats", profilePhotoHandler.HandleGetChats).Methods("GET")
 
-	// Analytics routes (authenticated with API key)
-	if cfg.AnalyticsAPIKey != "" {
-		apiKeyAuth := middleware.NewAPIKeyAuth(cfg.AnalyticsAPIKey)
+	// Analytics routes - Chat listing
+	api.HandleFunc("/analytics/chats", analyticsHandler.HandleListChats).Methods("GET")
 
-		// Chat listing route (no chat_id required)
-		chatsRouter := api.PathPrefix("/analytics/chats").Subrouter()
-		chatsRouter.Use(apiKeyAuth.Authenticate)
-		chatsRouter.HandleFunc("", analyticsHandler.HandleListChats).Methods("GET")
+	// Analytics routes - Per-chat
+	api.HandleFunc("/analytics/chats/{chat_id}/info", analyticsHandler.HandleGetChat).Methods("GET")
+	api.HandleFunc("/analytics/chats/{chat_id}/overview", analyticsHandler.HandleOverview).Methods("GET")
+	api.HandleFunc("/analytics/chats/{chat_id}/leaderboard", analyticsHandler.HandleLeaderboard).Methods("GET")
+	api.HandleFunc("/analytics/chats/{chat_id}/users/{user_id}", analyticsHandler.HandleUserDetail).Methods("GET")
+	api.HandleFunc("/analytics/chats/{chat_id}/timeline", analyticsHandler.HandleTimeline).Methods("GET")
+	api.HandleFunc("/analytics/chats/{chat_id}/heatmap", analyticsHandler.HandleHeatmap).Methods("GET")
+	api.HandleFunc("/analytics/chats/{chat_id}/top-content", analyticsHandler.HandleTopContent).Methods("GET")
+	api.HandleFunc("/analytics/chats/{chat_id}/compare", analyticsHandler.HandleCompare).Methods("GET")
 
-		// Per-chat analytics routes
-		analyticsRouter := api.PathPrefix("/analytics/chats/{chat_id}").Subrouter()
-		analyticsRouter.Use(apiKeyAuth.Authenticate)
+	// Analytics routes - User-centric
+	api.HandleFunc("/analytics/users/{user_id}/active-chats", analyticsHandler.HandleUserActiveChats).Methods("GET")
 
-		analyticsRouter.HandleFunc("/info", analyticsHandler.HandleGetChat).Methods("GET")
-		analyticsRouter.HandleFunc("/overview", analyticsHandler.HandleOverview).Methods("GET")
-		analyticsRouter.HandleFunc("/leaderboard", analyticsHandler.HandleLeaderboard).Methods("GET")
-		analyticsRouter.HandleFunc("/users/{user_id}", analyticsHandler.HandleUserDetail).Methods("GET")
-		analyticsRouter.HandleFunc("/timeline", analyticsHandler.HandleTimeline).Methods("GET")
-		analyticsRouter.HandleFunc("/heatmap", analyticsHandler.HandleHeatmap).Methods("GET")
-		analyticsRouter.HandleFunc("/top-content", analyticsHandler.HandleTopContent).Methods("GET")
-		analyticsRouter.HandleFunc("/compare", analyticsHandler.HandleCompare).Methods("GET")
-
-		// User-centric analytics routes
-		usersRouter := api.PathPrefix("/analytics/users/{user_id}").Subrouter()
-		usersRouter.Use(apiKeyAuth.Authenticate)
-		usersRouter.HandleFunc("/active-chats", analyticsHandler.HandleUserActiveChats).Methods("GET")
-
-		slog.Info("analytics endpoints enabled", "path_prefix", "/api/v1/analytics")
-	} else {
-		slog.Warn("analytics endpoints disabled (ANALYTICS_API_KEY not configured)")
-	}
-
-	// Health check endpoint
-	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	}).Methods("GET")
+	slog.Info("all API endpoints require authentication", "path_prefix", "/api/v1")
 
 	return router
+}
+
+// getAppNames extracts app names from the appKeys map for logging
+func getAppNames(appKeys map[string]string) []string {
+	names := make([]string, 0, len(appKeys))
+	for name := range appKeys {
+		names = append(names, name)
+	}
+	return names
 }

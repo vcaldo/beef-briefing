@@ -58,13 +58,23 @@ logger = setup_logging(cfg)
 # Initialize Flask server
 server = Flask(__name__)
 
-# Determine URL prefix for Dash
-# In production behind Traefik, the path prefix is stripped, so Dash sees /
-# In development, we access directly on port 8050, so no prefix needed
-# The requests_pathname_prefix tells Dash what URL prefix to use for assets/callbacks
-url_prefix = cfg.leaderboard_path if cfg.is_production() else "/"
-if not url_prefix.endswith("/"):
-    url_prefix = url_prefix + "/"
+# Determine URL prefixes for Dash
+# - routes_pathname_prefix: where the app actually responds (internal routing)
+# - requests_pathname_prefix: what URL prefix to use for assets/callbacks (browser-facing)
+#
+# In production behind Traefik:
+#   - Traefik strips /leaderboard prefix before forwarding, so app sees /
+#   - But generated URLs must include /leaderboard for the browser
+#
+# In development:
+#   - No reverse proxy, so app must respond on /leaderboard directly
+#   - Generated URLs also use /leaderboard
+requests_prefix = cfg.leaderboard_path
+if not requests_prefix.endswith("/"):
+    requests_prefix = requests_prefix + "/"
+
+# In production, Traefik strips the path prefix; in dev, we handle it directly
+routes_prefix = "/" if cfg.is_production() else requests_prefix
 
 # Initialize Dash app with Bootstrap theme
 app = Dash(
@@ -72,8 +82,28 @@ app = Dash(
     server=server,
     external_stylesheets=[dbc.themes.BOOTSTRAP],
     title="Beef Briefing Leaderboard",
-    requests_pathname_prefix=url_prefix,
+    routes_pathname_prefix=routes_prefix,
+    requests_pathname_prefix=requests_prefix
 )
+
+# Set emoji favicon using SVG data URL
+app.index_string = """<!DOCTYPE html>
+<html>
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥩</text></svg>">
+        {%css%}
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>"""
 
 # Database engine (lazy initialization)
 _engine = None
@@ -134,7 +164,7 @@ def health():
 if __name__ == "__main__":
     logger.info(f"Starting leaderboard service on port {cfg.leaderboard_port}")
     logger.info(f"Environment: {cfg.environment}")
-    logger.info(f"URL prefix: {url_prefix}")
+    logger.info(f"Routes prefix: {routes_prefix}, Requests prefix: {requests_prefix}")
 
     if cfg.new_relic_enabled():
         logger.info(f"New Relic APM initialized: {cfg.new_relic_full_app_name}")

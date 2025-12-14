@@ -21,7 +21,7 @@ if cfg.new_relic_enabled():
     newrelic.agent.initialize()
 
 from flask import Flask, g, redirect, request
-from dash import Dash, html, dcc, callback, Output, Input
+from dash import Dash, html, dcc, callback, Output, Input, clientside_callback, ClientsideFunction
 import dash_bootstrap_components as dbc
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
@@ -33,6 +33,15 @@ from src.routes import auth_bp
 from src.routes.auth import init_auth_routes
 from src.pages import create_landing_page
 from src.utils import filter_chats_for_user
+from src.themes import (
+    GOOGLE_FONTS_URL,
+    THEME_STORAGE_KEY,
+    THEMES,
+    DEFAULT_LIGHT_THEME,
+    DEFAULT_DARK_THEME,
+    get_theme,
+)
+from src.components import THEME_SWITCHER_ID
 
 
 def setup_logging(config):
@@ -83,11 +92,11 @@ if not requests_prefix.endswith("/"):
 # In production, Traefik strips the path prefix; in dev, we handle it directly
 routes_prefix = "/" if cfg.is_production() else requests_prefix
 
-# Initialize Dash app with Bootstrap theme
+# Initialize Dash app with Bootstrap theme and custom fonts
 app = Dash(
     __name__,
     server=server,
-    external_stylesheets=[dbc.themes.BOOTSTRAP],
+    external_stylesheets=[dbc.themes.BOOTSTRAP, GOOGLE_FONTS_URL],
     title="Beef Briefing Leaderboard",
     routes_pathname_prefix=routes_prefix,
     requests_pathname_prefix=requests_prefix,
@@ -102,6 +111,19 @@ app.index_string = """<!DOCTYPE html>
         <title>{%title%}</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥩</text></svg>">
         {%css%}
+        <style>
+            /* Animation keyframes for card entrance */
+            @keyframes fadeSlideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+        </style>
     </head>
     <body>
         {%app_entry%}
@@ -180,7 +202,12 @@ def serve_layout():
     return html.Div(
         [
             dcc.Location(id="url", refresh=False),
-            html.Div(id="page-content"),
+            # Theme store persisted to localStorage
+            dcc.Store(id="theme-store", storage_type="local"),
+            # Trigger for initial theme detection
+            dcc.Store(id="theme-initialized", data=False),
+            # Main content wrapped in themed MantineProvider
+            html.Div(id="themed-app-container"),
         ]
     )
 
@@ -188,10 +215,53 @@ def serve_layout():
 app.layout = serve_layout
 
 
-# Routing callback for dynamic page content
-@callback(Output("page-content", "children"), Input("url", "pathname"))
-def display_page(pathname):
-    """Route to appropriate page based on URL."""
+# Clientside callback to detect OS theme preference on initial load
+app.clientside_callback(
+    """
+    function(initialized, currentTheme) {
+        // If theme is already set, don't override
+        if (currentTheme) {
+            return window.dash_clientside.no_update;
+        }
+
+        // Detect OS preference
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        return prefersDark ? 'smokehouse' : 'butcher-paper';
+    }
+    """,
+    Output("theme-store", "data", allow_duplicate=True),
+    Input("theme-initialized", "data"),
+    Input("theme-store", "data"),
+    prevent_initial_call="initial_duplicate",
+)
+
+
+# Callback to sync theme switcher with store
+@callback(
+    Output("theme-store", "data"),
+    Input(THEME_SWITCHER_ID, "value"),
+    prevent_initial_call=True,
+)
+def update_theme_store(theme_value):
+    """Update theme store when user changes theme via switcher."""
+    if theme_value:
+        return theme_value
+    return DEFAULT_LIGHT_THEME
+
+
+# Main routing callback with theming
+@callback(
+    Output("themed-app-container", "children"),
+    Input("url", "pathname"),
+    Input("theme-store", "data"),
+)
+def display_page(pathname, theme_name):
+    """Route to appropriate page based on URL with theme applied."""
+    # Get theme configuration
+    theme_config = get_theme(theme_name)
+    theme = theme_config["theme"]
+    background = theme_config["background"]
+
     # Get user from session cookie (Flask g is not available in callbacks)
     session_id = request.cookies.get("session_id")
     user = get_auth_service().get_session(session_id) if session_id else None
@@ -199,21 +269,25 @@ def display_page(pathname):
     if not user:
         # Redirect to login if not authenticated
         return dmc.MantineProvider(
-            dmc.Center(
-                dmc.Stack(
-                    [
-                        dmc.Text("Session expired", c="dimmed"),
-                        dmc.Anchor(
-                            dmc.Button("Login", variant="light"),
-                            href=f"{cfg.leaderboard_path}/login",
-                            refresh=True,
-                        ),
-                    ],
-                    align="center",
-                    gap="md",
+            html.Div(
+                dmc.Center(
+                    dmc.Stack(
+                        [
+                            dmc.Text("Session expired", c="dimmed"),
+                            dmc.Anchor(
+                                dmc.Button("Login", variant="light"),
+                                href=f"{cfg.leaderboard_path}/login",
+                                refresh=True,
+                            ),
+                        ],
+                        align="center",
+                        gap="md",
+                    ),
+                    style={"minHeight": "100vh"},
                 ),
-                style={"minHeight": "100vh"},
-            )
+                style=background,
+            ),
+            theme=theme,
         )
 
     # Strip prefix for route matching
@@ -228,27 +302,37 @@ def display_page(pathname):
     if route_path in ["/", ""]:
         all_chats = get_queries().get_chats_with_stats()
         visible_chats = filter_chats_for_user(all_chats, user)
-        return create_landing_page(visible_chats, user, cfg.leaderboard_path)
+        return dmc.MantineProvider(
+            html.Div(
+                create_landing_page(visible_chats, user, cfg.leaderboard_path, theme_name),
+                style=background,
+            ),
+            theme=theme,
+        )
 
     # 404 fallback
     return dmc.MantineProvider(
-        dmc.Center(
-            dmc.Stack(
-                [
-                    DashIconify(icon="mdi:alert-circle-outline", width=64, color="gray"),
-                    dmc.Title("404 - Page Not Found", order=2),
-                    dmc.Text("The page you're looking for doesn't exist.", c="dimmed"),
-                    dmc.Anchor(
-                        dmc.Button("Go Home", variant="light"),
-                        href=cfg.leaderboard_path,
-                        refresh=True,
-                    ),
-                ],
-                align="center",
-                gap="md",
+        html.Div(
+            dmc.Center(
+                dmc.Stack(
+                    [
+                        DashIconify(icon="mdi:alert-circle-outline", width=64, color="gray"),
+                        dmc.Title("404 - Page Not Found", order=2),
+                        dmc.Text("The page you're looking for doesn't exist.", c="dimmed"),
+                        dmc.Anchor(
+                            dmc.Button("Go Home", variant="light"),
+                            href=cfg.leaderboard_path,
+                            refresh=True,
+                        ),
+                    ],
+                    align="center",
+                    gap="md",
+                ),
+                style={"minHeight": "100vh"},
             ),
-            style={"minHeight": "100vh"},
-        )
+            style=background,
+        ),
+        theme=theme,
     )
 
 

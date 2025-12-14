@@ -5,10 +5,12 @@ import dash_mantine_components as dmc
 from dash import html
 from dash_iconify import DashIconify
 
-from src.components import create_group_card
+from src.components import create_group_card, create_theme_switcher
 
 
-def create_landing_page(chats: list[dict], user: dict, base_url: str) -> html.Div:
+def create_landing_page(
+    chats: list[dict], user: dict, base_url: str, theme_name: str | None = None
+) -> html.Div:
     """
     Create landing page layout with group cards.
 
@@ -16,6 +18,7 @@ def create_landing_page(chats: list[dict], user: dict, base_url: str) -> html.Di
         chats: List of chat dicts with stats
         user: Session dict with user info
         base_url: Base URL for navigation links
+        theme_name: Current theme name for theme switcher
 
     Returns:
         Dash layout component
@@ -23,9 +26,9 @@ def create_landing_page(chats: list[dict], user: dict, base_url: str) -> html.Di
     # Create greeting based on user info
     greeting = f"Welcome, {user.get('first_name', 'User')}"
 
-    # Create group cards
+    # Create group cards with staggered entrance animation
     cards = []
-    for chat in chats:
+    for idx, chat in enumerate(chats):
         card = create_group_card(
             chat_id=chat["id"],
             title=chat["title"],
@@ -35,7 +38,16 @@ def create_landing_page(chats: list[dict], user: dict, base_url: str) -> html.Di
             last_activity=chat["last_activity"],
             avg_messages_per_day=float(chat.get("avg_messages_per_day", 0)),
         )
-        cards.append(dbc.Col(card, xs=12, sm=6, lg=4, xl=3))
+        # Wrap card with staggered animation
+        animated_card = html.Div(
+            card,
+            style={
+                "animation": "fadeSlideIn 0.4s ease-out forwards",
+                "animationDelay": f"{idx * 0.05}s",
+                "opacity": "0",
+            },
+        )
+        cards.append(dbc.Col(animated_card, xs=12, sm=6, lg=4, xl=3))
 
     # Empty state if no chats
     if not cards:
@@ -43,69 +55,63 @@ def create_landing_page(chats: list[dict], user: dict, base_url: str) -> html.Di
     else:
         content = dbc.Row(cards, className="g-3")
 
-    return html.Div(
+    # Note: CSS keyframes for fadeSlideIn animation are defined in app.py index_string
+
+    return dbc.Container(
         [
-            dmc.MantineProvider(
-                dbc.Container(
-                    [
-                        # Header
-                        dmc.Group(
-                            [
-                                dmc.Stack(
-                                    [
-                                        dmc.Title("🥩 Beef Briefing", order=1),
-                                        dmc.Text(greeting, c="dimmed", size="lg"),
-                                    ],
-                                    gap=4,
+            # Header
+            dmc.Group(
+                [
+                    dmc.Stack(
+                        [
+                            dmc.Title("🥩 Beef Briefing", order=1),
+                            dmc.Text(greeting, c="dimmed", size="lg"),
+                        ],
+                        gap=4,
+                    ),
+                    # Theme switcher, user menu, logout
+                    dmc.Group(
+                        [
+                            create_theme_switcher(theme_name),
+                            dmc.Avatar(
+                                src=user.get("photo_url"),
+                                children=user.get("first_name", "U")[0],
+                                radius="xl",
+                                size="md",
+                            ),
+                            dmc.Anchor(
+                                dmc.Button(
+                                    "Logout",
+                                    variant="subtle",
+                                    size="sm",
+                                    leftSection=DashIconify(icon="mdi:logout", width=16),
                                 ),
-                                # User menu / logout
-                                dmc.Group(
-                                    [
-                                        dmc.Avatar(
-                                            src=user.get("photo_url"),
-                                            children=user.get("first_name", "U")[0],
-                                            radius="xl",
-                                            size="md",
-                                        ),
-                                        dmc.Anchor(
-                                            dmc.Button(
-                                                "Logout",
-                                                variant="subtle",
-                                                color="gray",
-                                                size="sm",
-                                                leftSection=DashIconify(
-                                                    icon="mdi:logout", width=16
-                                                ),
-                                            ),
-                                            href=f"{base_url}/logout",
-                                            refresh=True,
-                                        ),
-                                    ],
-                                    gap="sm",
-                                ),
-                            ],
-                            justify="space-between",
-                            align="center",
-                            mb="xl",
-                            mt="lg",
-                        ),
-                        # Section title
-                        dmc.Group(
-                            [
-                                DashIconify(icon="mdi:telegram", width=24, color="blue"),
-                                dmc.Title("Your Groups", order=2),
-                            ],
-                            gap="sm",
-                            mb="lg",
-                        ),
-                        # Cards grid or empty state
-                        content,
-                    ],
-                    fluid=True,
-                    className="py-3",
-                ),
+                                href=f"{base_url}/logout",
+                                refresh=True,
+                            ),
+                        ],
+                        gap="sm",
+                    ),
+                ],
+                justify="space-between",
+                align="center",
+                mb="xl",
+                mt="lg",
             ),
-        ]
+            # Section title
+            dmc.Group(
+                [
+                    DashIconify(icon="mdi:telegram", width=24),
+                    dmc.Title("Your Groups", order=2),
+                ],
+                gap="sm",
+                mb="lg",
+            ),
+            # Cards grid or empty state
+            content,
+        ],
+        fluid=True,
+        className="py-3",
     )
 
 

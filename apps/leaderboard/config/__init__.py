@@ -29,6 +29,13 @@ class Config(BaseSettings):
     environment: str = "development"
     log_level: str = "info"
 
+    # Telegram OAuth Configuration
+    telegram_bot_token: str = ""
+    telegram_bot_username: str = ""
+
+    # Admin Configuration (comma-separated user IDs)
+    admin_user_ids: str = ""
+
     # New Relic APM Configuration (optional)
     new_relic_app_name: Optional[str] = None
     new_relic_license_key: Optional[str] = None
@@ -59,6 +66,21 @@ class Config(BaseSettings):
         if self.new_relic_app_name:
             return f"{self.new_relic_app_name}-leaderboard-{self.environment}"
         return ""
+
+    def get_admin_user_ids(self) -> list[int]:
+        """Parse admin_user_ids string into list of integers."""
+        if not self.admin_user_ids:
+            return []
+        return [int(uid.strip()) for uid in self.admin_user_ids.split(",") if uid.strip()]
+
+    def is_admin(self, user_id: int) -> bool:
+        """Check if user_id is in the admin list."""
+        return user_id in self.get_admin_user_ids()
+
+    def get_first_admin_id(self) -> int | None:
+        """Get first admin user ID (used for dev mode auto-login)."""
+        admin_ids = self.get_admin_user_ids()
+        return admin_ids[0] if admin_ids else None
 
 
 def load_config() -> Config:

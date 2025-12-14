@@ -20,12 +20,15 @@ if cfg.new_relic_enabled():
 
     newrelic.agent.initialize()
 
-from flask import Flask
+from flask import Flask, g, redirect, request
 from dash import Dash, html
 import dash_bootstrap_components as dbc
 from sqlalchemy import create_engine
 
-from src.database import DashboardQueries
+from src.database import DashboardQueries, SessionQueries
+from src.auth import TelegramAuthService
+from src.routes import auth_bp
+from src.routes.auth import init_auth_routes
 
 
 def setup_logging(config):
@@ -131,6 +134,36 @@ def get_queries() -> DashboardQueries:
     return _queries
 
 
+# Session queries (lazy initialization)
+_session_queries = None
+
+
+def get_session_queries() -> SessionQueries:
+    """Get or create SessionQueries instance."""
+    global _session_queries
+    if _session_queries is None:
+        _session_queries = SessionQueries(get_engine())
+        logger.info("SessionQueries initialized")
+    return _session_queries
+
+
+# Auth service (lazy initialization)
+_auth_service = None
+
+
+def get_auth_service() -> TelegramAuthService:
+    """Get or create TelegramAuthService instance."""
+    global _auth_service
+    if _auth_service is None:
+        _auth_service = TelegramAuthService(
+            config=cfg,
+            session_queries=get_session_queries(),
+            dashboard_queries=get_queries(),
+        )
+        logger.info("TelegramAuthService initialized")
+    return _auth_service
+
+
 # Application layout - skeleton with "Coming Soon" message
 app.layout = dbc.Container(
     [
@@ -152,6 +185,77 @@ app.layout = dbc.Container(
     fluid=True,
     className="py-5",
 )
+
+
+# Register auth blueprint and initialize auth routes
+# Note: Blueprint is registered on Flask server, not Dash app
+# The URL prefix depends on whether Traefik strips the path or not
+if cfg.is_production():
+    # In production, Traefik strips /leaderboard, so routes are at root
+    server.register_blueprint(auth_bp)
+else:
+    # In development, we need the full path prefix
+    server.register_blueprint(auth_bp, url_prefix=cfg.leaderboard_path)
+
+# Initialize auth routes with services (must be done after blueprint registration)
+init_auth_routes(get_auth_service(), cfg)
+
+
+# Route protection: check authentication before all requests
+@server.before_request
+def check_auth():
+    """
+    Protect routes that require authentication.
+
+    Allows:
+    - /login, /auth/callback, /logout (auth flow)
+    - /health (health check)
+    - Static assets (/_dash-*, /assets/*)
+
+    All other routes require valid session.
+    """
+    path = request.path
+
+    # In development, paths include the leaderboard prefix
+    # In production, Traefik strips it
+    if not cfg.is_production():
+        # Remove the leaderboard prefix for checking
+        prefix = cfg.leaderboard_path
+        if path.startswith(prefix):
+            path = path[len(prefix):] or "/"
+
+    # Allow auth-related paths
+    if path in ["/login", "/logout"] or path.startswith("/auth/"):
+        return None
+
+    # Allow health check
+    if path == "/health":
+        return None
+
+    # Allow Dash static assets
+    if path.startswith("/_dash") or path.startswith("/assets"):
+        return None
+
+    # Check for valid session
+    session_id = request.cookies.get("session_id")
+    if not session_id:
+        return _redirect_to_login()
+
+    session = get_auth_service().get_session(session_id)
+    if not session:
+        response = _redirect_to_login()
+        response.delete_cookie("session_id")
+        return response
+
+    # Store session info in Flask g for use in request handlers
+    g.user = session
+
+
+def _redirect_to_login():
+    """Redirect to login page with correct prefix."""
+    if cfg.is_production():
+        return redirect(cfg.leaderboard_path + "/login")
+    return redirect(cfg.leaderboard_path + "/login")
 
 
 # Health check endpoint on Flask server

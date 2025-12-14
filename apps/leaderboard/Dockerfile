@@ -32,6 +32,7 @@ ENV PATH=/root/.local/bin:$PATH
 
 # Copy application code
 COPY apps/leaderboard/config ./config
+COPY apps/leaderboard/src ./src
 COPY apps/leaderboard/app.py .
 
 EXPOSE 8050

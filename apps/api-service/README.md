@@ -343,57 +343,6 @@ Health check endpoint.
 
 **Response**: `200 OK` with body `OK`
 
-## Analytics API Endpoints
-
-The Analytics API provides read-only endpoints for querying chat and user activity data. All analytics endpoints require API key authentication.
-
-**Authentication**: Include API key in the `Authorization` header:
-```
-Authorization: Bearer <your-api-key>
-```
-
-### GET `/api/v1/analytics/users/{user_id}/active-chats`
-
-Returns a list of chat IDs where the specified user has been active within a time range.
-
-**Activity Definition**: A user is considered "active" in a chat if they have:
-- Sent messages in that chat
-- Given reactions to messages in that chat
-
-**Path Parameters**:
-- `user_id` (required): Telegram user ID (integer)
-
-**Query Parameters**:
-- `start_date` (required): Start of time range (RFC3339 format, e.g., `2024-01-01T00:00:00Z`)
-- `end_date` (required): End of time range (RFC3339 format, e.g., `2024-12-31T23:59:59Z`)
-
-**Example Request**:
-
-```bash
-curl -X GET "http://localhost:8080/api/v1/analytics/users/987654321/active-chats?start_date=2024-01-01T00:00:00Z&end_date=2024-12-31T23:59:59Z" \
-  -H "Authorization: Bearer your-api-key"
-```
-
-**Response**: `200 OK`
-
-```json
-{
-  "data": [-1001234567890, -1009876543210],
-  "metadata": {
-    "user_id": 987654321,
-    "start_date": "2024-01-01T00:00:00Z",
-    "end_date": "2024-12-31T23:59:59Z",
-    "generated_at": "2024-12-13T10:30:00Z",
-    "total_count": 2
-  }
-}
-```
-
-**Error Responses**:
-- `400 Bad Request` - Invalid user_id, missing date parameters, or invalid date format
-- `401 Unauthorized` - Missing or invalid API key
-- `500 Internal Server Error` - Database failure
-
 ## Media Upload Details
 
 ### File Naming Convention

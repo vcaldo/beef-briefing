@@ -217,9 +217,6 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	ingestService := services.NewIngestService(db, minioClient, nrApp)
 	ingestHandler := handlers.NewIngestHandler(ingestService, cfg)
 
-	analyticsService := services.NewAnalyticsService(db, nrApp)
-	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
-
 	profilePhotoService := services.NewProfilePhotoService(db, minioClient, nrApp)
 	profilePhotoHandler := handlers.NewProfilePhotoHandler(profilePhotoService, cfg)
 
@@ -235,22 +232,6 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	api.HandleFunc("/profile-photos/chat", profilePhotoHandler.HandleChatPhotos).Methods("POST")
 	api.HandleFunc("/users", profilePhotoHandler.HandleGetUsers).Methods("GET")
 	api.HandleFunc("/chats", profilePhotoHandler.HandleGetChats).Methods("GET")
-
-	// Analytics routes - Chat listing
-	api.HandleFunc("/analytics/chats", analyticsHandler.HandleListChats).Methods("GET")
-
-	// Analytics routes - Per-chat
-	api.HandleFunc("/analytics/chats/{chat_id}/info", analyticsHandler.HandleGetChat).Methods("GET")
-	api.HandleFunc("/analytics/chats/{chat_id}/overview", analyticsHandler.HandleOverview).Methods("GET")
-	api.HandleFunc("/analytics/chats/{chat_id}/leaderboard", analyticsHandler.HandleLeaderboard).Methods("GET")
-	api.HandleFunc("/analytics/chats/{chat_id}/users/{user_id}", analyticsHandler.HandleUserDetail).Methods("GET")
-	api.HandleFunc("/analytics/chats/{chat_id}/timeline", analyticsHandler.HandleTimeline).Methods("GET")
-	api.HandleFunc("/analytics/chats/{chat_id}/heatmap", analyticsHandler.HandleHeatmap).Methods("GET")
-	api.HandleFunc("/analytics/chats/{chat_id}/top-content", analyticsHandler.HandleTopContent).Methods("GET")
-	api.HandleFunc("/analytics/chats/{chat_id}/compare", analyticsHandler.HandleCompare).Methods("GET")
-
-	// Analytics routes - User-centric
-	api.HandleFunc("/analytics/users/{user_id}/active-chats", analyticsHandler.HandleUserActiveChats).Methods("GET")
 
 	slog.Info("all API endpoints require authentication", "path_prefix", "/api/v1")
 

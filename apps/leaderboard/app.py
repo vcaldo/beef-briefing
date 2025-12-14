@@ -216,11 +216,12 @@ def display_page(pathname):
         )
 
     # Strip prefix for route matching
+    # Note: pathname comes from dcc.Location which reflects the browser URL,
+    # so it always includes the /leaderboard prefix regardless of environment
     route_path = pathname or "/"
-    if not cfg.is_production():
-        prefix = cfg.leaderboard_path
-        if route_path.startswith(prefix):
-            route_path = route_path[len(prefix) :] or "/"
+    prefix = cfg.leaderboard_path
+    if route_path.startswith(prefix):
+        route_path = route_path[len(prefix):] or "/"
 
     # Route to landing page for root
     if route_path in ["/", ""]:

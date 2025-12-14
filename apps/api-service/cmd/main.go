@@ -232,6 +232,8 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	api.HandleFunc("/profile-photos/chat", profilePhotoHandler.HandleChatPhotos).Methods("POST")
 	api.HandleFunc("/users", profilePhotoHandler.HandleGetUsers).Methods("GET")
 	api.HandleFunc("/chats", profilePhotoHandler.HandleGetChats).Methods("GET")
+	api.HandleFunc("/users/{id}/photo", profilePhotoHandler.HandleGetUserPhoto).Methods("GET")
+	api.HandleFunc("/chats/{id}/photo", profilePhotoHandler.HandleGetChatPhoto).Methods("GET")
 
 	slog.Info("all API endpoints require authentication", "path_prefix", "/api/v1")
 

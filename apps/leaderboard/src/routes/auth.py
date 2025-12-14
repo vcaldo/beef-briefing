@@ -198,8 +198,19 @@ def _set_session_cookie(response, session_id: str) -> None:
 
 
 def _render_login_page(layout) -> str:
-    """Render login page HTML."""
-    # Create a minimal HTML template with the login page
+    """Render login page HTML with theme support."""
+    # Google Fonts for all themes
+    google_fonts = (
+        "https://fonts.googleapis.com/css2?"
+        "family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700"
+        "&family=Atkinson+Hyperlegible:wght@400;700"
+        "&family=Bebas+Neue"
+        "&family=Source+Sans+3:wght@400;600"
+        "&family=Righteous"
+        "&family=DM+Sans:wght@400;500;600"
+        "&display=swap"
+    )
+
     html_template = """
     <!DOCTYPE html>
     <html>
@@ -208,9 +219,58 @@ def _render_login_page(layout) -> str:
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Beef Briefing Leaderboard - Login</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥩</text></svg>">
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="{{ google_fonts }}" rel="stylesheet">
         <style>
-            body { margin: 0; padding: 0; min-height: 100vh; background-color: #f8f9fa; }
+            /* Theme CSS Variables */
+            :root, :root[data-theme="butcher-paper"] {
+                --bg: #F5F0E8;
+                --surface: #FFFDF8;
+                --primary: #8B2635;
+                --text: #2D2420;
+                --muted: #7D7068;
+                --border: #E5DED3;
+                --font-heading: 'Fraunces', serif;
+                --font-body: 'Atkinson Hyperlegible', sans-serif;
+                --shadow: 0 2px 8px rgba(45, 36, 32, 0.1);
+            }
+            :root[data-theme="smokehouse"] {
+                --bg: #1A1614;
+                --surface: #252120;
+                --primary: #E8A849;
+                --text: #F0E6DC;
+                --muted: #8B7D73;
+                --border: #3D352F;
+                --font-heading: 'Bebas Neue', sans-serif;
+                --font-body: 'Source Sans 3', sans-serif;
+                --shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            }
+            :root[data-theme="neon-diner"] {
+                --bg: #0D0D12;
+                --surface: #1A1A24;
+                --primary: #FF2D6A;
+                --text: #EEEEF0;
+                --muted: #6B6B7B;
+                --border: #2D2D3A;
+                --font-heading: 'Righteous', cursive;
+                --font-body: 'DM Sans', sans-serif;
+                --shadow: 0 4px 24px rgba(255, 45, 106, 0.15);
+            }
+
+            * { box-sizing: border-box; }
+            body {
+                margin: 0;
+                padding: 0;
+                min-height: 100vh;
+                background-color: var(--bg);
+                color: var(--text);
+                font-family: var(--font-body);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background-color 0.3s ease, color 0.3s ease;
+            }
             @keyframes pulse {
                 0% { transform: scale(1); }
                 50% { transform: scale(1.15); }
@@ -221,29 +281,62 @@ def _render_login_page(layout) -> str:
                 display: inline-block;
             }
             .login-card {
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                background: var(--surface);
+                border-radius: 12px;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
                 padding: 48px;
                 max-width: 400px;
+                width: 90%;
                 margin: 0 auto;
                 text-align: center;
+                transition: background-color 0.3s ease, border-color 0.3s ease;
             }
-            .login-title { margin-top: 16px; font-weight: 600; }
-            .login-subtitle { color: #868e96; }
-            .login-text { color: #868e96; font-size: 14px; margin-top: 16px; }
-            #telegram-login-widget { margin-top: 24px; display: flex; justify-content: center; }
+            .login-title {
+                margin-top: 16px;
+                font-weight: 600;
+                font-family: var(--font-heading);
+                color: var(--text);
+                font-size: 1.75rem;
+            }
+            .login-subtitle {
+                color: var(--muted);
+                font-family: var(--font-heading);
+                font-size: 1.25rem;
+                margin-top: 4px;
+            }
+            .login-text {
+                color: var(--muted);
+                font-size: 14px;
+                margin-top: 16px;
+            }
+            #telegram-login-widget {
+                margin-top: 24px;
+                display: flex;
+                justify-content: center;
+            }
         </style>
+        <script>
+            // Apply theme before page renders to prevent flash
+            (function() {
+                var stored = localStorage.getItem('beef-theme');
+                if (stored) {
+                    document.documentElement.setAttribute('data-theme', stored);
+                } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.setAttribute('data-theme', 'smokehouse');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'butcher-paper');
+                }
+            })();
+        </script>
     </head>
     <body>
-        <div class="container-fluid d-flex align-items-center justify-content-center" style="min-height: 100vh;">
-            <div class="login-card">
-                <div class="pulse-emoji" style="font-size: 72px;">🥩</div>
-                <h2 class="login-title">Beef Briefing</h2>
-                <h4 class="login-subtitle">Leaderboard</h4>
-                <p class="login-text">Sign in with Telegram to continue</p>
-                <div id="telegram-login-widget"></div>
-            </div>
+        <div class="login-card">
+            <div class="pulse-emoji" style="font-size: 72px;">🥩</div>
+            <h2 class="login-title">Beef Briefing</h2>
+            <h4 class="login-subtitle">Leaderboard</h4>
+            <p class="login-text">Sign in with Telegram to continue</p>
+            <div id="telegram-login-widget"></div>
         </div>
         {{ telegram_script | safe }}
     </body>
@@ -269,11 +362,23 @@ def _render_login_page(layout) -> str:
     </script>
     """
 
-    return render_template_string(html_template, telegram_script=telegram_script)
+    return render_template_string(html_template, telegram_script=telegram_script, google_fonts=google_fonts)
 
 
 def _render_error_page(message: str) -> str:
-    """Render error page HTML."""
+    """Render error page HTML with theme support."""
+    # Google Fonts for all themes
+    google_fonts = (
+        "https://fonts.googleapis.com/css2?"
+        "family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700"
+        "&family=Atkinson+Hyperlegible:wght@400;700"
+        "&family=Bebas+Neue"
+        "&family=Source+Sans+3:wght@400;600"
+        "&family=Righteous"
+        "&family=DM+Sans:wght@400;500;600"
+        "&display=swap"
+    )
+
     html_template = """
     <!DOCTYPE html>
     <html>
@@ -282,31 +387,117 @@ def _render_error_page(message: str) -> str:
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Beef Briefing Leaderboard - Error</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥩</text></svg>">
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="{{ google_fonts }}" rel="stylesheet">
         <style>
-            body { margin: 0; padding: 0; min-height: 100vh; background-color: #f8f9fa; }
+            /* Theme CSS Variables */
+            :root, :root[data-theme="butcher-paper"] {
+                --bg: #F5F0E8;
+                --surface: #FFFDF8;
+                --primary: #8B2635;
+                --text: #2D2420;
+                --muted: #7D7068;
+                --border: #E5DED3;
+                --font-heading: 'Fraunces', serif;
+                --font-body: 'Atkinson Hyperlegible', sans-serif;
+                --shadow: 0 2px 8px rgba(45, 36, 32, 0.1);
+            }
+            :root[data-theme="smokehouse"] {
+                --bg: #1A1614;
+                --surface: #252120;
+                --primary: #E8A849;
+                --text: #F0E6DC;
+                --muted: #8B7D73;
+                --border: #3D352F;
+                --font-heading: 'Bebas Neue', sans-serif;
+                --font-body: 'Source Sans 3', sans-serif;
+                --shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            }
+            :root[data-theme="neon-diner"] {
+                --bg: #0D0D12;
+                --surface: #1A1A24;
+                --primary: #FF2D6A;
+                --text: #EEEEF0;
+                --muted: #6B6B7B;
+                --border: #2D2D3A;
+                --font-heading: 'Righteous', cursive;
+                --font-body: 'DM Sans', sans-serif;
+                --shadow: 0 4px 24px rgba(255, 45, 106, 0.15);
+            }
+
+            * { box-sizing: border-box; }
+            body {
+                margin: 0;
+                padding: 0;
+                min-height: 100vh;
+                background-color: var(--bg);
+                color: var(--text);
+                font-family: var(--font-body);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
             .error-card {
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                background: var(--surface);
+                border-radius: 12px;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
                 padding: 48px;
                 max-width: 400px;
+                width: 90%;
                 margin: 0 auto;
                 text-align: center;
             }
+            .error-title {
+                margin-top: 16px;
+                font-family: var(--font-heading);
+                color: var(--text);
+                font-size: 1.5rem;
+            }
+            .error-message {
+                color: var(--muted);
+                margin-top: 8px;
+            }
+            .retry-btn {
+                display: inline-block;
+                margin-top: 24px;
+                padding: 12px 24px;
+                background-color: var(--primary);
+                color: white;
+                text-decoration: none;
+                border-radius: 8px;
+                font-weight: 500;
+                transition: opacity 0.2s ease;
+            }
+            .retry-btn:hover {
+                opacity: 0.9;
+                color: white;
+            }
         </style>
+        <script>
+            // Apply theme before page renders to prevent flash
+            (function() {
+                var stored = localStorage.getItem('beef-theme');
+                if (stored) {
+                    document.documentElement.setAttribute('data-theme', stored);
+                } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.setAttribute('data-theme', 'smokehouse');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'butcher-paper');
+                }
+            })();
+        </script>
     </head>
     <body>
-        <div class="container-fluid d-flex align-items-center justify-content-center" style="min-height: 100vh;">
-            <div class="error-card">
-                <div style="font-size: 72px;">😕</div>
-                <h2 style="margin-top: 16px;">Oops!</h2>
-                <p style="color: #868e96;">{{ message }}</p>
-                <a href="{{ login_url }}" class="btn btn-primary mt-3">Try Again</a>
-            </div>
+        <div class="error-card">
+            <div style="font-size: 72px;">😕</div>
+            <h2 class="error-title">Oops!</h2>
+            <p class="error-message">{{ message }}</p>
+            <a href="{{ login_url }}" class="retry-btn">Try Again</a>
         </div>
     </body>
     </html>
     """
 
-    return render_template_string(html_template, message=message, login_url=_get_login_url())
+    return render_template_string(html_template, message=message, login_url=_get_login_url(), google_fonts=google_fonts)

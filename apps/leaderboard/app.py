@@ -206,6 +206,7 @@ def display_page(pathname):
                         dmc.Anchor(
                             dmc.Button("Login", variant="light"),
                             href=f"{cfg.leaderboard_path}/login",
+                            refresh=True,
                         ),
                     ],
                     align="center",
@@ -240,6 +241,7 @@ def display_page(pathname):
                     dmc.Anchor(
                         dmc.Button("Go Home", variant="light"),
                         href=cfg.leaderboard_path,
+                        refresh=True,
                     ),
                 ],
                 align="center",

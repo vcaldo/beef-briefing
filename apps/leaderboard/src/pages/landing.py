@@ -78,6 +78,7 @@ def create_landing_page(chats: list[dict], user: dict, base_url: str) -> html.Di
                                                 ),
                                             ),
                                             href=f"{base_url}/logout",
+                                            refresh=True,
                                         ),
                                     ],
                                     gap="sm",

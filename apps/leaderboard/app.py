@@ -21,14 +21,18 @@ if cfg.new_relic_enabled():
     newrelic.agent.initialize()
 
 from flask import Flask, g, redirect, request
-from dash import Dash, html
+from dash import Dash, html, dcc, callback, Output, Input
 import dash_bootstrap_components as dbc
+import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 from sqlalchemy import create_engine
 
 from src.database import DashboardQueries, SessionQueries
 from src.auth import TelegramAuthService
 from src.routes import auth_bp
 from src.routes.auth import init_auth_routes
+from src.pages import create_landing_page
+from src.utils import filter_chats_for_user
 
 
 def setup_logging(config):
@@ -86,7 +90,8 @@ app = Dash(
     external_stylesheets=[dbc.themes.BOOTSTRAP],
     title="Beef Briefing Leaderboard",
     routes_pathname_prefix=routes_prefix,
-    requests_pathname_prefix=requests_prefix
+    requests_pathname_prefix=requests_prefix,
+    suppress_callback_exceptions=True,
 )
 
 # Set emoji favicon using SVG data URL
@@ -164,27 +169,84 @@ def get_auth_service() -> TelegramAuthService:
     return _auth_service
 
 
-# Application layout - skeleton with "Coming Soon" message
-app.layout = dbc.Container(
-    [
-        dbc.Row(
-            [
-                dbc.Col(
+# Dynamic layout function
+def serve_layout():
+    """
+    Serve layout dynamically based on route.
+
+    This function is called on every page load, allowing us to
+    access Flask's g.user for authenticated layouts.
+    """
+    return html.Div(
+        [
+            dcc.Location(id="url", refresh=False),
+            html.Div(id="page-content"),
+        ]
+    )
+
+
+app.layout = serve_layout
+
+
+# Routing callback for dynamic page content
+@callback(Output("page-content", "children"), Input("url", "pathname"))
+def display_page(pathname):
+    """Route to appropriate page based on URL."""
+    # Get user from session cookie (Flask g is not available in callbacks)
+    session_id = request.cookies.get("session_id")
+    user = get_auth_service().get_session(session_id) if session_id else None
+
+    if not user:
+        # Redirect to login if not authenticated
+        return dmc.MantineProvider(
+            dmc.Center(
+                dmc.Stack(
                     [
-                        html.H1("Leaderboard", className="text-center my-4"),
-                        html.P(
-                            "Leaderboard coming soon!",
-                            className="text-center lead text-muted",
+                        dmc.Text("Session expired", c="dimmed"),
+                        dmc.Anchor(
+                            dmc.Button("Login", variant="light"),
+                            href=f"{cfg.leaderboard_path}/login",
                         ),
                     ],
-                    width=12,
-                )
-            ]
+                    align="center",
+                    gap="md",
+                ),
+                style={"minHeight": "100vh"},
+            )
         )
-    ],
-    fluid=True,
-    className="py-5",
-)
+
+    # Strip prefix for route matching
+    route_path = pathname or "/"
+    if not cfg.is_production():
+        prefix = cfg.leaderboard_path
+        if route_path.startswith(prefix):
+            route_path = route_path[len(prefix) :] or "/"
+
+    # Route to landing page for root
+    if route_path in ["/", ""]:
+        all_chats = get_queries().get_chats_with_stats()
+        visible_chats = filter_chats_for_user(all_chats, user)
+        return create_landing_page(visible_chats, user, cfg.leaderboard_path)
+
+    # 404 fallback
+    return dmc.MantineProvider(
+        dmc.Center(
+            dmc.Stack(
+                [
+                    DashIconify(icon="mdi:alert-circle-outline", width=64, color="gray"),
+                    dmc.Title("404 - Page Not Found", order=2),
+                    dmc.Text("The page you're looking for doesn't exist.", c="dimmed"),
+                    dmc.Anchor(
+                        dmc.Button("Go Home", variant="light"),
+                        href=cfg.leaderboard_path,
+                    ),
+                ],
+                align="center",
+                gap="md",
+            ),
+            style={"minHeight": "100vh"},
+        )
+    )
 
 
 # Register auth blueprint and initialize auth routes

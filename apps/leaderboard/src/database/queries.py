@@ -246,6 +246,65 @@ class DashboardQueries:
         """
         return self._execute_many(query, {})
 
+    def get_chats_with_stats(self, chat_ids: list[int] | None = None) -> list[dict]:
+        """
+        Get chats with statistics for landing page cards.
+
+        Args:
+            chat_ids: Optional list of chat IDs to filter. None returns all.
+
+        Returns list of:
+            {
+                'id': int,
+                'title': str,
+                'type': str,
+                'username': str | None,
+                'message_count': int,
+                'user_count': int,
+                'last_activity': datetime,
+                'first_activity': datetime,
+                'avg_messages_per_day': float
+            }
+        """
+        base_query = """
+            WITH chat_stats AS (
+                SELECT
+                    c.id,
+                    COALESCE(c.title, '') as title,
+                    c.type::text as type,
+                    c.username,
+                    COUNT(DISTINCT m.id) as message_count,
+                    COUNT(DISTINCT m.user_id) as user_count,
+                    COALESCE(MAX(m.date), c.created_at) as last_activity,
+                    COALESCE(MIN(m.date), c.created_at) as first_activity
+                FROM chats c
+                LEFT JOIN messages m ON m.chat_id = c.id
+                WHERE c.type IN ('group', 'supergroup')
+                {filter_clause}
+                GROUP BY c.id, c.title, c.type, c.username, c.created_at
+            )
+            SELECT
+                cs.*,
+                CASE
+                    WHEN EXTRACT(DAY FROM (cs.last_activity - cs.first_activity)) > 0
+                    THEN ROUND(
+                        cs.message_count::numeric /
+                        NULLIF(EXTRACT(DAY FROM (cs.last_activity - cs.first_activity)), 0),
+                        1
+                    )
+                    ELSE cs.message_count::numeric
+                END as avg_messages_per_day
+            FROM chat_stats cs
+            ORDER BY cs.last_activity DESC
+        """
+
+        if chat_ids:
+            query = base_query.format(filter_clause="AND c.id = ANY(:chat_ids)")
+            return self._execute_many(query, {"chat_ids": chat_ids})
+        else:
+            query = base_query.format(filter_clause="")
+            return self._execute_many(query, {})
+
     def get_chat_card_data(self, chat_id: int) -> dict | None:
         """
         Get data for a chat summary card.

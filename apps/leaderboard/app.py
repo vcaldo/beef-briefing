@@ -25,6 +25,8 @@ from dash import Dash, html
 import dash_bootstrap_components as dbc
 from sqlalchemy import create_engine
 
+from src.database import DashboardQueries
+
 
 def setup_logging(config):
     """Configure logging based on environment."""
@@ -84,6 +86,19 @@ def get_engine():
         _engine = create_engine(cfg.dsn(), pool_pre_ping=True)
         logger.info("Database connection established")
     return _engine
+
+
+# Query executor (lazy initialization)
+_queries = None
+
+
+def get_queries() -> DashboardQueries:
+    """Get or create DashboardQueries instance."""
+    global _queries
+    if _queries is None:
+        _queries = DashboardQueries(get_engine())
+        logger.info("DashboardQueries initialized")
+    return _queries
 
 
 # Application layout - skeleton with "Coming Soon" message

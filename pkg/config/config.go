@@ -38,9 +38,13 @@ type Config struct {
 	Environment string `envconfig:"ENVIRONMENT" default:"development"`
 	LogLevel    string `envconfig:"LOG_LEVEL" default:"info"`
 
-	// Analytics API Configuration
-	AnalyticsAPIKey     string `envconfig:"ANALYTICS_API_KEY"`
-	AnalyticsAPIKeyFile string `envconfig:"ANALYTICS_API_KEY_FILE"`
+	// API Authentication (for clients like telegram-bot)
+	APIKey     string `envconfig:"API_KEY"`
+	APIKeyFile string `envconfig:"API_KEY_FILE"`
+
+	// API Service App Keys Directory (for api-service to validate incoming requests)
+	AppKeysDir     string `envconfig:"APP_KEYS_DIR"`
+	AppKeysDirFile string `envconfig:"APP_KEYS_DIR_FILE"`
 
 	// New Relic APM Configuration
 	NewRelicAppName    string `envconfig:"NEW_RELIC_APP_NAME"`
@@ -95,13 +99,22 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	// Load analytics API key from file if specified
-	if cfg.AnalyticsAPIKeyFile != "" {
-		apiKey, err := readSecretFromFile(cfg.AnalyticsAPIKeyFile)
+	// Load API key from file if specified (for clients like telegram-bot)
+	if cfg.APIKeyFile != "" {
+		apiKey, err := readSecretFromFile(cfg.APIKeyFile)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read analytics API key from file: %w", err)
+			return nil, fmt.Errorf("failed to read API key from file: %w", err)
 		}
-		cfg.AnalyticsAPIKey = apiKey
+		cfg.APIKey = apiKey
+	}
+
+	// Load app keys directory path from file if specified (for api-service)
+	if cfg.AppKeysDirFile != "" {
+		appKeysDir, err := readSecretFromFile(cfg.AppKeysDirFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read app keys dir from file: %w", err)
+		}
+		cfg.AppKeysDir = appKeysDir
 	}
 
 	return &cfg, nil
@@ -114,4 +127,39 @@ func readSecretFromFile(filepath string) (string, error) {
 		return "", fmt.Errorf("reading file %s: %w", filepath, err)
 	}
 	return strings.TrimSpace(string(data)), nil
+}
+
+// LoadAppKeysFromDir reads all key files from a directory.
+// Each file name is the app name, and the file content is the API key.
+// Returns a map of appName -> apiKey.
+func LoadAppKeysFromDir(dirPath string) (map[string]string, error) {
+	if dirPath == "" {
+		return nil, nil
+	}
+
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading app keys directory %s: %w", dirPath, err)
+	}
+
+	appKeys := make(map[string]string)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		appName := entry.Name()
+		filePath := dirPath + "/" + appName
+
+		key, err := readSecretFromFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("reading app key for %s: %w", appName, err)
+		}
+
+		if key != "" {
+			appKeys[appName] = key
+		}
+	}
+
+	return appKeys, nil
 }

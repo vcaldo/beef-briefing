@@ -143,7 +143,8 @@ make tf-ip            # Point domain A record to this IP
 
 # 4. Generate secrets
 make secrets-traefik-password
-make secrets-analytics-api-key
+make secrets-service-api APP=telegram-bot
+make secrets-service-api APP=leaderboard
 
 # 5. Deploy
 make deploy           # Full deployment
@@ -213,12 +214,17 @@ make secrets-traefik-password
 
 Updates `TRAEFIK_DASHBOARD_USERS` in `.env.prod` with bcrypt hash ($$2y$$ escaping for docker-compose).
 
-**Analytics API Key**:
+**API Service Keys** (per-application authentication):
 ```bash
-make secrets-analytics-api-key
+make secrets-service-api APP=telegram-bot
+make secrets-service-api APP=leaderboard
 ```
 
-Generates a secure random API key and saves it to `infrastructure/secrets/apps/api-service/analytics_api_key`. This key is automatically deployed to production when you run `make deploy`. The key is used for authenticating requests to the analytics endpoints.
+Generates a secure random API key for each application. Keys are stored in two locations:
+- `infrastructure/secrets/apps/api-service/app_keys/{app}` - for api-service to validate incoming requests
+- `infrastructure/secrets/apps/{app}/api_key` - for the app to read when making requests
+
+This structure allows each container to mount its own secrets directory without collisions. All `/api/v1/*` endpoints require authentication via `Authorization: Bearer <key>` header. Only `/health` is unauthenticated (for load balancer health checks).
 
 ## Import CLI Usage
 
@@ -275,15 +281,28 @@ cd ~/beef-briefing/apps/import-cli
 ### Local Development Testing
 
 ```bash
+# Generate API keys first (required before starting services)
+make secrets-service-api APP=telegram-bot
+make secrets-service-api APP=leaderboard
+
 # Start all services
 make up-build
 
-# Test API health
+# Test API health (unauthenticated)
 curl http://localhost:8080/health
 
-# Test message ingestion
+# Read API key for testing
+API_KEY=$(cat infrastructure/secrets/apps/telegram-bot/api_key)
+
+# Test message ingestion (authenticated)
 curl -X POST http://localhost:8080/api/v1/ingest \
+  -H "Authorization: Bearer $API_KEY" \
   -F 'update={"update_id":1,"message":{"message_id":1,"chat":{"id":-100123,"type":"supergroup"},"from":{"id":456,"first_name":"User"},"date":1733611200,"text":"Test"}}'
+
+# Test without auth (should return 401)
+curl -X POST http://localhost:8080/api/v1/ingest \
+  -F 'update={}'
+# Returns: {"error": "missing authorization header"}
 
 # Test Telegram bot
 # Send a message to your bot in Telegram
@@ -297,12 +316,17 @@ beef-briefing/
 ├── apps/
 │   ├── api-service/       # REST API for Telegram data ingestion (includes embedded migrations)
 │   ├── telegram-bot/      # Telegram bot client
+│   ├── leaderboard/       # Analytics dashboard (Dash/Python)
 │   └── import-cli/        # CLI for importing Telegram exports
 ├── infrastructure/
 │   ├── docker-compose.dev.yml     # Development environment
 │   ├── docker-compose.prod.yml    # Production with Traefik
 │   ├── terraform/                 # Linode infrastructure as code
 │   ├── secrets/                   # Secrets directory (gitignored)
+│   │   └── apps/
+│   │       ├── api-service/app_keys/  # API keys for validation
+│   │       ├── telegram-bot/          # telegram-bot's API key
+│   │       └── leaderboard/           # leaderboard's API key
 │   └── letsencrypt/               # SSL certificates (gitignored)
 ├── pkg/config/            # Shared configuration package
 ├── scripts/               # Deployment and utility scripts

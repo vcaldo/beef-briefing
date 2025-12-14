@@ -149,3 +149,43 @@ def format_period_label(period: str) -> str:
         "max": "All time",
     }
     return labels.get(period, period)
+
+
+def create_time_filter_links(
+    base_url: str,
+    chat_id: int,
+    current_tab: str,
+    current_period: str | None = None,
+) -> dmc.Group:
+    """
+    Create a time filter as anchor links for URL-based navigation.
+
+    Args:
+        base_url: Base URL path (e.g., "/leaderboard")
+        chat_id: Chat ID for URL generation
+        current_tab: Current page tab (e.g., "overview", "activity")
+        current_period: Currently active period, or None for default
+
+    Returns:
+        DMC Group containing period link buttons
+    """
+    if current_period is None:
+        current_period = DEFAULT_PERIOD
+
+    buttons = []
+    for p in PERIODS:
+        is_active = p["value"] == current_period
+        href = f"{base_url}/group/{chat_id}/{current_tab}?period={p['value']}"
+        buttons.append(
+            dmc.Anchor(
+                dmc.Button(
+                    p["label"],
+                    variant="filled" if is_active else "default",
+                    size="xs",
+                    radius="md",
+                ),
+                href=href,
+                underline="never",
+            )
+        )
+    return dmc.Group(buttons, gap=2)

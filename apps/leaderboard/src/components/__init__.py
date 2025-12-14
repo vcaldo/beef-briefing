@@ -17,6 +17,7 @@ from .time_filter import (
     PERIODS,
     TIME_FILTER_ID,
     create_time_filter,
+    create_time_filter_links,
     create_time_filter_with_label,
     format_period_label,
     get_comparison_dates,
@@ -37,6 +38,7 @@ __all__ = [
     "THEME_SWITCHER_ID",
     # Time filter
     "create_time_filter",
+    "create_time_filter_links",
     "create_time_filter_with_label",
     "get_period_dates",
     "get_comparison_dates",

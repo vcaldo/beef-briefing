@@ -7,13 +7,15 @@ Provides a header with:
 - Tab navigation (Overview, Activity, Reactions, Leaderboard, My Stats)
 - Time filter
 - Theme switcher
+
+All navigation is URL-based using anchor links for server-side rendering.
 """
 
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 
 from src.components.theme_switcher import create_theme_switcher
-from src.components.time_filter import create_time_filter
+from src.components.time_filter import create_time_filter_links
 
 # Tab definitions
 TABS = [
@@ -47,22 +49,6 @@ def create_group_nav(
     Returns:
         DMC Stack containing the full navigation header
     """
-    # Build tab list
-    tab_list = []
-    for tab in TABS:
-        tab_list.append(
-            dmc.TabsTab(
-                dmc.Group(
-                    [
-                        DashIconify(icon=tab["icon"], width=16),
-                        dmc.Text(tab["label"], size="sm"),
-                    ],
-                    gap="xs",
-                ),
-                value=tab["value"],
-            )
-        )
-
     return dmc.Stack(
         [
             # Top row: back button, title, theme switcher
@@ -85,14 +71,10 @@ def create_group_nav(
             # Tab row with time filter
             dmc.Group(
                 [
-                    dmc.Tabs(
-                        [dmc.TabsList(tab_list)],
-                        value=current_tab,
-                        id="group-tabs",
-                        variant="default",
-                        style={"flex": 1},
+                    _create_tab_links(base_url, chat_id, current_tab, current_period),
+                    create_time_filter_links(
+                        base_url, chat_id, current_tab, current_period
                     ),
-                    create_time_filter(current_period),
                 ],
                 justify="space-between",
                 align="center",
@@ -102,6 +84,34 @@ def create_group_nav(
         ],
         gap="md",
     )
+
+
+def _create_tab_links(
+    base_url: str, chat_id: int, current_tab: str, period: str
+) -> dmc.Group:
+    """Create tab navigation as anchor links."""
+    tabs = []
+    for tab in TABS:
+        is_active = tab["value"] == current_tab
+        href = f"{base_url}/group/{chat_id}/{tab['value']}?period={period}"
+        tabs.append(
+            dmc.Anchor(
+                dmc.Button(
+                    dmc.Group(
+                        [
+                            DashIconify(icon=tab["icon"], width=16),
+                            dmc.Text(tab["label"], size="sm"),
+                        ],
+                        gap="xs",
+                    ),
+                    variant="filled" if is_active else "subtle",
+                    size="sm",
+                ),
+                href=href,
+                underline="never",
+            )
+        )
+    return dmc.Group(tabs, gap="xs")
 
 
 def create_group_header_simple(

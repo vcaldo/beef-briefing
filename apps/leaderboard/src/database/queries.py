@@ -1497,3 +1497,521 @@ class DashboardQueries:
         """
         result = self._execute_single(query, {"chat_id": chat_id, "user_id": user_id})
         return result.get("first_date") if result else None
+
+    # =========================================
+    # SENTIMENT METHODS
+    # =========================================
+
+    def get_sentiment_stats(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict:
+        """
+        Get sentiment overview statistics for a chat.
+
+        Returns:
+            {
+                'total_analyzed': int,
+                'total_messages': int,
+                'positive_count': int,
+                'neutral_count': int,
+                'negative_count': int,
+                'positive_rate': float,
+                'negative_rate': float,
+                'avg_confidence': float
+            }
+        """
+        if start_date is None and end_date is None:
+            query = """
+                WITH stats AS (
+                    SELECT
+                        COUNT(*) as total_analyzed,
+                        SUM(CASE WHEN label = 'positive' THEN 1 ELSE 0 END) as positive_count,
+                        SUM(CASE WHEN label = 'neutral' THEN 1 ELSE 0 END) as neutral_count,
+                        SUM(CASE WHEN label = 'negative' THEN 1 ELSE 0 END) as negative_count,
+                        AVG(confidence) as avg_confidence
+                    FROM ml_sentiment
+                    WHERE chat_id = :chat_id
+                ),
+                total AS (
+                    SELECT COUNT(*) as total_messages
+                    FROM messages
+                    WHERE chat_id = :chat_id
+                        AND (text IS NOT NULL OR caption IS NOT NULL)
+                )
+                SELECT
+                    s.total_analyzed,
+                    t.total_messages,
+                    s.positive_count,
+                    s.neutral_count,
+                    s.negative_count,
+                    CASE WHEN s.total_analyzed > 0
+                        THEN ROUND(s.positive_count * 100.0 / s.total_analyzed, 1)
+                        ELSE 0 END as positive_rate,
+                    CASE WHEN s.total_analyzed > 0
+                        THEN ROUND(s.negative_count * 100.0 / s.total_analyzed, 1)
+                        ELSE 0 END as negative_rate,
+                    COALESCE(s.avg_confidence, 0) as avg_confidence
+                FROM stats s, total t
+            """
+            result = self._execute_single(query, {"chat_id": chat_id})
+        else:
+            query = """
+                WITH stats AS (
+                    SELECT
+                        COUNT(*) as total_analyzed,
+                        SUM(CASE WHEN ms.label = 'positive' THEN 1 ELSE 0 END) as positive_count,
+                        SUM(CASE WHEN ms.label = 'neutral' THEN 1 ELSE 0 END) as neutral_count,
+                        SUM(CASE WHEN ms.label = 'negative' THEN 1 ELSE 0 END) as negative_count,
+                        AVG(ms.confidence) as avg_confidence
+                    FROM ml_sentiment ms
+                    JOIN messages m ON m.id = ms.message_id
+                    WHERE ms.chat_id = :chat_id
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                ),
+                total AS (
+                    SELECT COUNT(*) as total_messages
+                    FROM messages
+                    WHERE chat_id = :chat_id
+                        AND date >= :start_date
+                        AND date < :end_date
+                        AND (text IS NOT NULL OR caption IS NOT NULL)
+                )
+                SELECT
+                    s.total_analyzed,
+                    t.total_messages,
+                    s.positive_count,
+                    s.neutral_count,
+                    s.negative_count,
+                    CASE WHEN s.total_analyzed > 0
+                        THEN ROUND(s.positive_count * 100.0 / s.total_analyzed, 1)
+                        ELSE 0 END as positive_rate,
+                    CASE WHEN s.total_analyzed > 0
+                        THEN ROUND(s.negative_count * 100.0 / s.total_analyzed, 1)
+                        ELSE 0 END as negative_rate,
+                    COALESCE(s.avg_confidence, 0) as avg_confidence
+                FROM stats s, total t
+            """
+            result = self._execute_single(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+        return result or {
+            "total_analyzed": 0,
+            "total_messages": 0,
+            "positive_count": 0,
+            "neutral_count": 0,
+            "negative_count": 0,
+            "positive_rate": 0,
+            "negative_rate": 0,
+            "avg_confidence": 0,
+        }
+
+    def get_sentiment_distribution(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get sentiment label distribution for charts.
+
+        Returns DataFrame with columns:
+            label, count, percentage
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    label,
+                    COUNT(*) as count,
+                    ROUND(COUNT(*) * 100.0 / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) as percentage
+                FROM ml_sentiment
+                WHERE chat_id = :chat_id
+                GROUP BY label
+                ORDER BY
+                    CASE label
+                        WHEN 'positive' THEN 1
+                        WHEN 'neutral' THEN 2
+                        WHEN 'negative' THEN 3
+                    END
+            """
+            return self._execute_df(query, {"chat_id": chat_id})
+        else:
+            query = """
+                SELECT
+                    ms.label,
+                    COUNT(*) as count,
+                    ROUND(COUNT(*) * 100.0 / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) as percentage
+                FROM ml_sentiment ms
+                JOIN messages m ON m.id = ms.message_id
+                WHERE ms.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                GROUP BY ms.label
+                ORDER BY
+                    CASE ms.label
+                        WHEN 'positive' THEN 1
+                        WHEN 'neutral' THEN 2
+                        WHEN 'negative' THEN 3
+                    END
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+    def get_sentiment_timeline(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get daily sentiment counts for timeline chart.
+
+        Returns DataFrame with columns:
+            date, positive, neutral, negative
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    DATE(m.date) as date,
+                    SUM(CASE WHEN ms.label = 'positive' THEN 1 ELSE 0 END) as positive,
+                    SUM(CASE WHEN ms.label = 'neutral' THEN 1 ELSE 0 END) as neutral,
+                    SUM(CASE WHEN ms.label = 'negative' THEN 1 ELSE 0 END) as negative
+                FROM ml_sentiment ms
+                JOIN messages m ON m.id = ms.message_id
+                WHERE ms.chat_id = :chat_id
+                GROUP BY DATE(m.date)
+                ORDER BY date
+            """
+            return self._execute_df(query, {"chat_id": chat_id})
+        else:
+            query = """
+                SELECT
+                    DATE(m.date) as date,
+                    SUM(CASE WHEN ms.label = 'positive' THEN 1 ELSE 0 END) as positive,
+                    SUM(CASE WHEN ms.label = 'neutral' THEN 1 ELSE 0 END) as neutral,
+                    SUM(CASE WHEN ms.label = 'negative' THEN 1 ELSE 0 END) as negative
+                FROM ml_sentiment ms
+                JOIN messages m ON m.id = ms.message_id
+                WHERE ms.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                GROUP BY DATE(m.date)
+                ORDER BY date
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+    def get_hourly_sentiment_heatmap(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get average sentiment by hour and day of week for heatmap.
+
+        Sentiment is converted to numeric: positive=1, neutral=0, negative=-1
+
+        Returns DataFrame with columns:
+            day_of_week (0-6), hour (0-23), avg_sentiment (-1 to 1), message_count
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    EXTRACT(DOW FROM m.date)::int as day_of_week,
+                    EXTRACT(HOUR FROM m.date)::int as hour,
+                    AVG(CASE
+                        WHEN ms.label = 'positive' THEN 1
+                        WHEN ms.label = 'neutral' THEN 0
+                        WHEN ms.label = 'negative' THEN -1
+                    END) as avg_sentiment,
+                    COUNT(*) as message_count
+                FROM ml_sentiment ms
+                JOIN messages m ON m.id = ms.message_id
+                WHERE ms.chat_id = :chat_id
+                GROUP BY day_of_week, hour
+                ORDER BY day_of_week, hour
+            """
+            return self._execute_df(query, {"chat_id": chat_id})
+        else:
+            query = """
+                SELECT
+                    EXTRACT(DOW FROM m.date)::int as day_of_week,
+                    EXTRACT(HOUR FROM m.date)::int as hour,
+                    AVG(CASE
+                        WHEN ms.label = 'positive' THEN 1
+                        WHEN ms.label = 'neutral' THEN 0
+                        WHEN ms.label = 'negative' THEN -1
+                    END) as avg_sentiment,
+                    COUNT(*) as message_count
+                FROM ml_sentiment ms
+                JOIN messages m ON m.id = ms.message_id
+                WHERE ms.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                GROUP BY day_of_week, hour
+                ORDER BY day_of_week, hour
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+    def get_user_sentiment_rankings(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        limit: int = 10,
+        ascending: bool = False,
+    ) -> list[dict]:
+        """
+        Get users ranked by average sentiment.
+
+        Calculates directly from ml_sentiment data for real-time accuracy.
+
+        Args:
+            chat_id: Chat ID
+            start_date: Start date filter (inclusive)
+            end_date: End date filter (exclusive)
+            limit: Number of users to return
+            ascending: If True, returns most negative users first
+
+        Returns list of:
+            {
+                'user_id': int,
+                'first_name': str,
+                'username': str | None,
+                'avg_sentiment': float,
+                'messages_analyzed': int
+            }
+        """
+        order = "ASC" if ascending else "DESC"
+        # Calculate average sentiment directly from ml_sentiment
+        # Score mapping: positive=1, neutral=0, negative=-1
+        if start_date is None and end_date is None:
+            query = f"""
+                SELECT
+                    u.id as user_id,
+                    u.first_name,
+                    u.username,
+                    AVG(
+                        CASE ms.label
+                            WHEN 'positive' THEN 1.0
+                            WHEN 'neutral' THEN 0.0
+                            WHEN 'negative' THEN -1.0
+                            ELSE 0.0
+                        END
+                    ) as avg_sentiment,
+                    COUNT(*) as messages_analyzed
+                FROM ml_sentiment ms
+                JOIN messages m ON m.id = ms.message_id AND m.chat_id = ms.chat_id
+                JOIN users u ON u.id = m.user_id
+                WHERE ms.chat_id = :chat_id
+                    AND u.is_bot = false
+                GROUP BY u.id, u.first_name, u.username
+                HAVING COUNT(*) >= 5
+                ORDER BY avg_sentiment {order}
+                LIMIT :limit
+            """
+            return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
+        else:
+            query = f"""
+                SELECT
+                    u.id as user_id,
+                    u.first_name,
+                    u.username,
+                    AVG(
+                        CASE ms.label
+                            WHEN 'positive' THEN 1.0
+                            WHEN 'neutral' THEN 0.0
+                            WHEN 'negative' THEN -1.0
+                            ELSE 0.0
+                        END
+                    ) as avg_sentiment,
+                    COUNT(*) as messages_analyzed
+                FROM ml_sentiment ms
+                JOIN messages m ON m.id = ms.message_id AND m.chat_id = ms.chat_id
+                JOIN users u ON u.id = m.user_id
+                WHERE ms.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                    AND u.is_bot = false
+                GROUP BY u.id, u.first_name, u.username
+                HAVING COUNT(*) >= 5
+                ORDER BY avg_sentiment {order}
+                LIMIT :limit
+            """
+            return self._execute_many(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "limit": limit,
+                },
+            )
+
+    def get_toxicity_stats(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict:
+        """
+        Get toxicity statistics for a chat.
+
+        Returns:
+            {
+                'total_analyzed': int,
+                'toxic_count': int,
+                'toxic_rate': float
+            }
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    COUNT(*) as total_analyzed,
+                    SUM(CASE WHEN is_toxic THEN 1 ELSE 0 END) as toxic_count,
+                    CASE WHEN COUNT(*) > 0
+                        THEN ROUND(SUM(CASE WHEN is_toxic THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+                        ELSE 0 END as toxic_rate
+                FROM ml_toxicity
+                WHERE chat_id = :chat_id
+            """
+            result = self._execute_single(query, {"chat_id": chat_id})
+        else:
+            query = """
+                SELECT
+                    COUNT(*) as total_analyzed,
+                    SUM(CASE WHEN mt.is_toxic THEN 1 ELSE 0 END) as toxic_count,
+                    CASE WHEN COUNT(*) > 0
+                        THEN ROUND(SUM(CASE WHEN mt.is_toxic THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+                        ELSE 0 END as toxic_rate
+                FROM ml_toxicity mt
+                JOIN messages m ON m.id = mt.message_id
+                WHERE mt.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+            """
+            result = self._execute_single(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+        return result or {
+            "total_analyzed": 0,
+            "toxic_count": 0,
+            "toxic_rate": 0,
+        }
+
+    def get_toxicity_timeline(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get daily toxicity counts for timeline chart.
+
+        Returns DataFrame with columns:
+            date, toxic_count, total_count
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    DATE(m.date) as date,
+                    SUM(CASE WHEN mt.is_toxic THEN 1 ELSE 0 END) as toxic_count,
+                    COUNT(*) as total_count
+                FROM ml_toxicity mt
+                JOIN messages m ON m.id = mt.message_id
+                WHERE mt.chat_id = :chat_id
+                GROUP BY DATE(m.date)
+                ORDER BY date
+            """
+            return self._execute_df(query, {"chat_id": chat_id})
+        else:
+            query = """
+                SELECT
+                    DATE(m.date) as date,
+                    SUM(CASE WHEN mt.is_toxic THEN 1 ELSE 0 END) as toxic_count,
+                    COUNT(*) as total_count
+                FROM ml_toxicity mt
+                JOIN messages m ON m.id = mt.message_id
+                WHERE mt.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                GROUP BY DATE(m.date)
+                ORDER BY date
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+    def get_user_toxicity_rankings(
+        self,
+        chat_id: int,
+        limit: int = 10,
+    ) -> list[dict]:
+        """
+        Get users ranked by toxicity rate (highest first).
+
+        Returns list of:
+            {
+                'user_id': int,
+                'first_name': str,
+                'username': str | None,
+                'toxicity_rate': float,
+                'messages_analyzed': int
+            }
+        """
+        query = """
+            SELECT
+                u.id as user_id,
+                u.first_name,
+                u.username,
+                mup.toxicity_rate,
+                mup.messages_analyzed
+            FROM ml_user_profiles mup
+            JOIN users u ON u.id = mup.user_id
+            WHERE mup.chat_id = :chat_id
+                AND mup.messages_analyzed >= 5
+                AND mup.toxicity_rate > 0
+            ORDER BY mup.toxicity_rate DESC
+            LIMIT :limit
+        """
+        return self._execute_many(query, {"chat_id": chat_id, "limit": limit})

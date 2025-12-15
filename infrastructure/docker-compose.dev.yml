@@ -70,6 +70,18 @@ services:
       - beef-dev-network
     restart: unless-stopped
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: beef-qdrant-dev
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data_dev:/qdrant/storage
+    networks:
+      - beef-dev-network
+    restart: unless-stopped
+
   telegram-bot:
     build:
       context: ..
@@ -129,6 +141,7 @@ services:
 volumes:
   postgres_data_dev:
   minio_data_dev:
+  qdrant_data_dev:
 
 networks:
   beef-dev-network:

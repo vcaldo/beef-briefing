@@ -221,6 +221,9 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	profilePhotoService := services.NewProfilePhotoService(db, minioClient, nrApp)
 	profilePhotoHandler := handlers.NewProfilePhotoHandler(profilePhotoService, cfg)
 
+	mlService := services.NewMLService(db, nrApp)
+	mlHandler := handlers.NewMLHandler(mlService, cfg)
+
 	// API v1 routes - ALL AUTHENTICATED
 	api := router.PathPrefix("/api/v1").Subrouter()
 	api.Use(multiKeyAuth.Authenticate)
@@ -235,6 +238,11 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	api.HandleFunc("/chats", profilePhotoHandler.HandleGetChats).Methods("GET")
 	api.HandleFunc("/users/{id}/photo", profilePhotoHandler.HandleGetUserPhoto).Methods("GET")
 	api.HandleFunc("/chats/{id}/photo", profilePhotoHandler.HandleGetChatPhoto).Methods("GET")
+
+	// ML analytics routes
+	api.HandleFunc("/ml/messages", mlHandler.HandleGetMessages).Methods("GET")
+	api.HandleFunc("/ml/results", mlHandler.HandlePostResults).Methods("POST")
+	api.HandleFunc("/ml/status", mlHandler.HandleGetStatus).Methods("GET")
 
 	slog.Info("all API endpoints require authentication", "path_prefix", "/api/v1")
 

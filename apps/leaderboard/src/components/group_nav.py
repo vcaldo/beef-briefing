@@ -24,6 +24,7 @@ TABS = [
     {"value": "reactions", "label": "Reactions", "icon": "mdi:emoticon-outline"},
     {"value": "leaderboard", "label": "Leaderboard", "icon": "mdi:trophy-outline"},
     {"value": "my-stats", "label": "My Stats", "icon": "mdi:account-outline"},
+    {"value": "sentiment", "label": "Sentiment", "icon": "mdi:brain"},
 ]
 
 

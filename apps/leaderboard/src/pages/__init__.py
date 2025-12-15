@@ -8,6 +8,7 @@ from .group import (
     create_my_stats_page,
     create_overview_page,
     create_reactions_page,
+    create_sentiment_page,
 )
 
 __all__ = [
@@ -19,4 +20,5 @@ __all__ = [
     "create_reactions_page",
     "create_leaderboard_page",
     "create_my_stats_page",
+    "create_sentiment_page",
 ]

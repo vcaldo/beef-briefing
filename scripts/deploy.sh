@@ -74,6 +74,23 @@ log_success "SSH host: $SSH_HOST"
 COMMIT_HASH=$(get_commit_hash)
 log_success "Commit hash: $COMMIT_HASH"
 
+# Fetch deployer's IP for API allowlist
+log_info "Fetching current IP address..."
+ALLOWED_IP=$(curl -s whatismyip.akamai.com)
+if [[ -z "$ALLOWED_IP" ]]; then
+    log_error "Failed to fetch IP from whatismyip.akamai.com"
+    exit 1
+fi
+log_success "Current IP: $ALLOWED_IP"
+
+# Update ALLOWED_IP in .env.prod
+if grep -q "^ALLOWED_IP=" "$PROD_ENV_FILE"; then
+    sed -i "s/^ALLOWED_IP=.*/ALLOWED_IP=$ALLOWED_IP/" "$PROD_ENV_FILE"
+else
+    echo "ALLOWED_IP=$ALLOWED_IP" >> "$PROD_ENV_FILE"
+fi
+log_success "Updated ALLOWED_IP in .env.prod"
+
 # Detect remote server architecture for cross-platform builds
 log_info "Detecting remote server architecture..."
 REMOTE_ARCH=$(get_remote_arch "$SSH_HOST")

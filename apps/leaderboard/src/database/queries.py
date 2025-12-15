@@ -2015,3 +2015,204 @@ class DashboardQueries:
             LIMIT :limit
         """
         return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
+
+    def get_user_sentiment_stats(
+        self,
+        chat_id: int,
+        user_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict:
+        """
+        Get sentiment statistics for a specific user compared to group average.
+
+        Args:
+            chat_id: Chat ID
+            user_id: User ID
+            start_date: Start date filter (inclusive)
+            end_date: End date filter (exclusive)
+
+        Returns:
+            {
+                'avg_sentiment': float (-1 to 1),
+                'positive_count': int,
+                'neutral_count': int,
+                'negative_count': int,
+                'messages_analyzed': int,
+                'group_avg_sentiment': float,
+                'sentiment_rank': int | None,
+                'total_ranked_users': int
+            }
+        """
+        if start_date is None and end_date is None:
+            query = """
+                WITH user_sentiment AS (
+                    SELECT
+                        AVG(
+                            CASE ms.label
+                                WHEN 'positive' THEN 1.0
+                                WHEN 'neutral' THEN 0.0
+                                WHEN 'negative' THEN -1.0
+                            END
+                        ) as avg_sentiment,
+                        SUM(CASE WHEN ms.label = 'positive' THEN 1 ELSE 0 END) as positive_count,
+                        SUM(CASE WHEN ms.label = 'neutral' THEN 1 ELSE 0 END) as neutral_count,
+                        SUM(CASE WHEN ms.label = 'negative' THEN 1 ELSE 0 END) as negative_count,
+                        COUNT(*) as messages_analyzed
+                    FROM ml_sentiment ms
+                    JOIN messages m ON m.id = ms.message_id AND m.chat_id = ms.chat_id
+                    WHERE ms.chat_id = :chat_id
+                        AND m.user_id = :user_id
+                ),
+                group_sentiment AS (
+                    SELECT
+                        AVG(
+                            CASE ms.label
+                                WHEN 'positive' THEN 1.0
+                                WHEN 'neutral' THEN 0.0
+                                WHEN 'negative' THEN -1.0
+                            END
+                        ) as group_avg
+                    FROM ml_sentiment ms
+                    WHERE ms.chat_id = :chat_id
+                ),
+                user_ranks AS (
+                    SELECT
+                        m.user_id,
+                        AVG(
+                            CASE ms.label
+                                WHEN 'positive' THEN 1.0
+                                WHEN 'neutral' THEN 0.0
+                                WHEN 'negative' THEN -1.0
+                            END
+                        ) as avg_sentiment,
+                        COUNT(*) as msg_count
+                    FROM ml_sentiment ms
+                    JOIN messages m ON m.id = ms.message_id AND m.chat_id = ms.chat_id
+                    JOIN users u ON u.id = m.user_id
+                    WHERE ms.chat_id = :chat_id
+                        AND u.is_bot = false
+                    GROUP BY m.user_id
+                    HAVING COUNT(*) >= 5
+                ),
+                ranked AS (
+                    SELECT
+                        user_id,
+                        ROW_NUMBER() OVER (ORDER BY avg_sentiment DESC) as rank,
+                        COUNT(*) OVER () as total_users
+                    FROM user_ranks
+                )
+                SELECT
+                    us.avg_sentiment,
+                    us.positive_count,
+                    us.neutral_count,
+                    us.negative_count,
+                    us.messages_analyzed,
+                    gs.group_avg as group_avg_sentiment,
+                    r.rank as sentiment_rank,
+                    r.total_users as total_ranked_users
+                FROM user_sentiment us
+                CROSS JOIN group_sentiment gs
+                LEFT JOIN ranked r ON r.user_id = :user_id
+            """
+            result = self._execute_single(
+                query, {"chat_id": chat_id, "user_id": user_id}
+            )
+        else:
+            query = """
+                WITH user_sentiment AS (
+                    SELECT
+                        AVG(
+                            CASE ms.label
+                                WHEN 'positive' THEN 1.0
+                                WHEN 'neutral' THEN 0.0
+                                WHEN 'negative' THEN -1.0
+                            END
+                        ) as avg_sentiment,
+                        SUM(CASE WHEN ms.label = 'positive' THEN 1 ELSE 0 END) as positive_count,
+                        SUM(CASE WHEN ms.label = 'neutral' THEN 1 ELSE 0 END) as neutral_count,
+                        SUM(CASE WHEN ms.label = 'negative' THEN 1 ELSE 0 END) as negative_count,
+                        COUNT(*) as messages_analyzed
+                    FROM ml_sentiment ms
+                    JOIN messages m ON m.id = ms.message_id AND m.chat_id = ms.chat_id
+                    WHERE ms.chat_id = :chat_id
+                        AND m.user_id = :user_id
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                ),
+                group_sentiment AS (
+                    SELECT
+                        AVG(
+                            CASE ms.label
+                                WHEN 'positive' THEN 1.0
+                                WHEN 'neutral' THEN 0.0
+                                WHEN 'negative' THEN -1.0
+                            END
+                        ) as group_avg
+                    FROM ml_sentiment ms
+                    JOIN messages m ON m.id = ms.message_id
+                    WHERE ms.chat_id = :chat_id
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                ),
+                user_ranks AS (
+                    SELECT
+                        m.user_id,
+                        AVG(
+                            CASE ms.label
+                                WHEN 'positive' THEN 1.0
+                                WHEN 'neutral' THEN 0.0
+                                WHEN 'negative' THEN -1.0
+                            END
+                        ) as avg_sentiment,
+                        COUNT(*) as msg_count
+                    FROM ml_sentiment ms
+                    JOIN messages m ON m.id = ms.message_id AND m.chat_id = ms.chat_id
+                    JOIN users u ON u.id = m.user_id
+                    WHERE ms.chat_id = :chat_id
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                        AND u.is_bot = false
+                    GROUP BY m.user_id
+                    HAVING COUNT(*) >= 5
+                ),
+                ranked AS (
+                    SELECT
+                        user_id,
+                        ROW_NUMBER() OVER (ORDER BY avg_sentiment DESC) as rank,
+                        COUNT(*) OVER () as total_users
+                    FROM user_ranks
+                )
+                SELECT
+                    us.avg_sentiment,
+                    us.positive_count,
+                    us.neutral_count,
+                    us.negative_count,
+                    us.messages_analyzed,
+                    gs.group_avg as group_avg_sentiment,
+                    r.rank as sentiment_rank,
+                    r.total_users as total_ranked_users
+                FROM user_sentiment us
+                CROSS JOIN group_sentiment gs
+                LEFT JOIN ranked r ON r.user_id = :user_id
+            """
+            result = self._execute_single(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "user_id": user_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+        return result or {
+            "avg_sentiment": None,
+            "positive_count": 0,
+            "neutral_count": 0,
+            "negative_count": 0,
+            "messages_analyzed": 0,
+            "group_avg_sentiment": None,
+            "sentiment_rank": None,
+            "total_ranked_users": 0,
+        }

@@ -25,6 +25,7 @@ def create_overview_page(
     base_url: str,
     theme_name: str | None,
     queries,
+    photo_client,
 ) -> html.Div:
     """
     Create the overview page for a group.
@@ -37,6 +38,7 @@ def create_overview_page(
         base_url: Base URL path
         theme_name: Current theme name
         queries: DashboardQueries instance
+        photo_client: PhotoClient for fetching profile photos
 
     Returns:
         Page layout as html.Div
@@ -72,6 +74,10 @@ def create_overview_page(
 
     # Fetch top users for mini leaderboard
     top_users = queries.get_user_rankings(chat_id, metric="message_count", limit=5)
+
+    # Fetch photos for top users
+    user_ids = [u["user_id"] for u in top_users]
+    photo_urls = photo_client.get_user_photos_batch(user_ids, size="small")
 
     # Fetch top reactions
     top_reactions = queries.get_top_reactions(chat_id, limit=5)
@@ -136,7 +142,9 @@ def create_overview_page(
                         lg=8,
                     ),
                     dbc.Col(
-                        _create_leaderboard_card(top_users, base_url, chat_id, colors),
+                        _create_leaderboard_card(
+                            top_users, base_url, chat_id, colors, photo_urls
+                        ),
                         lg=4,
                     ),
                 ],
@@ -253,7 +261,7 @@ def _create_activity_card(sparkline_data: list, colors: dict) -> dmc.Paper:
 
 
 def _create_leaderboard_card(
-    top_users: list, base_url: str, chat_id: int, colors: dict
+    top_users: list, base_url: str, chat_id: int, colors: dict, photo_urls: dict
 ) -> dmc.Paper:
     """Create mini leaderboard card."""
     if top_users:
@@ -269,6 +277,7 @@ def _create_leaderboard_card(
                             w=40,
                         ),
                         dmc.Avatar(
+                            src=photo_urls.get(user["user_id"]),
                             children=user["first_name"][0].upper()
                             if user["first_name"]
                             else "?",

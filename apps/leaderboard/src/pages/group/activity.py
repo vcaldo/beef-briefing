@@ -27,6 +27,7 @@ def create_activity_page(
     base_url: str,
     theme_name: str | None,
     queries,
+    photo_client,
 ) -> html.Div:
     """
     Create the activity page for a group.
@@ -39,6 +40,7 @@ def create_activity_page(
         base_url: Base URL path
         theme_name: Current theme name
         queries: DashboardQueries instance
+        photo_client: PhotoClient for fetching profile photos (unused)
 
     Returns:
         Page layout as html.Div

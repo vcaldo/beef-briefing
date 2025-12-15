@@ -24,6 +24,7 @@ def create_reactions_page(
     base_url: str,
     theme_name: str | None,
     queries,
+    photo_client,
 ) -> html.Div:
     """
     Create the reactions page for a group.
@@ -36,6 +37,7 @@ def create_reactions_page(
         base_url: Base URL path
         theme_name: Current theme name
         queries: DashboardQueries instance
+        photo_client: PhotoClient for fetching profile photos
 
     Returns:
         Page layout as html.Div
@@ -97,6 +99,14 @@ def create_reactions_page(
         end_date=end_date,
     )
 
+    # Fetch profile photos for all users
+    all_user_ids = set()
+    for u in top_reactors:
+        all_user_ids.add(u["user_id"])
+    for u in top_receivers:
+        all_user_ids.add(u["user_id"])
+    photo_urls = photo_client.get_user_photos_batch(list(all_user_ids), size="small")
+
     return dbc.Container(
         [
             create_group_nav(
@@ -135,7 +145,7 @@ def create_reactions_page(
             ),
             dmc.Space(h="xl"),
             # Top reactors/receivers
-            _create_user_tables_card(top_reactors, top_receivers, colors),
+            _create_user_tables_card(top_reactors, top_receivers, colors, photo_urls),
         ],
         fluid=True,
         className="py-4",
@@ -236,7 +246,7 @@ def _create_type_breakdown_card(data: list, colors: dict) -> dmc.Paper:
 
 
 def _create_user_tables_card(
-    top_reactors: list, top_receivers: list, colors: dict
+    top_reactors: list, top_receivers: list, colors: dict, photo_urls: dict
 ) -> dmc.Paper:
     """Create tabbed tables for top reactors and receivers."""
 
@@ -264,6 +274,7 @@ def _create_user_tables_card(
                             dmc.Group(
                                 [
                                     dmc.Avatar(
+                                        src=photo_urls.get(user["user_id"]),
                                         children=user["first_name"][0].upper()
                                         if user["first_name"]
                                         else "?",

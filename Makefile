@@ -34,6 +34,7 @@ PKG_DIR := pkg/config
 
 # Python directories
 LEADERBOARD_DIR := apps/leaderboard
+ML_PROCESSOR_DIR := apps/ml-processor
 
 # Git
 COMMIT_HASH ?= $(shell git rev-parse --short HEAD)
@@ -378,6 +379,30 @@ tf-docs: ## Show Terraform documentation
 tf-deploy-check: tf-validate tf-fmt-check tf-plan ## Full pre-deployment check
 
 # =============================================================================
+# ML PROCESSOR (ml-*)
+# =============================================================================
+# Production API URL (override with: make ml-run-prod API_URL=https://your-domain.com)
+PROD_API_URL ?= https://barra-pesada.online
+
+ml-run: ## Run ml-processor (dev, local API)
+	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py
+
+ml-run-status: ## Show ml-processor status (dev)
+	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py --status
+
+ml-run-once: ## Run ml-processor for a single batch (dev)
+	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py --once
+
+ml-run-prod: ## Run ml-processor against production API
+	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py --api-url $(PROD_API_URL)
+
+ml-run-status-prod: ## Show ml-processor status (prod)
+	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py --status --api-url $(PROD_API_URL)
+
+ml-run-once-prod: ## Run ml-processor for a single batch (prod)
+	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py --once --api-url $(PROD_API_URL)
+
+# =============================================================================
 # MINIO CLIENT (mc-*)
 # =============================================================================
 mc-setup-prod: ## Configure MinIO Client alias for production
@@ -414,4 +439,5 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	tf-ip tf-ssh tf-ssh-user-host tf-arch tf-root-pass \
 	tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage tf-update-ssh-config tf-docs tf-deploy-check \
+	ml-run ml-run-status ml-run-once ml-run-prod ml-run-status-prod ml-run-once-prod \
 	mc-setup-prod

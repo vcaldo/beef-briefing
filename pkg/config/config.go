@@ -33,6 +33,7 @@ type Config struct {
 	MinIOSecretKey string `envconfig:"MINIO_SECRET_KEY" default:"minioadmin"`
 	MinIOBucket    string `envconfig:"MINIO_BUCKET" default:"telegram-media"`
 	MinIOUseSSL    bool   `envconfig:"MINIO_USE_SSL" default:"false"`
+	MinIORegion    string `envconfig:"MINIO_REGION" default:""`
 
 	// Application Settings
 	Environment string `envconfig:"ENVIRONMENT" default:"development"`

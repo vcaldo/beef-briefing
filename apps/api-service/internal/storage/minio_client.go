@@ -21,10 +21,11 @@ type MinIOClient struct {
 	nrApp  *newrelic.Application
 }
 
-func NewMinIOClient(endpoint, accessKey, secretKey, bucket string, useSSL bool, nrApp *newrelic.Application) (*MinIOClient, error) {
+func NewMinIOClient(endpoint, accessKey, secretKey, bucket, region string, useSSL bool, nrApp *newrelic.Application) (*MinIOClient, error) {
 	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: useSSL,
+		Region: region,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MinIO client: %w", err)

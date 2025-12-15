@@ -37,6 +37,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: telegram-media
       MINIO_USE_SSL: false
+      MINIO_REGION: ${MINIO_REGION:-}
       APP_KEYS_DIR: /app/secrets/app_keys
       NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}

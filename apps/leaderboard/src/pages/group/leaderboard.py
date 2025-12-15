@@ -35,6 +35,7 @@ def create_leaderboard_page(
     base_url: str,
     theme_name: str | None,
     queries,
+    photo_client,
     metric: str = "message_count",
     page: int = 1,
 ) -> html.Div:
@@ -49,6 +50,7 @@ def create_leaderboard_page(
         base_url: Base URL path
         theme_name: Current theme name
         queries: DashboardQueries instance
+        photo_client: PhotoClient for fetching profile photos
         metric: Metric to rank by
         page: Current page number
 
@@ -81,6 +83,10 @@ def create_leaderboard_page(
         start_date=start_date,
         end_date=end_date,
     )
+
+    # Fetch profile photos for all users on this page
+    user_ids = [u["user_id"] for u in users]
+    photo_urls = photo_client.get_user_photos_batch(user_ids, size="small")
 
     # Get metric label
     metric_label = next(
@@ -126,7 +132,7 @@ def create_leaderboard_page(
             # Leaderboard table
             dmc.Paper(
                 [
-                    _create_leaderboard_table(users, metric_label, colors),
+                    _create_leaderboard_table(users, metric_label, colors, photo_urls),
                     dmc.Space(h="md"),
                     _create_pagination(
                         page_base_url, metric, period, page, total_pages
@@ -247,7 +253,7 @@ def _create_pagination(
 
 
 def _create_leaderboard_table(
-    users: list, metric_label: str, colors: dict
+    users: list, metric_label: str, colors: dict, photo_urls: dict
 ) -> dmc.Table:
     """Create the leaderboard table."""
     if not users:
@@ -329,6 +335,7 @@ def _create_leaderboard_table(
                         dmc.Group(
                             [
                                 dmc.Avatar(
+                                    src=photo_urls.get(user["user_id"]),
                                     children=user["first_name"][0].upper()
                                     if user["first_name"]
                                     else "?",

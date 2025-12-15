@@ -36,6 +36,10 @@ class Config(BaseSettings):
     # Admin Configuration (comma-separated user IDs)
     admin_user_ids: str = ""
 
+    # API Service Configuration (for fetching profile photos)
+    api_service_url: str = ""
+    api_key_file: str = ""
+
     # New Relic APM Configuration (optional)
     new_relic_app_name: Optional[str] = None
     new_relic_license_key: Optional[str] = None
@@ -81,6 +85,17 @@ class Config(BaseSettings):
         """Get first admin user ID (used for dev mode auto-login)."""
         admin_ids = self.get_admin_user_ids()
         return admin_ids[0] if admin_ids else None
+
+    @cached_property
+    def api_key(self) -> str:
+        """Load API key from file if api_key_file is set."""
+        if not self.api_key_file:
+            return ""
+        try:
+            with open(self.api_key_file) as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            return ""
 
 
 def load_config() -> Config:

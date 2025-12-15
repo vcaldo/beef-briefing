@@ -34,9 +34,9 @@ def create_login_page(bot_username: str, callback_url: str) -> html.Div:
                                             [
                                                 # Beef emoji
                                                 dmc.Center(
-                                                    html.Span(
+                                                    dmc.Text(
                                                         "\U0001F969",  # Beef emoji
-                                                        style={"fontSize": "72px"},
+                                                        fz=72,
                                                     )
                                                 ),
                                                 # Title
@@ -62,9 +62,9 @@ def create_login_page(bot_username: str, callback_url: str) -> html.Div:
                                                 ),
                                                 # Telegram Login Widget container
                                                 dmc.Center(
-                                                    html.Div(
+                                                    dmc.Box(
                                                         id="telegram-login-widget",
-                                                        style={"marginTop": "24px"},
+                                                        mt=24,
                                                     ),
                                                     mt="xl",
                                                 ),
@@ -92,11 +92,9 @@ def create_login_page(bot_username: str, callback_url: str) -> html.Div:
                                             radius="md",
                                             p="xl",
                                             withBorder=True,
-                                            style={
-                                                "backgroundColor": "white",
-                                                "maxWidth": "400px",
-                                                "margin": "0 auto",
-                                            },
+                                            bg="white",
+                                            maw=400,
+                                            mx="auto",
                                         )
                                     ],
                                     md=6,
@@ -106,11 +104,11 @@ def create_login_page(bot_username: str, callback_url: str) -> html.Div:
                             ],
                             justify="center",
                             align="center",
-                            style={"minHeight": "100vh"},
+                            mih="100vh",
                         )
                     ],
                     fluid=True,
-                    style={"backgroundColor": "#f8f9fa"},
+                    bg="#f8f9fa",
                 )
             ),
         ]

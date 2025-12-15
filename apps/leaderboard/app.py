@@ -31,8 +31,16 @@ from src.database import DashboardQueries, SessionQueries
 from src.auth import TelegramAuthService
 from src.routes import auth_bp
 from src.routes.auth import init_auth_routes
-from src.pages import create_landing_page
+from src.pages import (
+    create_landing_page,
+    create_overview_page,
+    create_activity_page,
+    create_reactions_page,
+    create_leaderboard_page,
+    create_my_stats_page,
+)
 from src.utils import filter_chats_for_user
+from src.components import DEFAULT_PERIOD
 from src.themes import (
     GOOGLE_FONTS_URL,
     THEME_STORAGE_KEY,
@@ -249,13 +257,96 @@ def update_theme_store(theme_value):
     return DEFAULT_LIGHT_THEME
 
 
+def _create_404_page(theme: dict, background: dict, base_url: str):
+    """Create a 404 page with themed styling."""
+    return dmc.MantineProvider(
+        html.Div(
+            dmc.Center(
+                dmc.Stack(
+                    [
+                        DashIconify(icon="mdi:alert-circle-outline", width=64, color="gray"),
+                        dmc.Title("404 - Page Not Found", order=2),
+                        dmc.Text("The page you're looking for doesn't exist.", c="dimmed"),
+                        dmc.Anchor(
+                            dmc.Button("Go Home", variant="light"),
+                            href=base_url,
+                            refresh=True,
+                        ),
+                    ],
+                    align="center",
+                    gap="md",
+                ),
+                mih="100vh",
+            ),
+            style=background,
+        ),
+        theme=theme,
+    )
+
+
+def parse_group_path(route_path: str) -> tuple[int | None, str | None]:
+    """
+    Parse a group page path to extract chat_id and page name.
+
+    Args:
+        route_path: Route path like /group/123/overview
+
+    Returns:
+        Tuple of (chat_id, page_name) or (None, None) if not a group path
+    """
+    import re
+
+    match = re.match(r"^/group/(-?\d+)(?:/(\w+(?:-\w+)?))?$", route_path)
+    if not match:
+        return None, None
+
+    chat_id = int(match.group(1))
+    page_name = match.group(2) or "overview"
+    return chat_id, page_name
+
+
+def parse_query_params(search: str | None) -> dict:
+    """
+    Parse URL query string into a dict.
+
+    Args:
+        search: URL search string like ?period=7d&metric=message_count
+
+    Returns:
+        Dict of query parameters
+    """
+    if not search:
+        return {}
+
+    from urllib.parse import parse_qs
+
+    params = parse_qs(search.lstrip("?"))
+    # Convert single-value lists to scalars
+    return {k: v[0] if len(v) == 1 else v for k, v in params.items()}
+
+
+def get_period_from_search(search: str | None) -> str:
+    """
+    Extract period parameter from URL query string.
+
+    Args:
+        search: URL search string like ?period=7d
+
+    Returns:
+        Period value or default
+    """
+    params = parse_query_params(search)
+    return params.get("period", DEFAULT_PERIOD)
+
+
 # Main routing callback with theming
 @callback(
     Output("themed-app-container", "children"),
     Input("url", "pathname"),
+    Input("url", "search"),
     Input("theme-store", "data"),
 )
-def display_page(pathname, theme_name):
+def display_page(pathname, search, theme_name):
     """Route to appropriate page based on URL with theme applied."""
     # Get theme configuration
     theme_config = get_theme(theme_name)
@@ -283,7 +374,7 @@ def display_page(pathname, theme_name):
                         align="center",
                         gap="md",
                     ),
-                    style={"minHeight": "100vh"},
+                    mih="100vh",
                 ),
                 style=background,
             ),
@@ -310,30 +401,117 @@ def display_page(pathname, theme_name):
             theme=theme,
         )
 
-    # 404 fallback
-    return dmc.MantineProvider(
-        html.Div(
-            dmc.Center(
-                dmc.Stack(
-                    [
-                        DashIconify(icon="mdi:alert-circle-outline", width=64, color="gray"),
-                        dmc.Title("404 - Page Not Found", order=2),
-                        dmc.Text("The page you're looking for doesn't exist.", c="dimmed"),
-                        dmc.Anchor(
-                            dmc.Button("Go Home", variant="light"),
-                            href=cfg.leaderboard_path,
-                            refresh=True,
+    # Route to group pages
+    chat_id, page_name = parse_group_path(route_path)
+    if chat_id is not None:
+        # Get chat info and verify access
+        chat_info = get_queries().get_chat_info(chat_id)
+        if not chat_info:
+            # Chat not found - show 404
+            return _create_404_page(theme, background, cfg.leaderboard_path)
+
+        # Check if user has access to this chat
+        all_chats = get_queries().get_chats_with_stats()
+        visible_chats = filter_chats_for_user(all_chats, user)
+        visible_chat_ids = [c["id"] for c in visible_chats]
+        if chat_id not in visible_chat_ids:
+            # Access denied - show 403
+            return dmc.MantineProvider(
+                html.Div(
+                    dmc.Center(
+                        dmc.Stack(
+                            [
+                                DashIconify(icon="mdi:lock-outline", width=64, color="gray"),
+                                dmc.Title("Access Denied", order=2),
+                                dmc.Text("You don't have access to this group.", c="dimmed"),
+                                dmc.Anchor(
+                                    dmc.Button("Go Home", variant="light"),
+                                    href=cfg.leaderboard_path,
+                                    refresh=True,
+                                ),
+                            ],
+                            align="center",
+                            gap="md",
                         ),
-                    ],
-                    align="center",
-                    gap="md",
+                        mih="100vh",
+                    ),
+                    style=background,
                 ),
-                style={"minHeight": "100vh"},
-            ),
-            style=background,
-        ),
-        theme=theme,
-    )
+                theme=theme,
+            )
+
+        # Get query params from URL
+        query_params = parse_query_params(search)
+        period = query_params.get("period", DEFAULT_PERIOD)
+        queries = get_queries()
+
+        # Route to specific group page
+        page_creators = {
+            "overview": create_overview_page,
+            "activity": create_activity_page,
+            "reactions": create_reactions_page,
+            "leaderboard": create_leaderboard_page,
+            "my-stats": create_my_stats_page,
+        }
+
+        page_creator = page_creators.get(page_name)
+        if page_creator:
+            # Build base kwargs for all pages
+            page_kwargs = {
+                "chat_id": chat_id,
+                "chat_info": chat_info,
+                "user": user,
+                "period": period,
+                "base_url": cfg.leaderboard_path,
+                "theme_name": theme_name,
+                "queries": queries,
+            }
+
+            # Add page-specific kwargs from query params
+            if page_name == "leaderboard":
+                page_kwargs["metric"] = query_params.get("metric", "message_count")
+                try:
+                    page_kwargs["page"] = int(query_params.get("page", 1))
+                except (ValueError, TypeError):
+                    page_kwargs["page"] = 1
+
+            try:
+                page_content = page_creator(**page_kwargs)
+            except Exception as e:
+                logger.error(f"Error rendering {page_name} page: {e}")
+                page_content = dmc.Center(
+                    dmc.Stack(
+                        [
+                            DashIconify(
+                                icon="mdi:alert-circle-outline", width=64, color="red"
+                            ),
+                            dmc.Title("Something went wrong", order=2),
+                            dmc.Text(
+                                "An error occurred while loading this page.",
+                                c="dimmed",
+                            ),
+                            dmc.Anchor(
+                                dmc.Button("Try Again", variant="light"),
+                                href=request.url,
+                                refresh=True,
+                            ),
+                        ],
+                        align="center",
+                        gap="md",
+                    ),
+                    mih="100vh",
+                )
+
+            return dmc.MantineProvider(
+                html.Div(
+                    page_content,
+                    style=background,
+                ),
+                theme=theme,
+            )
+
+    # 404 fallback
+    return _create_404_page(theme, background, cfg.leaderboard_path)
 
 
 # Register auth blueprint and initialize auth routes

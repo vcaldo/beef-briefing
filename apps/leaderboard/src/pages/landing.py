@@ -37,6 +37,7 @@ def create_landing_page(
             user_count=chat["user_count"],
             last_activity=chat["last_activity"],
             avg_messages_per_day=float(chat.get("avg_messages_per_day", 0)),
+            base_url=base_url,
         )
         # Wrap card with staggered animation
         animated_card = html.Div(
@@ -138,5 +139,5 @@ def _create_empty_state(user: dict) -> html.Div:
             align="center",
             gap="md",
         ),
-        style={"minHeight": "400px"},
+        mih=400,
     )

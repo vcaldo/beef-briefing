@@ -14,7 +14,7 @@ import dash_mantine_components as dmc
 from dash import html
 
 from src.charts import get_chart_colors
-from src.components import create_group_nav
+from src.components import create_group_nav, get_period_dates
 
 # Metric options for the selector
 METRICS = [
@@ -58,20 +58,28 @@ def create_leaderboard_page(
     chat_title = chat_info.get("title", f"Chat {chat_id}")
     colors = get_chart_colors(theme_name)
 
+    # Get date range for period
+    start_date, end_date = get_period_dates(period)
+
     # Validate metric
     valid_metrics = [m["value"] for m in METRICS]
     if metric not in valid_metrics:
         metric = "message_count"
 
     # Calculate pagination
-    total_users = queries.get_user_rankings_total(chat_id)
+    total_users = queries.get_user_rankings_total(chat_id, start_date, end_date)
     total_pages = max(1, math.ceil(total_users / ITEMS_PER_PAGE))
     page = max(1, min(page, total_pages))
     offset = (page - 1) * ITEMS_PER_PAGE
 
     # Fetch users for current page
     users = queries.get_user_rankings(
-        chat_id, metric=metric, limit=ITEMS_PER_PAGE, offset=offset
+        chat_id,
+        metric=metric,
+        limit=ITEMS_PER_PAGE,
+        offset=offset,
+        start_date=start_date,
+        end_date=end_date,
     )
 
     # Get metric label

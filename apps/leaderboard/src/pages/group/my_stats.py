@@ -46,8 +46,11 @@ def create_my_stats_page(
     user_name = user.get("first_name", "User")
     colors = get_chart_colors(theme_name)
 
+    # Get date range for period
+    start_date, end_date = get_period_dates(period)
+
     # Fetch user stats
-    user_stats = queries.get_user_stats(chat_id, user_id)
+    user_stats = queries.get_user_stats(chat_id, user_id, start_date, end_date)
     if user_stats is None:
         user_stats = {
             "message_count": 0,
@@ -57,23 +60,26 @@ def create_my_stats_page(
         }
 
     # Fetch user rank (for messages)
-    user_rank = queries.get_user_rank(chat_id, user_id, "message_count")
+    user_rank = queries.get_user_rank(
+        chat_id, user_id, "message_count", start_date, end_date
+    )
 
     # Fetch group averages
-    group_avgs = queries.get_group_averages(chat_id)
+    group_avgs = queries.get_group_averages(chat_id, start_date, end_date)
 
     # Fetch first message date
     first_msg_date = queries.get_user_first_message_date(chat_id, user_id)
     member_since = first_msg_date.strftime("%b %d, %Y") if first_msg_date else "Unknown"
 
     # Fetch reply stats
-    reply_stats = queries.get_user_reply_stats(chat_id, user_id)
+    reply_stats = queries.get_user_reply_stats(
+        chat_id, user_id, start_date=start_date, end_date=end_date
+    )
 
     # Fetch user's reaction distribution
-    user_reactions = queries.get_user_reaction_distribution(chat_id, user_id, limit=5)
-
-    # Get date range for activity chart
-    start_date, end_date = get_period_dates(period)
+    user_reactions = queries.get_user_reaction_distribution(
+        chat_id, user_id, limit=5, start_date=start_date, end_date=end_date
+    )
 
     # Fetch user's daily activity
     user_activity_df = queries.get_user_daily_activity(
@@ -262,19 +268,21 @@ def _create_comparison_card(
     colors: dict,
 ) -> dmc.Paper:
     """Create a stat comparison card."""
-    your_value = your_value or 0
+    # Convert to float to handle Decimal values from database
+    your_value = float(your_value) if your_value else 0.0
+    group_avg = float(group_avg) if group_avg else None
     your_display = _format_number(your_value)
 
     if group_avg is not None and group_avg > 0:
-        pct = ((your_value - group_avg) / group_avg) * 100
+        pct = float((your_value - group_avg) / group_avg) * 100
         diff_text = f"{pct:+.0f}% vs avg"
         diff_color = "green" if pct > 0 else "red" if pct < 0 else "dimmed"
         # Calculate progress bar percentage (capped at 200%)
-        progress_pct = min(100, (your_value / (group_avg * 2)) * 100) if group_avg else 50
+        progress_pct = float(min(100, (your_value / (group_avg * 2)) * 100)) if group_avg else 50.0
     else:
         diff_text = "N/A"
         diff_color = "dimmed"
-        progress_pct = 50
+        progress_pct = 50.0
 
     return dmc.Paper(
         dmc.Stack(
@@ -323,18 +331,19 @@ def _create_activity_chart(
         if not user_df.empty:
             for _, row in user_df.iterrows():
                 date_str = str(row["date"])
-                user_by_date[date_str] = row["message_count"]
+                user_by_date[date_str] = float(row["message_count"]) if row["message_count"] else 0.0
 
         # Use group data as base (has all dates)
         if not group_df.empty:
             for _, row in group_df.iterrows():
                 date_str = str(row["date"])
+                msg_count = float(row["message_count"]) if row["message_count"] else 0.0
+                unique_users = float(row.get("unique_users", 1)) if row.get("unique_users") else 1.0
                 chart_data.append(
                     {
                         "date": date_str,
-                        "you": user_by_date.get(date_str, 0),
-                        "group_avg": row["message_count"]
-                        / max(1, row.get("unique_users", 1)),
+                        "you": float(user_by_date.get(date_str, 0)),
+                        "group_avg": msg_count / max(1.0, unique_users),
                     }
                 )
         elif not user_df.empty:
@@ -343,8 +352,8 @@ def _create_activity_chart(
                 chart_data.append(
                     {
                         "date": str(row["date"]),
-                        "you": row["message_count"],
-                        "group_avg": 0,
+                        "you": float(row["message_count"]) if row["message_count"] else 0.0,
+                        "group_avg": 0.0,
                     }
                 )
 
@@ -369,7 +378,6 @@ def _create_activity_chart(
                 withYAxis=True,
                 withDots=False,
                 gridColor=colors["border"],
-                xAxisProps={"tickFormatter": lambda x: x[-5:] if len(x) > 5 else x},
             )
         else:
             chart = dmc.Center(
@@ -410,9 +418,10 @@ def _create_reactions_card(reactions: list, colors: dict) -> dmc.Paper:
     """Create top reactions card."""
     if reactions:
         rows = []
-        max_count = reactions[0]["count"] if reactions else 1
+        max_count = float(reactions[0]["count"]) if reactions else 1.0
         for reaction in reactions:
-            pct = (reaction["count"] / max_count) * 100 if max_count > 0 else 0
+            count = float(reaction["count"])
+            pct = (count / max_count) * 100 if max_count > 0 else 0.0
             rows.append(
                 dmc.Group(
                     [
@@ -427,7 +436,7 @@ def _create_reactions_card(reactions: list, colors: dict) -> dmc.Paper:
                             style={"flex": 1},
                         ),
                         dmc.Text(
-                            _format_number(reaction["count"]),
+                            _format_number(count),
                             size="sm",
                             c="dimmed",
                             style={"minWidth": "40px", "textAlign": "right"},

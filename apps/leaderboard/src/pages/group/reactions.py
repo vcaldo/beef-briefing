@@ -52,7 +52,7 @@ def create_reactions_page(
     total_messages = stats.get("total_messages", 0)
 
     # Fetch reaction distribution
-    reaction_df = queries.get_reaction_distribution(chat_id)
+    reaction_df = queries.get_reaction_distribution(chat_id, start_date, end_date)
 
     # Calculate summary stats
     unique_emoji = len(reaction_df) if not reaction_df.empty else 0
@@ -83,10 +83,18 @@ def create_reactions_page(
 
     # Fetch top reactors and receivers
     top_reactors = queries.get_user_rankings(
-        chat_id, metric="reactions_sent", limit=10
+        chat_id,
+        metric="reactions_sent",
+        limit=10,
+        start_date=start_date,
+        end_date=end_date,
     )
     top_receivers = queries.get_user_rankings(
-        chat_id, metric="reactions_received", limit=10
+        chat_id,
+        metric="reactions_received",
+        limit=10,
+        start_date=start_date,
+        end_date=end_date,
     )
 
     return dbc.Container(

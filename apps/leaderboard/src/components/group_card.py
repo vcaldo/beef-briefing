@@ -100,7 +100,7 @@ def create_group_card(
                 ),
                 href=f"{base_url}/group/{chat_id}/overview",
                 underline="never",
-                style={"width": "100%"},
+                w="100%",
             ),
         ],
         withBorder=True,

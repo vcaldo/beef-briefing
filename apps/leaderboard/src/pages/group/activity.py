@@ -246,7 +246,7 @@ def _create_heatmap_card(heatmap_df, colors: dict) -> dmc.Paper:
 
         # Header row with hour labels
         header_cells = [
-            dmc.Text("", size="xs", style={"width": "40px", "textAlign": "center"})
+            dmc.Text("", size="xs", w=40, ta="center")
         ]
         for hour in range(0, 24, 3):  # Show every 3 hours
             header_cells.append(
@@ -254,7 +254,8 @@ def _create_heatmap_card(heatmap_df, colors: dict) -> dmc.Paper:
                     f"{hour:02d}",
                     size="xs",
                     c="dimmed",
-                    style={"width": "36px", "textAlign": "center"},
+                    w=36,
+                    ta="center",
                 )
             )
         rows.append(dmc.Group(header_cells, gap=2))
@@ -266,7 +267,9 @@ def _create_heatmap_card(heatmap_df, colors: dict) -> dmc.Paper:
                     day_label,
                     size="xs",
                     c="dimmed",
-                    style={"width": "40px", "textAlign": "right", "paddingRight": "4px"},
+                    w=40,
+                    ta="right",
+                    pr=4,
                 )
             ]
 
@@ -287,13 +290,11 @@ def _create_heatmap_card(heatmap_df, colors: dict) -> dmc.Paper:
 
                 row_cells.append(
                     dmc.Tooltip(
-                        dmc.Paper(
-                            style={
-                                "width": "12px",
-                                "height": "12px",
-                                "backgroundColor": bg_color,
-                                "borderRadius": "2px",
-                            },
+                        dmc.Box(
+                            w=12,
+                            h=12,
+                            bg=bg_color,
+                            style={"borderRadius": "2px"},
                         ),
                         label=f"{day_label} {hour:02d}:00 - {count} messages",
                         position="top",
@@ -321,38 +322,29 @@ def _create_heatmap_card(heatmap_df, colors: dict) -> dmc.Paper:
             dmc.Group(
                 [
                     dmc.Text("Less", size="xs", c="dimmed"),
-                    dmc.Paper(
-                        style={
-                            "width": "12px",
-                            "height": "12px",
-                            "backgroundColor": colors["surface"],
-                            "borderRadius": "2px",
-                            "border": f"1px solid {colors['border']}",
-                        }
+                    dmc.Box(
+                        w=12,
+                        h=12,
+                        bg=colors["surface"],
+                        style={"borderRadius": "2px", "border": f"1px solid {colors['border']}"},
                     ),
-                    dmc.Paper(
-                        style={
-                            "width": "12px",
-                            "height": "12px",
-                            "backgroundColor": colors["muted"],
-                            "borderRadius": "2px",
-                        }
+                    dmc.Box(
+                        w=12,
+                        h=12,
+                        bg=colors["muted"],
+                        style={"borderRadius": "2px"},
                     ),
-                    dmc.Paper(
-                        style={
-                            "width": "12px",
-                            "height": "12px",
-                            "backgroundColor": colors["accent"],
-                            "borderRadius": "2px",
-                        }
+                    dmc.Box(
+                        w=12,
+                        h=12,
+                        bg=colors["accent"],
+                        style={"borderRadius": "2px"},
                     ),
-                    dmc.Paper(
-                        style={
-                            "width": "12px",
-                            "height": "12px",
-                            "backgroundColor": colors["primary"],
-                            "borderRadius": "2px",
-                        }
+                    dmc.Box(
+                        w=12,
+                        h=12,
+                        bg=colors["primary"],
+                        style={"borderRadius": "2px"},
                     ),
                     dmc.Text("More", size="xs", c="dimmed"),
                 ],

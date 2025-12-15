@@ -139,5 +139,5 @@ def _create_empty_state(user: dict) -> html.Div:
             align="center",
             gap="md",
         ),
-        style={"minHeight": "400px"},
+        mih=400,
     )

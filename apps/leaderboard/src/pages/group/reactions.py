@@ -169,20 +169,23 @@ def _create_reactions_bar_card(data: list, colors: dict) -> dmc.Paper:
                 dmc.Group(
                     [
                         dmc.Text(
-                            item["emoji"], size="xl", style={"minWidth": "40px"}
+                            item["emoji"], size="xl", miw=40
                         ),
-                        dmc.Progress(
-                            value=pct,
-                            size="lg",
-                            radius="xl",
-                            color=colors["primary"],
+                        dmc.Box(
+                            dmc.Progress(
+                                value=pct,
+                                size="lg",
+                                radius="xl",
+                                color=colors["primary"],
+                            ),
                             style={"flex": 1},
                         ),
                         dmc.Text(
                             _format_number(item["count"]),
                             size="sm",
                             fw=500,
-                            style={"minWidth": "60px", "textAlign": "right"},
+                            miw=60,
+                            ta="right",
                         ),
                     ],
                     gap="sm",

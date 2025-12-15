@@ -275,11 +275,13 @@ def _create_leaderboard_card(
                             size="sm",
                             radius="xl",
                         ),
-                        dmc.Text(
-                            user["first_name"] or "Unknown",
-                            size="sm",
+                        dmc.Box(
+                            dmc.Text(
+                                user["first_name"] or "Unknown",
+                                size="sm",
+                                lineClamp=1,
+                            ),
                             style={"flex": 1},
-                            lineClamp=1,
                         ),
                         dmc.Text(
                             _format_number(user["score"]),
@@ -329,20 +331,23 @@ def _create_reactions_card(top_reactions: list, colors: dict) -> dmc.Paper:
                 dmc.Group(
                     [
                         dmc.Text(
-                            reaction["emoji"], size="lg", style={"minWidth": "30px"}
+                            reaction["emoji"], size="lg", miw=30
                         ),
-                        dmc.Progress(
-                            value=pct,
-                            size="sm",
-                            radius="xl",
-                            color=colors["primary"],
+                        dmc.Box(
+                            dmc.Progress(
+                                value=pct,
+                                size="sm",
+                                radius="xl",
+                                color=colors["primary"],
+                            ),
                             style={"flex": 1},
                         ),
                         dmc.Text(
                             _format_number(reaction["count"]),
                             size="sm",
                             c="dimmed",
-                            style={"minWidth": "50px", "textAlign": "right"},
+                            miw=50,
+                            ta="right",
                         ),
                     ],
                     gap="sm",

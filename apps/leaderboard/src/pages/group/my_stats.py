@@ -426,20 +426,23 @@ def _create_reactions_card(reactions: list, colors: dict) -> dmc.Paper:
                 dmc.Group(
                     [
                         dmc.Text(
-                            reaction["emoji"], size="lg", style={"minWidth": "30px"}
+                            reaction["emoji"], size="lg", miw=30
                         ),
-                        dmc.Progress(
-                            value=pct,
-                            size="sm",
-                            radius="xl",
-                            color=colors["primary"],
+                        dmc.Box(
+                            dmc.Progress(
+                                value=pct,
+                                size="sm",
+                                radius="xl",
+                                color=colors["primary"],
+                            ),
                             style={"flex": 1},
                         ),
                         dmc.Text(
                             _format_number(count),
                             size="sm",
                             c="dimmed",
-                            style={"minWidth": "40px", "textAlign": "right"},
+                            miw=40,
+                            ta="right",
                         ),
                     ],
                     gap="sm",
@@ -482,11 +485,13 @@ def _create_reply_stats_card(reply_stats: dict, colors: dict) -> dmc.Paper:
                             size="sm",
                             radius="xl",
                         ),
-                        dmc.Text(
-                            p.get("first_name", "Unknown"),
-                            size="sm",
+                        dmc.Box(
+                            dmc.Text(
+                                p.get("first_name", "Unknown"),
+                                size="sm",
+                                lineClamp=1,
+                            ),
                             style={"flex": 1},
-                            lineClamp=1,
                         ),
                         dmc.Badge(
                             str(p["count"]),

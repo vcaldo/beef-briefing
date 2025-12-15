@@ -276,7 +276,7 @@ def _create_404_page(theme: dict, background: dict, base_url: str):
                     align="center",
                     gap="md",
                 ),
-                style={"minHeight": "100vh"},
+                mih="100vh",
             ),
             style=background,
         ),
@@ -374,7 +374,7 @@ def display_page(pathname, search, theme_name):
                         align="center",
                         gap="md",
                     ),
-                    style={"minHeight": "100vh"},
+                    mih="100vh",
                 ),
                 style=background,
             ),
@@ -433,7 +433,7 @@ def display_page(pathname, search, theme_name):
                             align="center",
                             gap="md",
                         ),
-                        style={"minHeight": "100vh"},
+                        mih="100vh",
                     ),
                     style=background,
                 ),
@@ -499,7 +499,7 @@ def display_page(pathname, search, theme_name):
                         align="center",
                         gap="md",
                     ),
-                    style={"minHeight": "100vh"},
+                    mih="100vh",
                 )
 
             return dmc.MantineProvider(

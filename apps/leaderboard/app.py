@@ -29,6 +29,7 @@ from sqlalchemy import create_engine
 
 from src.database import DashboardQueries, SessionQueries
 from src.auth import TelegramAuthService
+from src.api import PhotoClient
 from src.routes import auth_bp
 from src.routes.auth import init_auth_routes
 from src.pages import (
@@ -197,6 +198,26 @@ def get_auth_service() -> TelegramAuthService:
         )
         logger.info("TelegramAuthService initialized")
     return _auth_service
+
+
+# Photo client (lazy initialization)
+_photo_client = None
+
+
+def get_photo_client() -> PhotoClient:
+    """Get or create PhotoClient instance."""
+    global _photo_client
+    if _photo_client is None:
+        if cfg.api_service_url and cfg.api_key:
+            _photo_client = PhotoClient(cfg.api_service_url, cfg.api_key)
+            logger.info("PhotoClient initialized")
+        else:
+            # Return a stub client that always returns None
+            _photo_client = PhotoClient("", "")
+            logger.warning(
+                "PhotoClient not configured (missing API_SERVICE_URL or API_KEY_FILE)"
+            )
+    return _photo_client
 
 
 # Dynamic layout function
@@ -395,7 +416,9 @@ def display_page(pathname, search, theme_name):
         visible_chats = filter_chats_for_user(all_chats, user)
         return dmc.MantineProvider(
             html.Div(
-                create_landing_page(visible_chats, user, cfg.leaderboard_path, theme_name),
+                create_landing_page(
+                    visible_chats, user, cfg.leaderboard_path, theme_name, get_photo_client()
+                ),
                 style=background,
             ),
             theme=theme,
@@ -444,6 +467,7 @@ def display_page(pathname, search, theme_name):
         query_params = parse_query_params(search)
         period = query_params.get("period", DEFAULT_PERIOD)
         queries = get_queries()
+        photo_client = get_photo_client()
 
         # Route to specific group page
         page_creators = {
@@ -465,6 +489,7 @@ def display_page(pathname, search, theme_name):
                 "base_url": cfg.leaderboard_path,
                 "theme_name": theme_name,
                 "queries": queries,
+                "photo_client": photo_client,
             }
 
             # Add page-specific kwargs from query params

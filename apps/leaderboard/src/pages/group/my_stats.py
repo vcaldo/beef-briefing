@@ -25,6 +25,7 @@ def create_my_stats_page(
     base_url: str,
     theme_name: str | None,
     queries,
+    photo_client,
 ) -> html.Div:
     """
     Create the personal stats page for the current user.
@@ -37,6 +38,7 @@ def create_my_stats_page(
         base_url: Base URL path
         theme_name: Current theme name
         queries: DashboardQueries instance
+        photo_client: PhotoClient for fetching profile photos
 
     Returns:
         Page layout as html.Div
@@ -74,6 +76,16 @@ def create_my_stats_page(
     # Fetch reply stats
     reply_stats = queries.get_user_reply_stats(
         chat_id, user_id, start_date=start_date, end_date=end_date
+    )
+
+    # Fetch photos for reply partners
+    partner_ids = set()
+    for p in reply_stats.get("top_replied_to", []):
+        partner_ids.add(p["user_id"])
+    for p in reply_stats.get("top_repliers", []):
+        partner_ids.add(p["user_id"])
+    partner_photo_urls = photo_client.get_user_photos_batch(
+        list(partner_ids), size="small"
     )
 
     # Fetch user's reaction distribution
@@ -177,7 +189,7 @@ def create_my_stats_page(
             ),
             dmc.Space(h="xl"),
             # Reply stats
-            _create_reply_stats_card(reply_stats, colors),
+            _create_reply_stats_card(reply_stats, colors, partner_photo_urls),
         ],
         fluid=True,
         className="py-4",
@@ -466,7 +478,9 @@ def _create_reactions_card(reactions: list, colors: dict) -> dmc.Paper:
     )
 
 
-def _create_reply_stats_card(reply_stats: dict, colors: dict) -> dmc.Paper:
+def _create_reply_stats_card(
+    reply_stats: dict, colors: dict, photo_urls: dict
+) -> dmc.Paper:
     """Create reply statistics card."""
     replies_sent = reply_stats.get("replies_sent", 0)
     replies_received = reply_stats.get("replies_received", 0)
@@ -479,6 +493,7 @@ def _create_reply_stats_card(reply_stats: dict, colors: dict) -> dmc.Paper:
                 dmc.Group(
                     [
                         dmc.Avatar(
+                            src=photo_urls.get(p["user_id"]),
                             children=p["first_name"][0].upper()
                             if p.get("first_name")
                             else "?",

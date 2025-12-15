@@ -1425,7 +1425,7 @@ class DashboardQueries:
         replies_received_query = f"""
             SELECT COUNT(*) as count
             FROM messages m
-            JOIN messages original ON original.id = m.reply_to_message_id
+            JOIN messages original ON original.chat_id = m.chat_id AND original.message_id = m.reply_to_message_id
             WHERE m.chat_id = :chat_id
                 AND original.user_id = :user_id
                 AND m.user_id != :user_id
@@ -1441,7 +1441,7 @@ class DashboardQueries:
                 u.first_name,
                 COUNT(*) as count
             FROM messages m
-            JOIN messages original ON original.id = m.reply_to_message_id
+            JOIN messages original ON original.chat_id = m.chat_id AND original.message_id = m.reply_to_message_id
             JOIN users u ON u.id = original.user_id
             WHERE m.chat_id = :chat_id
                 AND m.user_id = :user_id
@@ -1462,7 +1462,7 @@ class DashboardQueries:
                 u.first_name,
                 COUNT(*) as count
             FROM messages m
-            JOIN messages original ON original.id = m.reply_to_message_id
+            JOIN messages original ON original.chat_id = m.chat_id AND original.message_id = m.reply_to_message_id
             JOIN users u ON u.id = m.user_id
             WHERE m.chat_id = :chat_id
                 AND original.user_id = :user_id

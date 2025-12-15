@@ -343,6 +343,126 @@ Health check endpoint.
 
 **Response**: `200 OK` with body `OK`
 
+---
+
+## ML Analytics Endpoints
+
+These endpoints support the ml-processor service for batch ML analysis of messages.
+
+### GET `/api/v1/ml/messages`
+
+Fetch unprocessed messages for ML analysis.
+
+**Query Parameters**:
+- `limit` (optional, default: 500, max: 1000): Number of messages to return
+
+**Response**: `200 OK`
+
+```json
+{
+  "messages": [
+    {
+      "id": 12345,
+      "message_id": 789,
+      "chat_id": -1003280306634,
+      "user_id": 123456,
+      "text": "Message content here..."
+    }
+  ],
+  "has_more": true
+}
+```
+
+**Example**:
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" \
+  "http://localhost:8080/api/v1/ml/messages?limit=100"
+```
+
+### POST `/api/v1/ml/results`
+
+Submit batch ML analysis results (sentiment, toxicity).
+
+**Request Body**:
+
+```json
+{
+  "results": [
+    {
+      "message_id": 12345,
+      "chat_id": -1003280306634,
+      "sentiment": {
+        "label": "positive",
+        "scores": {
+          "positive": 0.85,
+          "neutral": 0.10,
+          "negative": 0.05
+        }
+      },
+      "toxicity": {
+        "is_toxic": false,
+        "label": "non-hateful",
+        "score": 0.92
+      }
+    }
+  ],
+  "processor_version": "v1.0.0"
+}
+```
+
+**Response**: `200 OK`
+
+```json
+{
+  "status": "ok",
+  "saved": 1
+}
+```
+
+**Example**:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/ml/results \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "results": [{
+      "message_id": 12345,
+      "chat_id": -1003280306634,
+      "sentiment": {"label": "neutral", "scores": {"positive": 0.2, "neutral": 0.7, "negative": 0.1}},
+      "toxicity": {"is_toxic": false, "label": "non-hateful", "score": 0.95}
+    }],
+    "processor_version": "v1.0.0"
+  }'
+```
+
+### GET `/api/v1/ml/status`
+
+Get ML processing statistics.
+
+**Response**: `200 OK`
+
+```json
+{
+  "total_with_text": 150000,
+  "processed": 75000,
+  "unprocessed": 75000,
+  "sentiment_analyzed": 75000,
+  "toxicity_analyzed": 75000,
+  "toxic_messages": 1234
+}
+```
+
+**Example**:
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" \
+  http://localhost:8080/api/v1/ml/status
+```
+
+---
+
 ## Media Upload Details
 
 ### File Naming Convention

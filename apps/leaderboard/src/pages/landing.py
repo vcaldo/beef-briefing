@@ -9,7 +9,11 @@ from src.components import create_group_card, create_theme_switcher
 
 
 def create_landing_page(
-    chats: list[dict], user: dict, base_url: str, theme_name: str | None = None
+    chats: list[dict],
+    user: dict,
+    base_url: str,
+    theme_name: str | None = None,
+    photo_client=None,
 ) -> html.Div:
     """
     Create landing page layout with group cards.
@@ -19,12 +23,21 @@ def create_landing_page(
         user: Session dict with user info
         base_url: Base URL for navigation links
         theme_name: Current theme name for theme switcher
+        photo_client: PhotoClient for fetching group photos (optional)
 
     Returns:
         Dash layout component
     """
     # Create greeting based on user info
     greeting = f"Welcome, {user.get('first_name', 'User')}"
+
+    # Fetch group photos
+    chat_ids = [chat["id"] for chat in chats]
+    chat_photo_urls = (
+        photo_client.get_chat_photos_batch(chat_ids, size="small")
+        if photo_client
+        else {}
+    )
 
     # Create group cards with staggered entrance animation
     cards = []
@@ -38,6 +51,7 @@ def create_landing_page(
             last_activity=chat["last_activity"],
             avg_messages_per_day=float(chat.get("avg_messages_per_day", 0)),
             base_url=base_url,
+            photo_url=chat_photo_urls.get(chat["id"]),
         )
         # Wrap card with staggered animation
         animated_card = html.Div(

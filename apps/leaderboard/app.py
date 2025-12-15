@@ -416,7 +416,9 @@ def display_page(pathname, search, theme_name):
         visible_chats = filter_chats_for_user(all_chats, user)
         return dmc.MantineProvider(
             html.Div(
-                create_landing_page(visible_chats, user, cfg.leaderboard_path, theme_name),
+                create_landing_page(
+                    visible_chats, user, cfg.leaderboard_path, theme_name, get_photo_client()
+                ),
                 style=background,
             ),
             theme=theme,

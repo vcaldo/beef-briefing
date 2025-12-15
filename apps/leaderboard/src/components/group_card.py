@@ -15,6 +15,7 @@ def create_group_card(
     last_activity: datetime,
     avg_messages_per_day: float,
     base_url: str = "",
+    photo_url: str | None = None,
 ) -> dmc.Card:
     """
     Create a card component for displaying group information.
@@ -28,6 +29,7 @@ def create_group_card(
         last_activity: Timestamp of last message
         avg_messages_per_day: Average messages per day
         base_url: Base URL path for links
+        photo_url: Pre-signed URL for group photo (optional)
 
     Returns:
         dmc.Card component
@@ -51,8 +53,9 @@ def create_group_card(
             # Header with avatar and badge
             dmc.Group(
                 [
-                    # Placeholder avatar for group photo
+                    # Group photo avatar
                     dmc.Avatar(
+                        src=photo_url,
                         children=avatar_letter,
                         size="lg",
                         radius="md",

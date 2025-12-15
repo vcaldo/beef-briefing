@@ -88,6 +88,7 @@ func main() {
 		cfg.MinIOAccessKey,
 		cfg.MinIOSecretKey,
 		cfg.MinIOBucket,
+		cfg.MinIORegion,
 		cfg.MinIOUseSSL,
 		nrApp,
 	)

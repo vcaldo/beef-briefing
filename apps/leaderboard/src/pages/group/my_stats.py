@@ -4,6 +4,7 @@ My Stats page for group statistics.
 Personal stats with group comparison:
 - Profile header (avatar, name, rank, member since)
 - Stat comparisons (6 metrics vs group average)
+- Sentiment analysis (score, distribution, rank)
 - Personal timeline (line chart: user vs group average)
 - Top reactions you send (horizontal bar chart)
 - Reply stats (replies sent/received, top partners)
@@ -15,6 +16,13 @@ from dash import html
 
 from src.charts import get_chart_colors
 from src.components import create_group_nav, get_period_dates
+
+# Sentiment colors (matching sentiment.py)
+SENTIMENT_COLORS = {
+    "positive": "#22c55e",  # Green
+    "neutral": "#94a3b8",   # Gray
+    "negative": "#ef4444",  # Red
+}
 
 
 def create_my_stats_page(
@@ -101,6 +109,11 @@ def create_my_stats_page(
     # Fetch group daily activity for comparison
     group_activity_df = queries.get_daily_activity(chat_id, start_date, end_date)
 
+    # Fetch user sentiment stats
+    sentiment_stats = queries.get_user_sentiment_stats(
+        chat_id, user_id, start_date, end_date
+    )
+
     # Total users for context
     total_users = group_avgs.get("total_users", 0)
 
@@ -170,6 +183,9 @@ def create_my_stats_page(
                 cols={"base": 1, "sm": 2, "lg": 3},
                 spacing="md",
             ),
+            dmc.Space(h="xl"),
+            # Sentiment section
+            _create_sentiment_card(sentiment_stats, colors),
             dmc.Space(h="xl"),
             # Charts row
             dbc.Row(
@@ -579,3 +595,253 @@ def _format_number(n: int | float) -> str:
     elif n >= 1_000:
         return f"{n / 1_000:.1f}K"
     return str(n)
+
+
+def _create_sentiment_card(sentiment_stats: dict, colors: dict) -> dmc.Paper:
+    """Create sentiment analysis card showing user's sentiment profile."""
+    from dash_iconify import DashIconify
+
+    avg_sentiment = sentiment_stats.get("avg_sentiment")
+    positive_count = sentiment_stats.get("positive_count", 0) or 0
+    neutral_count = sentiment_stats.get("neutral_count", 0) or 0
+    negative_count = sentiment_stats.get("negative_count", 0) or 0
+    messages_analyzed = sentiment_stats.get("messages_analyzed", 0) or 0
+    group_avg = sentiment_stats.get("group_avg_sentiment")
+    sentiment_rank = sentiment_stats.get("sentiment_rank")
+    total_ranked = sentiment_stats.get("total_ranked_users", 0) or 0
+
+    # No sentiment data
+    if messages_analyzed == 0 or avg_sentiment is None:
+        return dmc.Paper(
+            [
+                dmc.Group(
+                    [
+                        DashIconify(icon="mdi:brain", width=24, color=colors["muted"]),
+                        dmc.Title("Your Sentiment", order=4),
+                    ],
+                    gap="xs",
+                ),
+                dmc.Space(h="md"),
+                dmc.Center(
+                    dmc.Text("No sentiment data available yet", c="dimmed", size="sm"),
+                    h=100,
+                ),
+            ],
+            p="md",
+            withBorder=True,
+        )
+
+    # Determine sentiment label and color
+    if avg_sentiment > 0.1:
+        sentiment_label = "Positive"
+        sentiment_color = SENTIMENT_COLORS["positive"]
+        sentiment_icon = "mdi:emoticon-happy-outline"
+    elif avg_sentiment < -0.1:
+        sentiment_label = "Negative"
+        sentiment_color = SENTIMENT_COLORS["negative"]
+        sentiment_icon = "mdi:emoticon-sad-outline"
+    else:
+        sentiment_label = "Neutral"
+        sentiment_color = SENTIMENT_COLORS["neutral"]
+        sentiment_icon = "mdi:emoticon-neutral-outline"
+
+    # Calculate percentages for distribution
+    total = positive_count + neutral_count + negative_count
+    pos_pct = (positive_count / total * 100) if total > 0 else 0
+    neu_pct = (neutral_count / total * 100) if total > 0 else 0
+    neg_pct = (negative_count / total * 100) if total > 0 else 0
+
+    # Group comparison
+    if group_avg is not None:
+        diff = float(avg_sentiment) - float(group_avg)
+        if diff > 0.05:
+            diff_text = f"+{diff:.2f} vs group"
+            diff_color = "green"
+        elif diff < -0.05:
+            diff_text = f"{diff:.2f} vs group"
+            diff_color = "red"
+        else:
+            diff_text = "Same as group"
+            diff_color = "dimmed"
+    else:
+        diff_text = ""
+        diff_color = "dimmed"
+
+    # Rank display
+    if sentiment_rank and total_ranked > 0:
+        rank_text = f"#{sentiment_rank} of {total_ranked}"
+    else:
+        rank_text = "Not ranked (need 5+ messages)"
+
+    return dmc.Paper(
+        [
+            dmc.Group(
+                [
+                    DashIconify(icon="mdi:brain", width=24, color=colors["muted"]),
+                    dmc.Title("Your Sentiment", order=4),
+                ],
+                gap="xs",
+            ),
+            dmc.Space(h="md"),
+            dbc.Row(
+                [
+                    # Score column
+                    dbc.Col(
+                        dmc.Stack(
+                            [
+                                dmc.Group(
+                                    [
+                                        DashIconify(
+                                            icon=sentiment_icon,
+                                            width=32,
+                                            color=sentiment_color,
+                                        ),
+                                        dmc.Stack(
+                                            [
+                                                dmc.Text(
+                                                    f"{avg_sentiment:+.2f}",
+                                                    size="xl",
+                                                    fw=700,
+                                                    c=sentiment_color,
+                                                ),
+                                                dmc.Text(
+                                                    sentiment_label,
+                                                    size="sm",
+                                                    c="dimmed",
+                                                ),
+                                            ],
+                                            gap=0,
+                                        ),
+                                    ],
+                                    gap="sm",
+                                ),
+                                dmc.Text(diff_text, size="sm", c=diff_color)
+                                if diff_text
+                                else None,
+                                dmc.Text(
+                                    f"Positivity Rank: {rank_text}",
+                                    size="xs",
+                                    c="dimmed",
+                                ),
+                                dmc.Text(
+                                    f"{messages_analyzed} messages analyzed",
+                                    size="xs",
+                                    c="dimmed",
+                                ),
+                            ],
+                            gap="xs",
+                        ),
+                        md=4,
+                    ),
+                    # Distribution column
+                    dbc.Col(
+                        dmc.Stack(
+                            [
+                                dmc.Text("Your Message Breakdown", size="sm", c="dimmed"),
+                                # Stacked progress bar
+                                dmc.Group(
+                                    [
+                                        dmc.Box(
+                                            w=f"{pos_pct}%",
+                                            h=8,
+                                            style={
+                                                "backgroundColor": SENTIMENT_COLORS["positive"],
+                                                "borderRadius": "4px 0 0 4px" if pos_pct > 0 else "0",
+                                                "minWidth": "4px" if pos_pct > 0 else "0",
+                                            },
+                                        )
+                                        if pos_pct > 0
+                                        else None,
+                                        dmc.Box(
+                                            w=f"{neu_pct}%",
+                                            h=8,
+                                            style={
+                                                "backgroundColor": SENTIMENT_COLORS["neutral"],
+                                                "minWidth": "4px" if neu_pct > 0 else "0",
+                                            },
+                                        )
+                                        if neu_pct > 0
+                                        else None,
+                                        dmc.Box(
+                                            w=f"{neg_pct}%",
+                                            h=8,
+                                            style={
+                                                "backgroundColor": SENTIMENT_COLORS["negative"],
+                                                "borderRadius": "0 4px 4px 0" if neg_pct > 0 else "0",
+                                                "minWidth": "4px" if neg_pct > 0 else "0",
+                                            },
+                                        )
+                                        if neg_pct > 0
+                                        else None,
+                                    ],
+                                    gap=0,
+                                    style={"width": "100%"},
+                                ),
+                                # Legend with counts
+                                dmc.Group(
+                                    [
+                                        dmc.Group(
+                                            [
+                                                dmc.Box(
+                                                    w=12,
+                                                    h=12,
+                                                    style={
+                                                        "backgroundColor": SENTIMENT_COLORS["positive"],
+                                                        "borderRadius": "2px",
+                                                    },
+                                                ),
+                                                dmc.Text(
+                                                    f"Positive: {positive_count} ({pos_pct:.0f}%)",
+                                                    size="xs",
+                                                ),
+                                            ],
+                                            gap="xs",
+                                        ),
+                                        dmc.Group(
+                                            [
+                                                dmc.Box(
+                                                    w=12,
+                                                    h=12,
+                                                    style={
+                                                        "backgroundColor": SENTIMENT_COLORS["neutral"],
+                                                        "borderRadius": "2px",
+                                                    },
+                                                ),
+                                                dmc.Text(
+                                                    f"Neutral: {neutral_count} ({neu_pct:.0f}%)",
+                                                    size="xs",
+                                                ),
+                                            ],
+                                            gap="xs",
+                                        ),
+                                        dmc.Group(
+                                            [
+                                                dmc.Box(
+                                                    w=12,
+                                                    h=12,
+                                                    style={
+                                                        "backgroundColor": SENTIMENT_COLORS["negative"],
+                                                        "borderRadius": "2px",
+                                                    },
+                                                ),
+                                                dmc.Text(
+                                                    f"Negative: {negative_count} ({neg_pct:.0f}%)",
+                                                    size="xs",
+                                                ),
+                                            ],
+                                            gap="xs",
+                                        ),
+                                    ],
+                                    gap="md",
+                                ),
+                            ],
+                            gap="sm",
+                        ),
+                        md=8,
+                    ),
+                ],
+            ),
+        ],
+        p="md",
+        withBorder=True,
+    )

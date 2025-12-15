@@ -66,7 +66,15 @@ def create_landing_page(
                     dmc.Stack(
                         [
                             dmc.Title("🥩 Beef Briefing", order=1),
-                            dmc.Text(greeting, c="dimmed", size="lg"),
+                            dmc.Group(
+                                [
+                                    dmc.Text(greeting, c="dimmed", size="lg"),
+                                    dmc.Badge("Admin", variant="light", size="sm")
+                                    if user.get("is_admin")
+                                    else None,
+                                ],
+                                gap="xs",
+                            ),
                         ],
                         gap=4,
                     ),

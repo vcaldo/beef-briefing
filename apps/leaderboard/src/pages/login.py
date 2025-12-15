@@ -104,11 +104,11 @@ def create_login_page(bot_username: str, callback_url: str) -> html.Div:
                             ],
                             justify="center",
                             align="center",
-                            mih="100vh",
+                            style={"minHeight": "100vh"},
                         )
                     ],
                     fluid=True,
-                    bg="#f8f9fa",
+                    style={"backgroundColor": "#f8f9fa"},
                 )
             ),
         ]

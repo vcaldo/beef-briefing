@@ -25,10 +25,10 @@ declare -A DEV_SERVICES=(
 )
 
 declare -A PROD_SERVICES=(
-    ["api-service"]="-|(internal)|"
+    ["api-service"]="-|https://api.\${DOMAIN}|"
     ["telegram-bot"]="-|-|"
     ["leaderboard"]="-|https://\${DOMAIN}\${LEADERBOARD_PATH}|"
-    ["traefik"]="-|https://\${DOMAIN}/traefik-dashboard|"
+    ["traefik"]="-|https://\${DOMAIN}/dashboard|"
 )
 
 # Image names for build summary
@@ -218,6 +218,7 @@ show_prod_summary() {
     local image_tag="$2"
     local ssh_host="$3"
     local previous_tag="${4:-N/A}"
+    local allowed_ip="${5:-N/A}"
 
     echo ""
     echo -e "${GREEN}+====================================================================+${NC}"
@@ -227,17 +228,18 @@ show_prod_summary() {
     echo -e "${GREEN}+==================+==========+======================================+${NC}"
 
     printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
-        "api-service" "deployed" "(internal)"
+        "api-service" "deployed" "https://api.${domain}"
     printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
         "telegram-bot" "deployed" "-"
     printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
         "leaderboard" "deployed" "https://${domain}${LEADERBOARD_PATH:-/leaderboard}"
     printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
-        "traefik" "deployed" "https://${domain}/traefik-dashboard"
+        "traefik" "deployed" "https://${domain}/dashboard"
 
     echo -e "${GREEN}+==================+==========+======================================+${NC}"
     echo -e "${GREEN}| Image Tag: ${NC}${BLUE}${image_tag}${NC}${GREEN} | Server: ${NC}${BLUE}${ssh_host}${NC}"
     echo -e "${GREEN}| Previous:  ${NC}${YELLOW}${previous_tag}${NC}${GREEN} | Rollback: ${NC}make prod-rollback"
+    echo -e "${GREEN}| API IP Allowlist: ${NC}${BLUE}${allowed_ip}${NC}"
     echo -e "${GREEN}+====================================================================+${NC}"
     echo ""
 }
@@ -325,7 +327,8 @@ case "$MODE" in
         IMAGE_TAG="${IMAGE_TAG:-latest}"
         SSH_HOST="${SSH_HOST:-unknown}"
         PREVIOUS_TAG="${PREVIOUS_TAG:-N/A}"
-        show_prod_summary "$DOMAIN" "$IMAGE_TAG" "$SSH_HOST" "$PREVIOUS_TAG"
+        ALLOWED_IP="${ALLOWED_IP:-N/A}"
+        show_prod_summary "$DOMAIN" "$IMAGE_TAG" "$SSH_HOST" "$PREVIOUS_TAG" "$ALLOWED_IP"
         ;;
     build)
         IMAGE_TAG="${IMAGE_TAG:-latest}"

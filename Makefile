@@ -382,7 +382,7 @@ tf-deploy-check: tf-validate tf-fmt-check tf-plan ## Full pre-deployment check
 # ML PROCESSOR (ml-*)
 # =============================================================================
 # Production API URL (override with: make ml-run-prod API_URL=https://your-domain.com)
-PROD_API_URL ?= https://barra-pesada.online
+PROD_API_URL ?= https://api.barra-pesada.online
 
 ml-run: ## Run ml-processor (dev, local API)
 	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py

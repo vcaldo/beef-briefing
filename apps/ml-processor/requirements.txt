@@ -19,3 +19,6 @@ python-dotenv>=1.0.0
 # Utilities
 numpy>=2.0.0
 tqdm>=4.67.0
+
+# APM (optional)
+newrelic>=11.1.0

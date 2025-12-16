@@ -138,10 +138,43 @@ services:
       - beef-dev-network
     restart: unless-stopped
 
+  ml-processor:
+    build:
+      context: ..
+      dockerfile: apps/ml-processor/Dockerfile
+    container_name: beef-ml-processor-dev
+    environment:
+      API_SERVICE_URL: ${API_SERVICE_URL}
+      API_KEY_FILE: /app/secrets/api_key
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      BATCH_SIZE: ${ML_BATCH_SIZE:-500}
+      SLEEP_SECONDS: ${ML_SLEEP_SECONDS:-60}
+      DEVICE: ${ML_DEVICE:-cuda}
+      ENVIRONMENT: development
+      LOG_LEVEL: debug
+    volumes:
+      - ./secrets/apps/ml-processor:/app/secrets:ro
+      - ml_models_cache_dev:/root/.cache/huggingface
+    depends_on:
+      - api-service
+      - qdrant
+    networks:
+      - beef-dev-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
 volumes:
   postgres_data_dev:
   minio_data_dev:
   qdrant_data_dev:
+  ml_models_cache_dev:
 
 networks:
   beef-dev-network:

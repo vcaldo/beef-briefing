@@ -134,6 +134,24 @@ prod-logs-traefik: ## Tail logs from traefik (production)
 	@SSH_HOST=$$($(MAKE) -s tf-ssh-user-host); \
 	ssh $$SSH_HOST 'cd ~/beef-briefing && docker compose logs -f traefik'
 
+prod-update-ip: ## Update API IP allowlist and restart api-service
+	@echo "Fetching current IP address..."
+	@ALLOWED_IP=$$(curl -s whatismyip.akamai.com); \
+	if [ -z "$$ALLOWED_IP" ]; then \
+		echo "Error: Failed to fetch IP"; \
+		exit 1; \
+	fi; \
+	echo "Current IP: $$ALLOWED_IP"; \
+	if grep -q "^ALLOWED_IP=" $(PROD_ENV_FILE); then \
+		sed -i "s/^ALLOWED_IP=.*/ALLOWED_IP=$$ALLOWED_IP/" $(PROD_ENV_FILE); \
+	else \
+		echo "ALLOWED_IP=$$ALLOWED_IP" >> $(PROD_ENV_FILE); \
+	fi; \
+	echo "Updated $(PROD_ENV_FILE)"; \
+	echo "Updating remote .env and restarting api-service..."; \
+	scp $(PROD_ENV_FILE) $$($(MAKE) -s tf-ssh-user-host):~/beef-briefing/.env; \
+	ssh $$($(MAKE) -s tf-ssh-user-host) 'cd ~/beef-briefing && docker compose up -d --no-deps api-service'
+
 # =============================================================================
 # DOCKER BUILD (docker-build-*)
 # =============================================================================
@@ -425,7 +443,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	up build deploy \
 	dev-up dev-up-build dev-up-logs dev-down dev-restart dev-ps dev-clean dev-prune \
 	prod-deploy prod-deploy-skip-build prod-deploy-skip-cleanup prod-deploy-regenerate-certs \
-	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik \
+	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik prod-update-ip \
 	docker-build docker-build-api docker-build-bot docker-build-leaderboard \
 	docker-logs docker-logs-api docker-logs-bot docker-logs-postgres docker-logs-minio \
 	docker-logs-newrelic docker-logs-leaderboard \

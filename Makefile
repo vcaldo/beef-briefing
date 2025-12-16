@@ -420,6 +420,24 @@ ml-run-status-prod: ## Show ml-processor status (prod)
 ml-run-once-prod: ## Run ml-processor for a single batch (prod)
 	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py --once --api-url $(PROD_API_URL)
 
+ml-clean-dev: ## Clean all ML data (dev - PostgreSQL + Qdrant)
+	@echo "Cleaning ML data from dev PostgreSQL..."
+	@$(DC) exec -T postgres psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c "\
+		TRUNCATE ml_user_profiles, ml_message_topics, ml_topics, ml_toxicity, ml_sentiment, ml_processing_state CASCADE;"
+	@echo "Cleaning ML data from dev Qdrant..."
+	@curl -s -X DELETE "http://localhost:6333/collections/message_embeddings" || true
+	@echo "ML data cleaned (dev)"
+
+ml-clean-prod: ## Clean all ML data (prod - PostgreSQL + Qdrant)
+	@echo "WARNING: This will delete ALL ML data from production!"
+	@read -p "Are you sure? (yes/no): " confirm && [ "$$confirm" = "yes" ] || exit 1
+	@echo "Cleaning ML data from prod PostgreSQL..."
+	@ssh $$($(MAKE) -s tf-ssh-user-host) 'cd ~/beef-briefing && docker compose exec -T postgres psql -U postgres -d beef_briefing -c "\
+		TRUNCATE ml_user_profiles, ml_message_topics, ml_topics, ml_toxicity, ml_sentiment, ml_processing_state CASCADE;"'
+	@echo "Cleaning ML data from prod Qdrant (local)..."
+	@curl -s -X DELETE "http://localhost:6333/collections/message_embeddings" || true
+	@echo "ML data cleaned (prod)"
+
 # =============================================================================
 # MINIO CLIENT (mc-*)
 # =============================================================================
@@ -458,4 +476,5 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage tf-update-ssh-config tf-docs tf-deploy-check \
 	ml-run ml-run-status ml-run-once ml-run-prod ml-run-status-prod ml-run-once-prod \
+	ml-clean-dev ml-clean-prod \
 	mc-setup-prod

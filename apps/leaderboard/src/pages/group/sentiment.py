@@ -447,8 +447,13 @@ def _create_user_ranking_card(
     colors: dict,
     is_positive: bool = True,
 ) -> dmc.Paper:
-    """Create user ranking table card."""
+    """Create user ranking table card with confidence indicators."""
     from dash_iconify import DashIconify
+
+    # Confidence color thresholds
+    CONFIDENCE_HIGH = 0.8  # Green - reliable
+    CONFIDENCE_MED = 0.5   # Amber - moderate
+    AMBER_COLOR = "#f59e0b"
 
     if not users:
         content = dmc.Center(
@@ -458,38 +463,77 @@ def _create_user_ranking_card(
     else:
         rows = []
         for idx, user in enumerate(users, 1):
-            sentiment = user.get(metric_key, 0) or 0
-            display_value = f"{sentiment:+.2f}" if sentiment != 0 else "0.00"
+            # Get smoothed sentiment (primary) and raw sentiment (secondary)
+            smoothed = user.get("smoothed_sentiment", 0) or 0
+            raw = user.get("raw_sentiment", 0) or 0
+            confidence = user.get("confidence", 0) or 0
+            msg_count = user.get("messages_analyzed", 0) or 0
 
-            # Determine color based on sentiment value
-            if sentiment > 0:
+            # Display value is smoothed sentiment
+            display_value = f"{smoothed:+.2f}" if smoothed != 0 else "0.00"
+            raw_display = f"Raw: {raw:+.2f}" if raw != 0 else "Raw: 0.00"
+
+            # Determine color based on smoothed sentiment value
+            if smoothed > 0:
                 value_color = SENTIMENT_COLORS["positive"]
-            elif sentiment < 0:
+            elif smoothed < 0:
                 value_color = SENTIMENT_COLORS["negative"]
             else:
                 value_color = SENTIMENT_COLORS["neutral"]
 
+            # Confidence indicator color
+            if confidence >= CONFIDENCE_HIGH:
+                conf_color = SENTIMENT_COLORS["positive"]
+            elif confidence >= CONFIDENCE_MED:
+                conf_color = AMBER_COLOR
+            else:
+                conf_color = SENTIMENT_COLORS["negative"]
+
             rows.append(
-                dmc.Group(
+                dmc.Stack(
                     [
-                        dmc.Text(f"{idx}.", size="sm", c="dimmed", w=24),
-                        dmc.Text(
-                            user.get("first_name", "Unknown"),
-                            size="sm",
-                            style={"flex": 1},
+                        # Main row: rank, name, score, confidence ring
+                        dmc.Group(
+                            [
+                                dmc.Text(f"{idx}.", size="sm", c="dimmed", w=24),
+                                dmc.Text(
+                                    user.get("first_name", "Unknown"),
+                                    size="sm",
+                                    style={"flex": 1},
+                                ),
+                                dmc.Text(
+                                    display_value,
+                                    size="sm",
+                                    fw=600,
+                                    c=value_color,
+                                ),
+                                dmc.Tooltip(
+                                    dmc.RingProgress(
+                                        sections=[{"value": confidence * 100, "color": conf_color}],
+                                        size=32,
+                                        thickness=3,
+                                    ),
+                                    label=f"{msg_count} messages analyzed",
+                                    position="left",
+                                ),
+                            ],
+                            justify="space-between",
+                            gap="xs",
                         ),
-                        dmc.Text(
-                            display_value,
-                            size="sm",
-                            fw=600,
-                            c=value_color,
+                        # Secondary row: raw score
+                        dmc.Group(
+                            [
+                                dmc.Text("", w=24),  # spacer for alignment
+                                dmc.Text(raw_display, size="xs", c="dimmed"),
+                            ],
+                            gap="xs",
                         ),
                     ],
-                    justify="space-between",
+                    gap=2,
                 )
             )
 
-        content = dmc.Stack(rows, gap="xs")
+        content = dmc.Stack(rows, gap="sm")
 
     icon = "mdi:emoticon-happy-outline" if is_positive else "mdi:emoticon-sad-outline"
     icon_color = SENTIMENT_COLORS["positive"] if is_positive else SENTIMENT_COLORS["negative"]
@@ -503,7 +547,7 @@ def _create_user_ranking_card(
                 ],
                 gap="xs",
             ),
-            dmc.Text("By average sentiment score", size="xs", c="dimmed"),
+            dmc.Text("Sample-size adjusted sentiment score", size="xs", c="dimmed"),
             dmc.Space(h="md"),
             content,
         ],

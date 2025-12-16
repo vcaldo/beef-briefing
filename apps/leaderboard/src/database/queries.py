@@ -1791,9 +1791,12 @@ class DashboardQueries:
         ascending: bool = False,
     ) -> list[dict]:
         """
-        Get users ranked by average sentiment.
+        Get users ranked by sentiment with Bayesian smoothing.
 
-        Calculates directly from ml_sentiment data for real-time accuracy.
+        Uses Bayesian smoothing to adjust for sample size:
+        - Users with few messages are pulled toward the global mean
+        - Users with many messages keep their observed score
+        - Formula: smoothed = (n * raw + k * global) / (n + k) where k=50
 
         Args:
             chat_id: Chat ID
@@ -1807,15 +1810,41 @@ class DashboardQueries:
                 'user_id': int,
                 'first_name': str,
                 'username': str | None,
-                'avg_sentiment': float,
+                'raw_sentiment': float,      # Original unweighted average
+                'smoothed_sentiment': float, # Bayesian smoothed score
+                'confidence': float,         # 0-1 confidence based on msg count
                 'messages_analyzed': int
             }
         """
         order = "ASC" if ascending else "DESC"
-        # Calculate average sentiment directly from ml_sentiment
-        # Score mapping: positive=1, neutral=0, negative=-1
-        if start_date is None and end_date is None:
-            query = f"""
+        # Bayesian smoothing factor (k=50 means 50 messages = 50% weight on raw)
+        k = 50
+
+        # Build date filter clause
+        date_filter = ""
+        if start_date is not None and end_date is not None:
+            date_filter = "AND m.date >= :start_date AND m.date < :end_date"
+
+        query = f"""
+            WITH global_stats AS (
+                -- Calculate global average sentiment for the chat (within date range)
+                SELECT COALESCE(AVG(
+                    CASE ms.label
+                        WHEN 'positive' THEN 1.0
+                        WHEN 'neutral' THEN 0.0
+                        WHEN 'negative' THEN -1.0
+                        ELSE 0.0
+                    END
+                ), 0.0) as global_avg
+                FROM ml_sentiment ms
+                JOIN messages m ON m.id = ms.message_id AND m.chat_id = ms.chat_id
+                JOIN users u ON u.id = m.user_id
+                WHERE ms.chat_id = :chat_id
+                    AND u.is_bot = false
+                    {date_filter}
+            ),
+            user_stats AS (
+                -- Calculate per-user raw sentiment
                 SELECT
                     u.id as user_id,
                     u.first_name,
@@ -1827,55 +1856,40 @@ class DashboardQueries:
                             WHEN 'negative' THEN -1.0
                             ELSE 0.0
                         END
-                    ) as avg_sentiment,
+                    ) as raw_sentiment,
                     COUNT(*) as messages_analyzed
                 FROM ml_sentiment ms
                 JOIN messages m ON m.id = ms.message_id AND m.chat_id = ms.chat_id
                 JOIN users u ON u.id = m.user_id
                 WHERE ms.chat_id = :chat_id
                     AND u.is_bot = false
+                    {date_filter}
                 GROUP BY u.id, u.first_name, u.username
                 HAVING COUNT(*) >= 5
-                ORDER BY avg_sentiment {order}
-                LIMIT :limit
-            """
-            return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
-        else:
-            query = f"""
-                SELECT
-                    u.id as user_id,
-                    u.first_name,
-                    u.username,
-                    AVG(
-                        CASE ms.label
-                            WHEN 'positive' THEN 1.0
-                            WHEN 'neutral' THEN 0.0
-                            WHEN 'negative' THEN -1.0
-                            ELSE 0.0
-                        END
-                    ) as avg_sentiment,
-                    COUNT(*) as messages_analyzed
-                FROM ml_sentiment ms
-                JOIN messages m ON m.id = ms.message_id AND m.chat_id = ms.chat_id
-                JOIN users u ON u.id = m.user_id
-                WHERE ms.chat_id = :chat_id
-                    AND m.date >= :start_date
-                    AND m.date < :end_date
-                    AND u.is_bot = false
-                GROUP BY u.id, u.first_name, u.username
-                HAVING COUNT(*) >= 5
-                ORDER BY avg_sentiment {order}
-                LIMIT :limit
-            """
-            return self._execute_many(
-                query,
-                {
-                    "chat_id": chat_id,
-                    "start_date": start_date,
-                    "end_date": end_date,
-                    "limit": limit,
-                },
             )
+            SELECT
+                us.user_id,
+                us.first_name,
+                us.username,
+                us.raw_sentiment,
+                -- Bayesian smoothed score: (n * raw + k * global) / (n + k)
+                (us.messages_analyzed * us.raw_sentiment + {k} * gs.global_avg)
+                    / (us.messages_analyzed + {k}) as smoothed_sentiment,
+                -- Confidence: exponential approach to 1 as messages increase
+                1 - EXP(-us.messages_analyzed::float / {k}) as confidence,
+                us.messages_analyzed
+            FROM user_stats us
+            CROSS JOIN global_stats gs
+            ORDER BY smoothed_sentiment {order}
+            LIMIT :limit
+        """
+
+        params = {"chat_id": chat_id, "limit": limit}
+        if start_date is not None and end_date is not None:
+            params["start_date"] = start_date
+            params["end_date"] = end_date
+
+        return self._execute_many(query, params)
 
     def get_toxicity_stats(
         self,

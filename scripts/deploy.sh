@@ -294,5 +294,5 @@ log_success "Local cleanup complete"
 # SUMMARY
 # =============================================================================
 DOMAIN=$(get_domain_from_env "$PROD_ENV_FILE")
-DOMAIN="$DOMAIN" IMAGE_TAG="$COMMIT_HASH" SSH_HOST="$SSH_HOST" PREVIOUS_TAG="${PREVIOUS_TAG:-N/A}" \
+DOMAIN="$DOMAIN" IMAGE_TAG="$COMMIT_HASH" SSH_HOST="$SSH_HOST" PREVIOUS_TAG="${PREVIOUS_TAG:-N/A}" ALLOWED_IP="$ALLOWED_IP" \
     "$SCRIPT_DIR/show-summary.sh" prod

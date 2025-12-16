@@ -134,6 +134,24 @@ prod-logs-traefik: ## Tail logs from traefik (production)
 	@SSH_HOST=$$($(MAKE) -s tf-ssh-user-host); \
 	ssh $$SSH_HOST 'cd ~/beef-briefing && docker compose logs -f traefik'
 
+prod-update-ip: ## Update API IP allowlist and restart api-service
+	@echo "Fetching current IP address..."
+	@ALLOWED_IP=$$(curl -s whatismyip.akamai.com); \
+	if [ -z "$$ALLOWED_IP" ]; then \
+		echo "Error: Failed to fetch IP"; \
+		exit 1; \
+	fi; \
+	echo "Current IP: $$ALLOWED_IP"; \
+	if grep -q "^ALLOWED_IP=" $(PROD_ENV_FILE); then \
+		sed -i "s/^ALLOWED_IP=.*/ALLOWED_IP=$$ALLOWED_IP/" $(PROD_ENV_FILE); \
+	else \
+		echo "ALLOWED_IP=$$ALLOWED_IP" >> $(PROD_ENV_FILE); \
+	fi; \
+	echo "Updated $(PROD_ENV_FILE)"; \
+	echo "Updating remote .env and restarting api-service..."; \
+	scp $(PROD_ENV_FILE) $$($(MAKE) -s tf-ssh-user-host):~/beef-briefing/.env; \
+	ssh $$($(MAKE) -s tf-ssh-user-host) 'cd ~/beef-briefing && docker compose up -d --no-deps api-service'
+
 # =============================================================================
 # DOCKER BUILD (docker-build-*)
 # =============================================================================
@@ -382,7 +400,7 @@ tf-deploy-check: tf-validate tf-fmt-check tf-plan ## Full pre-deployment check
 # ML PROCESSOR (ml-*)
 # =============================================================================
 # Production API URL (override with: make ml-run-prod API_URL=https://your-domain.com)
-PROD_API_URL ?= https://barra-pesada.online
+PROD_API_URL ?= https://api.barra-pesada.online
 
 ml-run: ## Run ml-processor (dev, local API)
 	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py
@@ -401,6 +419,24 @@ ml-run-status-prod: ## Show ml-processor status (prod)
 
 ml-run-once-prod: ## Run ml-processor for a single batch (prod)
 	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py --once --api-url $(PROD_API_URL)
+
+ml-clean-dev: ## Clean all ML data (dev - PostgreSQL + Qdrant)
+	@echo "Cleaning ML data from dev PostgreSQL..."
+	@$(DC) exec -T postgres psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c "\
+		TRUNCATE ml_user_profiles, ml_message_topics, ml_topics, ml_toxicity, ml_sentiment, ml_processing_state CASCADE;"
+	@echo "Cleaning ML data from dev Qdrant..."
+	@curl -s -X DELETE "http://localhost:6333/collections/message_embeddings" || true
+	@echo "ML data cleaned (dev)"
+
+ml-clean-prod: ## Clean all ML data (prod - PostgreSQL + Qdrant)
+	@echo "WARNING: This will delete ALL ML data from production!"
+	@read -p "Are you sure? (yes/no): " confirm && [ "$$confirm" = "yes" ] || exit 1
+	@echo "Cleaning ML data from prod PostgreSQL..."
+	@ssh $$($(MAKE) -s tf-ssh-user-host) 'cd ~/beef-briefing && docker compose exec -T postgres psql -U postgres -d beef_briefing -c "\
+		TRUNCATE ml_user_profiles, ml_message_topics, ml_topics, ml_toxicity, ml_sentiment, ml_processing_state CASCADE;"'
+	@echo "Cleaning ML data from prod Qdrant (local)..."
+	@curl -s -X DELETE "http://localhost:6333/collections/message_embeddings" || true
+	@echo "ML data cleaned (prod)"
 
 # =============================================================================
 # MINIO CLIENT (mc-*)
@@ -425,7 +461,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	up build deploy \
 	dev-up dev-up-build dev-up-logs dev-down dev-restart dev-ps dev-clean dev-prune \
 	prod-deploy prod-deploy-skip-build prod-deploy-skip-cleanup prod-deploy-regenerate-certs \
-	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik \
+	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik prod-update-ip \
 	docker-build docker-build-api docker-build-bot docker-build-leaderboard \
 	docker-logs docker-logs-api docker-logs-bot docker-logs-postgres docker-logs-minio \
 	docker-logs-newrelic docker-logs-leaderboard \
@@ -440,4 +476,5 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage tf-update-ssh-config tf-docs tf-deploy-check \
 	ml-run ml-run-status ml-run-once ml-run-prod ml-run-status-prod ml-run-once-prod \
+	ml-clean-dev ml-clean-prod \
 	mc-setup-prod

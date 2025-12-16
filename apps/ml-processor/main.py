@@ -10,11 +10,26 @@ Usage:
     python main.py --api-key-file PATH  # Override API key file
 """
 
-import argparse
-import logging
+import os
 import sys
 
+# Load config first (before New Relic import)
 from config import load_config
+
+_config = load_config()
+
+# Initialize New Relic APM if configured (must be done before other imports)
+if _config.new_relic_enabled():
+    os.environ["NEW_RELIC_APP_NAME"] = _config.new_relic_full_app_name
+    os.environ["NEW_RELIC_LICENSE_KEY"] = _config.new_relic_license_key
+    import newrelic.agent
+
+    newrelic.agent.initialize()
+
+# Now import everything else
+import argparse
+import logging
+
 from src.pipeline.processor import MLProcessor
 
 
@@ -84,8 +99,8 @@ def main():
     )
     args = parser.parse_args()
 
-    # Load configuration
-    config = load_config()
+    # Use module-level config (already loaded for New Relic init)
+    config = _config
 
     # Override config from CLI args
     if args.limit:
@@ -101,6 +116,8 @@ def main():
     logger.info(f"ML Processor starting (device: {config.device})")
     logger.info(f"API Service: {config.api_service_url}")
     logger.info(f"Qdrant: {config.qdrant_host}:{config.qdrant_port}")
+    if config.new_relic_enabled():
+        logger.info(f"New Relic APM: {config.new_relic_full_app_name}")
 
     # Create processor
     processor = MLProcessor(config)

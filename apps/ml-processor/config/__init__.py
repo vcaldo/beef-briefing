@@ -5,6 +5,7 @@ Uses Pydantic for environment variable parsing.
 
 from functools import cached_property
 from pathlib import Path
+from typing import Optional
 
 from pydantic_settings import BaseSettings
 
@@ -15,6 +16,10 @@ class Config(BaseSettings):
     # API Service Configuration
     api_service_url: str = "http://localhost:8080"
     api_key_file: str = "../../infrastructure/secrets/apps/ml-processor/api_key"
+
+    # New Relic APM Configuration (optional)
+    new_relic_app_name: Optional[str] = None
+    new_relic_license_key: Optional[str] = None
 
     # Qdrant Configuration
     qdrant_host: str = "localhost"
@@ -41,6 +46,17 @@ class Config(BaseSettings):
     def is_production(self) -> bool:
         """Check if running in production environment."""
         return self.environment.lower() == "production"
+
+    def new_relic_enabled(self) -> bool:
+        """Return True if New Relic APM is configured."""
+        return bool(self.new_relic_app_name and self.new_relic_license_key)
+
+    @cached_property
+    def new_relic_full_app_name(self) -> str:
+        """Return full New Relic app name: {base-name}-ml-processor-{environment}."""
+        if self.new_relic_app_name:
+            return f"{self.new_relic_app_name}-ml-processor-{self.environment}"
+        return ""
 
     @cached_property
     def api_key(self) -> str:

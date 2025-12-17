@@ -138,6 +138,30 @@ services:
       - beef-dev-network
     restart: unless-stopped
 
+  ml-dashboard:
+    build:
+      context: ..
+      dockerfile: apps/ml-dashboard/Dockerfile
+    container_name: beef-ml-dashboard-dev
+    environment:
+      DB_HOST: postgres
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_PORT: ${DB_PORT}
+      DB_SSL_MODE: disable
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      ML_DASHBOARD_PORT: ${ML_DASHBOARD_PORT:-8501}
+      ENVIRONMENT: development
+      LOG_LEVEL: debug
+      CACHE_DIR: /app/cache
+    ports:
+      - "${ML_DASHBOARD_PORT:-8501}:8501"
+    volumes:
+      - ml_dashboard_cache_dev:/app/cache
+    depends_on:
+      - postgres
   ml-processor:
     build:
       context: ..
@@ -174,6 +198,7 @@ volumes:
   postgres_data_dev:
   minio_data_dev:
   qdrant_data_dev:
+  ml_dashboard_cache_dev:
   ml_models_cache_dev:
 
 networks:

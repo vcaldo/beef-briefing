@@ -3,11 +3,9 @@
 ML Processor - Analyzes Portuguese chat messages using local ML models.
 
 Usage:
-    python main.py                      # Run continuous processing (dev)
-    python main.py --once               # Run single batch and exit
-    python main.py --status             # Print processing status
-    python main.py --api-url URL        # Override API endpoint
-    python main.py --api-key-file PATH  # Override API key file
+    python main.py process --chat-id -1003280306634 [--limit N] [--batch-size N]
+    python main.py status --chat-id -1003280306634
+    python main.py continuous --chat-id -1003280306634
 """
 
 import os
@@ -30,7 +28,13 @@ if _config.new_relic_enabled():
 import argparse
 import logging
 
-from src.pipeline.processor import MLProcessor
+from sqlalchemy import create_engine
+
+from src.analyzers.base import AnalyzerRegistry
+from src.database import MLQueries
+from src.processor import MLProcessor
+
+logger = logging.getLogger(__name__)
 
 
 def setup_logging(config):
@@ -64,92 +68,197 @@ def setup_logging(config):
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("transformers").setLevel(logging.WARNING)
     logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+    logging.getLogger("qdrant_client").setLevel(logging.WARNING)
 
     return logging.getLogger(__name__)
 
 
+def create_processor(config) -> MLProcessor:
+    """Create and setup the ML processor."""
+    # Create database engine
+    engine = create_engine(config.dsn(), pool_pre_ping=True)
+
+    # Create components
+    queries = MLQueries(engine)
+    registry = AnalyzerRegistry(config)
+    processor = MLProcessor(config, queries, registry)
+
+    return processor
+
+
+def run_process(args, config):
+    """Run batch processing command."""
+    logger.info(f"Processing chat {args.chat_id}")
+
+    processor = create_processor(config)
+    processor.setup()
+
+    try:
+        # Log configured providers
+        logger.info(f"Sentiment provider: {config.sentiment_provider}")
+        logger.info(f"Toxicity provider: {config.toxicity_provider}")
+        logger.info(f"Topics provider: {config.topics_provider}")
+        logger.info(f"NER provider: {config.ner_provider}")
+
+        # Process in batches
+        total_processed = 0
+        remaining = args.limit
+
+        while True:
+            # Determine batch size for this iteration
+            current_batch = args.batch_size
+            if remaining is not None:
+                current_batch = min(args.batch_size, remaining)
+                if current_batch <= 0:
+                    break
+
+            # Process batch
+            count = processor.process_batch(args.chat_id, limit=current_batch)
+            total_processed += count
+
+            logger.info(f"Batch complete: {count} messages (total: {total_processed})")
+
+            # Update remaining
+            if remaining is not None:
+                remaining -= count
+
+            # No more messages to process
+            if count < current_batch:
+                break
+
+        logger.info(f"Processing complete: {total_processed} total messages processed")
+        return total_processed
+
+    finally:
+        processor.cleanup()
+
+
+def run_status(args, config):
+    """Run status command."""
+    processor = create_processor(config)
+    processor.setup()
+
+    try:
+        processor.print_status(args.chat_id)
+    finally:
+        processor.cleanup()
+
+
+def run_continuous(args, config):
+    """Run continuous processing command."""
+    logger.info(f"Starting continuous processing for chat {args.chat_id}")
+
+    processor = create_processor(config)
+    processor.setup()
+
+    try:
+        # Log configured providers
+        logger.info(f"Sentiment provider: {config.sentiment_provider}")
+        logger.info(f"Toxicity provider: {config.toxicity_provider}")
+        logger.info(f"Topics provider: {config.topics_provider}")
+        logger.info(f"NER provider: {config.ner_provider}")
+
+        processor.run_continuous(args.chat_id)
+
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user")
+
+    finally:
+        processor.cleanup()
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="ML Processor for Portuguese chat analysis"
+        description="ML Processor - Batch job for analyzing Portuguese chat messages"
     )
-    parser.add_argument(
-        "--once",
-        action="store_true",
-        help="Run single batch and exit",
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # process command
+    process_parser = subparsers.add_parser(
+        "process",
+        help="Process unanalyzed messages in batches",
     )
-    parser.add_argument(
-        "--status",
-        action="store_true",
-        help="Print processing status and exit",
+    process_parser.add_argument(
+        "--chat-id",
+        type=int,
+        required=True,
+        help="Target chat ID to process",
     )
-    parser.add_argument(
+    process_parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=500,
+        help="Messages per batch (default: 500)",
+    )
+    process_parser.add_argument(
         "--limit",
         type=int,
-        help="Override batch size limit",
+        default=None,
+        help="Max messages to process (default: unlimited)",
     )
-    parser.add_argument(
-        "--api-url",
-        type=str,
-        help="Override API service URL (e.g., https://api.example.com)",
+
+    # status command
+    status_parser = subparsers.add_parser(
+        "status",
+        help="Show processing status for a chat",
     )
-    parser.add_argument(
-        "--api-key-file",
-        type=str,
-        help="Override API key file path",
+    status_parser.add_argument(
+        "--chat-id",
+        type=int,
+        required=True,
+        help="Target chat ID",
     )
+
+    # continuous command
+    continuous_parser = subparsers.add_parser(
+        "continuous",
+        help="Run continuous processing loop (daemon mode)",
+    )
+    continuous_parser.add_argument(
+        "--chat-id",
+        type=int,
+        required=True,
+        help="Target chat ID to process",
+    )
+
     args = parser.parse_args()
 
     # Use module-level config (already loaded for New Relic init)
     config = _config
 
-    # Override config from CLI args
-    if args.limit:
-        config.batch_size = args.limit
-    if args.api_url:
-        config.api_service_url = args.api_url
-    if args.api_key_file:
-        config.api_key_file = args.api_key_file
-
     # Setup logging
-    logger = setup_logging(config)
+    setup_logging(config)
 
+    # Validate API keys for non-local providers
+    errors = config.validate_api_keys()
+    if errors:
+        for error in errors:
+            logger.error(f"Configuration error: {error}")
+        sys.exit(1)
+
+    # Log startup info
     logger.info(f"ML Processor starting (device: {config.device})")
-    logger.info(f"API Service: {config.api_service_url}")
+    logger.info(f"Database: {config.db_host}:{config.db_port}/{config.db_name}")
     logger.info(f"Qdrant: {config.qdrant_host}:{config.qdrant_port}")
     if config.new_relic_enabled():
         logger.info(f"New Relic APM: {config.new_relic_full_app_name}")
 
-    # Create processor
-    processor = MLProcessor(config)
-
     try:
-        # Setup connections and load models
-        processor.setup()
+        if args.command == "process":
+            result = run_process(args, config)
+            sys.exit(0 if result >= 0 else 1)
 
-        if args.status:
-            # Just print status and exit
-            processor.print_status()
-            return
+        elif args.command == "status":
+            run_status(args, config)
+            sys.exit(0)
 
-        if args.once:
-            # Run single batch
-            processed = processor.run_once()
-            logger.info(f"Processed {processed} messages")
-        else:
-            # Run continuous loop
-            processor.run_continuous()
-
-    except KeyboardInterrupt:
-        logger.info("Interrupted by user")
+        elif args.command == "continuous":
+            run_continuous(args, config)
+            sys.exit(0)
 
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)
-
-    finally:
-        processor.cleanup()
-
-    logger.info("ML Processor stopped")
 
 
 if __name__ == "__main__":

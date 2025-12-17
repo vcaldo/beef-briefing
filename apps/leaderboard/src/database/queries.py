@@ -2230,3 +2230,1047 @@ class DashboardQueries:
             "sentiment_rank": None,
             "total_ranked_users": 0,
         }
+
+    # =========================================
+    # TOPICS METHODS
+    # =========================================
+
+    def get_topics_overview(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict:
+        """
+        Get topics overview statistics.
+
+        Returns:
+            {
+                'total_topics': int,
+                'total_messages_with_topics': int,
+                'total_messages': int,
+                'coverage_rate': float
+            }
+        """
+        if start_date is None and end_date is None:
+            query = """
+                WITH topic_stats AS (
+                    SELECT COUNT(DISTINCT topic_id) as total_topics
+                    FROM ml_topics
+                    WHERE chat_id = :chat_id AND topic_id >= 0
+                ),
+                message_stats AS (
+                    SELECT COUNT(*) as total_messages_with_topics
+                    FROM ml_message_topics
+                    WHERE chat_id = :chat_id AND topic_id >= 0
+                ),
+                total AS (
+                    SELECT COUNT(*) as total_messages
+                    FROM messages
+                    WHERE chat_id = :chat_id
+                        AND (text IS NOT NULL OR caption IS NOT NULL)
+                )
+                SELECT
+                    ts.total_topics,
+                    ms.total_messages_with_topics,
+                    t.total_messages,
+                    CASE WHEN t.total_messages > 0
+                        THEN ROUND(ms.total_messages_with_topics * 100.0 / t.total_messages, 1)
+                        ELSE 0 END as coverage_rate
+                FROM topic_stats ts, message_stats ms, total t
+            """
+            result = self._execute_single(query, {"chat_id": chat_id})
+        else:
+            query = """
+                WITH topic_stats AS (
+                    SELECT COUNT(DISTINCT mt.topic_id) as total_topics
+                    FROM ml_message_topics mt
+                    JOIN messages m ON m.id = mt.message_id
+                    WHERE mt.chat_id = :chat_id
+                        AND mt.topic_id >= 0
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                ),
+                message_stats AS (
+                    SELECT COUNT(*) as total_messages_with_topics
+                    FROM ml_message_topics mt
+                    JOIN messages m ON m.id = mt.message_id
+                    WHERE mt.chat_id = :chat_id
+                        AND mt.topic_id >= 0
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                ),
+                total AS (
+                    SELECT COUNT(*) as total_messages
+                    FROM messages
+                    WHERE chat_id = :chat_id
+                        AND date >= :start_date
+                        AND date < :end_date
+                        AND (text IS NOT NULL OR caption IS NOT NULL)
+                )
+                SELECT
+                    ts.total_topics,
+                    ms.total_messages_with_topics,
+                    t.total_messages,
+                    CASE WHEN t.total_messages > 0
+                        THEN ROUND(ms.total_messages_with_topics * 100.0 / t.total_messages, 1)
+                        ELSE 0 END as coverage_rate
+                FROM topic_stats ts, message_stats ms, total t
+            """
+            result = self._execute_single(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+        return result or {
+            "total_topics": 0,
+            "total_messages_with_topics": 0,
+            "total_messages": 0,
+            "coverage_rate": 0,
+        }
+
+    def get_topic_distribution(
+        self,
+        chat_id: int,
+        limit: int = 15,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get topic distribution for charts.
+
+        Returns DataFrame with columns:
+            topic_id, keywords, message_count
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    t.topic_id,
+                    t.keywords,
+                    t.message_count
+                FROM ml_topics t
+                WHERE t.chat_id = :chat_id AND t.topic_id >= 0
+                ORDER BY t.message_count DESC
+                LIMIT :limit
+            """
+            return self._execute_df(query, {"chat_id": chat_id, "limit": limit})
+        else:
+            query = """
+                SELECT
+                    t.topic_id,
+                    t.keywords,
+                    COUNT(*) as message_count
+                FROM ml_message_topics mt
+                JOIN ml_topics t ON t.chat_id = mt.chat_id AND t.topic_id = mt.topic_id
+                JOIN messages m ON m.id = mt.message_id
+                WHERE mt.chat_id = :chat_id
+                    AND mt.topic_id >= 0
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                GROUP BY t.topic_id, t.keywords
+                ORDER BY message_count DESC
+                LIMIT :limit
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "limit": limit,
+                },
+            )
+
+    def get_topic_timeline(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        top_n: int = 5,
+    ) -> pd.DataFrame:
+        """
+        Get topic trends over time for top N topics.
+
+        Returns DataFrame with columns:
+            date, topic_id, keywords, count
+        """
+        if start_date is None and end_date is None:
+            query = """
+                WITH top_topics AS (
+                    SELECT topic_id, keywords
+                    FROM ml_topics
+                    WHERE chat_id = :chat_id AND topic_id >= 0
+                    ORDER BY message_count DESC
+                    LIMIT :top_n
+                )
+                SELECT
+                    DATE(m.date) as date,
+                    tt.topic_id,
+                    tt.keywords,
+                    COUNT(*) as count
+                FROM ml_message_topics mt
+                JOIN top_topics tt ON tt.topic_id = mt.topic_id
+                JOIN messages m ON m.id = mt.message_id
+                WHERE mt.chat_id = :chat_id
+                GROUP BY DATE(m.date), tt.topic_id, tt.keywords
+                ORDER BY date, tt.topic_id
+            """
+            return self._execute_df(query, {"chat_id": chat_id, "top_n": top_n})
+        else:
+            query = """
+                WITH top_topics AS (
+                    SELECT t.topic_id, t.keywords
+                    FROM ml_topics t
+                    WHERE t.chat_id = :chat_id AND t.topic_id >= 0
+                    ORDER BY t.message_count DESC
+                    LIMIT :top_n
+                )
+                SELECT
+                    DATE(m.date) as date,
+                    tt.topic_id,
+                    tt.keywords,
+                    COUNT(*) as count
+                FROM ml_message_topics mt
+                JOIN top_topics tt ON tt.topic_id = mt.topic_id
+                JOIN messages m ON m.id = mt.message_id
+                WHERE mt.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                GROUP BY DATE(m.date), tt.topic_id, tt.keywords
+                ORDER BY date, tt.topic_id
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "top_n": top_n,
+                },
+            )
+
+    def get_user_topic_interests(
+        self,
+        chat_id: int,
+        limit: int = 10,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[dict]:
+        """
+        Get users with their most discussed topics.
+
+        Returns list of:
+            {
+                'user_id': int,
+                'first_name': str,
+                'top_topic_keywords': list[str],
+                'topic_message_count': int
+            }
+        """
+        if start_date is None and end_date is None:
+            query = """
+                WITH user_topics AS (
+                    SELECT
+                        m.user_id,
+                        mt.topic_id,
+                        t.keywords,
+                        COUNT(*) as topic_count,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY m.user_id
+                            ORDER BY COUNT(*) DESC
+                        ) as rn
+                    FROM ml_message_topics mt
+                    JOIN messages m ON m.id = mt.message_id
+                    JOIN ml_topics t ON t.chat_id = mt.chat_id AND t.topic_id = mt.topic_id
+                    JOIN users u ON u.id = m.user_id
+                    WHERE mt.chat_id = :chat_id
+                        AND mt.topic_id >= 0
+                        AND u.is_bot = false
+                    GROUP BY m.user_id, mt.topic_id, t.keywords
+                )
+                SELECT
+                    ut.user_id,
+                    u.first_name,
+                    ut.keywords as top_topic_keywords,
+                    ut.topic_count as topic_message_count
+                FROM user_topics ut
+                JOIN users u ON u.id = ut.user_id
+                WHERE ut.rn = 1
+                ORDER BY ut.topic_count DESC
+                LIMIT :limit
+            """
+            return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
+        else:
+            query = """
+                WITH user_topics AS (
+                    SELECT
+                        m.user_id,
+                        mt.topic_id,
+                        t.keywords,
+                        COUNT(*) as topic_count,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY m.user_id
+                            ORDER BY COUNT(*) DESC
+                        ) as rn
+                    FROM ml_message_topics mt
+                    JOIN messages m ON m.id = mt.message_id
+                    JOIN ml_topics t ON t.chat_id = mt.chat_id AND t.topic_id = mt.topic_id
+                    JOIN users u ON u.id = m.user_id
+                    WHERE mt.chat_id = :chat_id
+                        AND mt.topic_id >= 0
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                        AND u.is_bot = false
+                    GROUP BY m.user_id, mt.topic_id, t.keywords
+                )
+                SELECT
+                    ut.user_id,
+                    u.first_name,
+                    ut.keywords as top_topic_keywords,
+                    ut.topic_count as topic_message_count
+                FROM user_topics ut
+                JOIN users u ON u.id = ut.user_id
+                WHERE ut.rn = 1
+                ORDER BY ut.topic_count DESC
+                LIMIT :limit
+            """
+            return self._execute_many(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "limit": limit,
+                },
+            )
+
+    def get_ner_overview(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict:
+        """
+        Get NER overview statistics.
+
+        Returns:
+            {
+                'total_entities': int,
+                'unique_entities': int,
+                'top_entity_type': str | None
+            }
+        """
+        if start_date is None and end_date is None:
+            query = """
+                WITH stats AS (
+                    SELECT
+                        COUNT(*) as total_entities,
+                        COUNT(DISTINCT entity_text) as unique_entities
+                    FROM ml_ner
+                    WHERE chat_id = :chat_id
+                ),
+                top_type AS (
+                    SELECT entity_type
+                    FROM ml_ner
+                    WHERE chat_id = :chat_id
+                    GROUP BY entity_type
+                    ORDER BY COUNT(*) DESC
+                    LIMIT 1
+                )
+                SELECT
+                    s.total_entities,
+                    s.unique_entities,
+                    tt.entity_type as top_entity_type
+                FROM stats s
+                LEFT JOIN top_type tt ON true
+            """
+            result = self._execute_single(query, {"chat_id": chat_id})
+        else:
+            query = """
+                WITH stats AS (
+                    SELECT
+                        COUNT(*) as total_entities,
+                        COUNT(DISTINCT n.entity_text) as unique_entities
+                    FROM ml_ner n
+                    JOIN messages m ON m.id = n.message_id
+                    WHERE n.chat_id = :chat_id
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                ),
+                top_type AS (
+                    SELECT n.entity_type
+                    FROM ml_ner n
+                    JOIN messages m ON m.id = n.message_id
+                    WHERE n.chat_id = :chat_id
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                    GROUP BY n.entity_type
+                    ORDER BY COUNT(*) DESC
+                    LIMIT 1
+                )
+                SELECT
+                    s.total_entities,
+                    s.unique_entities,
+                    tt.entity_type as top_entity_type
+                FROM stats s
+                LEFT JOIN top_type tt ON true
+            """
+            result = self._execute_single(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+        return result or {
+            "total_entities": 0,
+            "unique_entities": 0,
+            "top_entity_type": None,
+        }
+
+    def get_ner_distribution(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get named entity type distribution.
+
+        Returns DataFrame with columns:
+            entity_type, count, percentage
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    entity_type,
+                    COUNT(*) as count,
+                    ROUND(COUNT(*) * 100.0 / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) as percentage
+                FROM ml_ner
+                WHERE chat_id = :chat_id
+                GROUP BY entity_type
+                ORDER BY count DESC
+            """
+            return self._execute_df(query, {"chat_id": chat_id})
+        else:
+            query = """
+                SELECT
+                    n.entity_type,
+                    COUNT(*) as count,
+                    ROUND(COUNT(*) * 100.0 / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) as percentage
+                FROM ml_ner n
+                JOIN messages m ON m.id = n.message_id
+                WHERE n.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                GROUP BY n.entity_type
+                ORDER BY count DESC
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+    def get_top_entities(
+        self,
+        chat_id: int,
+        entity_type: str | None = None,
+        limit: int = 20,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[dict]:
+        """
+        Get most mentioned entities.
+
+        Args:
+            entity_type: Filter by type (PERSON, ORG, LOC, MISC) or None for all
+
+        Returns list of:
+            {'entity_text': str, 'entity_type': str, 'count': int}
+        """
+        type_filter = "AND entity_type = :entity_type" if entity_type else ""
+
+        if start_date is None and end_date is None:
+            query = f"""
+                SELECT
+                    entity_text,
+                    entity_type,
+                    COUNT(*) as count
+                FROM ml_ner
+                WHERE chat_id = :chat_id
+                    {type_filter}
+                GROUP BY entity_text, entity_type
+                ORDER BY count DESC
+                LIMIT :limit
+            """
+            params = {"chat_id": chat_id, "limit": limit}
+            if entity_type:
+                params["entity_type"] = entity_type
+            return self._execute_many(query, params)
+        else:
+            query = f"""
+                SELECT
+                    n.entity_text,
+                    n.entity_type,
+                    COUNT(*) as count
+                FROM ml_ner n
+                JOIN messages m ON m.id = n.message_id
+                WHERE n.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                    {type_filter.replace('entity_type', 'n.entity_type')}
+                GROUP BY n.entity_text, n.entity_type
+                ORDER BY count DESC
+                LIMIT :limit
+            """
+            params = {
+                "chat_id": chat_id,
+                "start_date": start_date,
+                "end_date": end_date,
+                "limit": limit,
+            }
+            if entity_type:
+                params["entity_type"] = entity_type
+            return self._execute_many(query, params)
+
+    # =========================================
+    # HUMOR METHODS
+    # =========================================
+
+    def get_humor_stats(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict:
+        """
+        Get humor overview statistics.
+
+        Returns:
+            {
+                'total_analyzed': int,
+                'humorous_count': int,
+                'humor_rate': float,
+                'avg_score': float,
+                'top_humor_type': str | None
+            }
+        """
+        if start_date is None and end_date is None:
+            query = """
+                WITH stats AS (
+                    SELECT
+                        COUNT(*) as total_analyzed,
+                        SUM(CASE WHEN is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                        AVG(CASE WHEN is_humorous THEN score ELSE NULL END) as avg_score
+                    FROM ml_humor
+                    WHERE chat_id = :chat_id
+                ),
+                top_type AS (
+                    SELECT humor_type
+                    FROM ml_humor
+                    WHERE chat_id = :chat_id AND is_humorous = true
+                    GROUP BY humor_type
+                    ORDER BY COUNT(*) DESC
+                    LIMIT 1
+                )
+                SELECT
+                    s.total_analyzed,
+                    s.humorous_count,
+                    CASE WHEN s.total_analyzed > 0
+                        THEN ROUND(s.humorous_count * 100.0 / s.total_analyzed, 1)
+                        ELSE 0 END as humor_rate,
+                    COALESCE(s.avg_score, 0) as avg_score,
+                    tt.humor_type as top_humor_type
+                FROM stats s
+                LEFT JOIN top_type tt ON true
+            """
+            result = self._execute_single(query, {"chat_id": chat_id})
+        else:
+            query = """
+                WITH stats AS (
+                    SELECT
+                        COUNT(*) as total_analyzed,
+                        SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                        AVG(CASE WHEN h.is_humorous THEN h.score ELSE NULL END) as avg_score
+                    FROM ml_humor h
+                    JOIN messages m ON m.id = h.message_id
+                    WHERE h.chat_id = :chat_id
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                ),
+                top_type AS (
+                    SELECT h.humor_type
+                    FROM ml_humor h
+                    JOIN messages m ON m.id = h.message_id
+                    WHERE h.chat_id = :chat_id
+                        AND h.is_humorous = true
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                    GROUP BY h.humor_type
+                    ORDER BY COUNT(*) DESC
+                    LIMIT 1
+                )
+                SELECT
+                    s.total_analyzed,
+                    s.humorous_count,
+                    CASE WHEN s.total_analyzed > 0
+                        THEN ROUND(s.humorous_count * 100.0 / s.total_analyzed, 1)
+                        ELSE 0 END as humor_rate,
+                    COALESCE(s.avg_score, 0) as avg_score,
+                    tt.humor_type as top_humor_type
+                FROM stats s
+                LEFT JOIN top_type tt ON true
+            """
+            result = self._execute_single(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+        return result or {
+            "total_analyzed": 0,
+            "humorous_count": 0,
+            "humor_rate": 0,
+            "avg_score": 0,
+            "top_humor_type": None,
+        }
+
+    def get_humor_type_distribution(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get humor type breakdown.
+
+        Returns DataFrame with columns:
+            humor_type, count, percentage
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    humor_type,
+                    COUNT(*) as count,
+                    ROUND(COUNT(*) * 100.0 / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) as percentage
+                FROM ml_humor
+                WHERE chat_id = :chat_id AND is_humorous = true
+                GROUP BY humor_type
+                ORDER BY count DESC
+            """
+            return self._execute_df(query, {"chat_id": chat_id})
+        else:
+            query = """
+                SELECT
+                    h.humor_type,
+                    COUNT(*) as count,
+                    ROUND(COUNT(*) * 100.0 / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) as percentage
+                FROM ml_humor h
+                JOIN messages m ON m.id = h.message_id
+                WHERE h.chat_id = :chat_id
+                    AND h.is_humorous = true
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                GROUP BY h.humor_type
+                ORDER BY count DESC
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+    def get_humor_timeline(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get daily humor counts.
+
+        Returns DataFrame with columns:
+            date, humorous_count, total_count
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    DATE(m.date) as date,
+                    SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                    COUNT(*) as total_count
+                FROM ml_humor h
+                JOIN messages m ON m.id = h.message_id
+                WHERE h.chat_id = :chat_id
+                GROUP BY DATE(m.date)
+                ORDER BY date
+            """
+            return self._execute_df(query, {"chat_id": chat_id})
+        else:
+            query = """
+                SELECT
+                    DATE(m.date) as date,
+                    SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                    COUNT(*) as total_count
+                FROM ml_humor h
+                JOIN messages m ON m.id = h.message_id
+                WHERE h.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                GROUP BY DATE(m.date)
+                ORDER BY date
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+    def get_funniest_users(
+        self,
+        chat_id: int,
+        limit: int = 10,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[dict]:
+        """
+        Get users ranked by humor rate.
+
+        Returns list of:
+            {
+                'user_id': int,
+                'first_name': str,
+                'humor_rate': float,
+                'humorous_count': int,
+                'messages_analyzed': int
+            }
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    m.user_id,
+                    u.first_name,
+                    ROUND(SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as humor_rate,
+                    SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                    COUNT(*) as messages_analyzed
+                FROM ml_humor h
+                JOIN messages m ON m.id = h.message_id
+                JOIN users u ON u.id = m.user_id
+                WHERE h.chat_id = :chat_id
+                    AND u.is_bot = false
+                GROUP BY m.user_id, u.first_name
+                HAVING COUNT(*) >= 10
+                ORDER BY humor_rate DESC
+                LIMIT :limit
+            """
+            return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
+        else:
+            query = """
+                SELECT
+                    m.user_id,
+                    u.first_name,
+                    ROUND(SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as humor_rate,
+                    SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                    COUNT(*) as messages_analyzed
+                FROM ml_humor h
+                JOIN messages m ON m.id = h.message_id
+                JOIN users u ON u.id = m.user_id
+                WHERE h.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                    AND u.is_bot = false
+                GROUP BY m.user_id, u.first_name
+                HAVING COUNT(*) >= 10
+                ORDER BY humor_rate DESC
+                LIMIT :limit
+            """
+            return self._execute_many(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "limit": limit,
+                },
+            )
+
+    # =========================================
+    # QUESTIONS METHODS
+    # =========================================
+
+    def get_questions_stats(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict:
+        """
+        Get questions overview statistics.
+
+        Returns:
+            {
+                'total_analyzed': int,
+                'question_count': int,
+                'question_rate': float,
+                'top_question_type': str | None
+            }
+        """
+        if start_date is None and end_date is None:
+            query = """
+                WITH stats AS (
+                    SELECT
+                        COUNT(*) as total_analyzed,
+                        SUM(CASE WHEN is_question THEN 1 ELSE 0 END) as question_count
+                    FROM ml_questions
+                    WHERE chat_id = :chat_id
+                ),
+                top_type AS (
+                    SELECT question_type
+                    FROM ml_questions
+                    WHERE chat_id = :chat_id AND is_question = true
+                    GROUP BY question_type
+                    ORDER BY COUNT(*) DESC
+                    LIMIT 1
+                )
+                SELECT
+                    s.total_analyzed,
+                    s.question_count,
+                    CASE WHEN s.total_analyzed > 0
+                        THEN ROUND(s.question_count * 100.0 / s.total_analyzed, 1)
+                        ELSE 0 END as question_rate,
+                    tt.question_type as top_question_type
+                FROM stats s
+                LEFT JOIN top_type tt ON true
+            """
+            result = self._execute_single(query, {"chat_id": chat_id})
+        else:
+            query = """
+                WITH stats AS (
+                    SELECT
+                        COUNT(*) as total_analyzed,
+                        SUM(CASE WHEN q.is_question THEN 1 ELSE 0 END) as question_count
+                    FROM ml_questions q
+                    JOIN messages m ON m.id = q.message_id
+                    WHERE q.chat_id = :chat_id
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                ),
+                top_type AS (
+                    SELECT q.question_type
+                    FROM ml_questions q
+                    JOIN messages m ON m.id = q.message_id
+                    WHERE q.chat_id = :chat_id
+                        AND q.is_question = true
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                    GROUP BY q.question_type
+                    ORDER BY COUNT(*) DESC
+                    LIMIT 1
+                )
+                SELECT
+                    s.total_analyzed,
+                    s.question_count,
+                    CASE WHEN s.total_analyzed > 0
+                        THEN ROUND(s.question_count * 100.0 / s.total_analyzed, 1)
+                        ELSE 0 END as question_rate,
+                    tt.question_type as top_question_type
+                FROM stats s
+                LEFT JOIN top_type tt ON true
+            """
+            result = self._execute_single(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+        return result or {
+            "total_analyzed": 0,
+            "question_count": 0,
+            "question_rate": 0,
+            "top_question_type": None,
+        }
+
+    def get_question_type_distribution(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get question type breakdown.
+
+        Returns DataFrame with columns:
+            question_type, count, percentage
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    question_type,
+                    COUNT(*) as count,
+                    ROUND(COUNT(*) * 100.0 / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) as percentage
+                FROM ml_questions
+                WHERE chat_id = :chat_id AND is_question = true
+                GROUP BY question_type
+                ORDER BY count DESC
+            """
+            return self._execute_df(query, {"chat_id": chat_id})
+        else:
+            query = """
+                SELECT
+                    q.question_type,
+                    COUNT(*) as count,
+                    ROUND(COUNT(*) * 100.0 / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) as percentage
+                FROM ml_questions q
+                JOIN messages m ON m.id = q.message_id
+                WHERE q.chat_id = :chat_id
+                    AND q.is_question = true
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                GROUP BY q.question_type
+                ORDER BY count DESC
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+    def get_questions_timeline(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get daily question counts.
+
+        Returns DataFrame with columns:
+            date, question_count, total_count
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    DATE(m.date) as date,
+                    SUM(CASE WHEN q.is_question THEN 1 ELSE 0 END) as question_count,
+                    COUNT(*) as total_count
+                FROM ml_questions q
+                JOIN messages m ON m.id = q.message_id
+                WHERE q.chat_id = :chat_id
+                GROUP BY DATE(m.date)
+                ORDER BY date
+            """
+            return self._execute_df(query, {"chat_id": chat_id})
+        else:
+            query = """
+                SELECT
+                    DATE(m.date) as date,
+                    SUM(CASE WHEN q.is_question THEN 1 ELSE 0 END) as question_count,
+                    COUNT(*) as total_count
+                FROM ml_questions q
+                JOIN messages m ON m.id = q.message_id
+                WHERE q.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                GROUP BY DATE(m.date)
+                ORDER BY date
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+            )
+
+    def get_most_inquisitive_users(
+        self,
+        chat_id: int,
+        limit: int = 10,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[dict]:
+        """
+        Get users ranked by question frequency.
+
+        Returns list of:
+            {
+                'user_id': int,
+                'first_name': str,
+                'question_rate': float,
+                'question_count': int,
+                'messages_analyzed': int
+            }
+        """
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    m.user_id,
+                    u.first_name,
+                    ROUND(SUM(CASE WHEN q.is_question THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as question_rate,
+                    SUM(CASE WHEN q.is_question THEN 1 ELSE 0 END) as question_count,
+                    COUNT(*) as messages_analyzed
+                FROM ml_questions q
+                JOIN messages m ON m.id = q.message_id
+                JOIN users u ON u.id = m.user_id
+                WHERE q.chat_id = :chat_id
+                    AND u.is_bot = false
+                GROUP BY m.user_id, u.first_name
+                HAVING COUNT(*) >= 10
+                ORDER BY question_rate DESC
+                LIMIT :limit
+            """
+            return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
+        else:
+            query = """
+                SELECT
+                    m.user_id,
+                    u.first_name,
+                    ROUND(SUM(CASE WHEN q.is_question THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as question_rate,
+                    SUM(CASE WHEN q.is_question THEN 1 ELSE 0 END) as question_count,
+                    COUNT(*) as messages_analyzed
+                FROM ml_questions q
+                JOIN messages m ON m.id = q.message_id
+                JOIN users u ON u.id = m.user_id
+                WHERE q.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                    AND u.is_bot = false
+                GROUP BY m.user_id, u.first_name
+                HAVING COUNT(*) >= 10
+                ORDER BY question_rate DESC
+                LIMIT :limit
+            """
+            return self._execute_many(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "limit": limit,
+                },
+            )

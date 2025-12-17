@@ -4,18 +4,34 @@ Uses Pydantic for environment variable parsing.
 """
 
 from functools import cached_property
-from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic_settings import BaseSettings
+
+ProviderType = Literal["local", "openai", "anthropic", "perspective"]
 
 
 class Config(BaseSettings):
     """Configuration loaded from environment variables."""
 
-    # API Service Configuration
-    api_service_url: str = "http://localhost:8080"
-    api_key_file: str = "../../infrastructure/secrets/apps/ml-processor/api_key"
+    # Database Configuration (direct PostgreSQL access)
+    db_host: str = "localhost"
+    db_port: int = 5432
+    db_user: str = "postgres"
+    db_password: str = ""
+    db_name: str = "beef_briefing"
+    db_ssl_mode: str = "disable"
+
+    # Provider Selection (per analysis type)
+    sentiment_provider: ProviderType = "local"
+    toxicity_provider: ProviderType = "local"
+    topics_provider: ProviderType = "local"
+    ner_provider: ProviderType = "local"
+
+    # Optional API Keys (only needed for non-local providers)
+    openai_api_key: Optional[str] = None
+    perspective_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
 
     # New Relic APM Configuration (optional)
     new_relic_app_name: Optional[str] = None
@@ -29,11 +45,12 @@ class Config(BaseSettings):
     batch_size: int = 500
     sleep_seconds: int = 60
 
-    # Model Configuration
+    # Model Configuration (for local providers)
     device: str = "cuda"
     sentiment_model: str = "lxyuan/distilbert-base-multilingual-cased-sentiments-student"
     toxicity_model: str = "ruanchaves/bert-base-portuguese-cased-hatebr"
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    ner_model: str = "pt_core_news_lg"
 
     # Application Settings
     environment: str = "development"
@@ -42,6 +59,14 @@ class Config(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+
+    def dsn(self) -> str:
+        """Return PostgreSQL connection string."""
+        return (
+            f"postgresql://{self.db_user}:{self.db_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+            f"?sslmode={self.db_ssl_mode}"
+        )
 
     def is_production(self) -> bool:
         """Check if running in production environment."""
@@ -58,18 +83,35 @@ class Config(BaseSettings):
             return f"{self.new_relic_app_name}-ml-processor-{self.environment}"
         return ""
 
-    @cached_property
-    def api_key(self) -> str:
-        """Load API key from file."""
-        key_path = Path(self.api_key_file)
-        if not key_path.exists():
-            raise FileNotFoundError(f"API key file not found: {key_path}")
-        return key_path.read_text().strip()
-
     @property
     def qdrant_url(self) -> str:
         """Return Qdrant connection URL."""
         return f"http://{self.qdrant_host}:{self.qdrant_port}"
+
+    def validate_api_keys(self) -> list[str]:
+        """Return list of missing API keys for configured providers."""
+        errors = []
+
+        api_providers = {
+            "openai": self.openai_api_key,
+            "anthropic": self.anthropic_api_key,
+            "perspective": self.perspective_api_key,
+        }
+
+        provider_attrs = [
+            ("sentiment_provider", self.sentiment_provider),
+            ("toxicity_provider", self.toxicity_provider),
+            ("topics_provider", self.topics_provider),
+            ("ner_provider", self.ner_provider),
+        ]
+
+        for attr_name, provider in provider_attrs:
+            if provider != "local" and not api_providers.get(provider):
+                errors.append(
+                    f"{attr_name}={provider} requires {provider.upper()}_API_KEY"
+                )
+
+        return errors
 
 
 def load_config() -> Config:

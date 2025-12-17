@@ -13,7 +13,7 @@ services:
       - postgres_data_dev:/var/lib/postgresql/data
       # To restore a backup on dev environment startup, run: make clean
       # then uncomment the line below and run: make up
-      # - ../local_backups/db/latest.sql:/docker-entrypoint-initdb.d/99-restore.sql:ro
+      - ../local_backups/db/latest.sql:/docker-entrypoint-initdb.d/99-restore.sql:ro
     networks:
       - beef-dev-network
     restart: unless-stopped
@@ -167,21 +167,34 @@ services:
       context: ..
       dockerfile: apps/ml-processor/Dockerfile
     container_name: beef-ml-processor-dev
+    command: ["python", "main.py", "continuous", "--chat-id", "${ML_CHAT_ID:--1003280306634}"]
     environment:
-      API_SERVICE_URL: ${API_SERVICE_URL}
-      API_KEY_FILE: /app/secrets/api_key
+      # Database (direct PostgreSQL access)
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_SSL_MODE: disable
+      # Provider selection
+      SENTIMENT_PROVIDER: local
+      TOXICITY_PROVIDER: local
+      TOPICS_PROVIDER: local
+      NER_PROVIDER: local
+      # Qdrant
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
+      # Processing
       BATCH_SIZE: ${ML_BATCH_SIZE:-500}
       SLEEP_SECONDS: ${ML_SLEEP_SECONDS:-60}
       DEVICE: ${ML_DEVICE:-cuda}
+      # Application
       ENVIRONMENT: development
       LOG_LEVEL: debug
     volumes:
-      - ./secrets/apps/ml-processor:/app/secrets:ro
       - ml_models_cache_dev:/root/.cache/huggingface
     depends_on:
-      - api-service
+      - postgres
       - qdrant
     networks:
       - beef-dev-network

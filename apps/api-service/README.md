@@ -382,7 +382,15 @@ curl -H "Authorization: Bearer $API_KEY" \
 
 ### POST `/api/v1/ml/results`
 
-Submit batch ML analysis results (sentiment, toxicity).
+Submit batch ML analysis results. All analysis types are optional - include only what you have.
+
+**Supported Analysis Types**:
+- `sentiment`: Sentiment classification (positive/neutral/negative)
+- `toxicity`: Toxicity/hate speech detection
+- `humor`: Humor detection (jokes, sarcasm, etc.)
+- `question`: Question detection and classification
+- `entities`: Named Entity Recognition (NER)
+- `topic`: Topic cluster assignment
 
 **Request Body**:
 
@@ -404,10 +412,33 @@ Submit batch ML analysis results (sentiment, toxicity).
         "is_toxic": false,
         "label": "non-hateful",
         "score": 0.92
+      },
+      "humor": {
+        "is_humorous": true,
+        "humor_type": "sarcasm",
+        "score": 0.78
+      },
+      "question": {
+        "is_question": false,
+        "question_type": null,
+        "score": 0.12
+      },
+      "entities": [
+        {
+          "entity_type": "PERSON",
+          "entity_text": "John",
+          "start_pos": 0,
+          "end_pos": 4,
+          "confidence": 0.95
+        }
+      ],
+      "topic": {
+        "topic_id": 3,
+        "similarity": 0.82
       }
     }
   ],
-  "processor_version": "v1.0.0"
+  "processor_version": "v2.0.0"
 }
 ```
 
@@ -420,7 +451,7 @@ Submit batch ML analysis results (sentiment, toxicity).
 }
 ```
 
-**Example**:
+**Example** (minimal - sentiment and toxicity only):
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/ml/results \
@@ -437,6 +468,27 @@ curl -X POST http://localhost:8080/api/v1/ml/results \
   }'
 ```
 
+**Example** (full - all analysis types):
+
+```bash
+curl -X POST http://localhost:8080/api/v1/ml/results \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "results": [{
+      "message_id": 12345,
+      "chat_id": -1003280306634,
+      "sentiment": {"label": "positive", "scores": {"positive": 0.8, "neutral": 0.15, "negative": 0.05}},
+      "toxicity": {"is_toxic": false, "label": "clean", "score": 0.98},
+      "humor": {"is_humorous": true, "humor_type": "joke", "score": 0.85},
+      "question": {"is_question": false, "score": 0.1},
+      "entities": [{"entity_type": "PERSON", "entity_text": "Bob", "confidence": 0.92}],
+      "topic": {"topic_id": 5, "similarity": 0.75}
+    }],
+    "processor_version": "v2.0.0"
+  }'
+```
+
 ### GET `/api/v1/ml/status`
 
 Get ML processing statistics.
@@ -450,7 +502,11 @@ Get ML processing statistics.
   "unprocessed": 75000,
   "sentiment_analyzed": 75000,
   "toxicity_analyzed": 75000,
-  "toxic_messages": 1234
+  "toxic_messages": 1234,
+  "humor_analyzed": 50000,
+  "questions_analyzed": 50000,
+  "entities_extracted": 45000,
+  "topics_assigned": 60000
 }
 ```
 

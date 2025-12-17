@@ -49,6 +49,43 @@ type ToxicityResult struct {
 	Score     float32 `json:"score"`
 }
 
+// HumorResult represents humor detection results for a message.
+type HumorResult struct {
+	MessageID  int64   `json:"message_id"`
+	ChatID     int64   `json:"chat_id"`
+	IsHumorous bool    `json:"is_humorous"`
+	HumorType  string  `json:"humor_type"`
+	Score      float32 `json:"score"`
+}
+
+// QuestionResult represents question detection results for a message.
+type QuestionResult struct {
+	MessageID    int64   `json:"message_id"`
+	ChatID       int64   `json:"chat_id"`
+	IsQuestion   bool    `json:"is_question"`
+	QuestionType string  `json:"question_type"`
+	Score        float32 `json:"score"`
+}
+
+// NERResult represents a named entity extracted from a message.
+type NERResult struct {
+	MessageID  int64   `json:"message_id"`
+	ChatID     int64   `json:"chat_id"`
+	EntityType string  `json:"entity_type"`
+	EntityText string  `json:"entity_text"`
+	StartPos   *int    `json:"start_pos,omitempty"`
+	EndPos     *int    `json:"end_pos,omitempty"`
+	Confidence float32 `json:"confidence"`
+}
+
+// MessageTopicResult represents a message's topic assignment.
+type MessageTopicResult struct {
+	MessageID  int64   `json:"message_id"`
+	ChatID     int64   `json:"chat_id"`
+	TopicID    int     `json:"topic_id"`
+	Similarity float32 `json:"similarity"`
+}
+
 // GetUnprocessedMessages fetches messages that haven't been processed by ML.
 func (r *MLRepository) GetUnprocessedMessages(ctx context.Context, limit int) ([]UnprocessedMessage, error) {
 	txn := newrelic.FromContext(ctx)
@@ -151,6 +188,42 @@ func (r *MLRepository) GetProcessingStats(ctx context.Context) (map[string]int64
 		return nil, fmt.Errorf("failed to count toxic: %w", err)
 	}
 	stats["toxic_messages"] = toxicCount
+
+	// Humor counts (use 0 if table doesn't exist yet)
+	var humorCount int64
+	err = r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM ml_humor`).Scan(&humorCount)
+	if err == nil {
+		stats["humor_analyzed"] = humorCount
+	} else {
+		stats["humor_analyzed"] = 0
+	}
+
+	// Question counts
+	var questionCount int64
+	err = r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM ml_questions`).Scan(&questionCount)
+	if err == nil {
+		stats["questions_analyzed"] = questionCount
+	} else {
+		stats["questions_analyzed"] = 0
+	}
+
+	// NER counts (count unique messages with entities)
+	var nerCount int64
+	err = r.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT message_id) FROM ml_ner`).Scan(&nerCount)
+	if err == nil {
+		stats["entities_extracted"] = nerCount
+	} else {
+		stats["entities_extracted"] = 0
+	}
+
+	// Topic assignment counts
+	var topicCount int64
+	err = r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM ml_message_topics`).Scan(&topicCount)
+	if err == nil {
+		stats["topics_assigned"] = topicCount
+	} else {
+		stats["topics_assigned"] = 0
+	}
 
 	return stats, nil
 }
@@ -328,6 +401,196 @@ func (r *MLRepository) SaveTopics(ctx context.Context, chatID int64, topics map[
 		_, err := stmt.ExecContext(ctx, chatID, topicID, pq.Array(keywords))
 		if err != nil {
 			return fmt.Errorf("failed to save topic %d: %w", topicID, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// SaveHumorResults saves humor detection results in batch.
+func (r *MLRepository) SaveHumorResults(ctx context.Context, results []HumorResult) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:ml-save-humor")
+		defer segment.End()
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO ml_humor (message_id, chat_id, is_humorous, humor_type, score)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (message_id) DO UPDATE SET
+			is_humorous = EXCLUDED.is_humorous,
+			humor_type = EXCLUDED.humor_type,
+			score = EXCLUDED.score,
+			created_at = NOW()
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, r := range results {
+		humorType := sql.NullString{String: r.HumorType, Valid: r.HumorType != ""}
+		_, err := stmt.ExecContext(ctx, r.MessageID, r.ChatID, r.IsHumorous, humorType, r.Score)
+		if err != nil {
+			return fmt.Errorf("failed to insert humor for message %d: %w", r.MessageID, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// SaveQuestionResults saves question detection results in batch.
+func (r *MLRepository) SaveQuestionResults(ctx context.Context, results []QuestionResult) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:ml-save-questions")
+		defer segment.End()
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO ml_questions (message_id, chat_id, is_question, question_type, score)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (message_id) DO UPDATE SET
+			is_question = EXCLUDED.is_question,
+			question_type = EXCLUDED.question_type,
+			score = EXCLUDED.score,
+			created_at = NOW()
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, r := range results {
+		questionType := sql.NullString{String: r.QuestionType, Valid: r.QuestionType != ""}
+		_, err := stmt.ExecContext(ctx, r.MessageID, r.ChatID, r.IsQuestion, questionType, r.Score)
+		if err != nil {
+			return fmt.Errorf("failed to insert question for message %d: %w", r.MessageID, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// SaveNERResults saves named entity recognition results in batch.
+func (r *MLRepository) SaveNERResults(ctx context.Context, results []NERResult) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:ml-save-ner")
+		defer segment.End()
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO ml_ner (message_id, chat_id, entity_type, entity_text, start_pos, end_pos, confidence)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (message_id, entity_type, entity_text, COALESCE(start_pos, -1)) DO UPDATE SET
+			confidence = EXCLUDED.confidence,
+			created_at = NOW()
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, r := range results {
+		var startPos, endPos sql.NullInt32
+		if r.StartPos != nil {
+			startPos = sql.NullInt32{Int32: int32(*r.StartPos), Valid: true}
+		}
+		if r.EndPos != nil {
+			endPos = sql.NullInt32{Int32: int32(*r.EndPos), Valid: true}
+		}
+		_, err := stmt.ExecContext(ctx, r.MessageID, r.ChatID, r.EntityType, r.EntityText, startPos, endPos, r.Confidence)
+		if err != nil {
+			return fmt.Errorf("failed to insert NER for message %d: %w", r.MessageID, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// SaveMessageTopics saves message-to-topic assignments in batch.
+func (r *MLRepository) SaveMessageTopics(ctx context.Context, results []MessageTopicResult) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:ml-save-message-topics")
+		defer segment.End()
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO ml_message_topics (message_id, chat_id, topic_id, similarity)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (message_id) DO UPDATE SET
+			topic_id = EXCLUDED.topic_id,
+			similarity = EXCLUDED.similarity,
+			created_at = NOW()
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, r := range results {
+		_, err := stmt.ExecContext(ctx, r.MessageID, r.ChatID, r.TopicID, r.Similarity)
+		if err != nil {
+			return fmt.Errorf("failed to insert topic for message %d: %w", r.MessageID, err)
 		}
 	}
 

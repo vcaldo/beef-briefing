@@ -214,14 +214,23 @@ class OpenAIQuestionClassifier(Analyzer):
     Uses gpt-4o-mini for question detection and classification.
     """
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(
+        self,
+        api_key: str | None = None,
+        max_retries: int = 5,
+        timeout: float = 60.0,
+    ):
         """
         Initialize with OpenAI API key.
 
         Args:
             api_key: OpenAI API key (required)
+            max_retries: Maximum retry attempts for rate limits/errors
+            timeout: Request timeout in seconds
         """
         self.api_key = api_key
+        self.max_retries = max_retries
+        self.timeout = timeout
         self._client = None
 
     @property
@@ -229,11 +238,15 @@ class OpenAIQuestionClassifier(Analyzer):
         return AnalysisType.QUESTIONS
 
     def _get_client(self):
-        """Lazy load the OpenAI client."""
+        """Lazy load the OpenAI client with retry configuration."""
         if self._client is None:
             from openai import OpenAI
 
-            self._client = OpenAI(api_key=self.api_key)
+            self._client = OpenAI(
+                api_key=self.api_key,
+                max_retries=self.max_retries,
+                timeout=self.timeout,
+            )
         return self._client
 
     def analyze(self, texts: list[str], **kwargs) -> list[dict]:

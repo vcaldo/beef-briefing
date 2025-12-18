@@ -173,7 +173,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.sentiment import OpenAISentimentAnalyzer
 
-                return OpenAISentimentAnalyzer(api_key=self.config.openai_api_key)
+                return OpenAISentimentAnalyzer(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
             elif provider == "anthropic":
                 from src.analyzers.sentiment import AnthropicSentimentAnalyzer
 
@@ -197,7 +201,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.toxicity import OpenAIModerationAnalyzer
 
-                return OpenAIModerationAnalyzer(api_key=self.config.openai_api_key)
+                return OpenAIModerationAnalyzer(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
 
         # ===== TOPICS =====
         elif analysis_type == AnalysisType.TOPICS:
@@ -208,7 +216,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.topics import OpenAITopicClusterer
 
-                return OpenAITopicClusterer(api_key=self.config.openai_api_key)
+                return OpenAITopicClusterer(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
 
         # ===== NER =====
         elif analysis_type == AnalysisType.NER:
@@ -219,7 +231,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.ner import OpenAINERExtractor
 
-                return OpenAINERExtractor(api_key=self.config.openai_api_key)
+                return OpenAINERExtractor(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
 
         # ===== EMBEDDINGS =====
         elif analysis_type == AnalysisType.EMBEDDINGS:
@@ -233,7 +249,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.embeddings import OpenAIEmbeddingEncoder
 
-                return OpenAIEmbeddingEncoder(api_key=self.config.openai_api_key)
+                return OpenAIEmbeddingEncoder(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
 
         # ===== HUMOR =====
         elif analysis_type == AnalysisType.HUMOR:
@@ -244,7 +264,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.humor import OpenAIHumorDetector
 
-                return OpenAIHumorDetector(api_key=self.config.openai_api_key)
+                return OpenAIHumorDetector(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
 
         # ===== QUESTIONS =====
         elif analysis_type == AnalysisType.QUESTIONS:
@@ -258,7 +282,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.questions import OpenAIQuestionClassifier
 
-                return OpenAIQuestionClassifier(api_key=self.config.openai_api_key)
+                return OpenAIQuestionClassifier(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
 
         raise ValueError(f"Unknown provider '{provider}' for {analysis_type}")
 

@@ -262,6 +262,8 @@ class OpenAITopicClusterer(Analyzer):
         api_key: str | None = None,
         min_cluster_size: int = 5,
         min_samples: int = 3,
+        max_retries: int = 5,
+        timeout: float = 60.0,
     ):
         """
         Initialize with OpenAI API key.
@@ -270,10 +272,14 @@ class OpenAITopicClusterer(Analyzer):
             api_key: OpenAI API key (required)
             min_cluster_size: Minimum cluster size for HDBSCAN
             min_samples: Minimum samples for core point
+            max_retries: Maximum retry attempts for rate limits/errors
+            timeout: Request timeout in seconds
         """
         self.api_key = api_key
         self.min_cluster_size = min_cluster_size
         self.min_samples = min_samples
+        self.max_retries = max_retries
+        self.timeout = timeout
         self._client = None
 
     @property
@@ -281,11 +287,15 @@ class OpenAITopicClusterer(Analyzer):
         return AnalysisType.TOPICS
 
     def _get_client(self):
-        """Lazy load the OpenAI client."""
+        """Lazy load the OpenAI client with retry configuration."""
         if self._client is None:
             from openai import OpenAI
 
-            self._client = OpenAI(api_key=self.api_key)
+            self._client = OpenAI(
+                api_key=self.api_key,
+                max_retries=self.max_retries,
+                timeout=self.timeout,
+            )
         return self._client
 
     def analyze(

@@ -153,6 +153,8 @@ class OpenAIEmbeddingEncoder(Analyzer):
         self,
         api_key: str | None = None,
         model_name: str = "text-embedding-3-small",
+        max_retries: int = 5,
+        timeout: float = 60.0,
     ):
         """
         Initialize with OpenAI API key.
@@ -160,9 +162,13 @@ class OpenAIEmbeddingEncoder(Analyzer):
         Args:
             api_key: OpenAI API key (required)
             model_name: OpenAI embedding model name
+            max_retries: Maximum retry attempts for rate limits/errors
+            timeout: Request timeout in seconds
         """
         self.api_key = api_key
         self.model_name = model_name
+        self.max_retries = max_retries
+        self.timeout = timeout
         self._client = None
 
     @property
@@ -170,11 +176,15 @@ class OpenAIEmbeddingEncoder(Analyzer):
         return AnalysisType.EMBEDDINGS
 
     def _get_client(self):
-        """Lazy load the OpenAI client."""
+        """Lazy load the OpenAI client with retry configuration."""
         if self._client is None:
             from openai import OpenAI
 
-            self._client = OpenAI(api_key=self.api_key)
+            self._client = OpenAI(
+                api_key=self.api_key,
+                max_retries=self.max_retries,
+                timeout=self.timeout,
+            )
         return self._client
 
     def analyze(self, texts: list[str], batch_size: int = 100, **kwargs) -> list[dict]:

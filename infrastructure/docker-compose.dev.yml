@@ -202,6 +202,9 @@ services:
       # Application
       ENVIRONMENT: development
       LOG_LEVEL: debug
+      # New Relic APM
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
     volumes:
       - ml_models_cache_dev:/root/.cache/huggingface
     depends_on:

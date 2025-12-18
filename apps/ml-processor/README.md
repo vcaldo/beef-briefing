@@ -111,7 +111,7 @@ Environment variables (see `.env.example`):
 | `API_KEY_FILE` | `../../infrastructure/secrets/apps/ml-processor/api_key` | Path to API key |
 | `QDRANT_HOST` | `localhost` | Qdrant host |
 | `QDRANT_PORT` | `6333` | Qdrant port |
-| `BATCH_SIZE` | `500` | Messages per batch (set via `ML_BATCH_SIZE` in docker-compose) |
+| `BATCH_SIZE` | `500` | Messages per batch (set via `ML_BATCH_SIZE` in docker-compose). **Note:** When using OpenAI providers, keep this ≤100 to avoid token limits. |
 | `SLEEP_SECONDS` | `60` | Sleep when no messages |
 | `DEVICE` | `cuda` | PyTorch device |
 
@@ -136,6 +136,8 @@ API keys (required for non-local providers):
 | `OPENAI_API_KEY` | `openai` provider |
 | `ANTHROPIC_API_KEY` | `anthropic` provider |
 | `PERSPECTIVE_API_KEY` | `perspective` provider |
+
+**Important:** OpenAI chat-based analyzers (sentiment, humor, questions, NER) batch all messages into a single prompt. Use `BATCH_SIZE ≤ 100` when using OpenAI providers to avoid exceeding token limits. The embeddings and moderation APIs have proper internal batching and can handle larger batch sizes.
 
 ### New Relic APM (optional)
 

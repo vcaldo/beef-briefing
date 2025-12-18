@@ -151,7 +151,7 @@ def create_content_timeline(
             overlaying="y",
             side="right",
             ticksuffix="%",
-            range=[0, max(df[rate_col].max() * 1.2, 10)],
+            range=[0, max(float(df[rate_col].max()) * 1.2, 10)],
         ),
         legend=dict(
             orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5
@@ -215,7 +215,7 @@ def create_user_ranking_bar(
 
     fig.update_layout(
         template="plotly_dark",
-        xaxis=dict(title=f"{label} Rate (%)", range=[0, df[rate_col].max() * 1.3]),
+        xaxis=dict(title=f"{label} Rate (%)", range=[0, float(df[rate_col].max()) * 1.3]),
         yaxis=dict(title=""),
         margin=dict(l=100, r=60, t=20, b=40),
         height=max(200, len(df) * 35 + 60),

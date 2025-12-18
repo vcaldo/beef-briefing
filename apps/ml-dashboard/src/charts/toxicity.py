@@ -75,7 +75,7 @@ def create_toxicity_timeline(df: pd.DataFrame) -> go.Figure:
             overlaying="y",
             side="right",
             ticksuffix="%",
-            range=[0, max(df["toxic_rate"].max() * 1.2, 10)],
+            range=[0, max(float(df["toxic_rate"].max()) * 1.2, 10)],
         ),
         legend=dict(
             orientation="h",
@@ -205,7 +205,7 @@ def create_user_toxicity_bar(users: list[dict], limit: int = 10) -> go.Figure:
         template="plotly_dark",
         xaxis=dict(
             title="Toxicity Rate (%)",
-            range=[0, df["toxicity_rate"].max() * 1.3],
+            range=[0, float(df["toxicity_rate"].max()) * 1.3],
         ),
         yaxis=dict(title=""),
         margin=dict(l=100, r=60, t=20, b=40),

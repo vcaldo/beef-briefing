@@ -16,6 +16,9 @@ from src.components.sidebar import render_sidebar
 from src.pages.group_overview import render_group_overview
 from src.pages.user_drilldown import render_user_drilldown
 from src.pages.embedding_explorer import render_embedding_explorer
+from src.pages.content_analysis import render_content_analysis
+from src.pages.entity_explorer import render_entity_explorer
+from src.pages.user_cards import render_user_cards
 
 
 # Page configuration
@@ -75,6 +78,15 @@ def main():
             render_user_drilldown(
                 queries, chat_id, user_id, qdrant=qdrant, reducer=reducer
             )
+
+    elif page == "Content Analysis":
+        render_content_analysis(queries, chat_id)
+
+    elif page == "Entity Explorer":
+        render_entity_explorer(queries, chat_id)
+
+    elif page == "User Cards":
+        render_user_cards(queries, chat_id)
 
     elif page == "Embedding Explorer":
         render_embedding_explorer(queries, chat_id, qdrant, reducer)

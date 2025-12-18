@@ -7,7 +7,9 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
-    # PostgreSQL only accessible via internal Docker network (no external port exposure)
+    # PostgreSQL accessible via internal Docker network + localhost (for SSH tunneling)
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - ${POSTGRES_DATA_PATH:-/mnt/postgres-data}/pgdata:/var/lib/postgresql/data
     networks:

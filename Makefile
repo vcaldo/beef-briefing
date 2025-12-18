@@ -154,6 +154,12 @@ prod-update-ip: ## Update API IP allowlist and restart api-service
 	scp $(PROD_ENV_FILE) $$($(MAKE) -s tf-ssh-user-host):~/beef-briefing/.env; \
 	ssh $$($(MAKE) -s tf-ssh-user-host) 'cd ~/beef-briefing && docker compose up -d --no-deps api-service'
 
+pg-tunnel: ## Open SSH tunnel to production PostgreSQL (localhost:5433 -> prod postgres)
+	@echo "Opening SSH tunnel to production PostgreSQL..."
+	@echo "Connect locally using: psql -h localhost -p 5433 -U postgres -d beef_briefing"
+	@echo "Press Ctrl+C to close the tunnel"
+	@ssh -L 5433:localhost:5432 $$($(MAKE) -s tf-ssh-user-host) -N
+
 # =============================================================================
 # DOCKER BUILD (docker-build-*)
 # =============================================================================
@@ -472,7 +478,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	up build deploy \
 	dev-up dev-up-build dev-up-logs dev-down dev-restart dev-ps dev-clean dev-prune \
 	prod-deploy prod-deploy-skip-build prod-deploy-skip-cleanup prod-deploy-regenerate-certs \
-	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik prod-update-ip \
+	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik prod-update-ip pg-tunnel \
 	docker-build docker-build-api docker-build-bot docker-build-leaderboard docker-build-ml-dashboard \
 	docker-logs docker-logs-api docker-logs-bot docker-logs-postgres docker-logs-minio \
 	docker-logs-newrelic docker-logs-leaderboard docker-logs-ml-dashboard \

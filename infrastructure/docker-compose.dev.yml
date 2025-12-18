@@ -13,7 +13,7 @@ services:
       - postgres_data_dev:/var/lib/postgresql/data
       # To restore a backup on dev environment startup, run: make clean
       # then uncomment the line below and run: make up
-      # - ../local_backups/db/latest.sql:/docker-entrypoint-initdb.d/99-restore.sql:ro
+      - ../local_backups/db/latest.sql:/docker-entrypoint-initdb.d/99-restore.sql:ro
     networks:
       - beef-dev-network
     restart: unless-stopped
@@ -162,26 +162,48 @@ services:
       - ml_dashboard_cache_dev:/app/cache
     depends_on:
       - postgres
+    networks:
+      - beef-dev-network
   ml-processor:
     build:
       context: ..
       dockerfile: apps/ml-processor/Dockerfile
     container_name: beef-ml-processor-dev
+    command: ["python", "main.py", "process", "--chat-id", "-1002572302334"]
     environment:
-      API_SERVICE_URL: ${API_SERVICE_URL}
-      API_KEY_FILE: /app/secrets/api_key
+      # Database (direct PostgreSQL access)
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_SSL_MODE: disable
+      # Provider selection (local, openai, anthropic, perspective)
+      SENTIMENT_PROVIDER: ${SENTIMENT_PROVIDER:-local}
+      TOXICITY_PROVIDER: ${TOXICITY_PROVIDER:-local}
+      EMBEDDINGS_PROVIDER: ${EMBEDDINGS_PROVIDER:-local}
+      TOPICS_PROVIDER: ${TOPICS_PROVIDER:-local}
+      NER_PROVIDER: ${NER_PROVIDER:-local}
+      HUMOR_PROVIDER: ${HUMOR_PROVIDER:-local}
+      QUESTIONS_PROVIDER: ${QUESTIONS_PROVIDER:-local}
+      # API keys (for non-local providers)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      PERSPECTIVE_API_KEY: ${PERSPECTIVE_API_KEY:-}
+      # Qdrant
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
+      # Processing
       BATCH_SIZE: ${ML_BATCH_SIZE:-500}
       SLEEP_SECONDS: ${ML_SLEEP_SECONDS:-60}
       DEVICE: ${ML_DEVICE:-cuda}
+      # Application
       ENVIRONMENT: development
       LOG_LEVEL: debug
     volumes:
-      - ./secrets/apps/ml-processor:/app/secrets:ro
       - ml_models_cache_dev:/root/.cache/huggingface
     depends_on:
-      - api-service
+      - postgres
       - qdrant
     networks:
       - beef-dev-network

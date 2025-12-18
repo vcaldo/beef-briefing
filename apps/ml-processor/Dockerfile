@@ -4,17 +4,17 @@ FROM nvidia/cuda:12.6.3-runtime-ubuntu24.04 AS builder
 
 WORKDIR /build
 
-# Install Python 3.14 from deadsnakes PPA
+# Install Python 3.12 from deadsnakes PPA (3.14 not yet supported by spaCy/pydantic)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common gnupg \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-    python3.14 python3.14-venv python3.14-dev \
+    python3.12 python3.12-venv python3.12-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment
-RUN python3.14 -m venv /opt/venv
+RUN python3.12 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy requirements first for layer caching
@@ -26,16 +26,19 @@ RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/wh
 # Install remaining dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Download spaCy Portuguese model (required for NER)
+RUN python -m spacy download pt_core_news_lg
+
 # Runtime stage
 FROM nvidia/cuda:12.6.3-runtime-ubuntu24.04
 
-# Install Python 3.14 runtime from deadsnakes PPA
+# Install Python 3.12 runtime from deadsnakes PPA
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common gnupg \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-    python3.14 python3.14-venv \
+    python3.12 python3.12-venv \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

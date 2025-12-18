@@ -25,6 +25,8 @@ TABS = [
     {"value": "leaderboard", "label": "Leaderboard", "icon": "mdi:trophy-outline"},
     {"value": "my-stats", "label": "My Stats", "icon": "mdi:account-outline"},
     {"value": "sentiment", "label": "Sentiment", "icon": "mdi:brain"},
+    {"value": "topics", "label": "Topics", "icon": "mdi:tag-multiple-outline"},
+    {"value": "insights", "label": "Insights", "icon": "mdi:lightbulb-outline"},
 ]
 
 

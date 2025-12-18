@@ -22,7 +22,14 @@ def render_sidebar(queries: MLDashboardQueries) -> tuple[int | None, int | None,
     # Page selection
     page = st.sidebar.radio(
         "View",
-        ["Group Overview", "User Analysis", "Embedding Explorer"],
+        [
+            "Group Overview",
+            "User Analysis",
+            "Content Analysis",
+            "Entity Explorer",
+            "User Cards",
+            "Embedding Explorer",
+        ],
         label_visibility="collapsed",
     )
 

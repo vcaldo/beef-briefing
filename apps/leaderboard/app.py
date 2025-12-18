@@ -40,6 +40,8 @@ from src.pages import (
     create_leaderboard_page,
     create_my_stats_page,
     create_sentiment_page,
+    create_topics_page,
+    create_insights_page,
 )
 from src.utils import filter_chats_for_user
 from src.components import DEFAULT_PERIOD
@@ -478,6 +480,8 @@ def display_page(pathname, search, theme_name):
             "leaderboard": create_leaderboard_page,
             "my-stats": create_my_stats_page,
             "sentiment": create_sentiment_page,
+            "topics": create_topics_page,
+            "insights": create_insights_page,
         }
 
         page_creator = page_creators.get(page_name)

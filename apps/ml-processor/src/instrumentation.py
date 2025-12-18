@@ -53,11 +53,12 @@ def background_task(name: str | None = None, group: str = "Task") -> Callable[[F
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             task_name = name or func.__name__
-            return newrelic.agent.background_task(
+            with newrelic.agent.BackgroundTask(
                 application=newrelic.agent.application(),
                 name=task_name,
                 group=group,
-            )(func)(*args, **kwargs)
+            ):
+                return func(*args, **kwargs)
 
         return wrapper  # type: ignore
 
@@ -82,10 +83,11 @@ def function_trace(name: str | None = None, group: str | None = None) -> Callabl
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             trace_name = name or func.__name__
-            return newrelic.agent.function_trace(
+            with newrelic.agent.FunctionTrace(
                 name=trace_name,
                 group=group,
-            )(func)(*args, **kwargs)
+            ):
+                return func(*args, **kwargs)
 
         return wrapper  # type: ignore
 

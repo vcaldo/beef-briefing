@@ -24,6 +24,8 @@ if _config.new_relic_enabled():
     import newrelic.agent
 
     newrelic.agent.initialize()
+    # For non-web apps, explicitly register and wait for connection
+    newrelic.agent.register_application(timeout=10.0)
 
 # Now import everything else
 import argparse

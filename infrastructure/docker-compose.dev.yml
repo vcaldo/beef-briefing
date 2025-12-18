@@ -171,7 +171,7 @@ services:
       dockerfile: apps/ml-processor/Dockerfile
     container_name: beef-ml-processor-dev
     # command: ["python", "main.py", "process", "--chat-id", "-1002572302334"]
-    command: ["python", "main.py", "process", "--chat-id", "-1002572302334", "--from-date", "2025-12-11"]
+    command: ["python", "main.py", "process", "--chat-id", "-1002572302334", "--from-date", "2025-11-18"]
     environment:
       # Database (direct PostgreSQL access)
       DB_HOST: postgres

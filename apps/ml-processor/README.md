@@ -79,23 +79,26 @@ make ml-run-prod PROD_API_URL=https://custom.domain.com
 # Activate virtual environment
 source venv/bin/activate
 
-# Run continuous processing
-python main.py
+# Run continuous processing (daemon mode)
+python main.py continuous --chat-id -1003280306634
 
-# Run single batch
-python main.py --once
+# Run batch processing (all unprocessed messages)
+python main.py process --chat-id -1003280306634
 
-# Check status
-python main.py --status
+# Run batch with limit
+python main.py process --chat-id -1003280306634 --limit 1000
 
-# Override batch size
-python main.py --limit 100
+# Process messages within a date range
+python main.py process --chat-id -1003280306634 --from-date 2024-11-01 --to-date 2024-12-01
 
-# Point to different API (e.g., production)
-python main.py --api-url https://barra-pesada.online
+# Process messages from a specific date onwards
+python main.py process --chat-id -1003280306634 --from-date 2024-11-18
 
-# Use different API key file
-python main.py --api-key-file /path/to/api_key
+# Process messages until a specific date
+python main.py process --chat-id -1003280306634 --to-date 2024-12-01
+
+# Check processing status
+python main.py status --chat-id -1003280306634
 ```
 
 ## Configuration
@@ -133,6 +136,23 @@ API keys (required for non-local providers):
 | `OPENAI_API_KEY` | `openai` provider |
 | `ANTHROPIC_API_KEY` | `anthropic` provider |
 | `PERSPECTIVE_API_KEY` | `perspective` provider |
+
+### New Relic APM (optional)
+
+Enable APM monitoring by setting both variables:
+
+| Variable | Description |
+|----------|-------------|
+| `NEW_RELIC_APP_NAME` | Base app name (e.g., `beef-briefing`) |
+| `NEW_RELIC_LICENSE_KEY` | Your New Relic license key |
+
+When enabled, the processor reports:
+- **Background tasks**: `process_batch`, `status`, `continuous`
+- **Function traces**: Analyzer execution, database operations, Qdrant storage
+- **Custom metrics**: `Custom/MLProcessor/BatchSize`, `Custom/MLProcessor/TotalProcessed`, `Custom/Qdrant/EmbeddingsStored`
+- **Custom attributes**: `chat_id`, `batch_size`, `limit`, `from_date`, `to_date`
+
+The app name in New Relic will be: `{NEW_RELIC_APP_NAME}-ml-processor-{ENVIRONMENT}`
 
 ## Output
 

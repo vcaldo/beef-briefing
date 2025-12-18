@@ -6,12 +6,14 @@ Coordinates analyzers and handles database operations.
 
 import logging
 import time
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from src.analyzers.base import AnalysisType, AnalyzerRegistry
 from src.database import MLQueries
+from src.instrumentation import function_trace, notice_error, record_custom_metric
 from src.vector.qdrant import QdrantWrapper
 
 if TYPE_CHECKING:
@@ -73,10 +75,13 @@ class MLProcessor:
         self.qdrant = None
         logger.info("ML processor cleaned up")
 
+    @function_trace(name="process_batch", group="MLProcessor")
     def process_batch(
         self,
         chat_id: int,
         limit: int | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
     ) -> int:
         """
         Process a batch of unprocessed messages.
@@ -84,6 +89,8 @@ class MLProcessor:
         Args:
             chat_id: Target chat ID
             limit: Maximum messages to process (defaults to config.batch_size)
+            from_date: Only process messages from this date (inclusive)
+            to_date: Only process messages until this date (exclusive)
 
         Returns:
             Number of messages processed
@@ -91,7 +98,9 @@ class MLProcessor:
         limit = limit or self.config.batch_size
 
         # Fetch unprocessed messages
-        messages = self.queries.get_unprocessed_messages(chat_id, limit)
+        messages = self.queries.get_unprocessed_messages(
+            chat_id, limit, from_date=from_date, to_date=to_date
+        )
 
         if not messages:
             logger.debug(f"No unprocessed messages for chat {chat_id}")
@@ -151,6 +160,7 @@ class MLProcessor:
         logger.info(f"Processed {len(messages)} messages")
         return len(messages)
 
+    @function_trace(name="run_sentiment", group="Analyzer")
     def _run_sentiment(self, texts: list[str]) -> list[dict] | None:
         """Run sentiment analysis if available."""
         analyzer = self.registry.get_if_available(AnalysisType.SENTIMENT)
@@ -161,8 +171,10 @@ class MLProcessor:
             return analyzer.analyze(texts)
         except Exception as e:
             logger.error(f"Sentiment analysis failed: {e}")
+            notice_error(e)
             return None
 
+    @function_trace(name="run_toxicity", group="Analyzer")
     def _run_toxicity(self, texts: list[str]) -> list[dict] | None:
         """Run toxicity detection if available."""
         analyzer = self.registry.get_if_available(AnalysisType.TOXICITY)
@@ -173,8 +185,10 @@ class MLProcessor:
             return analyzer.analyze(texts)
         except Exception as e:
             logger.error(f"Toxicity detection failed: {e}")
+            notice_error(e)
             return None
 
+    @function_trace(name="run_embeddings", group="Analyzer")
     def _run_embeddings(self, texts: list[str]) -> np.ndarray | None:
         """Run embedding generation if available."""
         analyzer = self.registry.get_if_available(AnalysisType.EMBEDDINGS)
@@ -193,8 +207,10 @@ class MLProcessor:
                 return np.array([r["embedding"] for r in results])
         except Exception as e:
             logger.error(f"Embedding generation failed: {e}")
+            notice_error(e)
             return None
 
+    @function_trace(name="run_ner", group="Analyzer")
     def _run_ner(self, texts: list[str]) -> list[list[dict]] | None:
         """Run NER extraction if available."""
         analyzer = self.registry.get_if_available(AnalysisType.NER)
@@ -205,8 +221,10 @@ class MLProcessor:
             return analyzer.analyze(texts)
         except Exception as e:
             logger.error(f"NER extraction failed: {e}")
+            notice_error(e)
             return None
 
+    @function_trace(name="run_humor", group="Analyzer")
     def _run_humor(self, texts: list[str]) -> list[dict] | None:
         """Run humor detection if available."""
         analyzer = self.registry.get_if_available(AnalysisType.HUMOR)
@@ -217,8 +235,10 @@ class MLProcessor:
             return analyzer.analyze(texts)
         except Exception as e:
             logger.error(f"Humor detection failed: {e}")
+            notice_error(e)
             return None
 
+    @function_trace(name="run_questions", group="Analyzer")
     def _run_questions(self, texts: list[str]) -> list[dict] | None:
         """Run question detection if available."""
         analyzer = self.registry.get_if_available(AnalysisType.QUESTIONS)
@@ -229,8 +249,10 @@ class MLProcessor:
             return analyzer.analyze(texts)
         except Exception as e:
             logger.error(f"Question detection failed: {e}")
+            notice_error(e)
             return None
 
+    @function_trace(name="run_topics", group="Analyzer")
     def _run_topics(
         self,
         texts: list[str],
@@ -270,6 +292,7 @@ class MLProcessor:
             logger.error(f"Topic clustering failed: {e}")
             return None, {}, {}
 
+    @function_trace(name="store_embeddings", group="Qdrant")
     def _store_embeddings(
         self,
         message_ids: list[int],
@@ -287,10 +310,13 @@ class MLProcessor:
                 texts=texts,
                 embeddings=embeddings,
             )
+            record_custom_metric("Custom/Qdrant/EmbeddingsStored", len(message_ids))
             logger.debug(f"Stored {len(message_ids)} embeddings in Qdrant")
         except Exception as e:
             logger.error(f"Failed to store embeddings in Qdrant: {e}")
+            notice_error(e)
 
+    @function_trace(name="save_results", group="Database")
     def _save_results(
         self,
         chat_id: int,

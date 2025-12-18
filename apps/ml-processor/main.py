@@ -4,6 +4,7 @@ ML Processor - Analyzes Portuguese chat messages using local ML models.
 
 Usage:
     python main.py process --chat-id -1003280306634 [--limit N] [--batch-size N]
+    python main.py process --chat-id -1003280306634 --from-date 2024-11-01 --to-date 2024-12-01
     python main.py status --chat-id -1003280306634
     python main.py continuous --chat-id -1003280306634
 """
@@ -27,11 +28,17 @@ if _config.new_relic_enabled():
 # Now import everything else
 import argparse
 import logging
+from datetime import datetime
 
 from sqlalchemy import create_engine
 
 from src.analyzers.base import AnalyzerRegistry
 from src.database import MLQueries
+from src.instrumentation import (
+    add_custom_attributes,
+    background_task,
+    record_custom_metric,
+)
 from src.processor import MLProcessor
 
 logger = logging.getLogger(__name__)
@@ -86,9 +93,40 @@ def create_processor(config) -> MLProcessor:
     return processor
 
 
+def parse_date(date_str: str | None) -> datetime | None:
+    """Parse date string in YYYY-MM-DD format."""
+    if date_str is None:
+        return None
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError(f"Invalid date format: {date_str}. Use YYYY-MM-DD")
+
+
+@background_task(name="process_batch", group="MLProcessor")
 def run_process(args, config):
     """Run batch processing command."""
     logger.info(f"Processing chat {args.chat_id}")
+
+    # Parse date arguments
+    from_date = parse_date(getattr(args, "from_date", None))
+    to_date = parse_date(getattr(args, "to_date", None))
+
+    # Add custom attributes for APM tracking
+    add_custom_attributes(
+        {
+            "chat_id": args.chat_id,
+            "batch_size": args.batch_size,
+            "limit": args.limit,
+            "from_date": str(from_date.date()) if from_date else None,
+            "to_date": str(to_date.date()) if to_date else None,
+        }
+    )
+
+    if from_date:
+        logger.info(f"From date: {from_date.date()}")
+    if to_date:
+        logger.info(f"To date: {to_date.date()}")
 
     processor = create_processor(config)
     processor.setup()
@@ -113,8 +151,16 @@ def run_process(args, config):
                     break
 
             # Process batch
-            count = processor.process_batch(args.chat_id, limit=current_batch)
+            count = processor.process_batch(
+                args.chat_id,
+                limit=current_batch,
+                from_date=from_date,
+                to_date=to_date,
+            )
             total_processed += count
+
+            # Record batch metrics
+            record_custom_metric("Custom/MLProcessor/BatchSize", count)
 
             logger.info(f"Batch complete: {count} messages (total: {total_processed})")
 
@@ -126,6 +172,8 @@ def run_process(args, config):
             if count < current_batch:
                 break
 
+        # Record total processed metric
+        record_custom_metric("Custom/MLProcessor/TotalProcessed", total_processed)
         logger.info(f"Processing complete: {total_processed} total messages processed")
         return total_processed
 
@@ -133,8 +181,11 @@ def run_process(args, config):
         processor.cleanup()
 
 
+@background_task(name="status", group="MLProcessor")
 def run_status(args, config):
     """Run status command."""
+    add_custom_attributes({"chat_id": args.chat_id})
+
     processor = create_processor(config)
     processor.setup()
 
@@ -144,9 +195,12 @@ def run_status(args, config):
         processor.cleanup()
 
 
+@background_task(name="continuous", group="MLProcessor")
 def run_continuous(args, config):
     """Run continuous processing command."""
     logger.info(f"Starting continuous processing for chat {args.chat_id}")
+
+    add_custom_attributes({"chat_id": args.chat_id})
 
     processor = create_processor(config)
     processor.setup()
@@ -195,6 +249,18 @@ def main():
         type=int,
         default=None,
         help="Max messages to process (default: unlimited)",
+    )
+    process_parser.add_argument(
+        "--from-date",
+        type=str,
+        default=None,
+        help="Process messages from this date (YYYY-MM-DD)",
+    )
+    process_parser.add_argument(
+        "--to-date",
+        type=str,
+        default=None,
+        help="Process messages until this date (YYYY-MM-DD)",
     )
 
     # status command

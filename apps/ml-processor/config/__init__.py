@@ -43,6 +43,8 @@ class Config(BaseSettings):
     # New Relic APM Configuration (optional)
     new_relic_app_name: Optional[str] = None
     new_relic_license_key: Optional[str] = None
+    new_relic_ai_monitoring_enabled: bool = True  # Enable AI monitoring for LLM calls
+    track_ai_costs: bool = True  # Track estimated costs based on token usage
 
     # Qdrant Configuration
     qdrant_host: str = "localhost"

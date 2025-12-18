@@ -244,6 +244,10 @@ class LocalTopicClusterer(Analyzer):
         except ImportError:
             return False
 
+    def get_model_name(self) -> str:
+        """Return the algorithm name."""
+        return "hdbscan"
+
     def cleanup(self) -> None:
         """No resources to release."""
         pass
@@ -256,6 +260,8 @@ class OpenAITopicClusterer(Analyzer):
     Uses OpenAI's text-embedding-3-small for embeddings,
     then clusters locally with HDBSCAN.
     """
+
+    MODEL_NAME = "text-embedding-3-small"
 
     def __init__(
         self,
@@ -281,6 +287,7 @@ class OpenAITopicClusterer(Analyzer):
         self.max_retries = max_retries
         self.timeout = timeout
         self._client = None
+        self._last_usage: dict | None = None
 
     @property
     def analysis_type(self) -> AnalysisType:
@@ -321,9 +328,18 @@ class OpenAITopicClusterer(Analyzer):
 
         # Get embeddings from OpenAI
         response = client.embeddings.create(
-            model="text-embedding-3-small",
+            model=self.MODEL_NAME,
             input=texts,
         )
+
+        # Capture token usage for monitoring
+        if response.usage:
+            self._last_usage = {
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": 0,
+                "total_tokens": response.usage.total_tokens,
+                "model": self.MODEL_NAME,
+            }
 
         embeddings = np.array([e.embedding for e in response.data])
 
@@ -339,6 +355,15 @@ class OpenAITopicClusterer(Analyzer):
         """Check if OpenAI API key is available."""
         return bool(self.api_key)
 
+    def get_model_name(self) -> str:
+        """Return the OpenAI model name."""
+        return self.MODEL_NAME
+
+    def is_local_provider(self) -> bool:
+        """Return False - this uses OpenAI API for embeddings."""
+        return False
+
     def cleanup(self) -> None:
         """Release client resources."""
         self._client = None
+        self._last_usage = None

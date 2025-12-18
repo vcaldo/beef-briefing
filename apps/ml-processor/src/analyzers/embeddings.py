@@ -118,6 +118,10 @@ class LocalEmbeddingEncoder(Analyzer):
         except ImportError:
             return False
 
+    def get_model_name(self) -> str:
+        """Return the sentence-transformers model name."""
+        return self.model_name
+
     def cleanup(self) -> None:
         """Release model resources."""
         if self._model is not None:
@@ -170,6 +174,7 @@ class OpenAIEmbeddingEncoder(Analyzer):
         self.max_retries = max_retries
         self.timeout = timeout
         self._client = None
+        self._last_usage: dict | None = None
 
     @property
     def analysis_type(self) -> AnalysisType:
@@ -237,6 +242,18 @@ class OpenAIEmbeddingEncoder(Analyzer):
                     input=batch,
                 )
 
+                # Capture token usage for monitoring (accumulate across batches)
+                if response.usage:
+                    if self._last_usage is None:
+                        self._last_usage = {
+                            "prompt_tokens": 0,
+                            "completion_tokens": 0,
+                            "total_tokens": 0,
+                            "model": self.model_name,
+                        }
+                    self._last_usage["prompt_tokens"] += response.usage.prompt_tokens
+                    self._last_usage["total_tokens"] += response.usage.total_tokens
+
                 # Sort by index to ensure correct order
                 sorted_data = sorted(response.data, key=lambda x: x.index)
                 batch_embeddings = [item.embedding for item in sorted_data]
@@ -259,6 +276,15 @@ class OpenAIEmbeddingEncoder(Analyzer):
         """Check if OpenAI API key is available."""
         return bool(self.api_key)
 
+    def get_model_name(self) -> str:
+        """Return the OpenAI embedding model name."""
+        return self.model_name
+
+    def is_local_provider(self) -> bool:
+        """Return False - this uses OpenAI API."""
+        return False
+
     def cleanup(self) -> None:
         """Release client resources."""
         self._client = None
+        self._last_usage = None

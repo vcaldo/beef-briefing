@@ -11,6 +11,25 @@ from typing import Any, Callable, TypeVar
 
 logger = logging.getLogger(__name__)
 
+# Model pricing per token (in USD)
+# Based on 2024 pricing: https://openai.com/pricing
+MODEL_PRICING: dict[str, dict[str, float]] = {
+    # OpenAI Chat Models
+    "gpt-4o-mini": {"input": 0.15e-6, "output": 0.60e-6},
+    "gpt-4o": {"input": 2.50e-6, "output": 10.0e-6},
+    "gpt-4-turbo": {"input": 10.0e-6, "output": 30.0e-6},
+    # OpenAI Embedding Models
+    "text-embedding-3-small": {"input": 0.02e-6, "output": 0.0},
+    "text-embedding-3-large": {"input": 0.13e-6, "output": 0.0},
+    "text-embedding-ada-002": {"input": 0.10e-6, "output": 0.0},
+    # OpenAI Moderation (free)
+    "omni-moderation-latest": {"input": 0.0, "output": 0.0},
+    # Anthropic Models
+    "claude-3-haiku-20240307": {"input": 0.25e-6, "output": 1.25e-6},
+    "claude-3-5-haiku-20241022": {"input": 1.0e-6, "output": 5.0e-6},
+    "claude-3-5-sonnet-20241022": {"input": 3.0e-6, "output": 15.0e-6},
+}
+
 # Type variable for generic function signatures
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -176,3 +195,99 @@ def notice_error(error: Exception | None = None) -> None:
         newrelic.agent.notice_error(error=error)
     except Exception as e:
         logger.debug(f"Failed to notice error: {e}")
+
+
+def calculate_cost(
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int = 0,
+) -> float:
+    """
+    Calculate the estimated cost for API usage.
+
+    Args:
+        model: Model name (e.g., "gpt-4o-mini")
+        prompt_tokens: Number of input/prompt tokens
+        completion_tokens: Number of output/completion tokens
+
+    Returns:
+        Estimated cost in USD
+    """
+    pricing = MODEL_PRICING.get(model, {"input": 0.0, "output": 0.0})
+    input_cost = prompt_tokens * pricing["input"]
+    output_cost = completion_tokens * pricing["output"]
+    return input_cost + output_cost
+
+
+def add_analyzer_attributes(
+    analysis_type: str,
+    provider: str,
+    model: str,
+    is_local: bool,
+    batch_size: int,
+    usage: dict | None = None,
+) -> None:
+    """
+    Add analyzer-specific attributes to the current transaction.
+
+    Args:
+        analysis_type: Type of analysis (sentiment, toxicity, etc.)
+        provider: Provider name (local, openai, anthropic, etc.)
+        model: Model name used
+        is_local: Whether this is a local provider
+        batch_size: Number of texts in the batch
+        usage: Token usage dict with prompt_tokens, completion_tokens, total_tokens
+    """
+    prefix = analysis_type.lower()
+
+    attributes = {
+        f"{prefix}.provider": provider,
+        f"{prefix}.model": model,
+        f"{prefix}.is_local": is_local,
+        f"{prefix}.batch_size": batch_size,
+    }
+
+    if usage:
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        completion_tokens = usage.get("completion_tokens", 0)
+        total_tokens = usage.get("total_tokens", 0)
+        model_name = usage.get("model", model)
+
+        attributes[f"{prefix}.tokens.prompt"] = prompt_tokens
+        attributes[f"{prefix}.tokens.completion"] = completion_tokens
+        attributes[f"{prefix}.tokens.total"] = total_tokens
+
+        # Calculate and add cost
+        cost = calculate_cost(model_name, prompt_tokens, completion_tokens)
+        if cost > 0:
+            attributes[f"{prefix}.cost.estimated"] = cost
+
+    add_custom_attributes(attributes)
+
+
+def record_batch_ai_metrics(
+    total_tokens: int,
+    total_cost: float,
+    api_calls: int,
+    local_inferences: int,
+) -> None:
+    """
+    Record aggregate AI metrics for a batch.
+
+    Args:
+        total_tokens: Total tokens used across all API calls
+        total_cost: Total estimated cost in USD
+        api_calls: Number of API calls made
+        local_inferences: Number of local model inferences
+    """
+    record_custom_metric("Custom/AI/TotalTokens", total_tokens)
+    record_custom_metric("Custom/AI/EstimatedCost", total_cost)
+    record_custom_metric("Custom/AI/APICalls", api_calls)
+    record_custom_metric("Custom/AI/LocalInferences", local_inferences)
+
+    add_custom_attributes({
+        "ai.batch.total_tokens": total_tokens,
+        "ai.batch.estimated_cost": total_cost,
+        "ai.batch.api_calls": api_calls,
+        "ai.batch.local_inferences": local_inferences,
+    })

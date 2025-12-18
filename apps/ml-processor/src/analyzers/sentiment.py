@@ -112,6 +112,10 @@ class LocalSentimentAnalyzer(Analyzer):
         except ImportError:
             return False
 
+    def get_model_name(self) -> str:
+        """Return the HuggingFace model name."""
+        return self.model_name
+
     def cleanup(self) -> None:
         """Release model resources."""
         if self._pipeline is not None:
@@ -126,6 +130,8 @@ class OpenAISentimentAnalyzer(Analyzer):
 
     Uses gpt-4o-mini for cost-effective batch sentiment analysis.
     """
+
+    MODEL_NAME = "gpt-4o-mini"
 
     def __init__(
         self,
@@ -145,6 +151,7 @@ class OpenAISentimentAnalyzer(Analyzer):
         self.max_retries = max_retries
         self.timeout = timeout
         self._client = None
+        self._last_usage: dict | None = None
 
     @property
     def analysis_type(self) -> AnalysisType:
@@ -191,11 +198,20 @@ Messages:
             prompt += f"{i + 1}. {text[:500]}\n"  # Truncate long texts
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self.MODEL_NAME,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0,
         )
+
+        # Capture token usage for monitoring
+        if response.usage:
+            self._last_usage = {
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens,
+                "model": self.MODEL_NAME,
+            }
 
         import json
 
@@ -237,9 +253,18 @@ Messages:
         """Check if OpenAI API key is available."""
         return bool(self.api_key)
 
+    def get_model_name(self) -> str:
+        """Return the OpenAI model name."""
+        return self.MODEL_NAME
+
+    def is_local_provider(self) -> bool:
+        """Return False - this uses OpenAI API."""
+        return False
+
     def cleanup(self) -> None:
         """Release client resources."""
         self._client = None
+        self._last_usage = None
 
 
 class AnthropicSentimentAnalyzer(Analyzer):
@@ -248,6 +273,8 @@ class AnthropicSentimentAnalyzer(Analyzer):
 
     Uses claude-3-haiku for cost-effective batch sentiment analysis.
     """
+
+    MODEL_NAME = "claude-3-haiku-20240307"
 
     def __init__(self, api_key: str | None = None):
         """
@@ -258,6 +285,7 @@ class AnthropicSentimentAnalyzer(Analyzer):
         """
         self.api_key = api_key
         self._client = None
+        self._last_usage: dict | None = None
 
     @property
     def analysis_type(self) -> AnalysisType:
@@ -298,10 +326,19 @@ Messages to analyze:
             prompt += f"{i + 1}. {text[:500]}\n"
 
         response = client.messages.create(
-            model="claude-3-haiku-20240307",
+            model=self.MODEL_NAME,
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
+
+        # Capture token usage for monitoring
+        if response.usage:
+            self._last_usage = {
+                "prompt_tokens": response.usage.input_tokens,
+                "completion_tokens": response.usage.output_tokens,
+                "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
+                "model": self.MODEL_NAME,
+            }
 
         import json
 
@@ -350,6 +387,15 @@ Messages to analyze:
         """Check if Anthropic API key is available."""
         return bool(self.api_key)
 
+    def get_model_name(self) -> str:
+        """Return the Anthropic model name."""
+        return self.MODEL_NAME
+
+    def is_local_provider(self) -> bool:
+        """Return False - this uses Anthropic API."""
+        return False
+
     def cleanup(self) -> None:
         """Release client resources."""
         self._client = None
+        self._last_usage = None

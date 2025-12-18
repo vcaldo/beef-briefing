@@ -149,6 +149,10 @@ class LocalNERExtractor(Analyzer):
         except ImportError:
             return False
 
+    def get_model_name(self) -> str:
+        """Return the spaCy model name."""
+        return self.model_name
+
     def cleanup(self) -> None:
         """Release model resources."""
         if self._nlp is not None:
@@ -163,6 +167,8 @@ class OpenAINERExtractor(Analyzer):
 
     Uses GPT-4o-mini for entity extraction via structured output.
     """
+
+    MODEL_NAME = "gpt-4o-mini"
 
     def __init__(
         self,
@@ -182,6 +188,7 @@ class OpenAINERExtractor(Analyzer):
         self.max_retries = max_retries
         self.timeout = timeout
         self._client = None
+        self._last_usage: dict | None = None
 
     @property
     def analysis_type(self) -> AnalysisType:
@@ -231,11 +238,20 @@ Messages:
 
         try:
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=self.MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
                 temperature=0,
             )
+
+            # Capture token usage for monitoring
+            if response.usage:
+                self._last_usage = {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                    "model": self.MODEL_NAME,
+                }
 
             import json
 
@@ -277,6 +293,15 @@ Messages:
         """Check if OpenAI API key is available."""
         return bool(self.api_key)
 
+    def get_model_name(self) -> str:
+        """Return the OpenAI model name."""
+        return self.MODEL_NAME
+
+    def is_local_provider(self) -> bool:
+        """Return False - this uses OpenAI API."""
+        return False
+
     def cleanup(self) -> None:
         """Release client resources."""
         self._client = None
+        self._last_usage = None

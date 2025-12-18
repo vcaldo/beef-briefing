@@ -70,6 +70,29 @@ class Analyzer(ABC):
         """Return the provider name for logging."""
         return self.__class__.__name__
 
+    def get_model_name(self) -> str:
+        """Return the model name used by this analyzer."""
+        return "unknown"
+
+    def is_local_provider(self) -> bool:
+        """Return True if this analyzer runs locally (not via API)."""
+        return True
+
+    @property
+    def last_usage(self) -> dict | None:
+        """
+        Return token usage from the last API call.
+
+        Returns dict with keys:
+        - prompt_tokens: int
+        - completion_tokens: int
+        - total_tokens: int
+        - model: str
+
+        Returns None for local providers or if no usage data available.
+        """
+        return getattr(self, "_last_usage", None)
+
     def cleanup(self) -> None:
         """
         Release any resources held by this analyzer.

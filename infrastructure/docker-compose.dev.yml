@@ -205,6 +205,8 @@ services:
       # New Relic APM
       NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      NEW_RELIC_AI_MONITORING_ENABLED: "true"
+      TRACK_AI_COSTS: "true"
     volumes:
       - ml_models_cache_dev:/root/.cache/huggingface
     depends_on:

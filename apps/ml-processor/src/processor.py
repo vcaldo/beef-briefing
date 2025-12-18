@@ -13,7 +13,14 @@ import numpy as np
 
 from src.analyzers.base import AnalysisType, AnalyzerRegistry
 from src.database import MLQueries
-from src.instrumentation import function_trace, notice_error, record_custom_metric
+from src.instrumentation import (
+    add_analyzer_attributes,
+    calculate_cost,
+    function_trace,
+    notice_error,
+    record_batch_ai_metrics,
+    record_custom_metric,
+)
 from src.vector.qdrant import QdrantWrapper
 
 if TYPE_CHECKING:
@@ -157,8 +164,43 @@ class MLProcessor:
             processor_version=PROCESSOR_VERSION,
         )
 
+        # Record batch-level AI metrics
+        self._record_batch_metrics()
+
         logger.info(f"Processed {len(messages)} messages")
         return len(messages)
+
+    def _record_batch_metrics(self) -> None:
+        """Collect and record aggregate AI metrics for the batch."""
+        total_tokens = 0
+        total_cost = 0.0
+        api_calls = 0
+        local_inferences = 0
+
+        # Collect usage from all loaded analyzers
+        for analysis_type in AnalysisType:
+            if analysis_type in self.registry._analyzers:
+                analyzer = self.registry._analyzers[analysis_type]
+                usage = analyzer.last_usage
+
+                if analyzer.is_local_provider():
+                    local_inferences += 1
+                else:
+                    api_calls += 1
+                    if usage:
+                        prompt_tokens = usage.get("prompt_tokens", 0)
+                        completion_tokens = usage.get("completion_tokens", 0)
+                        model = usage.get("model", "unknown")
+
+                        total_tokens += usage.get("total_tokens", 0)
+                        total_cost += calculate_cost(model, prompt_tokens, completion_tokens)
+
+        record_batch_ai_metrics(
+            total_tokens=total_tokens,
+            total_cost=total_cost,
+            api_calls=api_calls,
+            local_inferences=local_inferences,
+        )
 
     @function_trace(name="run_sentiment", group="Analyzer")
     def _run_sentiment(self, texts: list[str]) -> list[dict] | None:
@@ -168,7 +210,16 @@ class MLProcessor:
             return None
 
         try:
-            return analyzer.analyze(texts)
+            result = analyzer.analyze(texts)
+            add_analyzer_attributes(
+                analysis_type="sentiment",
+                provider=analyzer.get_provider_name(),
+                model=analyzer.get_model_name(),
+                is_local=analyzer.is_local_provider(),
+                batch_size=len(texts),
+                usage=analyzer.last_usage,
+            )
+            return result
         except Exception as e:
             logger.error(f"Sentiment analysis failed: {e}")
             notice_error(e)
@@ -182,7 +233,16 @@ class MLProcessor:
             return None
 
         try:
-            return analyzer.analyze(texts)
+            result = analyzer.analyze(texts)
+            add_analyzer_attributes(
+                analysis_type="toxicity",
+                provider=analyzer.get_provider_name(),
+                model=analyzer.get_model_name(),
+                is_local=analyzer.is_local_provider(),
+                batch_size=len(texts),
+                usage=analyzer.last_usage,
+            )
+            return result
         except Exception as e:
             logger.error(f"Toxicity detection failed: {e}")
             notice_error(e)
@@ -200,11 +260,21 @@ class MLProcessor:
             from src.analyzers.embeddings import LocalEmbeddingEncoder
 
             if isinstance(analyzer, LocalEmbeddingEncoder):
-                return analyzer.encode(texts)
+                result = analyzer.encode(texts)
             else:
                 # Fallback for other implementations
                 results = analyzer.analyze(texts)
-                return np.array([r["embedding"] for r in results])
+                result = np.array([r["embedding"] for r in results])
+
+            add_analyzer_attributes(
+                analysis_type="embeddings",
+                provider=analyzer.get_provider_name(),
+                model=analyzer.get_model_name(),
+                is_local=analyzer.is_local_provider(),
+                batch_size=len(texts),
+                usage=analyzer.last_usage,
+            )
+            return result
         except Exception as e:
             logger.error(f"Embedding generation failed: {e}")
             notice_error(e)
@@ -218,7 +288,16 @@ class MLProcessor:
             return None
 
         try:
-            return analyzer.analyze(texts)
+            result = analyzer.analyze(texts)
+            add_analyzer_attributes(
+                analysis_type="ner",
+                provider=analyzer.get_provider_name(),
+                model=analyzer.get_model_name(),
+                is_local=analyzer.is_local_provider(),
+                batch_size=len(texts),
+                usage=analyzer.last_usage,
+            )
+            return result
         except Exception as e:
             logger.error(f"NER extraction failed: {e}")
             notice_error(e)
@@ -232,7 +311,16 @@ class MLProcessor:
             return None
 
         try:
-            return analyzer.analyze(texts)
+            result = analyzer.analyze(texts)
+            add_analyzer_attributes(
+                analysis_type="humor",
+                provider=analyzer.get_provider_name(),
+                model=analyzer.get_model_name(),
+                is_local=analyzer.is_local_provider(),
+                batch_size=len(texts),
+                usage=analyzer.last_usage,
+            )
+            return result
         except Exception as e:
             logger.error(f"Humor detection failed: {e}")
             notice_error(e)
@@ -246,7 +334,16 @@ class MLProcessor:
             return None
 
         try:
-            return analyzer.analyze(texts)
+            result = analyzer.analyze(texts)
+            add_analyzer_attributes(
+                analysis_type="questions",
+                provider=analyzer.get_provider_name(),
+                model=analyzer.get_model_name(),
+                is_local=analyzer.is_local_provider(),
+                batch_size=len(texts),
+                usage=analyzer.last_usage,
+            )
+            return result
         except Exception as e:
             logger.error(f"Question detection failed: {e}")
             notice_error(e)
@@ -274,6 +371,15 @@ class MLProcessor:
         try:
             # Run clustering
             results = analyzer.analyze(texts, embeddings=embeddings)
+
+            add_analyzer_attributes(
+                analysis_type="topics",
+                provider=analyzer.get_provider_name(),
+                model=analyzer.get_model_name(),
+                is_local=analyzer.is_local_provider(),
+                batch_size=len(texts),
+                usage=analyzer.last_usage,
+            )
 
             # Extract keywords and counts
             from src.analyzers.topics import LocalTopicClusterer

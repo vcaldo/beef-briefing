@@ -107,10 +107,14 @@ def create_topics_page(
     topic_timeline_data = []
     topic_series = []
     if not topic_timeline_df.empty:
-        # Get unique topics and assign colors
-        unique_topics = topic_timeline_df[["topic_id", "keywords"]].drop_duplicates()
+        # Get unique topics and assign colors (dedupe by topic_id only since keywords is a list)
+        seen_topics = set()
         topic_map = {}
-        for idx, (_, row) in enumerate(unique_topics.iterrows()):
+        idx = 0
+        for _, row in topic_timeline_df.iterrows():
+            if row["topic_id"] in seen_topics:
+                continue
+            seen_topics.add(row["topic_id"])
             keywords = row["keywords"]
             if isinstance(keywords, list):
                 label = ", ".join(keywords[:2])
@@ -121,6 +125,7 @@ def create_topics_page(
                 "name": label,
                 "color": TOPIC_SERIES_COLORS[idx % len(TOPIC_SERIES_COLORS)],
             })
+            idx += 1
 
         # Pivot data by date
         dates = topic_timeline_df["date"].unique()

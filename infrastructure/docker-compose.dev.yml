@@ -162,12 +162,14 @@ services:
       - ml_dashboard_cache_dev:/app/cache
     depends_on:
       - postgres
+    networks:
+      - beef-dev-network
   ml-processor:
     build:
       context: ..
       dockerfile: apps/ml-processor/Dockerfile
     container_name: beef-ml-processor-dev
-    command: ["python", "main.py", "continuous", "--chat-id", "${ML_CHAT_ID:--1003280306634}"]
+    command: ["python", "main.py", "process", "--chat-id", "-1002572302334"]
     environment:
       # Database (direct PostgreSQL access)
       DB_HOST: postgres

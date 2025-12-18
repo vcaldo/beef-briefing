@@ -124,3 +124,131 @@ class LocalEmbeddingEncoder(Analyzer):
             del self._model
             self._model = None
             logger.info("Embedding model unloaded")
+
+
+class OpenAIEmbeddingEncoder(Analyzer):
+    """
+    Embedding encoder using OpenAI API.
+
+    Default model: text-embedding-3-small
+    - Languages: Multilingual support
+    - Output: 1536-dimensional embeddings (small) or 3072 (large)
+    - Quality: High quality, production-ready
+    - Cost: ~$0.02 per 1M tokens (small)
+
+    Available models:
+    - text-embedding-3-small: 1536 dims, cheaper, good for most use cases
+    - text-embedding-3-large: 3072 dims, higher quality, more expensive
+    - text-embedding-ada-002: 1536 dims, legacy model
+    """
+
+    # Embedding dimensions for each model
+    MODEL_DIMS = {
+        "text-embedding-3-small": 1536,
+        "text-embedding-3-large": 3072,
+        "text-embedding-ada-002": 1536,
+    }
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model_name: str = "text-embedding-3-small",
+    ):
+        """
+        Initialize with OpenAI API key.
+
+        Args:
+            api_key: OpenAI API key (required)
+            model_name: OpenAI embedding model name
+        """
+        self.api_key = api_key
+        self.model_name = model_name
+        self._client = None
+
+    @property
+    def analysis_type(self) -> AnalysisType:
+        return AnalysisType.EMBEDDINGS
+
+    def _get_client(self):
+        """Lazy load the OpenAI client."""
+        if self._client is None:
+            from openai import OpenAI
+
+            self._client = OpenAI(api_key=self.api_key)
+        return self._client
+
+    def analyze(self, texts: list[str], batch_size: int = 100, **kwargs) -> list[dict]:
+        """
+        Generate embeddings for a batch of texts.
+
+        Args:
+            texts: List of texts to encode
+            batch_size: Processing batch size (max 2048 for OpenAI)
+
+        Returns:
+            List of dicts with:
+                - embedding: list[float]
+        """
+        if not texts:
+            return []
+
+        embeddings = self.encode(texts, batch_size=batch_size)
+
+        return [{"embedding": emb.tolist()} for emb in embeddings]
+
+    def encode(self, texts: list[str], batch_size: int = 100) -> np.ndarray:
+        """
+        Generate embeddings as numpy array.
+
+        Args:
+            texts: List of texts to encode
+            batch_size: Processing batch size
+
+        Returns:
+            Numpy array of shape (n_texts, embedding_dim)
+        """
+        if not texts:
+            return np.array([])
+
+        client = self._get_client()
+
+        all_embeddings = []
+
+        # Process in batches
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+
+            # Replace empty strings with a space (OpenAI doesn't accept empty)
+            batch = [t if t.strip() else " " for t in batch]
+
+            try:
+                response = client.embeddings.create(
+                    model=self.model_name,
+                    input=batch,
+                )
+
+                # Sort by index to ensure correct order
+                sorted_data = sorted(response.data, key=lambda x: x.index)
+                batch_embeddings = [item.embedding for item in sorted_data]
+                all_embeddings.extend(batch_embeddings)
+
+            except Exception as e:
+                logger.error(f"OpenAI embedding failed for batch {i}: {e}")
+                # Return zero vectors for failed batch
+                dim = self.embedding_dim
+                all_embeddings.extend([[0.0] * dim for _ in batch])
+
+        return np.array(all_embeddings)
+
+    @property
+    def embedding_dim(self) -> int:
+        """Return the embedding dimension for the current model."""
+        return self.MODEL_DIMS.get(self.model_name, 1536)
+
+    def is_available(self) -> bool:
+        """Check if OpenAI API key is available."""
+        return bool(self.api_key)
+
+    def cleanup(self) -> None:
+        """Release client resources."""
+        self._client = None

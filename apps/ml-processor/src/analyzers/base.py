@@ -147,7 +147,7 @@ class AnalyzerRegistry:
             AnalysisType.TOXICITY: self.config.toxicity_provider,
             AnalysisType.TOPICS: self.config.topics_provider,
             AnalysisType.NER: self.config.ner_provider,
-            AnalysisType.EMBEDDINGS: "local",  # Always local for now
+            AnalysisType.EMBEDDINGS: self.config.embeddings_provider,
             AnalysisType.HUMOR: self.config.humor_provider,
             AnalysisType.QUESTIONS: self.config.questions_provider,
         }
@@ -223,13 +223,17 @@ class AnalyzerRegistry:
 
         # ===== EMBEDDINGS =====
         elif analysis_type == AnalysisType.EMBEDDINGS:
-            # Embeddings are always local for now
-            from src.analyzers.embeddings import LocalEmbeddingEncoder
+            if provider == "local":
+                from src.analyzers.embeddings import LocalEmbeddingEncoder
 
-            return LocalEmbeddingEncoder(
-                model_name=self.config.embedding_model,
-                device=self.config.device,
-            )
+                return LocalEmbeddingEncoder(
+                    model_name=self.config.embedding_model,
+                    device=self.config.device,
+                )
+            elif provider == "openai":
+                from src.analyzers.embeddings import OpenAIEmbeddingEncoder
+
+                return OpenAIEmbeddingEncoder(api_key=self.config.openai_api_key)
 
         # ===== HUMOR =====
         elif analysis_type == AnalysisType.HUMOR:

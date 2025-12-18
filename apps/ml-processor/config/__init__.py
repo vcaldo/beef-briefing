@@ -27,6 +27,7 @@ class Config(BaseSettings):
     toxicity_provider: ProviderType = "local"
     topics_provider: ProviderType = "local"
     ner_provider: ProviderType = "local"
+    embeddings_provider: ProviderType = "local"
     humor_provider: ProviderType = "local"
     questions_provider: ProviderType = "local"
 
@@ -106,6 +107,7 @@ class Config(BaseSettings):
             ("toxicity_provider", self.toxicity_provider),
             ("topics_provider", self.topics_provider),
             ("ner_provider", self.ner_provider),
+            ("embeddings_provider", self.embeddings_provider),
             ("humor_provider", self.humor_provider),
             ("questions_provider", self.questions_provider),
         ]

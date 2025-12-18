@@ -178,11 +178,18 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
       DB_SSL_MODE: disable
-      # Provider selection
-      SENTIMENT_PROVIDER: local
-      TOXICITY_PROVIDER: local
-      TOPICS_PROVIDER: local
-      NER_PROVIDER: local
+      # Provider selection (local, openai, anthropic, perspective)
+      SENTIMENT_PROVIDER: ${SENTIMENT_PROVIDER:-local}
+      TOXICITY_PROVIDER: ${TOXICITY_PROVIDER:-local}
+      EMBEDDINGS_PROVIDER: ${EMBEDDINGS_PROVIDER:-local}
+      TOPICS_PROVIDER: ${TOPICS_PROVIDER:-local}
+      NER_PROVIDER: ${NER_PROVIDER:-local}
+      HUMOR_PROVIDER: ${HUMOR_PROVIDER:-local}
+      QUESTIONS_PROVIDER: ${QUESTIONS_PROVIDER:-local}
+      # API keys (for non-local providers)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      PERSPECTIVE_API_KEY: ${PERSPECTIVE_API_KEY:-}
       # Qdrant
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333

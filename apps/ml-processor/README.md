@@ -18,7 +18,7 @@ ml-processor (local, GPU)
 |----------|-------------|----------|
 | **Sentiment** | Positive/Neutral/Negative classification | Local or OpenAI/Anthropic |
 | **Toxicity** | Hate speech and toxic content detection | Local or Perspective/OpenAI |
-| **Embeddings** | 768-dimensional vector representations | Local only |
+| **Embeddings** | 768/1536-dimensional vector representations | Local or OpenAI |
 | **Topics** | HDBSCAN clustering with keyword extraction | Local or OpenAI |
 | **NER** | Named Entity Recognition (people, places, orgs) | Local (spaCy) or OpenAI |
 | **Humor** | Humor detection using Brazilian laugh patterns | Local or OpenAI |
@@ -120,6 +120,7 @@ Each analysis type can use a different provider (`local`, `openai`, `anthropic`,
 |----------|---------|---------|
 | `SENTIMENT_PROVIDER` | `local` | `local`, `openai`, `anthropic` |
 | `TOXICITY_PROVIDER` | `local` | `local`, `perspective`, `openai` |
+| `EMBEDDINGS_PROVIDER` | `local` | `local`, `openai` |
 | `TOPICS_PROVIDER` | `local` | `local`, `openai` |
 | `NER_PROVIDER` | `local` | `local`, `openai` |
 | `HUMOR_PROVIDER` | `local` | `local`, `openai` |

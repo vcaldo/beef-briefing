@@ -109,6 +109,8 @@ class MLProcessor:
         toxicity_results = self._run_toxicity(texts)
         embeddings = self._run_embeddings(texts)
         ner_results = self._run_ner(texts)
+        humor_results = self._run_humor(texts)
+        questions_results = self._run_questions(texts)
 
         # Store embeddings in Qdrant
         if embeddings is not None and self.qdrant:
@@ -135,6 +137,8 @@ class MLProcessor:
             topic_results=topic_results,
             cluster_keywords=cluster_keywords,
             cluster_counts=cluster_counts,
+            humor_results=humor_results,
+            questions_results=questions_results,
         )
 
         # Mark messages as processed
@@ -201,6 +205,30 @@ class MLProcessor:
             return analyzer.analyze(texts)
         except Exception as e:
             logger.error(f"NER extraction failed: {e}")
+            return None
+
+    def _run_humor(self, texts: list[str]) -> list[dict] | None:
+        """Run humor detection if available."""
+        analyzer = self.registry.get_if_available(AnalysisType.HUMOR)
+        if not analyzer:
+            return None
+
+        try:
+            return analyzer.analyze(texts)
+        except Exception as e:
+            logger.error(f"Humor detection failed: {e}")
+            return None
+
+    def _run_questions(self, texts: list[str]) -> list[dict] | None:
+        """Run question detection if available."""
+        analyzer = self.registry.get_if_available(AnalysisType.QUESTIONS)
+        if not analyzer:
+            return None
+
+        try:
+            return analyzer.analyze(texts)
+        except Exception as e:
+            logger.error(f"Question detection failed: {e}")
             return None
 
     def _run_topics(
@@ -273,6 +301,8 @@ class MLProcessor:
         topic_results: list[dict] | None,
         cluster_keywords: dict[int, list[str]],
         cluster_counts: dict[int, int],
+        humor_results: list[dict] | None = None,
+        questions_results: list[dict] | None = None,
     ):
         """Save all analysis results to database."""
         # Save sentiment results
@@ -362,6 +392,42 @@ class MLProcessor:
                 count = self.queries.save_message_topics(db_results)
                 logger.debug(f"Saved {count} topic assignments")
 
+        # Save humor results
+        if humor_results:
+            db_results = []
+            for i, msg in enumerate(messages):
+                if i < len(humor_results):
+                    result = humor_results[i]
+                    db_results.append(
+                        {
+                            "message_id": msg["id"],
+                            "chat_id": chat_id,
+                            "is_humorous": result["is_humorous"],
+                            "humor_type": result.get("humor_type"),
+                            "score": result["score"],
+                        }
+                    )
+            count = self.queries.save_humor_results(db_results)
+            logger.debug(f"Saved {count} humor results")
+
+        # Save questions results
+        if questions_results:
+            db_results = []
+            for i, msg in enumerate(messages):
+                if i < len(questions_results):
+                    result = questions_results[i]
+                    db_results.append(
+                        {
+                            "message_id": msg["id"],
+                            "chat_id": chat_id,
+                            "is_question": result["is_question"],
+                            "question_type": result.get("question_type"),
+                            "score": result["score"],
+                        }
+                    )
+            count = self.queries.save_questions_results(db_results)
+            logger.debug(f"Saved {count} questions results")
+
     def run_continuous(self, chat_id: int):
         """
         Run continuous processing loop.
@@ -411,6 +477,10 @@ class MLProcessor:
         print(f"Topics clustered:         {status.get('topics_clustered', 0):,}")
         print(f"NER entities extracted:   {status.get('ner_extracted', 0):,}")
         print(f"  - Unique entities:      {status.get('unique_entities', 0):,}")
+        print(f"Humor analyzed:           {status.get('humor_analyzed', 0):,}")
+        print(f"  - Humorous messages:    {status.get('humorous_count', 0):,}")
+        print(f"Questions analyzed:       {status.get('questions_analyzed', 0):,}")
+        print(f"  - Question messages:    {status.get('question_count', 0):,}")
         print(f"\n=== Qdrant Status ===")
         points = qdrant_info.get("points_count", 0) or 0
         print(f"Embeddings stored:        {points:,}")

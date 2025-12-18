@@ -27,6 +27,8 @@ class Config(BaseSettings):
     toxicity_provider: ProviderType = "local"
     topics_provider: ProviderType = "local"
     ner_provider: ProviderType = "local"
+    humor_provider: ProviderType = "local"
+    questions_provider: ProviderType = "local"
 
     # Optional API Keys (only needed for non-local providers)
     openai_api_key: Optional[str] = None
@@ -51,6 +53,7 @@ class Config(BaseSettings):
     toxicity_model: str = "ruanchaves/bert-base-portuguese-cased-hatebr"
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
     ner_model: str = "pt_core_news_lg"
+    questions_model: str = "facebook/bart-large-mnli"  # Zero-shot classification model
 
     # Application Settings
     environment: str = "development"
@@ -103,6 +106,8 @@ class Config(BaseSettings):
             ("toxicity_provider", self.toxicity_provider),
             ("topics_provider", self.topics_provider),
             ("ner_provider", self.ner_provider),
+            ("humor_provider", self.humor_provider),
+            ("questions_provider", self.questions_provider),
         ]
 
         for attr_name, provider in provider_attrs:

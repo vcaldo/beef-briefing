@@ -12,15 +12,29 @@ ml-processor (local, GPU)
     └── Store embeddings         → Qdrant (Docker)
 ```
 
-## Models Used
+## Analysis Types
+
+| Analysis | Description | Provider |
+|----------|-------------|----------|
+| **Sentiment** | Positive/Neutral/Negative classification | Local or OpenAI/Anthropic |
+| **Toxicity** | Hate speech and toxic content detection | Local or Perspective/OpenAI |
+| **Embeddings** | 768-dimensional vector representations | Local only |
+| **Topics** | HDBSCAN clustering with keyword extraction | Local or OpenAI |
+| **NER** | Named Entity Recognition (people, places, orgs) | Local (spaCy) or OpenAI |
+| **Humor** | Humor detection using Brazilian laugh patterns | Local or OpenAI |
+| **Questions** | Question detection and classification | Local (zero-shot) or OpenAI |
+
+## Models Used (Local Providers)
 
 | Model | Purpose | Memory |
 |-------|---------|--------|
 | `lxyuan/distilbert-base-multilingual-cased-sentiments-student` | Sentiment analysis | ~270MB |
 | `ruanchaves/bert-base-portuguese-cased-hatebr` | Toxicity detection (Portuguese) | ~440MB |
 | `sentence-transformers/paraphrase-multilingual-mpnet-base-v2` | Embeddings (768-dim) | ~420MB |
+| `pt_core_news_lg` | NER (spaCy Portuguese) | ~550MB |
+| `facebook/bart-large-mnli` | Question classification (zero-shot) | ~1.6GB |
 
-Total GPU memory: ~1.7GB
+Total GPU memory: ~3.3GB (with all local models loaded)
 
 ## Setup
 
@@ -98,24 +112,66 @@ Environment variables (see `.env.example`):
 | `SLEEP_SECONDS` | `60` | Sleep when no messages |
 | `DEVICE` | `cuda` | PyTorch device |
 
+### Provider Selection
+
+Each analysis type can use a different provider (`local`, `openai`, `anthropic`, `perspective`):
+
+| Variable | Default | Options |
+|----------|---------|---------|
+| `SENTIMENT_PROVIDER` | `local` | `local`, `openai`, `anthropic` |
+| `TOXICITY_PROVIDER` | `local` | `local`, `perspective`, `openai` |
+| `TOPICS_PROVIDER` | `local` | `local`, `openai` |
+| `NER_PROVIDER` | `local` | `local`, `openai` |
+| `HUMOR_PROVIDER` | `local` | `local`, `openai` |
+| `QUESTIONS_PROVIDER` | `local` | `local`, `openai` |
+
+API keys (required for non-local providers):
+
+| Variable | Required for |
+|----------|--------------|
+| `OPENAI_API_KEY` | `openai` provider |
+| `ANTHROPIC_API_KEY` | `anthropic` provider |
+| `PERSPECTIVE_API_KEY` | `perspective` provider |
+
 ## Output
 
-- **Sentiment**: Stored in PostgreSQL `ml_sentiment` table
-- **Toxicity**: Stored in PostgreSQL `ml_toxicity` table
-- **Embeddings**: Stored in Qdrant `message_embeddings` collection
+Results are stored in PostgreSQL and Qdrant:
+
+| Analysis | Storage | Table/Collection |
+|----------|---------|------------------|
+| Sentiment | PostgreSQL | `ml_sentiment` |
+| Toxicity | PostgreSQL | `ml_toxicity` |
+| NER | PostgreSQL | `ml_ner` |
+| Topics | PostgreSQL | `ml_topics`, `ml_message_topics` |
+| Humor | PostgreSQL | `ml_humor` |
+| Questions | PostgreSQL | `ml_questions` |
+| Embeddings | Qdrant | `message_embeddings` |
+| Processing State | PostgreSQL | `ml_processing_state` |
 
 ## Development
 
 ### Reset Processing State
 
-To reprocess all messages, clear the ML tables:
+To reprocess all messages, use the Makefile targets:
+
+```bash
+# Reset dev environment (PostgreSQL + Qdrant)
+make ml-clean-dev
+
+# Reset prod environment (requires confirmation)
+make ml-clean-prod
+```
+
+Or manually clear the ML tables:
 
 ```sql
 -- Connect to database
 docker exec -it beef-briefing-postgres psql -U postgres -d beef_briefing
 
--- Reset all (reprocess everything)
-TRUNCATE ml_processing_state, ml_sentiment, ml_toxicity CASCADE;
+-- Reset all ML data (reprocess everything)
+TRUNCATE ml_user_profiles, ml_user_cards, ml_message_topics, ml_topics,
+         ml_ner, ml_humor, ml_questions, ml_toxicity, ml_sentiment,
+         ml_processing_state CASCADE;
 
 -- Reset only processing state (keeps old results, will create duplicates)
 TRUNCATE ml_processing_state;
@@ -124,6 +180,10 @@ TRUNCATE ml_processing_state;
 DELETE FROM ml_processing_state WHERE chat_id = -1003280306634;
 DELETE FROM ml_sentiment WHERE chat_id = -1003280306634;
 DELETE FROM ml_toxicity WHERE chat_id = -1003280306634;
+DELETE FROM ml_ner WHERE chat_id = -1003280306634;
+DELETE FROM ml_humor WHERE chat_id = -1003280306634;
+DELETE FROM ml_questions WHERE chat_id = -1003280306634;
+DELETE FROM ml_message_topics WHERE chat_id = -1003280306634;
 ```
 
 To also clear Qdrant embeddings:

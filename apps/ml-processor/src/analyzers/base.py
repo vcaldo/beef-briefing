@@ -24,6 +24,8 @@ class AnalysisType(str, Enum):
     TOPICS = "topics"
     NER = "ner"
     EMBEDDINGS = "embeddings"
+    HUMOR = "humor"
+    QUESTIONS = "questions"
 
 
 class Analyzer(ABC):
@@ -146,6 +148,8 @@ class AnalyzerRegistry:
             AnalysisType.TOPICS: self.config.topics_provider,
             AnalysisType.NER: self.config.ner_provider,
             AnalysisType.EMBEDDINGS: "local",  # Always local for now
+            AnalysisType.HUMOR: self.config.humor_provider,
+            AnalysisType.QUESTIONS: self.config.questions_provider,
         }
         return mapping.get(analysis_type, "local")
 
@@ -226,6 +230,31 @@ class AnalyzerRegistry:
                 model_name=self.config.embedding_model,
                 device=self.config.device,
             )
+
+        # ===== HUMOR =====
+        elif analysis_type == AnalysisType.HUMOR:
+            if provider == "local":
+                from src.analyzers.humor import LocalHumorDetector
+
+                return LocalHumorDetector()
+            elif provider == "openai":
+                from src.analyzers.humor import OpenAIHumorDetector
+
+                return OpenAIHumorDetector(api_key=self.config.openai_api_key)
+
+        # ===== QUESTIONS =====
+        elif analysis_type == AnalysisType.QUESTIONS:
+            if provider == "local":
+                from src.analyzers.questions import LocalQuestionClassifier
+
+                return LocalQuestionClassifier(
+                    model_name=self.config.questions_model,
+                    device=self.config.device,
+                )
+            elif provider == "openai":
+                from src.analyzers.questions import OpenAIQuestionClassifier
+
+                return OpenAIQuestionClassifier(api_key=self.config.openai_api_key)
 
         raise ValueError(f"Unknown provider '{provider}' for {analysis_type}")
 

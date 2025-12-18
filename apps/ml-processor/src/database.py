@@ -123,7 +123,11 @@ class MLQueries:
                 'toxic_count': int,
                 'topics_clustered': int,
                 'ner_extracted': int,
-                'unique_entities': int
+                'unique_entities': int,
+                'humor_analyzed': int,
+                'humorous_count': int,
+                'questions_analyzed': int,
+                'question_count': int
             }
         """
         # Total messages with text
@@ -179,6 +183,26 @@ class MLQueries:
         """
         ner = self._execute_single(ner_query, {"chat_id": chat_id}) or {}
 
+        # Humor count
+        humor_query = """
+            SELECT
+                COUNT(*) as count,
+                SUM(CASE WHEN is_humorous THEN 1 ELSE 0 END) as humorous_count
+            FROM ml_humor
+            WHERE chat_id = :chat_id
+        """
+        humor = self._execute_single(humor_query, {"chat_id": chat_id}) or {}
+
+        # Questions count
+        questions_query = """
+            SELECT
+                COUNT(*) as count,
+                SUM(CASE WHEN is_question THEN 1 ELSE 0 END) as question_count
+            FROM ml_questions
+            WHERE chat_id = :chat_id
+        """
+        questions = self._execute_single(questions_query, {"chat_id": chat_id}) or {}
+
         total_with_text = total.get("count", 0)
         processed_count = processed.get("count", 0)
 
@@ -192,6 +216,10 @@ class MLQueries:
             "topics_clustered": topics.get("count", 0),
             "ner_extracted": ner.get("count", 0),
             "unique_entities": ner.get("unique_entities", 0) or 0,
+            "humor_analyzed": humor.get("count", 0),
+            "humorous_count": humor.get("humorous_count", 0) or 0,
+            "questions_analyzed": questions.get("count", 0),
+            "question_count": questions.get("question_count", 0) or 0,
         }
 
     # =========================================
@@ -261,6 +289,64 @@ class MLQueries:
             ON CONFLICT (message_id) DO UPDATE SET
                 is_toxic = EXCLUDED.is_toxic,
                 label = EXCLUDED.label,
+                score = EXCLUDED.score,
+                created_at = NOW()
+        """
+        return self._execute_batch(query, results)
+
+    def save_humor_results(self, results: list[dict]) -> int:
+        """
+        Save humor detection results.
+
+        Args:
+            results: List of dicts with:
+                - message_id: int
+                - chat_id: int
+                - is_humorous: bool
+                - humor_type: str | None
+                - score: float
+
+        Returns:
+            Number of rows affected
+        """
+        if not results:
+            return 0
+
+        query = """
+            INSERT INTO ml_humor (message_id, chat_id, is_humorous, humor_type, score)
+            VALUES (:message_id, :chat_id, :is_humorous, :humor_type, :score)
+            ON CONFLICT (message_id) DO UPDATE SET
+                is_humorous = EXCLUDED.is_humorous,
+                humor_type = EXCLUDED.humor_type,
+                score = EXCLUDED.score,
+                created_at = NOW()
+        """
+        return self._execute_batch(query, results)
+
+    def save_questions_results(self, results: list[dict]) -> int:
+        """
+        Save question detection results.
+
+        Args:
+            results: List of dicts with:
+                - message_id: int
+                - chat_id: int
+                - is_question: bool
+                - question_type: str | None
+                - score: float
+
+        Returns:
+            Number of rows affected
+        """
+        if not results:
+            return 0
+
+        query = """
+            INSERT INTO ml_questions (message_id, chat_id, is_question, question_type, score)
+            VALUES (:message_id, :chat_id, :is_question, :question_type, :score)
+            ON CONFLICT (message_id) DO UPDATE SET
+                is_question = EXCLUDED.is_question,
+                question_type = EXCLUDED.question_type,
                 score = EXCLUDED.score,
                 created_at = NOW()
         """

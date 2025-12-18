@@ -72,6 +72,9 @@ def create_sentiment_page(
     negative_users = queries.get_user_sentiment_rankings(
         chat_id, start_date, end_date, limit=5, ascending=True
     )
+    toxic_users = queries.get_user_toxicity_rankings(
+        chat_id, limit=5, start_date=start_date, end_date=end_date
+    )
 
     # Prepare timeline data
     timeline_data = []
@@ -151,6 +154,17 @@ def create_sentiment_page(
                             colors,
                             is_positive=False,
                         ),
+                        md=6,
+                    ),
+                ],
+                className="g-3",
+            ),
+            dmc.Space(h="lg"),
+            # Toxicity user rankings
+            dbc.Row(
+                [
+                    dbc.Col(
+                        _create_toxicity_ranking_card(toxic_users, colors),
                         md=6,
                     ),
                 ],
@@ -548,6 +562,71 @@ def _create_user_ranking_card(
                 gap="xs",
             ),
             dmc.Text("Sample-size adjusted sentiment score", size="xs", c="dimmed"),
+            dmc.Space(h="md"),
+            content,
+        ],
+        p="md",
+        withBorder=True,
+    )
+
+
+def _create_toxicity_ranking_card(users: list[dict], colors: dict) -> dmc.Paper:
+    """Create toxicity user ranking table card."""
+    from dash_iconify import DashIconify
+
+    if not users:
+        content = dmc.Center(
+            dmc.Text("No toxicity data available", c="dimmed", size="sm"),
+            h=200,
+        )
+    else:
+        rows = []
+        for idx, user in enumerate(users, 1):
+            toxicity_rate = user.get("toxicity_rate", 0) or 0
+            msg_count = user.get("messages_analyzed", 0) or 0
+
+            rows.append(
+                dmc.Group(
+                    [
+                        dmc.Text(f"{idx}.", size="sm", c="dimmed", w=24),
+                        dmc.Text(
+                            user.get("first_name", "Unknown"),
+                            size="sm",
+                            style={"flex": 1},
+                        ),
+                        dmc.Text(
+                            f"{toxicity_rate:.1f}%",
+                            size="sm",
+                            fw=600,
+                            c=SENTIMENT_COLORS["negative"],
+                        ),
+                        dmc.Text(
+                            f"{msg_count} msgs",
+                            size="xs",
+                            c="dimmed",
+                        ),
+                    ],
+                    justify="space-between",
+                    gap="xs",
+                )
+            )
+
+        content = dmc.Stack(rows, gap="sm")
+
+    return dmc.Paper(
+        [
+            dmc.Group(
+                [
+                    DashIconify(
+                        icon="mdi:alert-circle-outline",
+                        width=20,
+                        color=SENTIMENT_COLORS["negative"],
+                    ),
+                    dmc.Title("Most Toxic Users", order=4),
+                ],
+                gap="xs",
+            ),
+            dmc.Text("Users with highest toxicity rate", size="xs", c="dimmed"),
             dmc.Space(h="md"),
             content,
         ],

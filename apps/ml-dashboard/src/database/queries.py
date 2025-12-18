@@ -585,3 +585,603 @@ class MLDashboardQueries:
             ORDER BY u.first_name
         """
         return self._execute_many(query, {"chat_id": chat_id})
+
+    # =========================================
+    # HUMOR METHODS
+    # =========================================
+
+    def get_humor_stats(self, chat_id: int) -> dict:
+        """
+        Get humor statistics for a chat.
+
+        Returns:
+            {
+                'total_analyzed': int,
+                'humorous_count': int,
+                'humor_rate': float,
+                'avg_score': float
+            }
+        """
+        query = """
+            SELECT
+                COUNT(*) as total_analyzed,
+                SUM(CASE WHEN is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                CASE WHEN COUNT(*) > 0
+                    THEN ROUND(SUM(CASE WHEN is_humorous THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+                    ELSE 0 END as humor_rate,
+                AVG(CASE WHEN is_humorous THEN score ELSE NULL END) as avg_score
+            FROM ml_humor
+            WHERE chat_id = :chat_id
+        """
+        result = self._execute_single(query, {"chat_id": chat_id})
+        return result or {
+            "total_analyzed": 0,
+            "humorous_count": 0,
+            "humor_rate": 0,
+            "avg_score": 0,
+        }
+
+    def get_humor_type_distribution(self, chat_id: int) -> pd.DataFrame:
+        """
+        Get distribution of humor types.
+
+        Returns DataFrame with columns:
+            humor_type, count, percentage
+        """
+        query = """
+            SELECT
+                COALESCE(humor_type, 'unknown') as humor_type,
+                COUNT(*) as count,
+                ROUND(COUNT(*) * 100.0 / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) as percentage
+            FROM ml_humor
+            WHERE chat_id = :chat_id
+                AND is_humorous = true
+            GROUP BY humor_type
+            ORDER BY count DESC
+        """
+        return self._execute_df(query, {"chat_id": chat_id})
+
+    def get_humor_timeline(self, chat_id: int) -> pd.DataFrame:
+        """
+        Get daily humor counts.
+
+        Returns DataFrame with columns:
+            date, humorous_count, total_count, humor_rate
+        """
+        query = """
+            SELECT
+                DATE(m.date) as date,
+                SUM(CASE WHEN mh.is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                COUNT(*) as total_count,
+                ROUND(
+                    SUM(CASE WHEN mh.is_humorous THEN 1 ELSE 0 END) * 100.0 /
+                    NULLIF(COUNT(*), 0),
+                    2
+                ) as humor_rate
+            FROM ml_humor mh
+            JOIN messages m ON m.id = mh.message_id AND m.chat_id = mh.chat_id
+            WHERE mh.chat_id = :chat_id
+            GROUP BY DATE(m.date)
+            ORDER BY date
+        """
+        return self._execute_df(query, {"chat_id": chat_id})
+
+    def get_top_humorous_messages(self, chat_id: int, limit: int = 15) -> list[dict]:
+        """
+        Get most humorous messages ranked by score.
+
+        Returns list of:
+            {
+                'message_id': int,
+                'user_id': int,
+                'first_name': str,
+                'username': str | None,
+                'text': str,
+                'date': datetime,
+                'humor_type': str,
+                'score': float
+            }
+        """
+        query = """
+            SELECT
+                m.id as message_id,
+                m.user_id,
+                u.first_name,
+                u.username,
+                COALESCE(m.text, m.caption, '') as text,
+                m.date,
+                COALESCE(mh.humor_type, 'unknown') as humor_type,
+                mh.score
+            FROM ml_humor mh
+            JOIN messages m ON m.id = mh.message_id AND m.chat_id = mh.chat_id
+            JOIN users u ON u.id = m.user_id
+            WHERE mh.chat_id = :chat_id
+                AND mh.is_humorous = true
+                AND COALESCE(m.text, m.caption, '') != ''
+            ORDER BY mh.score DESC
+            LIMIT :limit
+        """
+        return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
+
+    def get_user_humor_rankings(self, chat_id: int, limit: int = 10) -> list[dict]:
+        """
+        Get users ranked by humor rate (funniest first).
+
+        Returns list of:
+            {
+                'user_id': int,
+                'first_name': str,
+                'username': str | None,
+                'humor_rate': float,
+                'humorous_count': int,
+                'messages_analyzed': int
+            }
+        """
+        query = """
+            SELECT
+                u.id as user_id,
+                u.first_name,
+                u.username,
+                ROUND(SUM(CASE WHEN mh.is_humorous THEN 1 ELSE 0 END) * 100.0 /
+                      NULLIF(COUNT(*), 0), 2) as humor_rate,
+                SUM(CASE WHEN mh.is_humorous THEN 1 ELSE 0 END)::int as humorous_count,
+                COUNT(*)::int as messages_analyzed
+            FROM ml_humor mh
+            JOIN messages m ON m.id = mh.message_id AND m.chat_id = mh.chat_id
+            JOIN users u ON u.id = m.user_id
+            WHERE mh.chat_id = :chat_id
+                AND u.is_bot = false
+            GROUP BY u.id, u.first_name, u.username
+            HAVING COUNT(*) >= 5
+            ORDER BY humor_rate DESC
+            LIMIT :limit
+        """
+        return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
+
+    # =========================================
+    # QUESTION METHODS
+    # =========================================
+
+    def get_question_stats(self, chat_id: int) -> dict:
+        """
+        Get question statistics for a chat.
+
+        Returns:
+            {
+                'total_analyzed': int,
+                'question_count': int,
+                'question_rate': float,
+                'avg_score': float
+            }
+        """
+        query = """
+            SELECT
+                COUNT(*) as total_analyzed,
+                SUM(CASE WHEN is_question THEN 1 ELSE 0 END) as question_count,
+                CASE WHEN COUNT(*) > 0
+                    THEN ROUND(SUM(CASE WHEN is_question THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+                    ELSE 0 END as question_rate,
+                AVG(CASE WHEN is_question THEN score ELSE NULL END) as avg_score
+            FROM ml_questions
+            WHERE chat_id = :chat_id
+        """
+        result = self._execute_single(query, {"chat_id": chat_id})
+        return result or {
+            "total_analyzed": 0,
+            "question_count": 0,
+            "question_rate": 0,
+            "avg_score": 0,
+        }
+
+    def get_question_type_distribution(self, chat_id: int) -> pd.DataFrame:
+        """
+        Get distribution of question types.
+
+        Returns DataFrame with columns:
+            question_type, count, percentage
+        """
+        query = """
+            SELECT
+                COALESCE(question_type, 'unknown') as question_type,
+                COUNT(*) as count,
+                ROUND(COUNT(*) * 100.0 / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) as percentage
+            FROM ml_questions
+            WHERE chat_id = :chat_id
+                AND is_question = true
+            GROUP BY question_type
+            ORDER BY count DESC
+        """
+        return self._execute_df(query, {"chat_id": chat_id})
+
+    def get_question_timeline(self, chat_id: int) -> pd.DataFrame:
+        """
+        Get daily question counts.
+
+        Returns DataFrame with columns:
+            date, question_count, total_count, question_rate
+        """
+        query = """
+            SELECT
+                DATE(m.date) as date,
+                SUM(CASE WHEN mq.is_question THEN 1 ELSE 0 END) as question_count,
+                COUNT(*) as total_count,
+                ROUND(
+                    SUM(CASE WHEN mq.is_question THEN 1 ELSE 0 END) * 100.0 /
+                    NULLIF(COUNT(*), 0),
+                    2
+                ) as question_rate
+            FROM ml_questions mq
+            JOIN messages m ON m.id = mq.message_id AND m.chat_id = mq.chat_id
+            WHERE mq.chat_id = :chat_id
+            GROUP BY DATE(m.date)
+            ORDER BY date
+        """
+        return self._execute_df(query, {"chat_id": chat_id})
+
+    def get_user_question_rankings(self, chat_id: int, limit: int = 10) -> list[dict]:
+        """
+        Get users ranked by question rate (most curious first).
+
+        Returns list of:
+            {
+                'user_id': int,
+                'first_name': str,
+                'username': str | None,
+                'question_rate': float,
+                'question_count': int,
+                'messages_analyzed': int
+            }
+        """
+        query = """
+            SELECT
+                u.id as user_id,
+                u.first_name,
+                u.username,
+                ROUND(SUM(CASE WHEN mq.is_question THEN 1 ELSE 0 END) * 100.0 /
+                      NULLIF(COUNT(*), 0), 2) as question_rate,
+                SUM(CASE WHEN mq.is_question THEN 1 ELSE 0 END)::int as question_count,
+                COUNT(*)::int as messages_analyzed
+            FROM ml_questions mq
+            JOIN messages m ON m.id = mq.message_id AND m.chat_id = mq.chat_id
+            JOIN users u ON u.id = m.user_id
+            WHERE mq.chat_id = :chat_id
+                AND u.is_bot = false
+            GROUP BY u.id, u.first_name, u.username
+            HAVING COUNT(*) >= 5
+            ORDER BY question_rate DESC
+            LIMIT :limit
+        """
+        return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
+
+    # =========================================
+    # NAMED ENTITY RECOGNITION METHODS
+    # =========================================
+
+    def get_ner_stats(self, chat_id: int) -> dict:
+        """
+        Get NER statistics for a chat.
+
+        Returns:
+            {
+                'total_entities': int,
+                'unique_entities': int,
+                'messages_with_entities': int,
+                'avg_confidence': float
+            }
+        """
+        query = """
+            SELECT
+                COUNT(*) as total_entities,
+                COUNT(DISTINCT entity_text) as unique_entities,
+                COUNT(DISTINCT message_id) as messages_with_entities,
+                AVG(confidence) as avg_confidence
+            FROM ml_ner
+            WHERE chat_id = :chat_id
+        """
+        result = self._execute_single(query, {"chat_id": chat_id})
+        return result or {
+            "total_entities": 0,
+            "unique_entities": 0,
+            "messages_with_entities": 0,
+            "avg_confidence": 0,
+        }
+
+    def get_entity_type_distribution(self, chat_id: int) -> pd.DataFrame:
+        """
+        Get distribution of entity types.
+
+        Returns DataFrame with columns:
+            entity_type, count, unique_count, percentage
+        """
+        query = """
+            SELECT
+                entity_type,
+                COUNT(*) as count,
+                COUNT(DISTINCT entity_text) as unique_count,
+                ROUND(COUNT(*) * 100.0 / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) as percentage
+            FROM ml_ner
+            WHERE chat_id = :chat_id
+            GROUP BY entity_type
+            ORDER BY count DESC
+        """
+        return self._execute_df(query, {"chat_id": chat_id})
+
+    def get_top_entities(
+        self, chat_id: int, entity_type: str | None = None, limit: int = 20
+    ) -> list[dict]:
+        """
+        Get most frequently mentioned entities.
+
+        Args:
+            chat_id: Chat to query
+            entity_type: Optional filter by type ('PERSON', 'ORG', 'LOC', 'MISC')
+            limit: Max entities to return
+
+        Returns list of:
+            {
+                'entity_text': str,
+                'entity_type': str,
+                'mention_count': int,
+                'avg_confidence': float
+            }
+        """
+        query = """
+            SELECT
+                entity_text,
+                entity_type,
+                COUNT(*) as mention_count,
+                AVG(confidence) as avg_confidence
+            FROM ml_ner
+            WHERE chat_id = :chat_id
+                AND (:entity_type IS NULL OR entity_type = :entity_type)
+            GROUP BY entity_text, entity_type
+            ORDER BY mention_count DESC
+            LIMIT :limit
+        """
+        return self._execute_many(
+            query, {"chat_id": chat_id, "entity_type": entity_type, "limit": limit}
+        )
+
+    def get_entity_timeline(
+        self, chat_id: int, entity_type: str | None = None
+    ) -> pd.DataFrame:
+        """
+        Get entity mentions over time.
+
+        Returns DataFrame with columns:
+            date, mention_count, unique_entities
+        """
+        query = """
+            SELECT
+                DATE(m.date) as date,
+                COUNT(*) as mention_count,
+                COUNT(DISTINCT ne.entity_text) as unique_entities
+            FROM ml_ner ne
+            JOIN messages m ON m.id = ne.message_id AND m.chat_id = ne.chat_id
+            WHERE ne.chat_id = :chat_id
+                AND (:entity_type IS NULL OR ne.entity_type = :entity_type)
+            GROUP BY DATE(m.date)
+            ORDER BY date
+        """
+        return self._execute_df(query, {"chat_id": chat_id, "entity_type": entity_type})
+
+    def get_entity_cooccurrence(self, chat_id: int, limit: int = 50) -> pd.DataFrame:
+        """
+        Get entities that frequently appear together in messages.
+
+        Returns DataFrame with columns:
+            entity1, entity2, cooccurrence_count
+        """
+        query = """
+            WITH entity_pairs AS (
+                SELECT
+                    LEAST(a.entity_text, b.entity_text) as entity1,
+                    GREATEST(a.entity_text, b.entity_text) as entity2,
+                    a.message_id
+                FROM ml_ner a
+                JOIN ml_ner b ON a.message_id = b.message_id
+                    AND a.chat_id = b.chat_id
+                    AND a.entity_text < b.entity_text
+                WHERE a.chat_id = :chat_id
+            )
+            SELECT
+                entity1,
+                entity2,
+                COUNT(DISTINCT message_id) as cooccurrence_count
+            FROM entity_pairs
+            GROUP BY entity1, entity2
+            HAVING COUNT(DISTINCT message_id) >= 2
+            ORDER BY cooccurrence_count DESC
+            LIMIT :limit
+        """
+        return self._execute_df(query, {"chat_id": chat_id, "limit": limit})
+
+    def get_user_entity_mentions(self, chat_id: int, limit: int = 10) -> list[dict]:
+        """
+        Get users ranked by entity mentions.
+
+        Returns list of:
+            {
+                'user_id': int,
+                'first_name': str,
+                'username': str | None,
+                'entity_mentions': int,
+                'unique_entities': int
+            }
+        """
+        query = """
+            SELECT
+                u.id as user_id,
+                u.first_name,
+                u.username,
+                COUNT(*)::int as entity_mentions,
+                COUNT(DISTINCT ne.entity_text)::int as unique_entities
+            FROM ml_ner ne
+            JOIN messages m ON m.id = ne.message_id AND m.chat_id = ne.chat_id
+            JOIN users u ON u.id = m.user_id
+            WHERE ne.chat_id = :chat_id
+                AND u.is_bot = false
+            GROUP BY u.id, u.first_name, u.username
+            ORDER BY entity_mentions DESC
+            LIMIT :limit
+        """
+        return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
+
+    # =========================================
+    # USER CARDS METHODS
+    # =========================================
+
+    def get_user_cards_weeks(self, chat_id: int) -> list[dict]:
+        """
+        Get available weeks for user cards.
+
+        Returns list of:
+            {'week_start': date, 'week_end': date, 'user_count': int}
+        """
+        query = """
+            SELECT
+                week_start,
+                week_end,
+                COUNT(DISTINCT user_id) as user_count
+            FROM ml_user_cards
+            WHERE chat_id = :chat_id
+            GROUP BY week_start, week_end
+            ORDER BY week_start DESC
+        """
+        return self._execute_many(query, {"chat_id": chat_id})
+
+    def get_user_card(
+        self, user_id: int, chat_id: int, week_start
+    ) -> dict | None:
+        """
+        Get a specific user card.
+
+        Returns:
+            {
+                'user_id': int,
+                'chat_id': int,
+                'week_start': date,
+                'week_end': date,
+                'stats': dict,
+                'trends': dict | None,
+                'daily_breakdown': dict | None,
+                'messages_analyzed': int
+            }
+        """
+        query = """
+            SELECT
+                user_id,
+                chat_id,
+                week_start,
+                week_end,
+                stats,
+                trends,
+                daily_breakdown,
+                messages_analyzed
+            FROM ml_user_cards
+            WHERE user_id = :user_id
+                AND chat_id = :chat_id
+                AND week_start = :week_start
+        """
+        return self._execute_single(
+            query, {"user_id": user_id, "chat_id": chat_id, "week_start": week_start}
+        )
+
+    def get_weekly_user_cards(self, chat_id: int, week_start) -> list[dict]:
+        """
+        Get all user cards for a specific week.
+
+        Returns list of:
+            {
+                'user_id': int,
+                'first_name': str,
+                'username': str | None,
+                'stats': dict,
+                'messages_analyzed': int
+            }
+        """
+        query = """
+            SELECT
+                uc.user_id,
+                u.first_name,
+                u.username,
+                uc.stats,
+                uc.messages_analyzed
+            FROM ml_user_cards uc
+            JOIN users u ON u.id = uc.user_id
+            WHERE uc.chat_id = :chat_id
+                AND uc.week_start = :week_start
+                AND u.is_bot = false
+            ORDER BY uc.messages_analyzed DESC
+        """
+        return self._execute_many(query, {"chat_id": chat_id, "week_start": week_start})
+
+    def get_user_card_history(
+        self, user_id: int, chat_id: int, limit: int = 12
+    ) -> list[dict]:
+        """
+        Get a user's card history over multiple weeks.
+
+        Returns list of:
+            {
+                'week_start': date,
+                'week_end': date,
+                'stats': dict,
+                'messages_analyzed': int
+            }
+        """
+        query = """
+            SELECT
+                week_start,
+                week_end,
+                stats,
+                messages_analyzed
+            FROM ml_user_cards
+            WHERE user_id = :user_id
+                AND chat_id = :chat_id
+            ORDER BY week_start DESC
+            LIMIT :limit
+        """
+        return self._execute_many(
+            query, {"user_id": user_id, "chat_id": chat_id, "limit": limit}
+        )
+
+    def get_weekly_leaderboard(
+        self, chat_id: int, week_start, stat_key: str
+    ) -> list[dict]:
+        """
+        Get leaderboard for a specific stat in a week.
+
+        Args:
+            chat_id: Chat to query
+            week_start: Week to query
+            stat_key: Key in stats JSONB (mood, volatility, toxicity, activity, etc.)
+
+        Returns list of:
+            {
+                'user_id': int,
+                'first_name': str,
+                'username': str | None,
+                'value': float,
+                'messages_analyzed': int
+            }
+        """
+        query = """
+            SELECT
+                uc.user_id,
+                u.first_name,
+                u.username,
+                (uc.stats->:stat_key)::real as value,
+                uc.messages_analyzed
+            FROM ml_user_cards uc
+            JOIN users u ON u.id = uc.user_id
+            WHERE uc.chat_id = :chat_id
+                AND uc.week_start = :week_start
+                AND u.is_bot = false
+                AND uc.stats ? :stat_key
+            ORDER BY value DESC
+            LIMIT 10
+        """
+        return self._execute_many(
+            query, {"chat_id": chat_id, "week_start": week_start, "stat_key": stat_key}
+        )

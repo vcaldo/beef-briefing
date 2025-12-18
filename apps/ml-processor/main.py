@@ -108,6 +108,9 @@ def run_process(args, config):
     """Run batch processing command."""
     logger.info(f"Processing chat {args.chat_id}")
 
+    # Use config batch_size if not specified via CLI
+    batch_size = args.batch_size if args.batch_size is not None else config.batch_size
+
     # Parse date arguments
     from_date = parse_date(getattr(args, "from_date", None))
     to_date = parse_date(getattr(args, "to_date", None))
@@ -116,7 +119,7 @@ def run_process(args, config):
     add_custom_attributes(
         {
             "chat_id": args.chat_id,
-            "batch_size": args.batch_size,
+            "batch_size": batch_size,
             "limit": args.limit,
             "from_date": str(from_date.date()) if from_date else None,
             "to_date": str(to_date.date()) if to_date else None,
@@ -127,6 +130,8 @@ def run_process(args, config):
         logger.info(f"From date: {from_date.date()}")
     if to_date:
         logger.info(f"To date: {to_date.date()}")
+
+    logger.info(f"Batch size: {batch_size}")
 
     processor = create_processor(config)
     processor.setup()
@@ -144,9 +149,9 @@ def run_process(args, config):
 
         while True:
             # Determine batch size for this iteration
-            current_batch = args.batch_size
+            current_batch = batch_size
             if remaining is not None:
-                current_batch = min(args.batch_size, remaining)
+                current_batch = min(batch_size, remaining)
                 if current_batch <= 0:
                     break
 
@@ -241,8 +246,8 @@ def main():
     process_parser.add_argument(
         "--batch-size",
         type=int,
-        default=500,
-        help="Messages per batch (default: 500)",
+        default=None,
+        help=f"Messages per batch (default: {_config.batch_size} from config)",
     )
     process_parser.add_argument(
         "--limit",

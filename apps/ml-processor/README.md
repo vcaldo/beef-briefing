@@ -111,7 +111,7 @@ Environment variables (see `.env.example`):
 | `API_KEY_FILE` | `../../infrastructure/secrets/apps/ml-processor/api_key` | Path to API key |
 | `QDRANT_HOST` | `localhost` | Qdrant host |
 | `QDRANT_PORT` | `6333` | Qdrant port |
-| `BATCH_SIZE` | `500` | Messages per batch |
+| `BATCH_SIZE` | `500` | Messages per batch (set via `ML_BATCH_SIZE` in docker-compose) |
 | `SLEEP_SECONDS` | `60` | Sleep when no messages |
 | `DEVICE` | `cuda` | PyTorch device |
 

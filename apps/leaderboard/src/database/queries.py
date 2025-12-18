@@ -2000,9 +2000,17 @@ class DashboardQueries:
         self,
         chat_id: int,
         limit: int = 10,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> list[dict]:
         """
         Get users ranked by toxicity rate (highest first).
+
+        Args:
+            chat_id: Chat ID
+            limit: Number of users to return
+            start_date: Start date filter (inclusive)
+            end_date: End date filter (exclusive)
 
         Returns list of:
             {
@@ -2013,22 +2021,58 @@ class DashboardQueries:
                 'messages_analyzed': int
             }
         """
-        query = """
-            SELECT
-                u.id as user_id,
-                u.first_name,
-                u.username,
-                mup.toxicity_rate,
-                mup.messages_analyzed
-            FROM ml_user_profiles mup
-            JOIN users u ON u.id = mup.user_id
-            WHERE mup.chat_id = :chat_id
-                AND mup.messages_analyzed >= 5
-                AND mup.toxicity_rate > 0
-            ORDER BY mup.toxicity_rate DESC
-            LIMIT :limit
-        """
-        return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
+        if start_date is None and end_date is None:
+            # All-time: use pre-aggregated ml_user_profiles
+            query = """
+                SELECT
+                    u.id as user_id,
+                    u.first_name,
+                    u.username,
+                    mup.toxicity_rate,
+                    mup.messages_analyzed
+                FROM ml_user_profiles mup
+                JOIN users u ON u.id = mup.user_id
+                WHERE mup.chat_id = :chat_id
+                    AND mup.messages_analyzed >= 5
+                    AND mup.toxicity_rate > 0
+                ORDER BY mup.toxicity_rate DESC
+                LIMIT :limit
+            """
+            return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
+        else:
+            # Date-filtered: compute from ml_toxicity + messages
+            query = """
+                SELECT
+                    m.user_id,
+                    u.first_name,
+                    u.username,
+                    ROUND(
+                        SUM(CASE WHEN t.is_toxic THEN 1 ELSE 0 END) * 100.0 / COUNT(*),
+                        2
+                    ) as toxicity_rate,
+                    COUNT(*) as messages_analyzed
+                FROM ml_toxicity t
+                JOIN messages m ON m.id = t.message_id
+                JOIN users u ON u.id = m.user_id
+                WHERE t.chat_id = :chat_id
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                    AND u.is_bot = false
+                GROUP BY m.user_id, u.first_name, u.username
+                HAVING COUNT(*) >= 5
+                    AND SUM(CASE WHEN t.is_toxic THEN 1 ELSE 0 END) > 0
+                ORDER BY toxicity_rate DESC
+                LIMIT :limit
+            """
+            return self._execute_many(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "limit": limit,
+                },
+            )
 
     def get_user_sentiment_stats(
         self,

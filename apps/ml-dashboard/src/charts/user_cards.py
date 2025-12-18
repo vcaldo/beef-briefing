@@ -222,7 +222,7 @@ def create_weekly_leaderboard_bar(
 
     fig.update_layout(
         template="plotly_dark",
-        xaxis=dict(title=label, range=[0, min(df["value"].max() * 1.3, 1.0)]),
+        xaxis=dict(title=label, range=[0, min(float(df["value"].max()) * 1.3, 1.0)]),
         yaxis=dict(title=""),
         margin=dict(l=100, r=60, t=20, b=40),
         height=max(200, len(df) * 35 + 60),

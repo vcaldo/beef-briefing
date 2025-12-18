@@ -119,6 +119,10 @@ class LocalHumorDetector(Analyzer):
         """Always available since we use only heuristics."""
         return True
 
+    def get_model_name(self) -> str:
+        """Return the model name (heuristic-based, no ML model)."""
+        return "heuristic"
+
     def cleanup(self) -> None:
         """No resources to clean up."""
         pass
@@ -131,26 +135,42 @@ class OpenAIHumorDetector(Analyzer):
     Uses gpt-4o-mini for humor detection in Portuguese text.
     """
 
-    def __init__(self, api_key: str | None = None):
+    MODEL_NAME = "gpt-4o-mini"
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        max_retries: int = 5,
+        timeout: float = 60.0,
+    ):
         """
         Initialize with OpenAI API key.
 
         Args:
             api_key: OpenAI API key (required)
+            max_retries: Maximum retry attempts for rate limits/errors
+            timeout: Request timeout in seconds
         """
         self.api_key = api_key
+        self.max_retries = max_retries
+        self.timeout = timeout
         self._client = None
+        self._last_usage: dict | None = None
 
     @property
     def analysis_type(self) -> AnalysisType:
         return AnalysisType.HUMOR
 
     def _get_client(self):
-        """Lazy load the OpenAI client."""
+        """Lazy load the OpenAI client with retry configuration."""
         if self._client is None:
             from openai import OpenAI
 
-            self._client = OpenAI(api_key=self.api_key)
+            self._client = OpenAI(
+                api_key=self.api_key,
+                max_retries=self.max_retries,
+                timeout=self.timeout,
+            )
         return self._client
 
     def analyze(self, texts: list[str], **kwargs) -> list[dict]:
@@ -182,11 +202,20 @@ Messages (in Portuguese):
             prompt += f"{i + 1}. {text[:500]}\n"  # Truncate long texts
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self.MODEL_NAME,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0,
         )
+
+        # Capture token usage for monitoring
+        if response.usage:
+            self._last_usage = {
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens,
+                "model": self.MODEL_NAME,
+            }
 
         import json
 
@@ -220,6 +249,15 @@ Messages (in Portuguese):
         """Check if OpenAI API key is available."""
         return bool(self.api_key)
 
+    def get_model_name(self) -> str:
+        """Return the OpenAI model name."""
+        return self.MODEL_NAME
+
+    def is_local_provider(self) -> bool:
+        """Return False - this uses OpenAI API."""
+        return False
+
     def cleanup(self) -> None:
         """Release client resources."""
         self._client = None
+        self._last_usage = None

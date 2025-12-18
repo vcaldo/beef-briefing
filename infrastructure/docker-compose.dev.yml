@@ -164,12 +164,14 @@ services:
       - postgres
     networks:
       - beef-dev-network
+
   ml-processor:
     build:
       context: ..
       dockerfile: apps/ml-processor/Dockerfile
     container_name: beef-ml-processor-dev
-    command: ["python", "main.py", "process", "--chat-id", "-1002572302334"]
+    # command: ["python", "main.py", "process", "--chat-id", "-1002572302334"]
+    command: ["python", "main.py", "process", "--chat-id", "-1002572302334", "--from-date", "2025-11-18"]
     environment:
       # Database (direct PostgreSQL access)
       DB_HOST: postgres
@@ -200,6 +202,11 @@ services:
       # Application
       ENVIRONMENT: development
       LOG_LEVEL: debug
+      # New Relic APM
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      NEW_RELIC_AI_MONITORING_ENABLED: "true"
+      TRACK_AI_COSTS: "true"
     volumes:
       - ml_models_cache_dev:/root/.cache/huggingface
     depends_on:

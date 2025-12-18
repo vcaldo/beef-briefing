@@ -70,6 +70,29 @@ class Analyzer(ABC):
         """Return the provider name for logging."""
         return self.__class__.__name__
 
+    def get_model_name(self) -> str:
+        """Return the model name used by this analyzer."""
+        return "unknown"
+
+    def is_local_provider(self) -> bool:
+        """Return True if this analyzer runs locally (not via API)."""
+        return True
+
+    @property
+    def last_usage(self) -> dict | None:
+        """
+        Return token usage from the last API call.
+
+        Returns dict with keys:
+        - prompt_tokens: int
+        - completion_tokens: int
+        - total_tokens: int
+        - model: str
+
+        Returns None for local providers or if no usage data available.
+        """
+        return getattr(self, "_last_usage", None)
+
     def cleanup(self) -> None:
         """
         Release any resources held by this analyzer.
@@ -173,7 +196,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.sentiment import OpenAISentimentAnalyzer
 
-                return OpenAISentimentAnalyzer(api_key=self.config.openai_api_key)
+                return OpenAISentimentAnalyzer(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
             elif provider == "anthropic":
                 from src.analyzers.sentiment import AnthropicSentimentAnalyzer
 
@@ -197,7 +224,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.toxicity import OpenAIModerationAnalyzer
 
-                return OpenAIModerationAnalyzer(api_key=self.config.openai_api_key)
+                return OpenAIModerationAnalyzer(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
 
         # ===== TOPICS =====
         elif analysis_type == AnalysisType.TOPICS:
@@ -208,7 +239,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.topics import OpenAITopicClusterer
 
-                return OpenAITopicClusterer(api_key=self.config.openai_api_key)
+                return OpenAITopicClusterer(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
 
         # ===== NER =====
         elif analysis_type == AnalysisType.NER:
@@ -219,7 +254,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.ner import OpenAINERExtractor
 
-                return OpenAINERExtractor(api_key=self.config.openai_api_key)
+                return OpenAINERExtractor(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
 
         # ===== EMBEDDINGS =====
         elif analysis_type == AnalysisType.EMBEDDINGS:
@@ -233,7 +272,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.embeddings import OpenAIEmbeddingEncoder
 
-                return OpenAIEmbeddingEncoder(api_key=self.config.openai_api_key)
+                return OpenAIEmbeddingEncoder(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
 
         # ===== HUMOR =====
         elif analysis_type == AnalysisType.HUMOR:
@@ -244,7 +287,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.humor import OpenAIHumorDetector
 
-                return OpenAIHumorDetector(api_key=self.config.openai_api_key)
+                return OpenAIHumorDetector(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
 
         # ===== QUESTIONS =====
         elif analysis_type == AnalysisType.QUESTIONS:
@@ -258,7 +305,11 @@ class AnalyzerRegistry:
             elif provider == "openai":
                 from src.analyzers.questions import OpenAIQuestionClassifier
 
-                return OpenAIQuestionClassifier(api_key=self.config.openai_api_key)
+                return OpenAIQuestionClassifier(
+                    api_key=self.config.openai_api_key,
+                    max_retries=self.config.openai_max_retries,
+                    timeout=self.config.openai_timeout,
+                )
 
         raise ValueError(f"Unknown provider '{provider}' for {analysis_type}")
 

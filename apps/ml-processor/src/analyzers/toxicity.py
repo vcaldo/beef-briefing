@@ -123,6 +123,10 @@ class LocalToxicityAnalyzer(Analyzer):
         except ImportError:
             return False
 
+    def get_model_name(self) -> str:
+        """Return the HuggingFace model name."""
+        return self.model_name
+
     def cleanup(self) -> None:
         """Release model resources."""
         if self._pipeline is not None:
@@ -231,6 +235,14 @@ class PerspectiveToxicityAnalyzer(Analyzer):
         """Check if API key is available."""
         return bool(self.api_key)
 
+    def get_model_name(self) -> str:
+        """Return the Perspective API model name."""
+        return "perspective-api"
+
+    def is_local_provider(self) -> bool:
+        """Return False - this uses Google Perspective API."""
+        return False
+
     def cleanup(self) -> None:
         """No resources to release."""
         pass
@@ -243,14 +255,23 @@ class OpenAIModerationAnalyzer(Analyzer):
     Free with OpenAI API key, supports batching.
     """
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(
+        self,
+        api_key: str | None = None,
+        max_retries: int = 5,
+        timeout: float = 60.0,
+    ):
         """
         Initialize with OpenAI API key.
 
         Args:
             api_key: OpenAI API key (required)
+            max_retries: Maximum retry attempts for rate limits/errors
+            timeout: Request timeout in seconds
         """
         self.api_key = api_key
+        self.max_retries = max_retries
+        self.timeout = timeout
         self._client = None
 
     @property
@@ -258,11 +279,15 @@ class OpenAIModerationAnalyzer(Analyzer):
         return AnalysisType.TOXICITY
 
     def _get_client(self):
-        """Lazy load the OpenAI client."""
+        """Lazy load the OpenAI client with retry configuration."""
         if self._client is None:
             from openai import OpenAI
 
-            self._client = OpenAI(api_key=self.api_key)
+            self._client = OpenAI(
+                api_key=self.api_key,
+                max_retries=self.max_retries,
+                timeout=self.timeout,
+            )
         return self._client
 
     def analyze(self, texts: list[str], **kwargs) -> list[dict]:
@@ -307,6 +332,14 @@ class OpenAIModerationAnalyzer(Analyzer):
     def is_available(self) -> bool:
         """Check if OpenAI API key is available."""
         return bool(self.api_key)
+
+    def get_model_name(self) -> str:
+        """Return the OpenAI moderation model name."""
+        return "omni-moderation-latest"
+
+    def is_local_provider(self) -> bool:
+        """Return False - this uses OpenAI API."""
+        return False
 
     def cleanup(self) -> None:
         """Release client resources."""

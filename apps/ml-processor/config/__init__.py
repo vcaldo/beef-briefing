@@ -36,9 +36,15 @@ class Config(BaseSettings):
     perspective_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
 
+    # OpenAI retry configuration
+    openai_max_retries: int = 5
+    openai_timeout: float = 60.0
+
     # New Relic APM Configuration (optional)
     new_relic_app_name: Optional[str] = None
     new_relic_license_key: Optional[str] = None
+    new_relic_ai_monitoring_enabled: bool = True  # Enable AI monitoring for LLM calls
+    track_ai_costs: bool = True  # Track estimated costs based on token usage
 
     # Qdrant Configuration
     qdrant_host: str = "localhost"

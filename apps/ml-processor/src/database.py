@@ -15,6 +15,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from src.instrumentation import function_trace
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,10 +78,13 @@ class MLQueries:
     # READ OPERATIONS
     # =========================================
 
+    @function_trace(name="get_unprocessed_messages", group="Database")
     def get_unprocessed_messages(
         self,
         chat_id: int,
         limit: int = 500,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
     ) -> list[dict]:
         """
         Fetch messages that haven't been ML-processed.
@@ -87,11 +92,20 @@ class MLQueries:
         Args:
             chat_id: Target chat ID
             limit: Maximum messages to fetch
+            from_date: Only fetch messages from this date (inclusive)
+            to_date: Only fetch messages until this date (exclusive)
 
         Returns:
             List of message dicts with id, message_id, chat_id, user_id, text, date
         """
-        query = """
+        # Build dynamic WHERE clause for date filtering
+        date_filters = ""
+        if from_date:
+            date_filters += " AND m.date >= :from_date"
+        if to_date:
+            date_filters += " AND m.date < :to_date"
+
+        query = f"""
             SELECT
                 m.id,
                 m.message_id,
@@ -104,11 +118,19 @@ class MLQueries:
             WHERE m.chat_id = :chat_id
                 AND mps.message_id IS NULL
                 AND (m.text IS NOT NULL OR m.caption IS NOT NULL)
+                {date_filters}
             ORDER BY m.date ASC
             LIMIT :limit
         """
-        return self._execute_many(query, {"chat_id": chat_id, "limit": limit})
+        params: dict[str, Any] = {"chat_id": chat_id, "limit": limit}
+        if from_date:
+            params["from_date"] = from_date
+        if to_date:
+            params["to_date"] = to_date
 
+        return self._execute_many(query, params)
+
+    @function_trace(name="get_processing_status", group="Database")
     def get_processing_status(self, chat_id: int) -> dict:
         """
         Get processing statistics for a chat.
@@ -226,6 +248,7 @@ class MLQueries:
     # WRITE OPERATIONS
     # =========================================
 
+    @function_trace(name="save_sentiment_results", group="Database")
     def save_sentiment_results(self, results: list[dict]) -> int:
         """
         Save sentiment analysis results.
@@ -265,6 +288,7 @@ class MLQueries:
         """
         return self._execute_batch(query, results)
 
+    @function_trace(name="save_toxicity_results", group="Database")
     def save_toxicity_results(self, results: list[dict]) -> int:
         """
         Save toxicity detection results.
@@ -294,6 +318,7 @@ class MLQueries:
         """
         return self._execute_batch(query, results)
 
+    @function_trace(name="save_humor_results", group="Database")
     def save_humor_results(self, results: list[dict]) -> int:
         """
         Save humor detection results.
@@ -323,6 +348,7 @@ class MLQueries:
         """
         return self._execute_batch(query, results)
 
+    @function_trace(name="save_questions_results", group="Database")
     def save_questions_results(self, results: list[dict]) -> int:
         """
         Save question detection results.
@@ -352,6 +378,7 @@ class MLQueries:
         """
         return self._execute_batch(query, results)
 
+    @function_trace(name="save_ner_results", group="Database")
     def save_ner_results(self, results: list[dict]) -> int:
         """
         Save NER (Named Entity Recognition) results.
@@ -388,6 +415,7 @@ class MLQueries:
         """
         return self._execute_batch(query, results)
 
+    @function_trace(name="save_topic_clusters", group="Database")
     def save_topic_clusters(
         self,
         chat_id: int,
@@ -430,6 +458,7 @@ class MLQueries:
 
         return self._execute_batch(query, params_list)
 
+    @function_trace(name="save_message_topics", group="Database")
     def save_message_topics(self, results: list[dict]) -> int:
         """
         Save message-to-topic assignments.
@@ -462,6 +491,7 @@ class MLQueries:
         """
         return self._execute_batch(query, valid_results)
 
+    @function_trace(name="mark_processed", group="Database")
     def mark_processed(
         self,
         message_ids: list[int],

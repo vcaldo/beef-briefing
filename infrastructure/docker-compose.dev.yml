@@ -171,11 +171,14 @@ services:
       dockerfile: apps/ml-processor/Dockerfile
     container_name: beef-ml-processor-dev
     # command: ["python", "main.py", "process", "--chat-id", "-1002572302334"]
-    command: ["python", "main.py", "process", "--chat-id", "-1002572302334", "--from-date", "2025-11-18"]
+    command: ["python", "main.py", "process", "--chat-id", "-1002572302334", "--from-date", "2025-11-19"]
     environment:
-      # Database (direct PostgreSQL access)
-      DB_HOST: postgres
-      DB_PORT: 5432
+      # Database - PROD via SSH tunnel: make pg-tunnel (localhost:5433 -> prod postgres)
+      DB_HOST: host.docker.internal
+      DB_PORT: 5433
+      # Database - DEV (local postgres container)
+      # DB_HOST: postgres
+      # DB_PORT: 5432
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
@@ -207,6 +210,8 @@ services:
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       NEW_RELIC_AI_MONITORING_ENABLED: "true"
       TRACK_AI_COSTS: "true"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ml_models_cache_dev:/root/.cache/huggingface
     depends_on:

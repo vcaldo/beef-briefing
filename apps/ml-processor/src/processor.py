@@ -15,6 +15,8 @@ from src.analyzers.base import AnalysisType, AnalyzerRegistry
 from src.database import MLQueries
 from src.instrumentation import (
     add_analyzer_attributes,
+    add_custom_attributes,
+    background_task,
     calculate_cost,
     function_trace,
     notice_error,
@@ -82,7 +84,7 @@ class MLProcessor:
         self.qdrant = None
         logger.info("ML processor cleaned up")
 
-    @function_trace(name="process_batch", group="MLProcessor")
+    @background_task(name="process_batch", group="MLProcessor")
     def process_batch(
         self,
         chat_id: int,
@@ -103,6 +105,14 @@ class MLProcessor:
             Number of messages processed
         """
         limit = limit or self.config.batch_size
+
+        # Add custom attributes for APM tracking
+        add_custom_attributes({
+            "chat_id": chat_id,
+            "batch_size": limit,
+            "from_date": str(from_date.date()) if from_date else None,
+            "to_date": str(to_date.date()) if to_date else None,
+        })
 
         # Fetch unprocessed messages
         messages = self.queries.get_unprocessed_messages(

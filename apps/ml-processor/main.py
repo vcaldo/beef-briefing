@@ -105,7 +105,6 @@ def parse_date(date_str: str | None) -> datetime | None:
         raise ValueError(f"Invalid date format: {date_str}. Use YYYY-MM-DD")
 
 
-@background_task(name="process_batch", group="MLProcessor")
 def run_process(args, config):
     """Run batch processing command."""
     logger.info(f"Processing chat {args.chat_id}")
@@ -202,7 +201,6 @@ def run_status(args, config):
         processor.cleanup()
 
 
-@background_task(name="continuous", group="MLProcessor")
 def run_continuous(args, config):
     """Run continuous processing command."""
     logger.info(f"Starting continuous processing for chat {args.chat_id}")

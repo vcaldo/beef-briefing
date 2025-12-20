@@ -3,7 +3,6 @@ API clients for fetching data from api-service.
 
 Provides:
 - PhotoClient: Fetch user and chat profile photos with presigned URLs
-- CardClient: Fetch weekly user personality cards with stats and trends
 - GalleryClient: Fetch card gallery images from card-image-generator
 """
 
@@ -12,7 +11,6 @@ from typing import Optional
 
 import httpx
 
-from src.api.card_client import CardClient
 from src.api.gallery_client import GalleryClient
 
 logger = logging.getLogger(__name__)
@@ -149,4 +147,4 @@ class PhotoClient:
             self._client = None
 
 
-__all__ = ["PhotoClient", "CardClient", "GalleryClient"]
+__all__ = ["PhotoClient", "GalleryClient"]

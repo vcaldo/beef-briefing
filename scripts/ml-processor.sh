@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# scripts/ml-processor.sh - Execute ml-processor commands in Docker container
+#
+# Usage:
+#   ./scripts/ml-processor.sh [--prod] <command> [options]
+#
+# Examples:
+#   ./scripts/ml-processor.sh process --limit 100       # Dev database
+#   ./scripts/ml-processor.sh --prod process            # Prod database (SSH tunnel)
+
+set -euo pipefail
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
+
+# Configuration
+CONTAINER="beef-ml-processor-dev"
+DEFAULT_CHAT_ID="-1002572302334"
+
+# Production database (via SSH tunnel: make pg-tunnel)
+PROD_DB_HOST="host.docker.internal"
+PROD_DB_PORT="5433"
+
+# Environment overrides for docker exec
+ENV_OVERRIDES=""
+
+usage() {
+    cat <<EOF
+Usage: $0 [--prod] <command> [options]
+
+Environment:
+  --prod          Target production database (via SSH tunnel)
+                  Requires: make pg-tunnel running in another terminal
+
+Commands:
+  process     Run batch processing
+  status      Show processing status
+  continuous  Run continuous processing (daemon mode)
+  cards       Generate weekly user cards
+  shell       Open interactive shell in container
+
+Options (passed through to main.py):
+  --chat-id ID      Chat ID (default: $DEFAULT_CHAT_ID)
+  --limit N         Limit messages to process
+  --batch-size N    Messages per batch
+  --from-date D     Process from date (YYYY-MM-DD)
+  --to-date D       Process until date (YYYY-MM-DD)
+  --week D          Week start for cards (YYYY-MM-DD)
+  --window-days N   Rolling window for cards (default: 30)
+  --min-messages N  Min messages for cards (default: 10)
+
+Examples:
+  $0 process --limit 100                    # Dev: local postgres
+  $0 --prod process --limit 100             # Prod: via SSH tunnel
+  $0 status                                 # Dev status
+  $0 --prod status                          # Prod status
+  $0 cards --week 2025-01-06                # Generate cards (dev)
+  $0 shell                                  # Open shell
+EOF
+    exit 1
+}
+
+# Check if container is running
+check_container() {
+    if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
+        log_error "Container '$CONTAINER' is not running"
+        log_info "Start it with: make up-build"
+        exit 1
+    fi
+}
+
+# Run docker exec with environment overrides
+docker_exec() {
+    if [[ -n "$ENV_OVERRIDES" ]]; then
+        # shellcheck disable=SC2086
+        docker exec -it $ENV_OVERRIDES "$CONTAINER" "$@"
+    else
+        docker exec -it "$CONTAINER" "$@"
+    fi
+}
+
+# Check if --chat-id is in args
+has_chat_id() {
+    for arg in "$@"; do
+        if [[ "$arg" == "--chat-id" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Main
+main() {
+    if [[ $# -lt 1 ]]; then
+        usage
+    fi
+
+    # Parse --prod flag
+    if [[ "$1" == "--prod" ]]; then
+        shift
+        ENV_OVERRIDES="-e DB_HOST=$PROD_DB_HOST -e DB_PORT=$PROD_DB_PORT"
+        log_info "Targeting PRODUCTION database (via SSH tunnel on port $PROD_DB_PORT)"
+    fi
+
+    if [[ $# -lt 1 ]]; then
+        usage
+    fi
+
+    local command="$1"
+    shift
+
+    check_container
+
+    case "$command" in
+        process)
+            if ! has_chat_id "$@"; then
+                log_info "Using default chat-id: $DEFAULT_CHAT_ID"
+                docker_exec python main.py process --chat-id "$DEFAULT_CHAT_ID" "$@"
+            else
+                docker_exec python main.py process "$@"
+            fi
+            ;;
+
+        status)
+            if ! has_chat_id "$@"; then
+                docker_exec python main.py status --chat-id "$DEFAULT_CHAT_ID" "$@"
+            else
+                docker_exec python main.py status "$@"
+            fi
+            ;;
+
+        continuous)
+            if ! has_chat_id "$@"; then
+                log_info "Starting continuous processing for chat: $DEFAULT_CHAT_ID"
+                docker_exec python main.py continuous --chat-id "$DEFAULT_CHAT_ID" "$@"
+            else
+                docker_exec python main.py continuous "$@"
+            fi
+            ;;
+
+        cards)
+            if ! has_chat_id "$@"; then
+                docker_exec python main.py generate-cards --chat-id "$DEFAULT_CHAT_ID" "$@"
+            else
+                docker_exec python main.py generate-cards "$@"
+            fi
+            ;;
+
+        shell)
+            log_info "Opening shell in $CONTAINER..."
+            docker_exec /bin/bash
+            ;;
+
+        help|--help|-h)
+            usage
+            ;;
+
+        *)
+            log_error "Unknown command: $command"
+            usage
+            ;;
+    esac
+}
+
+main "$@"

@@ -168,6 +168,7 @@ def create_card_page(
                 current_period=period,
                 base_url=base_url,
                 theme_name=theme_name,
+                is_admin=is_admin,
             ),
             dmc.Space(h="xl"),
             *content,

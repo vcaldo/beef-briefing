@@ -6,6 +6,7 @@ from .group import (
     create_activity_page,
     create_card_page,
     create_comedy_page,
+    create_gallery_page,
     create_insights_page,
     create_leaderboard_page,
     create_my_stats_page,
@@ -29,4 +30,5 @@ __all__ = [
     "create_insights_page",
     "create_comedy_page",
     "create_card_page",
+    "create_gallery_page",
 ]

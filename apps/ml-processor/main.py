@@ -265,6 +265,99 @@ def run_generate_cards(args, config):
     return result
 
 
+@background_task(name="render-cards", group="MLProcessor")
+def run_render_cards(args, config):
+    """Run card image rendering command."""
+    logger.info(f"Rendering card images for chat {args.chat_id}")
+
+    # Validate config
+    if not config.card_image_generator_url:
+        logger.error("CARD_IMAGE_GENERATOR_URL not configured")
+        print("\nError: Card image generator service not configured.")
+        print("Set CARD_IMAGE_GENERATOR_URL and CARD_IMAGE_GENERATOR_API_KEY environment variables.")
+        return None
+
+    if not config.card_image_generator_api_key:
+        logger.error("CARD_IMAGE_GENERATOR_API_KEY not configured")
+        print("\nError: Card image generator API key not configured.")
+        print("Set CARD_IMAGE_GENERATOR_API_KEY environment variable.")
+        return None
+
+    add_custom_attributes(
+        {
+            "chat_id": args.chat_id,
+            "week": args.week,
+            "theme": args.theme,
+            "force": args.force,
+        }
+    )
+
+    # Create client
+    from src.cards import CardImageClient
+
+    client = CardImageClient(
+        base_url=config.card_image_generator_url,
+        api_key=config.card_image_generator_api_key,
+        timeout=config.card_image_generator_timeout,
+    )
+
+    # Check health
+    if not client.health_check():
+        logger.error("Card image generator service is not healthy")
+        print("\nError: Card image generator service is not responding.")
+        print(f"Check if the service is running at {config.card_image_generator_url}")
+        return None
+
+    # Determine week (use provided or let service figure it out)
+    week_start = args.week if args.week else ""
+
+    # If no week specified, we need to get the latest from the database
+    if not week_start:
+        from sqlalchemy import create_engine, text
+
+        engine = create_engine(config.dsn(), pool_pre_ping=True)
+        with engine.connect() as conn:
+            result = conn.execute(
+                text(
+                    "SELECT week_start FROM ml_user_cards WHERE chat_id = :chat_id "
+                    "ORDER BY week_start DESC LIMIT 1"
+                ),
+                {"chat_id": args.chat_id},
+            ).scalar()
+            if result:
+                week_start = result.isoformat() if hasattr(result, "isoformat") else str(result)
+            else:
+                logger.error("No cards found for this chat")
+                print("\nError: No cards found for this chat. Run generate-cards first.")
+                return None
+
+    logger.info(f"Rendering images for week: {week_start}")
+
+    # Render cards
+    result = client.render_cards(
+        chat_id=args.chat_id,
+        week_start=week_start,
+        theme=args.theme,
+        force_regenerate=args.force,
+    )
+
+    # Print results
+    print("\nCard Image Rendering Results:")
+    print(f"  Week: {week_start}")
+    print(f"  Theme: {args.theme}")
+    print(f"  Generated: {result.generated}")
+    print(f"  Skipped: {result.skipped}")
+    print(f"  Failed: {result.failed}")
+
+    if result.failed > 0:
+        print("\nFailed renders:")
+        for r in result.results:
+            if r.get("status") == "failed":
+                print(f"  - User {r.get('user_id')}: {r.get('error')}")
+
+    return result
+
+
 def run_continuous(args, config):
     """Run continuous processing command."""
     logger.info(f"Starting continuous processing for chat {args.chat_id}")
@@ -404,6 +497,35 @@ def main():
         help="IANA timezone for week boundaries and chronotype (e.g., America/Sao_Paulo)",
     )
 
+    # render-cards command
+    render_cards_parser = subparsers.add_parser(
+        "render-cards",
+        help="Render card images for a chat (requires card-image-generator service)",
+    )
+    render_cards_parser.add_argument(
+        "--chat-id",
+        type=int,
+        required=True,
+        help="Target chat ID to render cards for",
+    )
+    render_cards_parser.add_argument(
+        "--week",
+        type=str,
+        default=None,
+        help="Week start date (YYYY-MM-DD). Default: latest week with cards",
+    )
+    render_cards_parser.add_argument(
+        "--theme",
+        type=str,
+        default="gaming",
+        help="Template theme name (default: gaming)",
+    )
+    render_cards_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force regenerate images even if they exist",
+    )
+
     args = parser.parse_args()
 
     # Use module-level config (already loaded for New Relic init)
@@ -442,6 +564,10 @@ def main():
         elif args.command == "generate-cards":
             run_generate_cards(args, config)
             sys.exit(0)
+
+        elif args.command == "render-cards":
+            result = run_render_cards(args, config)
+            sys.exit(0 if result else 1)
 
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)

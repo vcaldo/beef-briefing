@@ -302,6 +302,14 @@ secrets-service-api: ## Generate API key for an app (APP=telegram-bot required)
 	@chmod +x $(SCRIPTS_DIR)/generate-api-service-key.sh
 	@$(SCRIPTS_DIR)/generate-api-service-key.sh "$(APP)" "$(SECRETS_DIR)"
 
+secrets-card-image-generator: ## Generate card-image-generator API key for an app (APP=leaderboard required)
+	@if [ -z "$(APP)" ]; then \
+		echo "Error: APP variable is required. Usage: make secrets-card-image-generator APP=leaderboard"; \
+		exit 1; \
+	fi
+	@chmod +x $(SCRIPTS_DIR)/generate-card-image-generator-key.sh
+	@$(SCRIPTS_DIR)/generate-card-image-generator-key.sh "$(APP)" "$(SECRETS_DIR)"
+
 # =============================================================================
 # TERRAFORM (tf-*)
 # =============================================================================
@@ -437,6 +445,9 @@ ml-run-continuous: ## Run continuous processing (dev)
 ml-run-cards: ## Generate weekly user cards (dev)
 	./scripts/ml-processor.sh cards $(ML_ARGS)
 
+ml-run-render: ## Render card images (dev)
+	./scripts/ml-processor.sh render $(ML_ARGS)
+
 # Production (requires: make pg-tunnel in another terminal)
 ml-run-prod: ## Run ml-processor batch processing (prod)
 	./scripts/ml-processor.sh --prod process $(ML_ARGS)
@@ -452,6 +463,9 @@ ml-run-continuous-prod: ## Run continuous processing (prod)
 
 ml-run-cards-prod: ## Generate weekly user cards (prod)
 	./scripts/ml-processor.sh --prod cards $(ML_ARGS)
+
+ml-run-render-prod: ## Render card images (prod)
+	./scripts/ml-processor.sh --prod render $(ML_ARGS)
 
 # Utility
 ml-shell: ## Open shell in ml-processor container
@@ -541,13 +555,13 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	docker-shell-newrelic docker-shell-leaderboard docker-shell-ml-dashboard \
 	go-build go-build-api go-build-bot go-build-import-cli go-build-import-cli-prod go-clean \
 	go-fmt go-fmt-check \
-	secrets-traefik-password secrets-service-api \
+	secrets-traefik-password secrets-service-api secrets-card-image-generator \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-arch tf-root-pass \
 	tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage tf-update-ssh-config tf-docs tf-deploy-check \
-	ml-run ml-run-status ml-run-once ml-run-continuous ml-run-cards \
-	ml-run-prod ml-run-status-prod ml-run-once-prod ml-run-continuous-prod ml-run-cards-prod \
+	ml-run ml-run-status ml-run-once ml-run-continuous ml-run-cards ml-run-render \
+	ml-run-prod ml-run-status-prod ml-run-once-prod ml-run-continuous-prod ml-run-cards-prod ml-run-render-prod \
 	ml-shell ml-clean-dev ml-clean-prod ml-clean-cards-dev ml-clean-cards-prod \
 	mc-setup-prod

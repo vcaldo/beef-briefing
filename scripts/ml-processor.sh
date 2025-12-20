@@ -38,6 +38,7 @@ Commands:
   status      Show processing status
   continuous  Run continuous processing (daemon mode)
   cards       Generate weekly user cards
+  render      Render card images (requires card-image-generator service)
   shell       Open interactive shell in container
 
 Options (passed through to main.py):
@@ -46,9 +47,11 @@ Options (passed through to main.py):
   --batch-size N    Messages per batch
   --from-date D     Process from date (YYYY-MM-DD)
   --to-date D       Process until date (YYYY-MM-DD)
-  --week D          Week start for cards (YYYY-MM-DD)
+  --week D          Week start for cards/render (YYYY-MM-DD)
   --window-days N   Rolling window for cards (default: 30)
   --min-messages N  Min messages for cards (default: 10)
+  --theme T         Theme for card images (default: gaming)
+  --force           Force regenerate card images
 
 Examples:
   $0 process --limit 100                    # Dev: local postgres
@@ -56,6 +59,8 @@ Examples:
   $0 status                                 # Dev status
   $0 --prod status                          # Prod status
   $0 cards --week 2025-01-06                # Generate cards (dev)
+  $0 render --week 2025-01-06               # Render card images (dev)
+  $0 render --force                         # Force re-render images
   $0 shell                                  # Open shell
 EOF
     exit 1
@@ -144,6 +149,14 @@ main() {
                 docker_exec python main.py generate-cards --chat-id "$DEFAULT_CHAT_ID" "$@"
             else
                 docker_exec python main.py generate-cards "$@"
+            fi
+            ;;
+
+        render)
+            if ! has_chat_id "$@"; then
+                docker_exec python main.py render-cards --chat-id "$DEFAULT_CHAT_ID" "$@"
+            else
+                docker_exec python main.py render-cards "$@"
             fi
             ;;
 

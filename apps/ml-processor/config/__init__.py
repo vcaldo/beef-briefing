@@ -81,7 +81,7 @@ class Config(BaseSettings):
 
     # Card Image Generator Service (optional)
     card_image_generator_url: Optional[str] = None
-    card_image_generator_api_key: Optional[str] = None
+    card_image_generator_api_key_file: str = ""
     card_image_generator_timeout: float = 120.0
 
     class Config:
@@ -115,6 +115,17 @@ class Config(BaseSettings):
     def qdrant_url(self) -> str:
         """Return Qdrant connection URL."""
         return f"http://{self.qdrant_host}:{self.qdrant_port}"
+
+    @cached_property
+    def card_image_generator_api_key(self) -> str:
+        """Load card-image-generator API key from file."""
+        if not self.card_image_generator_api_key_file:
+            return ""
+        try:
+            with open(self.card_image_generator_api_key_file) as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            return ""
 
     def validate_api_keys(self) -> list[str]:
         """Return list of missing API keys for configured providers."""

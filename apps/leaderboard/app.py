@@ -29,7 +29,7 @@ from sqlalchemy import create_engine
 
 from src.database import DashboardQueries, SessionQueries
 from src.auth import TelegramAuthService
-from src.api import PhotoClient, CardClient, GalleryClient
+from src.api import PhotoClient, GalleryClient
 from src.routes import auth_bp
 from src.routes.auth import init_auth_routes
 from src.pages import (
@@ -43,7 +43,6 @@ from src.pages import (
     create_topics_page,
     create_insights_page,
     create_comedy_page,
-    create_card_page,
     create_gallery_page,
 )
 from src.utils import filter_chats_for_user
@@ -226,26 +225,6 @@ def get_photo_client() -> PhotoClient:
     return _photo_client
 
 
-# Card client (lazy initialization)
-_card_client = None
-
-
-def get_card_client() -> CardClient:
-    """Get or create CardClient instance."""
-    global _card_client
-    if _card_client is None:
-        if cfg.api_service_url and cfg.api_key:
-            _card_client = CardClient(cfg.api_service_url, cfg.api_key)
-            logger.info("CardClient initialized")
-        else:
-            # Return a stub client that always returns None
-            _card_client = CardClient("", "")
-            logger.warning(
-                "CardClient not configured (missing API_SERVICE_URL or API_KEY_FILE)"
-            )
-    return _card_client
-
-
 # Gallery client (lazy initialization)
 _gallery_client = None
 
@@ -324,27 +303,6 @@ def update_theme_store(theme_value):
     if theme_value:
         return theme_value
     return DEFAULT_LIGHT_THEME
-
-
-# Clientside callback for card user selector (admin feature)
-# Redirects to the card page with selected user ID in query param
-app.clientside_callback(
-    """
-    function(selectedUserId) {
-        if (!selectedUserId) {
-            return window.dash_clientside.no_update;
-        }
-        // Get current URL and update user param
-        const url = new URL(window.location.href);
-        url.searchParams.set('user', selectedUserId);
-        window.location.href = url.toString();
-        return window.dash_clientside.no_update;
-    }
-    """,
-    Output("card-user-select", "id"),  # Dummy output
-    Input("card-user-select", "value"),
-    prevent_initial_call=True,
-)
 
 
 def _create_404_page(theme: dict, background: dict, base_url: str):
@@ -549,7 +507,6 @@ def display_page(pathname, search, theme_name):
             "topics": create_topics_page,
             "insights": create_insights_page,
             "comedy": create_comedy_page,
-            "card": create_card_page,
             "gallery": create_gallery_page,
         }
 
@@ -574,18 +531,6 @@ def display_page(pathname, search, theme_name):
                     page_kwargs["page"] = int(query_params.get("page", 1))
                 except (ValueError, TypeError):
                     page_kwargs["page"] = 1
-            elif page_name == "card":
-                # Card page needs card_client and target user for admin view
-                page_kwargs["card_client"] = get_card_client()
-                target_user_id = user.get("user_id")  # Default to current user
-                if user.get("is_admin"):
-                    user_param = query_params.get("user")
-                    if user_param:
-                        try:
-                            target_user_id = int(user_param)
-                        except (ValueError, TypeError):
-                            pass  # Keep default
-                page_kwargs["target_user_id"] = target_user_id
             elif page_name == "gallery":
                 # Gallery page needs gallery_client and week param (admin only)
                 page_kwargs["gallery_client"] = get_gallery_client()

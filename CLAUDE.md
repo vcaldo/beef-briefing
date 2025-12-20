@@ -61,14 +61,19 @@ The system consists of 3 main Go services:
 
 ```
 Internet (443/80) → Traefik (SSL termination)
-                         └─→ Traefik Dashboard (/dashboard)
+                         ├─→ api.{domain} → API Service (8080)
+                         ├─→ cards-api.{domain} → Card Image Generator (8051)
+                         ├─→ {domain}/leaderboard → Leaderboard (8050)
+                         └─→ {domain}/dashboard → Traefik Dashboard
 
 Internal Docker Network:
   ├─ API Service (8080) ←→ Telegram Bot
+  ├─ Card Image Generator (8051) ←→ Leaderboard
   └─ PostgreSQL (5432)
 ```
 
 Only Traefik exposes ports externally. All services communicate via `beef-prod-network`.
+- `api.{domain}` and `cards-api.{domain}` are protected by IP allowlist (same `ALLOWED_IP`)
 
 ## Development Commands
 

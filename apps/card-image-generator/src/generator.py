@@ -197,6 +197,18 @@ class CardGenerator:
         card_id = card_data["card_id"]
         card_version = card_data["card_version"]
 
+        # Convert profile photo path to presigned URL for Playwright
+        profile_photo_path = card_data.get("profile_photo_path")
+        if profile_photo_path:
+            try:
+                card_data["profile_photo_path"] = self.storage.get_presigned_url(
+                    profile_photo_path,
+                    expires_seconds=300,  # 5 minutes is enough for rendering
+                )
+            except Exception as e:
+                logger.warning(f"Failed to get presigned URL for profile photo: {e}")
+                card_data["profile_photo_path"] = None
+
         # Transform data to template context
         context = self.template_loader.transform_card_data(
             card_data, theme=theme, rank=rank

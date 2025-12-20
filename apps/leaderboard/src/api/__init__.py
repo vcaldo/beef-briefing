@@ -7,7 +7,6 @@ Provides:
 """
 
 import logging
-from typing import Optional
 
 import httpx
 
@@ -48,7 +47,7 @@ class PhotoClient:
             )
         return self._client
 
-    def get_user_photo(self, user_id: int, size: str = "small") -> Optional[str]:
+    def get_user_photo(self, user_id: int, size: str = "small") -> str | None:
         """
         Get presigned URL for a user's profile photo.
 
@@ -72,11 +71,14 @@ class PhotoClient:
                 return None
             response.raise_for_status()
             return response.json().get("url")
-        except Exception as e:
-            logger.warning(f"Failed to fetch user photo for {user_id}: {e}")
+        except httpx.HTTPStatusError as e:
+            logger.warning(f"HTTP error fetching user photo for {user_id}: {e.response.status_code}")
+            return None
+        except httpx.RequestError as e:
+            logger.warning(f"Request error fetching user photo for {user_id}: {e}")
             return None
 
-    def get_chat_photo(self, chat_id: int, size: str = "small") -> Optional[str]:
+    def get_chat_photo(self, chat_id: int, size: str = "small") -> str | None:
         """
         Get presigned URL for a chat's profile photo.
 
@@ -100,13 +102,16 @@ class PhotoClient:
                 return None
             response.raise_for_status()
             return response.json().get("url")
-        except Exception as e:
-            logger.warning(f"Failed to fetch chat photo for {chat_id}: {e}")
+        except httpx.HTTPStatusError as e:
+            logger.warning(f"HTTP error fetching chat photo for {chat_id}: {e.response.status_code}")
+            return None
+        except httpx.RequestError as e:
+            logger.warning(f"Request error fetching chat photo for {chat_id}: {e}")
             return None
 
     def get_user_photos_batch(
         self, user_ids: list[int], size: str = "small"
-    ) -> dict[int, Optional[str]]:
+    ) -> dict[int, str | None]:
         """
         Fetch photos for multiple users.
 
@@ -124,7 +129,7 @@ class PhotoClient:
 
     def get_chat_photos_batch(
         self, chat_ids: list[int], size: str = "small"
-    ) -> dict[int, Optional[str]]:
+    ) -> dict[int, str | None]:
         """
         Fetch photos for multiple chats.
 

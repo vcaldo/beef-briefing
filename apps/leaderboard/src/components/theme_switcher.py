@@ -45,7 +45,7 @@ def create_theme_switcher(current_theme: str | None = None) -> dmc.SegmentedCont
                         icon=theme_info["icon"],
                         width=18,
                     ),
-                    style={"width": "100%"},
+                    w="100%",
                 ),
             }
         )

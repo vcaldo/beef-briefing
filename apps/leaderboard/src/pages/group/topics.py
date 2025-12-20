@@ -418,7 +418,7 @@ def _create_top_entities_card(entities: list[dict], colors: dict) -> dmc.Paper:
                         dmc.Text(
                             entity.get("entity_text", "Unknown"),
                             size="sm",
-                            style={"flex": 1},
+                            flex=1,
                             truncate=True,
                         ),
                         dmc.Text(
@@ -478,7 +478,7 @@ def _create_user_interests_card(users: list[dict], colors: dict) -> dmc.Paper:
                         dmc.Text(
                             user.get("first_name", "Unknown"),
                             size="sm",
-                            style={"flex": 1},
+                            flex=1,
                         ),
                         dmc.Badge(
                             topic_label,

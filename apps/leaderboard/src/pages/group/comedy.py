@@ -302,7 +302,7 @@ def _create_comedy_leaderboard_card(users: list[dict], colors: dict) -> dmc.Pape
                                     user.get("first_name", "Unknown"),
                                     size="sm",
                                     fw=500,
-                                    style={"flex": 1},
+                                    flex=1,
                                 ),
                                 dmc.Tooltip(
                                     dmc.Text(

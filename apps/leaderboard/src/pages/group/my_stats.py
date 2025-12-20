@@ -16,6 +16,7 @@ from dash import html
 
 from src.charts import get_chart_colors
 from src.components import create_group_nav, get_period_dates
+from src.utils import format_number
 
 # Sentiment colors (matching sentiment.py)
 SENTIMENT_COLORS = {
@@ -301,7 +302,7 @@ def _create_comparison_card(
     # Convert to float to handle Decimal values from database
     your_value = float(your_value) if your_value else 0.0
     group_avg = float(group_avg) if group_avg else None
-    your_display = _format_number(your_value)
+    your_display = format_number(your_value)
 
     if group_avg is not None and group_avg > 0:
         pct = float((your_value - group_avg) / group_avg) * 100
@@ -465,10 +466,10 @@ def _create_reactions_card(reactions: list, colors: dict) -> dmc.Paper:
                                 radius="xl",
                                 color=colors["primary"],
                             ),
-                            style={"flex": 1},
+                            flex=1,
                         ),
                         dmc.Text(
-                            _format_number(count),
+                            format_number(count),
                             size="sm",
                             c="dimmed",
                             miw=40,
@@ -524,7 +525,7 @@ def _create_reply_stats_card(
                                 size="sm",
                                 lineClamp=1,
                             ),
-                            style={"flex": 1},
+                            flex=1,
                         ),
                         dmc.Badge(
                             str(p["count"]),
@@ -559,7 +560,7 @@ def _create_reply_stats_card(
                         dmc.Stack(
                             [
                                 dmc.Text("Replies Sent", size="sm", c="dimmed"),
-                                dmc.Title(_format_number(replies_sent), order=3),
+                                dmc.Title(format_number(replies_sent), order=3),
                                 dmc.Space(h="sm"),
                                 create_partner_list(top_replied_to, "Top replied to"),
                             ],
@@ -571,7 +572,7 @@ def _create_reply_stats_card(
                         dmc.Stack(
                             [
                                 dmc.Text("Replies Received", size="sm", c="dimmed"),
-                                dmc.Title(_format_number(replies_received), order=3),
+                                dmc.Title(format_number(replies_received), order=3),
                                 dmc.Space(h="sm"),
                                 create_partner_list(top_repliers, "Top repliers"),
                             ],
@@ -585,18 +586,6 @@ def _create_reply_stats_card(
         p="md",
         withBorder=True,
     )
-
-
-def _format_number(n: int | float) -> str:
-    """Format number with K/M suffix for large values."""
-    if n is None:
-        return "0"
-    n = int(n)
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M"
-    elif n >= 1_000:
-        return f"{n / 1_000:.1f}K"
-    return str(n)
 
 
 def _create_sentiment_card(sentiment_stats: dict, colors: dict) -> dmc.Paper:
@@ -777,7 +766,7 @@ def _create_sentiment_card(sentiment_stats: dict, colors: dict) -> dmc.Paper:
                                         else None,
                                     ],
                                     gap=0,
-                                    style={"width": "100%"},
+                                    w="100%",
                                 ),
                                 # Legend with counts
                                 dmc.Group(
@@ -787,10 +776,8 @@ def _create_sentiment_card(sentiment_stats: dict, colors: dict) -> dmc.Paper:
                                                 dmc.Box(
                                                     w=12,
                                                     h=12,
-                                                    style={
-                                                        "backgroundColor": SENTIMENT_COLORS["positive"],
-                                                        "borderRadius": "2px",
-                                                    },
+                                                    bg=SENTIMENT_COLORS["positive"],
+                                                    radius="2px",
                                                 ),
                                                 dmc.Text(
                                                     f"Positive: {positive_count} ({pos_pct:.0f}%)",
@@ -804,10 +791,8 @@ def _create_sentiment_card(sentiment_stats: dict, colors: dict) -> dmc.Paper:
                                                 dmc.Box(
                                                     w=12,
                                                     h=12,
-                                                    style={
-                                                        "backgroundColor": SENTIMENT_COLORS["neutral"],
-                                                        "borderRadius": "2px",
-                                                    },
+                                                    bg=SENTIMENT_COLORS["neutral"],
+                                                    radius="2px",
                                                 ),
                                                 dmc.Text(
                                                     f"Neutral: {neutral_count} ({neu_pct:.0f}%)",
@@ -821,10 +806,8 @@ def _create_sentiment_card(sentiment_stats: dict, colors: dict) -> dmc.Paper:
                                                 dmc.Box(
                                                     w=12,
                                                     h=12,
-                                                    style={
-                                                        "backgroundColor": SENTIMENT_COLORS["negative"],
-                                                        "borderRadius": "2px",
-                                                    },
+                                                    bg=SENTIMENT_COLORS["negative"],
+                                                    radius="2px",
                                                 ),
                                                 dmc.Text(
                                                     f"Negative: {negative_count} ({neg_pct:.0f}%)",

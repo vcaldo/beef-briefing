@@ -1,9 +1,11 @@
 """Group card component for the landing page."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
+
+from src.utils import format_number, format_relative_time
 
 
 def create_group_card(
@@ -35,11 +37,11 @@ def create_group_card(
         dmc.Card component
     """
     # Format last activity as relative time
-    last_activity_str = _format_relative_time(last_activity)
+    last_activity_str = format_relative_time(last_activity)
 
     # Format numbers
-    message_count_str = _format_number(message_count)
-    user_count_str = _format_number(user_count)
+    message_count_str = format_number(message_count)
+    user_count_str = format_number(user_count)
     avg_msg_str = f"{avg_messages_per_day:.1f}"
 
     # Truncate title if too long
@@ -128,42 +130,3 @@ def _create_stat_item(icon: str, label: str, value: str) -> dmc.Group:
         ],
         gap="xs",
     )
-
-
-def _format_relative_time(dt: datetime) -> str:
-    """Format datetime as relative time string."""
-    if dt is None:
-        return "Never"
-
-    # Ensure timezone-aware comparison
-    now = datetime.now(timezone.utc)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-
-    diff = now - dt
-
-    if diff.days > 365:
-        years = diff.days // 365
-        return f"{years}y ago"
-    elif diff.days > 30:
-        months = diff.days // 30
-        return f"{months}mo ago"
-    elif diff.days > 0:
-        return f"{diff.days}d ago"
-    elif diff.seconds > 3600:
-        hours = diff.seconds // 3600
-        return f"{hours}h ago"
-    elif diff.seconds > 60:
-        minutes = diff.seconds // 60
-        return f"{minutes}m ago"
-    else:
-        return "Just now"
-
-
-def _format_number(n: int) -> str:
-    """Format number with K/M suffix for large values."""
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M"
-    elif n >= 1_000:
-        return f"{n / 1_000:.1f}K"
-    return str(n)

@@ -239,7 +239,8 @@ remote_exec "$SSH_HOST" "
 
     # Remove old secrets with fallback for permission issues
     rm -rf ~/beef-briefing/secrets 2>/dev/null || sudo rm -rf ~/beef-briefing/secrets
-    mv /tmp/apps/ ~/beef-briefing/secrets/
+    mkdir -p ~/beef-briefing/secrets
+    mv /tmp/apps ~/beef-briefing/secrets/
 
     # Start services immediately after secrets are in place
     echo 'Starting services...'

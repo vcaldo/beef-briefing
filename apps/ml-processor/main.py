@@ -32,7 +32,7 @@ import argparse
 import logging
 from datetime import datetime
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 from src.analyzers.base import AnalyzerRegistry
 from src.database import MLQueries

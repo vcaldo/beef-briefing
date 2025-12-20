@@ -99,6 +99,15 @@ python main.py process --chat-id -1003280306634 --to-date 2024-12-01
 
 # Check processing status
 python main.py status --chat-id -1003280306634
+
+# Generate weekly user cards (aggregates ML results)
+python main.py generate-cards --chat-id -1003280306634
+
+# Generate cards for a specific week
+python main.py generate-cards --chat-id -1003280306634 --week 2024-12-16
+
+# Generate cards with custom window and minimum messages
+python main.py generate-cards --chat-id -1003280306634 --window-days 30 --min-messages 10
 ```
 
 ## Configuration
@@ -204,6 +213,23 @@ Results are stored in PostgreSQL and Qdrant:
 | Questions | PostgreSQL | `ml_questions` |
 | Embeddings | Qdrant | `message_embeddings` |
 | Processing State | PostgreSQL | `ml_processing_state` |
+| **User Cards** | PostgreSQL | `ml_user_cards` |
+
+### User Cards
+
+Weekly aggregated stats per user, generated via `generate-cards` command:
+
+| Stat | Description | Source |
+|------|-------------|--------|
+| `mood` | Mood score (0-100) with label | `ml_sentiment` |
+| `volatility` | Mood consistency (0-1) | `ml_sentiment` stddev |
+| `toxicity` | % of toxic messages | `ml_toxicity` |
+| `activity` | Messages, active days, avg length | `messages` |
+| `reactions_received` | Total reactions on user's messages | `message_reactions` |
+| `chronotype` | Peak activity hour and label | `messages` hour distribution |
+| `comedy` | Combined humor score (ML 30% + laugh reactions 70%) | `ml_humor` + `message_reactions` |
+
+Cards use a 30-day rolling window for stable personality traits, with week-over-week trend comparisons.
 
 ## Development
 
@@ -241,6 +267,7 @@ DELETE FROM ml_ner WHERE chat_id = -1003280306634;
 DELETE FROM ml_humor WHERE chat_id = -1003280306634;
 DELETE FROM ml_questions WHERE chat_id = -1003280306634;
 DELETE FROM ml_message_topics WHERE chat_id = -1003280306634;
+DELETE FROM ml_user_cards WHERE chat_id = -1003280306634;
 ```
 
 To also clear Qdrant embeddings:

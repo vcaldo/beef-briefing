@@ -373,3 +373,74 @@ func (r *CardRepository) GetAvailableWeeks(
 
 	return weeks, nil
 }
+
+// CardImage represents a card image from the database.
+type CardImage struct {
+	ID              int64     `json:"id"`
+	CardID          int64     `json:"card_id"`
+	UserID          int64     `json:"user_id"`
+	ChatID          int64     `json:"chat_id"`
+	WeekStart       string    `json:"week_start"`
+	StoragePath     string    `json:"storage_path"`
+	Theme           string    `json:"theme"`
+	Width           int       `json:"width"`
+	Height          int       `json:"height"`
+	CardDataVersion int       `json:"card_data_version"`
+	GeneratedAt     time.Time `json:"generated_at"`
+}
+
+// GetCardImage retrieves a card image by user, chat, and optional week.
+func (r *CardRepository) GetCardImage(
+	ctx context.Context,
+	userID int64,
+	chatID int64,
+	weekStart *time.Time,
+	theme string,
+) (*CardImage, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:card-get-image")
+		defer segment.End()
+	}
+
+	if theme == "" {
+		theme = "gaming"
+	}
+
+	var query string
+	var args []interface{}
+
+	if weekStart != nil {
+		query = `
+			SELECT id, card_id, user_id, chat_id, week_start,
+			       storage_path, theme, width, height,
+			       card_data_version, generated_at
+			FROM ml_user_card_images
+			WHERE user_id = $1 AND chat_id = $2 AND week_start = $3 AND theme = $4
+		`
+		args = []interface{}{userID, chatID, weekStart, theme}
+	} else {
+		query = `
+			SELECT id, card_id, user_id, chat_id, week_start,
+			       storage_path, theme, width, height,
+			       card_data_version, generated_at
+			FROM ml_user_card_images
+			WHERE user_id = $1 AND chat_id = $2 AND theme = $3
+			ORDER BY week_start DESC
+			LIMIT 1
+		`
+		args = []interface{}{userID, chatID, theme}
+	}
+
+	var img CardImage
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(
+		&img.ID, &img.CardID, &img.UserID, &img.ChatID, &img.WeekStart,
+		&img.StoragePath, &img.Theme, &img.Width, &img.Height,
+		&img.CardDataVersion, &img.GeneratedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &img, nil
+}

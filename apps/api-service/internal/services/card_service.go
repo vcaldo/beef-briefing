@@ -15,17 +15,27 @@ import (
 // ErrCardNotFound is returned when a card doesn't exist.
 var ErrCardNotFound = errors.New("card not found")
 
+// ErrCardImageNotFound is returned when a card image doesn't exist.
+var ErrCardImageNotFound = errors.New("card image not found")
+
+// MinIOClient interface for generating presigned URLs.
+type MinIOClient interface {
+	GetPresignedURLSeconds(objectKey string, expirySeconds int) (string, error)
+}
+
 // CardService handles user card business logic.
 type CardService struct {
-	cardRepo *repository.CardRepository
-	nrApp    *newrelic.Application
+	cardRepo    *repository.CardRepository
+	minioClient MinIOClient
+	nrApp       *newrelic.Application
 }
 
 // NewCardService creates a new CardService.
-func NewCardService(db *sql.DB, nrApp *newrelic.Application) *CardService {
+func NewCardService(db *sql.DB, minioClient MinIOClient, nrApp *newrelic.Application) *CardService {
 	return &CardService{
-		cardRepo: repository.NewCardRepository(db, nrApp),
-		nrApp:    nrApp,
+		cardRepo:    repository.NewCardRepository(db, nrApp),
+		minioClient: minioClient,
+		nrApp:       nrApp,
 	}
 }
 
@@ -322,4 +332,66 @@ func extractMoodScore(statsJSON json.RawMessage) float64 {
 	}
 
 	return score
+}
+
+// CardImageURLResponse is the response for GetCardImageURL.
+type CardImageURLResponse struct {
+	ImageID     int64  `json:"image_id"`
+	URL         string `json:"url"`
+	ExpiresIn   int    `json:"expires_in"`
+	Width       int    `json:"width"`
+	Height      int    `json:"height"`
+	Theme       string `json:"theme"`
+	WeekStart   string `json:"week_start"`
+	GeneratedAt string `json:"generated_at"`
+}
+
+// GetCardImageURL retrieves a presigned URL for a user's card image.
+func (s *CardService) GetCardImageURL(
+	ctx context.Context,
+	userID int64,
+	chatID int64,
+	weekStart *time.Time,
+	theme string,
+	expirySeconds int,
+) (*CardImageURLResponse, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:GetCardImageURL")
+		defer segment.End()
+	}
+
+	if expirySeconds <= 0 {
+		expirySeconds = 3600 // Default 1 hour
+	}
+
+	// Get card image from repository
+	cardImage, err := s.cardRepo.GetCardImage(ctx, userID, chatID, weekStart, theme)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrCardImageNotFound
+		}
+		return nil, err
+	}
+
+	// Generate presigned URL
+	if s.minioClient == nil {
+		return nil, errors.New("storage client not configured")
+	}
+
+	url, err := s.minioClient.GetPresignedURLSeconds(cardImage.StoragePath, expirySeconds)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CardImageURLResponse{
+		ImageID:     cardImage.ID,
+		URL:         url,
+		ExpiresIn:   expirySeconds,
+		Width:       cardImage.Width,
+		Height:      cardImage.Height,
+		Theme:       cardImage.Theme,
+		WeekStart:   cardImage.WeekStart,
+		GeneratedAt: cardImage.GeneratedAt.Format(time.RFC3339),
+	}, nil
 }

@@ -26,6 +26,8 @@
             position: relative;
             overflow: hidden;
             color: #ffffff;
+            display: flex;
+            flex-direction: column;
         }
 
         /* Background decoration */
@@ -63,6 +65,7 @@
             margin-bottom: 20px;
             position: relative;
             z-index: 1;
+            flex-shrink: 0;
         }
 
         .avatar {
@@ -156,6 +159,7 @@
             margin-bottom: 20px;
             position: relative;
             z-index: 1;
+            flex-shrink: 0;
         }
 
         .stat-card {
@@ -246,7 +250,10 @@
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
+            margin-top: auto;
+            max-height: 72px;
+            overflow: hidden;
             position: relative;
             z-index: 1;
         }
@@ -300,6 +307,8 @@
             border-top: 1px solid rgba(255, 255, 255, 0.1);
             position: relative;
             z-index: 1;
+            margin-top: auto;
+            flex-shrink: 0;
         }
 
         .messages-count {

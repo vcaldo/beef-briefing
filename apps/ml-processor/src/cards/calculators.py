@@ -21,6 +21,20 @@ from sqlalchemy.engine import Engine
 
 logger = logging.getLogger(__name__)
 
+# Laugh emojis for comedy score calculation (from leaderboard queries)
+LAUGH_EMOJIS = [
+    # Classic laughs
+    "😂", "🤣", "😆", "😄", "😅", "😸", "😹",
+    # "I'm dead" / melting
+    "🫠", "💀", "☠️", "⚰️",
+    # Crying (from laughing)
+    "😭",
+    # Loud reactions
+    "📢", "🗣️",
+    # Physical comedy reactions
+    "🤸", "🏃", "💨", "🐒", "🤡",
+]
+
 
 @dataclass
 class StatResult:
@@ -109,8 +123,8 @@ def _chronotype_label(peak_hour: int) -> str:
         return "Coruja"
 
 
-def _humor_label(score: float) -> str:
-    """Convert humor score to label."""
+def _comedy_label(score: float) -> str:
+    """Convert comedy score (0-1) to label."""
     if score >= 0.7:
         return "Comediante"
     elif score >= 0.4:
@@ -389,7 +403,7 @@ def calculate_chronotype(
     )
 
 
-def calculate_humor(
+def calculate_comedy(
     engine: Engine,
     user_id: int,
     chat_id: int,
@@ -397,13 +411,17 @@ def calculate_humor(
     window_end: datetime,
 ) -> StatResult | None:
     """
-    Calculate humor score from humor detection.
+    Calculate comedy score combining ML humor detection and laugh reactions.
 
-    Returns average humor score and humorous message percentage.
+    Comedy score weights: ML humor 30%, laugh reactions 70%
+    Formula: (ml_score * 0.3) + (log2(1 + laugh_count) / 10 * 0.7)
     """
-    query = """
+    import math
+
+    # Query ML humor stats
+    humor_query = """
         SELECT
-            AVG(mh.score) as avg_score,
+            AVG(CASE WHEN mh.is_humorous THEN mh.score ELSE NULL END) as avg_score,
             COUNT(*) FILTER (WHERE mh.is_humorous = true) as humorous_count,
             COUNT(*) as total
         FROM ml_humor mh
@@ -413,9 +431,9 @@ def calculate_humor(
           AND m.date >= :window_start
           AND m.date <= :window_end
     """
-    result = _execute_single(
+    humor_result = _execute_single(
         engine,
-        query,
+        humor_query,
         {
             "user_id": user_id,
             "chat_id": chat_id,
@@ -424,11 +442,57 @@ def calculate_humor(
         },
     )
 
-    if not result or result.get("total", 0) == 0:
+    # Query laugh reactions received on user's messages
+    reactions_query = """
+        SELECT COUNT(*) as laugh_count
+        FROM message_reactions mr
+        JOIN messages m ON mr.chat_id = m.chat_id AND mr.message_id = m.message_id
+        WHERE m.user_id = :user_id
+          AND m.chat_id = :chat_id
+          AND m.date >= :window_start
+          AND m.date <= :window_end
+          AND mr.emoji_value = ANY(:laugh_emojis)
+          AND (mr.is_removed = false OR mr.is_removed IS NULL)
+    """
+    reactions_result = _execute_single(
+        engine,
+        reactions_query,
+        {
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "window_start": window_start,
+            "window_end": window_end,
+            "laugh_emojis": LAUGH_EMOJIS,
+        },
+    )
+
+    # Need at least humor data to compute score
+    if not humor_result or humor_result.get("total", 0) == 0:
         return None
 
-    score = round(float(result["avg_score"] or 0), 2)
-    return StatResult(value={"score": score, "label": _humor_label(score)})
+    total = int(humor_result["total"])
+    humorous_count = int(humor_result.get("humorous_count") or 0)
+    avg_ml_score = float(humor_result.get("avg_score") or 0)
+    laugh_count = int(reactions_result.get("laugh_count") or 0) if reactions_result else 0
+
+    # Calculate humor percentage
+    humor_pct = round((humorous_count / total) * 100, 1) if total > 0 else 0
+
+    # Combined comedy score: ML 30%, Reactions 70%
+    # ML component: avg_score (0-1)
+    # Reactions component: log2(1 + laugh_count) / 10, capped at 1
+    ml_component = avg_ml_score * 0.3
+    reactions_component = min(math.log2(1 + laugh_count) / 10, 1.0) * 0.7
+    combined_score = round(ml_component + reactions_component, 3)
+
+    return StatResult(
+        value={
+            "score": combined_score,
+            "label": _comedy_label(combined_score),
+            "humor_pct": humor_pct,
+            "laugh_reactions": laugh_count,
+        }
+    )
 
 
 # =========================================
@@ -443,5 +507,5 @@ CALCULATORS: dict[str, StatCalculator] = {
     "activity": calculate_activity,
     "reactions_received": calculate_reactions_received,
     "chronotype": calculate_chronotype,
-    "humor": calculate_humor,
+    "comedy": calculate_comedy,
 }

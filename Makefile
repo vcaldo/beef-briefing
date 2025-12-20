@@ -475,6 +475,41 @@ ml-clean-prod: ## Clean all ML data (prod - PostgreSQL + Qdrant)
 	@curl -s -X DELETE "http://localhost:6333/collections/message_embeddings" || true
 	@echo "ML data cleaned (prod)"
 
+# Card cleanup targets
+ml-clean-cards-dev: ## Clean cards for a chat (dev). Usage: make ml-clean-cards-dev CHAT_ID=-1003280306634 [WEEK=2024-12-16]
+	@if [ -z "$(CHAT_ID)" ]; then \
+		echo "Error: CHAT_ID is required. Usage: make ml-clean-cards-dev CHAT_ID=-1003280306634 [WEEK=2024-12-16]"; \
+		exit 1; \
+	fi
+	@if [ -n "$(WEEK)" ]; then \
+		echo "Deleting cards for chat $(CHAT_ID), week $(WEEK) (dev)..."; \
+		$(DC) exec -T postgres psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c \
+			"DELETE FROM ml_user_cards WHERE chat_id = $(CHAT_ID) AND week_start = '$(WEEK)'::date;"; \
+	else \
+		echo "Deleting ALL cards for chat $(CHAT_ID) (dev)..."; \
+		$(DC) exec -T postgres psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c \
+			"DELETE FROM ml_user_cards WHERE chat_id = $(CHAT_ID);"; \
+	fi
+	@echo "Cards deleted (dev)"
+
+ml-clean-cards-prod: ## Clean cards for a chat (prod). Usage: make ml-clean-cards-prod CHAT_ID=-1003280306634 [WEEK=2024-12-16]
+	@if [ -z "$(CHAT_ID)" ]; then \
+		echo "Error: CHAT_ID is required. Usage: make ml-clean-cards-prod CHAT_ID=-1003280306634 [WEEK=2024-12-16]"; \
+		exit 1; \
+	fi
+	@if [ -n "$(WEEK)" ]; then \
+		echo "Deleting cards for chat $(CHAT_ID), week $(WEEK) (prod)..."; \
+		ssh $$($(MAKE) -s tf-ssh-user-host) "cd ~/beef-briefing && docker compose exec -T postgres psql -U postgres -d beef_briefing -c \
+			\"DELETE FROM ml_user_cards WHERE chat_id = $(CHAT_ID) AND week_start = '$(WEEK)'::date;\""; \
+	else \
+		echo "WARNING: This will delete ALL cards for chat $(CHAT_ID) in production!"; \
+		read -p "Are you sure? (yes/no): " confirm && [ "$$confirm" = "yes" ] || exit 1; \
+		echo "Deleting ALL cards for chat $(CHAT_ID) (prod)..."; \
+		ssh $$($(MAKE) -s tf-ssh-user-host) "cd ~/beef-briefing && docker compose exec -T postgres psql -U postgres -d beef_briefing -c \
+			\"DELETE FROM ml_user_cards WHERE chat_id = $(CHAT_ID);\""; \
+	fi
+	@echo "Cards deleted (prod)"
+
 # =============================================================================
 # MINIO CLIENT (mc-*)
 # =============================================================================
@@ -514,5 +549,5 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	tf-connect tf-setup tf-sync-object-storage tf-update-ssh-config tf-docs tf-deploy-check \
 	ml-run ml-run-status ml-run-once ml-run-continuous ml-run-cards \
 	ml-run-prod ml-run-status-prod ml-run-once-prod ml-run-continuous-prod ml-run-cards-prod \
-	ml-shell ml-clean-dev ml-clean-prod \
+	ml-shell ml-clean-dev ml-clean-prod ml-clean-cards-dev ml-clean-cards-prod \
 	mc-setup-prod

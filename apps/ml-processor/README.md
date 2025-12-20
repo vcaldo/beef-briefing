@@ -81,7 +81,8 @@ make ml-run-cards-prod   # Generate cards (prod)
 # Pass additional arguments with ML_ARGS
 make ml-run ML_ARGS="--limit 100"
 make ml-run-prod ML_ARGS="--from-date 2024-11-01 --to-date 2024-12-01"
-make ml-run-cards ML_ARGS="--week 2024-12-16"
+make ml-run-cards ML_ARGS="--timezone America/Sao_Paulo"
+make ml-run-cards ML_ARGS="--timezone America/Sao_Paulo --week 2024-12-16"
 
 # Override default chat ID
 make ml-run ML_ARGS="--chat-id -1003280306634 --limit 500"
@@ -94,7 +95,8 @@ make ml-run ML_ARGS="--chat-id -1003280306634 --limit 500"
 ./scripts/ml-processor.sh process --limit 100
 ./scripts/ml-processor.sh status
 ./scripts/ml-processor.sh continuous
-./scripts/ml-processor.sh cards --week 2024-12-16
+./scripts/ml-processor.sh cards --timezone America/Sao_Paulo
+./scripts/ml-processor.sh cards --timezone America/Sao_Paulo --week 2024-12-16
 
 # Production (--prod flag)
 ./scripts/ml-processor.sh --prod process --limit 100
@@ -126,6 +128,7 @@ make ml-run ML_ARGS="--chat-id -1003280306634 --limit 500"
 
 # cards options
 --chat-id ID        # Target chat ID
+--timezone TZ       # IANA timezone (REQUIRED, e.g., America/Sao_Paulo)
 --week D            # Week start date (YYYY-MM-DD, should be Monday)
 --window-days N     # Rolling window for stats (default: 30)
 --min-messages N    # Minimum messages for card generation (default: 10)
@@ -247,12 +250,38 @@ Weekly aggregated stats per user, generated via `generate-cards` command:
 | `toxicity` | % of toxic messages | `ml_toxicity` |
 | `activity` | Messages, active days, avg length | `messages` |
 | `reactions_received` | Total reactions on user's messages | `message_reactions` |
-| `chronotype` | Peak activity hour and label | `messages` hour distribution |
+| `chronotype` | Peak activity hour and label | `messages` hour distribution (timezone-aware) |
 | `comedy` | Combined humor score (ML 30% + laugh reactions 70%) | `ml_humor` + `message_reactions` |
 
 Cards use a 30-day rolling window for stable personality traits, with week-over-week trend comparisons.
 
+**Timezone Support:** The `--timezone` parameter (required) affects:
+- **Week boundaries**: Monday 00:00 to Sunday 23:59:59 calculated in the specified timezone
+- **Chronotype**: Peak activity hours converted to the specified timezone
+- **Storage**: The timezone is stored with each card for reference
+
 ## Development
+
+### Reset Card Data
+
+To regenerate cards for a specific week or chat:
+
+```bash
+# Delete cards for a specific week (dev)
+make ml-clean-cards-dev CHAT_ID=-1003280306634 WEEK=2024-12-16
+
+# Delete ALL cards for a chat (dev)
+make ml-clean-cards-dev CHAT_ID=-1003280306634
+
+# Delete cards for a specific week (prod)
+make ml-clean-cards-prod CHAT_ID=-1003280306634 WEEK=2024-12-16
+
+# Delete ALL cards for a chat (prod - requires confirmation)
+make ml-clean-cards-prod CHAT_ID=-1003280306634
+
+# After cleaning, regenerate with timezone
+make ml-run-cards ML_ARGS="--timezone America/Sao_Paulo --week 2024-12-16"
+```
 
 ### Reset Processing State
 

@@ -317,8 +317,8 @@
                 {% if not user.photo_url %}{{ user.initials }}{% endif %}
             </div>
             <div class="user-info">
-                <h1 class="username">{{ user.first_name }} {{ user.last_name }}</h1>
-                <span class="handle">@{{ user.username or 'anonymous' }}</span>
+                <h1 class="username">{{ user.first_name }}{% if user.last_name %} {{ user.last_name }}{% endif %}</h1>
+                {% if user.username %}<span class="handle">@{{ user.username }}</span>{% endif %}
             </div>
             <div class="week-badge">
                 <span class="week-label">Week</span>
@@ -340,7 +340,7 @@
                 </div>
                 {% if stat.trend %}
                 <div class="stat-trend {{ stat.trend.direction }}">
-                    {{ stat.trend.icon }} {{ stat.trend.delta }}
+                    {{ stat.trend.icon }} {{ stat.trend.pct_change }}
                 </div>
                 {% endif %}
             </div>

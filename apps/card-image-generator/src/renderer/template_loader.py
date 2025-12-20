@@ -18,7 +18,7 @@ class TrendContext:
 
     direction: str  # "up", "down", "stable"
     icon: str  # Arrow emoji
-    delta: str  # "+5" or "-3"
+    pct_change: str  # "+15%" or "-8%"
 
 
 @dataclass
@@ -309,6 +309,7 @@ class TemplateLoader:
                     value=score,
                     percentage=config["to_pct"](score),
                     display_value=config["format"](score),
+                    trend=self._make_trend(trends_raw.get("comedy")),
                 )
             )
 
@@ -325,6 +326,7 @@ class TemplateLoader:
                     value=score,
                     percentage=config["to_pct"](score),
                     display_value=config["format"](score),
+                    trend=self._make_trend(trends_raw.get("volatility")),
                 )
             )
 
@@ -341,6 +343,7 @@ class TemplateLoader:
                     value=pct,
                     percentage=config["to_pct"](pct),
                     display_value=config["format"](pct),
+                    trend=self._make_trend(trends_raw.get("toxicity")),
                 )
             )
 
@@ -373,6 +376,7 @@ class TemplateLoader:
                     value=reactions,
                     percentage=config["to_pct"](reactions),
                     display_value=config["format"](reactions),
+                    trend=self._make_trend(trends_raw.get("reactions")),
                 )
             )
 
@@ -411,19 +415,19 @@ class TemplateLoader:
             return None
 
         direction = trend_data.get("direction", "stable")
-        delta = trend_data.get("delta", 0)
+        pct = trend_data.get("pct_change", 0)
 
         if direction == "up":
             icon = "\u2B06\uFE0F"
-            delta_str = f"+{delta:.0f}" if isinstance(delta, (int, float)) else str(delta)
+            pct_str = f"+{pct:.0f}%"
         elif direction == "down":
             icon = "\u2B07\uFE0F"
-            delta_str = f"{delta:.0f}" if isinstance(delta, (int, float)) else str(delta)
+            pct_str = f"{pct:.0f}%"
         else:
             icon = "\u27A1\uFE0F"
-            delta_str = "0"
+            pct_str = "0%"
 
-        return TrendContext(direction=direction, icon=icon, delta=delta_str)
+        return TrendContext(direction=direction, icon=icon, pct_change=pct_str)
 
     def _derive_badges(self, stats: dict) -> list[BadgeContext]:
         """Derive badges from stats using badge rules."""

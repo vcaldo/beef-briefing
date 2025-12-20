@@ -160,6 +160,15 @@
             padding: 12px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .category-medal {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            font-size: 18px;
+            filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.5));
         }
 
         .stat-header {
@@ -330,6 +339,9 @@
         <div class="stats-grid">
             {% for stat in stats %}
             <div class="stat-card {{ stat.key }}">
+                {% if stat.category_rank_medal %}
+                <span class="category-medal">{{ stat.category_rank_medal }}</span>
+                {% endif %}
                 <div class="stat-header">
                     <span class="stat-icon">{{ stat.icon }}</span>
                     <span class="stat-label">{{ stat.label }}</span>

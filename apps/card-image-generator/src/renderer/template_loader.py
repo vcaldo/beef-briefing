@@ -32,6 +32,16 @@ class StatContext:
     percentage: float  # 0-100 for progress bars
     display_value: str  # Formatted for display
     trend: TrendContext | None = None
+    category_rank: int | None = None  # 1, 2, or 3 if top 3 in category
+    category_rank_medal: str = ""  # Medal emoji if top 3
+
+
+# Medal emoji mapping for top 3 ranks
+RANK_MEDALS = {
+    1: "\U0001F947",  # 🥇
+    2: "\U0001F948",  # 🥈
+    3: "\U0001F949",  # 🥉
+}
 
 
 @dataclass
@@ -235,6 +245,7 @@ class TemplateLoader:
         card_data: dict[str, Any],
         theme: str = "gaming",
         rank: int | None = None,
+        category_rankings: dict[str, dict[int, int]] | None = None,
     ) -> TemplateContext:
         """
         Transform raw card data from database into template context.
@@ -243,10 +254,13 @@ class TemplateLoader:
             card_data: Row from ml_user_cards with user join
             theme: Template theme name
             rank: Optional ranking position
+            category_rankings: Optional dict of category -> {user_id: rank} for top 3
 
         Returns:
             TemplateContext ready for template rendering
         """
+        category_rankings = category_rankings or {}
+        user_id = card_data["user_id"]
         stats_raw = card_data.get("stats") or {}
         if isinstance(stats_raw, str):
             stats_raw = json.loads(stats_raw)
@@ -279,11 +293,19 @@ class TemplateLoader:
         # Extract and normalize stats
         stats_list = []
 
+        def get_category_rank_info(category: str) -> tuple[int | None, str]:
+            """Get rank and medal for a category."""
+            cat_ranks = category_rankings.get(category, {})
+            cat_rank = cat_ranks.get(user_id)
+            medal = RANK_MEDALS.get(cat_rank, "") if cat_rank else ""
+            return cat_rank, medal
+
         # Mood
         mood = stats_raw.get("mood", {})
         if mood:
             score = mood.get("score", 0)
             config = STAT_CONFIG["mood"]
+            cat_rank, medal = get_category_rank_info("mood")
             stats_list.append(
                 StatContext(
                     key="mood",
@@ -293,6 +315,8 @@ class TemplateLoader:
                     percentage=config["to_pct"](score),
                     display_value=config["format"](score),
                     trend=self._make_trend(trends_raw.get("mood")),
+                    category_rank=cat_rank,
+                    category_rank_medal=medal,
                 )
             )
 
@@ -301,6 +325,7 @@ class TemplateLoader:
         if comedy:
             score = comedy.get("score", 0)
             config = STAT_CONFIG["comedy"]
+            cat_rank, medal = get_category_rank_info("comedy")
             stats_list.append(
                 StatContext(
                     key="comedy",
@@ -310,6 +335,8 @@ class TemplateLoader:
                     percentage=config["to_pct"](score),
                     display_value=config["format"](score),
                     trend=self._make_trend(trends_raw.get("comedy")),
+                    category_rank=cat_rank,
+                    category_rank_medal=medal,
                 )
             )
 
@@ -318,6 +345,7 @@ class TemplateLoader:
         if volatility:
             score = volatility.get("score", 0)
             config = STAT_CONFIG["volatility"]
+            cat_rank, medal = get_category_rank_info("volatility")
             stats_list.append(
                 StatContext(
                     key="volatility",
@@ -327,6 +355,8 @@ class TemplateLoader:
                     percentage=config["to_pct"](score),
                     display_value=config["format"](score),
                     trend=self._make_trend(trends_raw.get("volatility")),
+                    category_rank=cat_rank,
+                    category_rank_medal=medal,
                 )
             )
 
@@ -335,6 +365,7 @@ class TemplateLoader:
         if toxicity:
             pct = toxicity.get("pct", 0)
             config = STAT_CONFIG["toxicity"]
+            cat_rank, medal = get_category_rank_info("toxicity")
             stats_list.append(
                 StatContext(
                     key="toxicity",
@@ -344,6 +375,8 @@ class TemplateLoader:
                     percentage=config["to_pct"](pct),
                     display_value=config["format"](pct),
                     trend=self._make_trend(trends_raw.get("toxicity")),
+                    category_rank=cat_rank,
+                    category_rank_medal=medal,
                 )
             )
 
@@ -352,6 +385,7 @@ class TemplateLoader:
         if activity:
             messages = activity.get("messages", 0)
             config = STAT_CONFIG["activity"]
+            cat_rank, medal = get_category_rank_info("activity")
             stats_list.append(
                 StatContext(
                     key="activity",
@@ -361,6 +395,8 @@ class TemplateLoader:
                     percentage=config["to_pct"](messages),
                     display_value=config["format"](messages),
                     trend=self._make_trend(trends_raw.get("activity")),
+                    category_rank=cat_rank,
+                    category_rank_medal=medal,
                 )
             )
 
@@ -368,6 +404,7 @@ class TemplateLoader:
         reactions = stats_raw.get("reactions_received", 0)
         if reactions:
             config = STAT_CONFIG["reactions"]
+            cat_rank, medal = get_category_rank_info("reactions")
             stats_list.append(
                 StatContext(
                     key="reactions",
@@ -377,6 +414,8 @@ class TemplateLoader:
                     percentage=config["to_pct"](reactions),
                     display_value=config["format"](reactions),
                     trend=self._make_trend(trends_raw.get("reactions")),
+                    category_rank=cat_rank,
+                    category_rank_medal=medal,
                 )
             )
 

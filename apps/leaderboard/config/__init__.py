@@ -5,7 +5,6 @@ Mirrors the Go pkg/config pattern using Pydantic for environment parsing.
 
 import os
 from functools import cached_property
-from typing import Optional
 
 from pydantic_settings import BaseSettings
 
@@ -45,8 +44,8 @@ class Config(BaseSettings):
     card_image_generator_api_key_file: str = ""
 
     # New Relic APM Configuration (optional)
-    new_relic_app_name: Optional[str] = None
-    new_relic_license_key: Optional[str] = None
+    new_relic_app_name: str | None = None
+    new_relic_license_key: str | None = None
 
     class Config:
         env_file = ".env"

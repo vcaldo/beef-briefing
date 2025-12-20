@@ -287,21 +287,21 @@ def _create_distribution_card(data: list, colors: dict) -> dmc.Paper:
                 [
                     dmc.Group(
                         [
-                            dmc.Box(w=12, h=12, style={"backgroundColor": SENTIMENT_COLORS["positive"], "borderRadius": "2px"}),
+                            dmc.Box(w=12, h=12, bg=SENTIMENT_COLORS["positive"], radius="2px"),
                             dmc.Text("Positive", size="xs"),
                         ],
                         gap="xs",
                     ),
                     dmc.Group(
                         [
-                            dmc.Box(w=12, h=12, style={"backgroundColor": SENTIMENT_COLORS["neutral"], "borderRadius": "2px"}),
+                            dmc.Box(w=12, h=12, bg=SENTIMENT_COLORS["neutral"], radius="2px"),
                             dmc.Text("Neutral", size="xs"),
                         ],
                         gap="xs",
                     ),
                     dmc.Group(
                         [
-                            dmc.Box(w=12, h=12, style={"backgroundColor": SENTIMENT_COLORS["negative"], "borderRadius": "2px"}),
+                            dmc.Box(w=12, h=12, bg=SENTIMENT_COLORS["negative"], radius="2px"),
                             dmc.Text("Negative", size="xs"),
                         ],
                         gap="xs",
@@ -443,9 +443,9 @@ def _create_heatmap_card(heatmap_df, colors: dict) -> dmc.Paper:
             dmc.Group(
                 [
                     dmc.Text("Negative", size="xs", c="dimmed"),
-                    dmc.Box(w=12, h=12, style={"backgroundColor": SENTIMENT_COLORS["negative"], "borderRadius": "2px"}),
-                    dmc.Box(w=12, h=12, style={"backgroundColor": SENTIMENT_COLORS["neutral"], "borderRadius": "2px"}),
-                    dmc.Box(w=12, h=12, style={"backgroundColor": SENTIMENT_COLORS["positive"], "borderRadius": "2px"}),
+                    dmc.Box(w=12, h=12, bg=SENTIMENT_COLORS["negative"], radius="2px"),
+                    dmc.Box(w=12, h=12, bg=SENTIMENT_COLORS["neutral"], radius="2px"),
+                    dmc.Box(w=12, h=12, bg=SENTIMENT_COLORS["positive"], radius="2px"),
                     dmc.Text("Positive", size="xs", c="dimmed"),
                 ],
                 gap="xs",
@@ -515,7 +515,7 @@ def _create_user_ranking_card(
                                 dmc.Text(
                                     user.get("first_name", "Unknown"),
                                     size="sm",
-                                    style={"flex": 1},
+                                    flex=1,
                                 ),
                                 dmc.Text(
                                     display_value,
@@ -594,7 +594,7 @@ def _create_toxicity_ranking_card(users: list[dict], colors: dict) -> dmc.Paper:
                         dmc.Text(
                             user.get("first_name", "Unknown"),
                             size="sm",
-                            style={"flex": 1},
+                            flex=1,
                         ),
                         dmc.Text(
                             f"{toxicity_rate:.1f}%",

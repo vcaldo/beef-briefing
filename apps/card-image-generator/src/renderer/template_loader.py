@@ -288,7 +288,18 @@ class TemplateLoader:
             week_end = date.fromisoformat(week_end)
 
         week_number = week_start.isocalendar()[1]
-        period_display = f"{week_start.strftime('%b %d')} - {week_end.strftime('%b %d')}"
+
+        # Parse stats window dates (30-day period)
+        stats_window_start = card_data.get("stats_window_start", week_start)
+        stats_window_end = card_data.get("stats_window_end", week_end)
+
+        if isinstance(stats_window_start, str):
+            stats_window_start = date.fromisoformat(stats_window_start)
+        if isinstance(stats_window_end, str):
+            stats_window_end = date.fromisoformat(stats_window_end)
+
+        # Display the 30-day stats window period
+        period_display = f"{stats_window_start.strftime('%b %d')} - {stats_window_end.strftime('%b %d')}"
 
         # Extract and normalize stats
         stats_list = []

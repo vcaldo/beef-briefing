@@ -38,12 +38,13 @@ Environment:
                   Also uses external card-image-generator URL for render command
 
 Commands:
-  process     Run batch processing
-  status      Show processing status
-  continuous  Run continuous processing (daemon mode)
-  cards       Generate weekly user cards
-  render      Render card images (requires card-image-generator service)
-  shell       Open interactive shell in container
+  process      Run batch processing
+  status       Show processing status
+  continuous   Run continuous processing (daemon mode)
+  cards        Generate weekly user cards
+  render       Render card images (requires card-image-generator service)
+  clean-cards  Delete user cards for a chat
+  shell        Open interactive shell in container
 
 Options (passed through to main.py):
   --chat-id ID      Chat ID (default: $DEFAULT_CHAT_ID)
@@ -162,6 +163,14 @@ main() {
                 docker_exec python main.py render-cards --chat-id "$DEFAULT_CHAT_ID" "$@"
             else
                 docker_exec python main.py render-cards "$@"
+            fi
+            ;;
+
+        clean-cards)
+            if ! has_chat_id "$@"; then
+                docker_exec python main.py clean-cards --chat-id "$DEFAULT_CHAT_ID" "$@"
+            else
+                docker_exec python main.py clean-cards "$@"
             fi
             ;;
 

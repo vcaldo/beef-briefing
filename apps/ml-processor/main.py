@@ -32,7 +32,7 @@ import argparse
 import logging
 from datetime import datetime
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 from src.analyzers.base import AnalyzerRegistry
 from src.database import MLQueries
@@ -358,6 +358,69 @@ def run_render_cards(args, config):
     return result
 
 
+@background_task(name="clean-cards", group="MLProcessor")
+def run_clean_cards(args, config):
+    """Run card deletion command."""
+    logger.info(f"Cleaning cards for chat {args.chat_id}")
+
+    week = parse_date(args.week) if args.week else None
+
+    add_custom_attributes(
+        {
+            "chat_id": args.chat_id,
+            "week": args.week,
+            "force": args.force,
+        }
+    )
+
+    # Create database engine
+    engine = create_engine(config.dsn(), pool_pre_ping=True)
+
+    with engine.connect() as conn:
+        if week:
+            # Delete specific week
+            result = conn.execute(
+                text(
+                    "DELETE FROM ml_user_cards "
+                    "WHERE chat_id = :chat_id AND week_start = :week_start"
+                ),
+                {"chat_id": args.chat_id, "week_start": week.date()},
+            )
+            conn.commit()
+            deleted = result.rowcount
+            print(f"\nDeleted {deleted} card(s) for week {args.week}")
+        else:
+            # Delete all weeks - require confirmation unless --force
+            if not args.force:
+                # Count cards first
+                count = conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM ml_user_cards WHERE chat_id = :chat_id"
+                    ),
+                    {"chat_id": args.chat_id},
+                ).scalar()
+
+                if count == 0:
+                    print(f"\nNo cards found for chat {args.chat_id}")
+                    return {"deleted": 0}
+
+                print(f"\nWARNING: This will delete ALL {count} card(s) for chat {args.chat_id}")
+                confirm = input("Are you sure? (yes/no): ")
+                if confirm.lower() != "yes":
+                    print("Aborted.")
+                    return {"deleted": 0, "aborted": True}
+
+            result = conn.execute(
+                text("DELETE FROM ml_user_cards WHERE chat_id = :chat_id"),
+                {"chat_id": args.chat_id},
+            )
+            conn.commit()
+            deleted = result.rowcount
+            print(f"\nDeleted {deleted} card(s) for chat {args.chat_id}")
+
+    return {"deleted": deleted}
+
+
 def run_continuous(args, config):
     """Run continuous processing command."""
     logger.info(f"Starting continuous processing for chat {args.chat_id}")
@@ -526,6 +589,29 @@ def main():
         help="Force regenerate images even if they exist",
     )
 
+    # clean-cards command
+    clean_cards_parser = subparsers.add_parser(
+        "clean-cards",
+        help="Delete user cards for a chat",
+    )
+    clean_cards_parser.add_argument(
+        "--chat-id",
+        type=int,
+        required=True,
+        help="Target chat ID to delete cards for",
+    )
+    clean_cards_parser.add_argument(
+        "--week",
+        type=str,
+        default=None,
+        help="Week start date (YYYY-MM-DD). If not specified, deletes all weeks",
+    )
+    clean_cards_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Skip confirmation when deleting all weeks",
+    )
+
     args = parser.parse_args()
 
     # Use module-level config (already loaded for New Relic init)
@@ -568,6 +654,10 @@ def main():
         elif args.command == "render-cards":
             result = run_render_cards(args, config)
             sys.exit(0 if result else 1)
+
+        elif args.command == "clean-cards":
+            run_clean_cards(args, config)
+            sys.exit(0)
 
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)

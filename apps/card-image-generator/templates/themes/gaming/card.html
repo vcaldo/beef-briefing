@@ -26,6 +26,8 @@
             position: relative;
             overflow: hidden;
             color: #ffffff;
+            display: flex;
+            flex-direction: column;
         }
 
         /* Background decoration */
@@ -63,6 +65,7 @@
             margin-bottom: 20px;
             position: relative;
             z-index: 1;
+            flex-shrink: 0;
         }
 
         .avatar {
@@ -101,7 +104,7 @@
             color: rgba(255, 255, 255, 0.6);
         }
 
-        .week-badge {
+        .rank-box {
             text-align: center;
             padding: 8px 12px;
             background: rgba(0, 217, 255, 0.2);
@@ -109,14 +112,14 @@
             border: 1px solid rgba(0, 217, 255, 0.3);
         }
 
-        .week-label {
+        .rank-label {
             font-size: 10px;
             color: rgba(255, 255, 255, 0.6);
             text-transform: uppercase;
             letter-spacing: 2px;
         }
 
-        .week-number {
+        .rank-number {
             font-family: 'Orbitron', sans-serif;
             font-size: 24px;
             font-weight: 900;
@@ -124,8 +127,12 @@
             display: block;
         }
 
-        /* Rank badge */
-        .rank-badge {
+        .rank-number.medal {
+            font-size: 28px;
+        }
+
+        /* Week badge (yellow circle) */
+        .week-circle-badge {
             position: absolute;
             top: -8px;
             right: -8px;
@@ -137,7 +144,7 @@
             align-items: center;
             justify-content: center;
             font-family: 'Orbitron', sans-serif;
-            font-size: 20px;
+            font-size: 14px;
             font-weight: 900;
             color: #1a1a2e;
             box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
@@ -152,6 +159,7 @@
             margin-bottom: 20px;
             position: relative;
             z-index: 1;
+            flex-shrink: 0;
         }
 
         .stat-card {
@@ -160,6 +168,15 @@
             padding: 12px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .category-medal {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            font-size: 18px;
+            filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.5));
         }
 
         .stat-header {
@@ -233,7 +250,10 @@
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
+            margin-top: auto;
+            max-height: 72px;
+            overflow: hidden;
             position: relative;
             z-index: 1;
         }
@@ -287,6 +307,8 @@
             border-top: 1px solid rgba(255, 255, 255, 0.1);
             position: relative;
             z-index: 1;
+            margin-top: auto;
+            flex-shrink: 0;
         }
 
         .messages-count {
@@ -307,9 +329,7 @@
 </head>
 <body>
     <div class="card">
-        {% if rank %}
-        <div class="rank-badge">#{{ rank }}</div>
-        {% endif %}
+        <div class="week-circle-badge">{{ week_number }}</div>
 
         <!-- Header -->
         <div class="card-header">
@@ -320,16 +340,23 @@
                 <h1 class="username">{{ user.first_name }}{% if user.last_name %} {{ user.last_name }}{% endif %}</h1>
                 {% if user.username %}<span class="handle">@{{ user.username }}</span>{% endif %}
             </div>
-            <div class="week-badge">
-                <span class="week-label">Week</span>
-                <span class="week-number">{{ week_number }}</span>
+            {% if rank %}
+            <div class="rank-box">
+                <span class="rank-label">Rank</span>
+                <span class="rank-number{% if rank <= 3 %} medal{% endif %}">
+                    {%- if rank == 1 -%}🥇{%- elif rank == 2 -%}🥈{%- elif rank == 3 -%}🥉{%- else -%}{{ rank }}{%- endif -%}
+                </span>
             </div>
+            {% endif %}
         </div>
 
         <!-- Stats Grid -->
         <div class="stats-grid">
             {% for stat in stats %}
             <div class="stat-card {{ stat.key }}">
+                {% if stat.category_rank_medal %}
+                <span class="category-medal">{{ stat.category_rank_medal }}</span>
+                {% endif %}
                 <div class="stat-header">
                     <span class="stat-icon">{{ stat.icon }}</span>
                     <span class="stat-label">{{ stat.label }}</span>

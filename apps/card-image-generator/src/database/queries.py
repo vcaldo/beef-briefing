@@ -56,7 +56,7 @@ class CardQueries:
             WHERE c.chat_id = :chat_id
               AND c.week_start = :week_start
               AND (:user_ids IS NULL OR c.user_id = ANY(:user_ids))
-            ORDER BY (c.stats->'mood'->>'score')::numeric DESC NULLS LAST
+            ORDER BY (c.stats->'activity'->>'messages')::numeric DESC NULLS LAST
         """)
 
         with self.engine.connect() as conn:
@@ -131,3 +131,70 @@ class CardQueries:
                 {"chat_id": chat_id, "week_start": week_start, "theme": theme},
             )
             return {row.user_id: dict(row._mapping) for row in result}
+
+    def get_category_rankings(
+        self,
+        chat_id: int,
+        week_start: date,
+    ) -> dict[str, dict[int, int]]:
+        """
+        Get top 3 rankings per category for a chat/week.
+
+        Returns dict mapping category -> {user_id: rank} (only top 3 users)
+        Example: {"mood": {123: 1, 456: 2, 789: 3}, "comedy": {...}, ...}
+        """
+        query = text("""
+            WITH category_ranks AS (
+                SELECT
+                    user_id,
+                    ROW_NUMBER() OVER (ORDER BY (stats->'mood'->>'score')::float DESC NULLS LAST) AS mood_rank,
+                    ROW_NUMBER() OVER (ORDER BY (stats->'comedy'->>'score')::float DESC NULLS LAST) AS comedy_rank,
+                    ROW_NUMBER() OVER (ORDER BY (stats->'volatility'->>'score')::float DESC NULLS LAST) AS volatility_rank,
+                    ROW_NUMBER() OVER (ORDER BY (stats->'toxicity'->>'pct')::float DESC NULLS LAST) AS toxicity_rank,
+                    ROW_NUMBER() OVER (ORDER BY (stats->'activity'->>'messages')::int DESC NULLS LAST) AS activity_rank,
+                    ROW_NUMBER() OVER (ORDER BY (stats->>'reactions_received')::int DESC NULLS LAST) AS reactions_rank
+                FROM ml_user_cards
+                WHERE chat_id = :chat_id
+                  AND week_start = :week_start
+            )
+            SELECT user_id, mood_rank, comedy_rank, volatility_rank, toxicity_rank, activity_rank, reactions_rank
+            FROM category_ranks
+            WHERE mood_rank <= 3
+               OR comedy_rank <= 3
+               OR volatility_rank <= 3
+               OR toxicity_rank <= 3
+               OR activity_rank <= 3
+               OR reactions_rank <= 3
+        """)
+
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                query,
+                {"chat_id": chat_id, "week_start": week_start},
+            )
+
+            rankings: dict[str, dict[int, int]] = {
+                "mood": {},
+                "comedy": {},
+                "volatility": {},
+                "toxicity": {},
+                "activity": {},
+                "reactions": {},
+            }
+
+            for row in result:
+                user_id = row.user_id
+                if row.mood_rank <= 3:
+                    rankings["mood"][user_id] = row.mood_rank
+                if row.comedy_rank <= 3:
+                    rankings["comedy"][user_id] = row.comedy_rank
+                if row.volatility_rank <= 3:
+                    rankings["volatility"][user_id] = row.volatility_rank
+                if row.toxicity_rank <= 3:
+                    rankings["toxicity"][user_id] = row.toxicity_rank
+                if row.activity_rank <= 3:
+                    rankings["activity"][user_id] = row.activity_rank
+                if row.reactions_rank <= 3:
+                    rankings["reactions"][user_id] = row.reactions_rank
+
+            return rankings

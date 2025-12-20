@@ -222,11 +222,12 @@ services:
       TRACK_AI_COSTS: "true"
       # Card Image Generator (for render-cards command)
       CARD_IMAGE_GENERATOR_URL: http://card-image-generator:8051
-      CARD_IMAGE_GENERATOR_API_KEY: ${CARD_IMAGE_GENERATOR_API_KEY:-}
+      CARD_IMAGE_GENERATOR_API_KEY_FILE: /app/secrets/card_image_generator_api_key
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - ml_models_cache_dev:/root/.cache/huggingface
+      - ./secrets/apps/ml-processor:/app/secrets:ro
     depends_on:
       - postgres
       - qdrant

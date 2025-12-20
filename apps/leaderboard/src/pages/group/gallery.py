@@ -1,10 +1,10 @@
 """
 Cards Gallery page for admin users.
 
-Displays generated card images in a carousel with:
-- Week selector dropdown
-- Prev/Next navigation
-- Click to open full-size modal
+Displays generated card images in a grid layout with:
+- Week selector buttons
+- Responsive columns (1-4 based on screen size)
+- Click to open full-size image in new tab
 """
 
 import dash_bootstrap_components as dbc
@@ -80,9 +80,9 @@ def create_gallery_page(
         )
         content.append(dmc.Space(h="lg"))
 
-    # Carousel or empty state
+    # Card grid or empty state
     if images:
-        content.append(_create_carousel(images, colors))
+        content.append(_create_card_grid(images, colors))
     else:
         content.append(_create_empty_state(colors))
 
@@ -152,24 +152,16 @@ def _create_week_selector(
     )
 
 
-def _create_carousel(images: list[dict], colors: dict) -> dmc.Card:
-    """Create image carousel with prev/next navigation."""
-    slides = [
-        dmc.CarouselSlide(_create_card_slide(img, colors))
-        for img in images
-    ]
+def _create_card_grid(images: list[dict], colors: dict) -> dmc.Card:
+    """Create a grid layout showing all card images."""
+    cards = [_create_card_item(img, colors) for img in images]
 
     return dmc.Card(
         [
-            dmc.Carousel(
-                slides,
-                withIndicators=True,
-                withControls=True,
-                type="loop",
-                slideSize="100%",
-                slideGap="md",
-                controlsOffset="xs",
-                controlSize=32,
+            dmc.SimpleGrid(
+                cards,
+                cols={"base": 1, "xs": 2, "md": 3, "lg": 4},
+                spacing="lg",
             ),
             dmc.Space(h="md"),
             dmc.Text(
@@ -186,8 +178,8 @@ def _create_carousel(images: list[dict], colors: dict) -> dmc.Card:
     )
 
 
-def _create_card_slide(img: dict, colors: dict) -> dmc.Stack:
-    """Create a single carousel slide with card image."""
+def _create_card_item(img: dict, colors: dict) -> dmc.Stack:
+    """Create a single card item for the grid."""
     first_name = img.get("first_name", "")
     last_name = img.get("last_name", "")
     user_name = f"{first_name} {last_name}".strip() or "Unknown"
@@ -196,22 +188,19 @@ def _create_card_slide(img: dict, colors: dict) -> dmc.Stack:
 
     return dmc.Stack(
         [
-            # User info header
             dmc.Group(
                 [
-                    dmc.Text(user_name, fw=500, size="lg"),
-                    dmc.Text(f"@{username}", size="sm", c="dimmed") if username else None,
+                    dmc.Text(user_name, fw=500, size="md"),
+                    dmc.Text(f"@{username}", size="xs", c="dimmed") if username else None,
                 ],
                 justify="center",
                 gap="xs",
             ),
-            # Card image - opens in new tab on click
             dmc.Anchor(
                 html.Img(
                     src=url,
                     style={
                         "width": "100%",
-                        "maxWidth": "400px",
                         "height": "auto",
                         "cursor": "pointer",
                         "borderRadius": "8px",
@@ -223,7 +212,7 @@ def _create_card_slide(img: dict, colors: dict) -> dmc.Stack:
             ),
         ],
         align="center",
-        gap="md",
+        gap="sm",
     )
 
 

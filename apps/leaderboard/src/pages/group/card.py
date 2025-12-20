@@ -7,6 +7,8 @@ Displays weekly user personality cards with ML-analyzed stats:
 - Admin dropdown to view any user's card
 """
 
+import math
+
 import dash_bootstrap_components as dbc
 import dash_mantine_components as dmc
 from dash import html
@@ -334,11 +336,11 @@ def _create_stat_card(
 
     # Extract score and label based on stat type
     if stat_key == "activity":
-        # Activity uses message count, normalize to 0-100
+        # Activity uses message count with logarithmic scale for ring progress
         messages = stat_data.get("messages", 0)
         active_days = stat_data.get("active_days", 0)
-        # Cap at 100 for display, using log scale for better distribution
-        score = min(100, messages) if messages < 100 else 100
+        # Log scale: 1 msg = ~0%, 100 msgs = ~50%, 10000 msgs = ~100%
+        score = min(100, int(math.log10(max(1, messages)) * 25)) if messages > 0 else 0
         label = stat_data.get("label", f"{messages} msgs, {active_days} days")
         display_value = str(messages)
     elif stat_key == "chronotype":
@@ -357,7 +359,7 @@ def _create_stat_card(
         else:
             score = 0
         label = stat_data.get("label", "")
-        display_value = f"{int(score)}" if score else "N/A"
+        display_value = f"{int(score)}" if score is not None else "N/A"
 
     # Determine color based on stat type and score
     ring_color = colors["primary"]
@@ -530,11 +532,15 @@ def _format_user_name(user: dict) -> str:
 
 
 def _format_date(date_str: str) -> str:
-    """Format date string for display (YYYY-MM-DD -> Mon DD)."""
+    """Format date string for display (YYYY-MM-DD or ISO datetime -> Mon DD)."""
     try:
         from datetime import datetime
 
-        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        # Handle ISO datetime format (2025-12-15T00:00:00Z)
+        if "T" in date_str:
+            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        else:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
         return dt.strftime("%b %d")
     except (ValueError, TypeError):
         return date_str

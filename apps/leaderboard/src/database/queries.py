@@ -3318,3 +3318,739 @@ class DashboardQueries:
                     "limit": limit,
                 },
             )
+
+    # =========================================
+    # COMEDY METHODS
+    # =========================================
+
+    # Emojis that indicate humor/laughter reactions
+    LAUGH_EMOJIS = [
+        # Classic laughs
+        "😂", "🤣", "😆", "😄", "😅", "😸", "😹",
+        # "I'm dead" / melting
+        "🫠", "💀", "☠️", "⚰️",
+        # Crying (from laughing)
+        "😭",
+        # Loud reactions
+        "📢", "🗣️",
+        # Physical comedy reactions
+        "🤸", "🏃", "💨", "🐒", "🤡",
+        # Effects / emphasis
+        "🪄", "💯", "✨", "💥",
+        # Silly faces
+        "🤪", "😜", "🤑", "🤭", "🫢", "🫣", "🤯",
+    ]
+
+    def get_comedy_leaderboard(
+        self,
+        chat_id: int,
+        limit: int = 20,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[dict]:
+        """
+        Get users ranked by hybrid comedy score.
+
+        Formula: comedy_score = (reaction_component * 0.7) + (ml_component * 0.3)
+        - reaction_component: log2(1 + laugh_reactions) * (distinct_reactors / max_distinct) * 10
+        - ml_component: (humorous_count / messages_analyzed) * avg_humor_score * 100
+
+        Returns list of:
+            {
+                'user_id': int,
+                'first_name': str,
+                'comedy_score': float,
+                'reaction_score': float,
+                'ml_score': float,
+                'laugh_reactions': int,
+                'distinct_reactors': int,
+                'humorous_count': int,
+                'messages_analyzed': int
+            }
+        """
+        laugh_emojis_tuple = tuple(self.LAUGH_EMOJIS)
+
+        if start_date is None and end_date is None:
+            query = """
+                WITH user_humor AS (
+                    SELECT
+                        m.user_id,
+                        COUNT(*) as messages_analyzed,
+                        SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                        AVG(CASE WHEN h.is_humorous THEN h.score ELSE NULL END) as avg_humor_score
+                    FROM ml_humor h
+                    JOIN messages m ON m.id = h.message_id
+                    JOIN users u ON u.id = m.user_id
+                    WHERE h.chat_id = :chat_id
+                        AND u.is_bot = false
+                    GROUP BY m.user_id
+                    HAVING COUNT(*) >= 10
+                ),
+                user_laugh_reactions AS (
+                    SELECT
+                        m.user_id,
+                        COUNT(*) as laugh_reactions,
+                        COUNT(DISTINCT mr.user_id) as distinct_reactors
+                    FROM message_reactions mr
+                    JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
+                    JOIN users u ON u.id = m.user_id
+                    WHERE mr.chat_id = :chat_id
+                        AND mr.emoji_value = ANY(:laugh_emojis)
+                        AND mr.is_removed = false
+                        AND u.is_bot = false
+                    GROUP BY m.user_id
+                ),
+                max_reactors AS (
+                    SELECT COALESCE(MAX(distinct_reactors), 1) as max_distinct
+                    FROM user_laugh_reactions
+                ),
+                scores AS (
+                    SELECT
+                        COALESCE(uh.user_id, ulr.user_id) as user_id,
+                        COALESCE(uh.messages_analyzed, 0) as messages_analyzed,
+                        COALESCE(uh.humorous_count, 0) as humorous_count,
+                        COALESCE(uh.avg_humor_score, 0) as avg_humor_score,
+                        COALESCE(ulr.laugh_reactions, 0) as laugh_reactions,
+                        COALESCE(ulr.distinct_reactors, 0) as distinct_reactors,
+                        CASE WHEN uh.messages_analyzed > 0 THEN
+                            (uh.humorous_count::float / uh.messages_analyzed) * COALESCE(uh.avg_humor_score, 0) * 100
+                        ELSE 0 END as ml_component,
+                        CASE WHEN COALESCE(ulr.laugh_reactions, 0) > 0 THEN
+                            LOG(2, 1 + ulr.laugh_reactions) * (ulr.distinct_reactors::float / mr.max_distinct) * 10
+                        ELSE 0 END as reaction_component
+                    FROM user_humor uh
+                    FULL OUTER JOIN user_laugh_reactions ulr ON ulr.user_id = uh.user_id
+                    CROSS JOIN max_reactors mr
+                )
+                SELECT
+                    s.user_id,
+                    u.first_name,
+                    s.messages_analyzed,
+                    s.humorous_count,
+                    s.laugh_reactions,
+                    s.distinct_reactors,
+                    ROUND(s.ml_component::numeric, 2) as ml_score,
+                    ROUND(s.reaction_component::numeric, 2) as reaction_score,
+                    ROUND((s.reaction_component * 0.7 + s.ml_component * 0.3)::numeric, 2) as comedy_score
+                FROM scores s
+                JOIN users u ON u.id = s.user_id
+                WHERE s.humorous_count > 0 OR s.laugh_reactions >= 3
+                ORDER BY comedy_score DESC
+                LIMIT :limit
+            """
+            return self._execute_many(
+                query,
+                {"chat_id": chat_id, "limit": limit, "laugh_emojis": list(laugh_emojis_tuple)},
+            )
+        else:
+            query = """
+                WITH user_humor AS (
+                    SELECT
+                        m.user_id,
+                        COUNT(*) as messages_analyzed,
+                        SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                        AVG(CASE WHEN h.is_humorous THEN h.score ELSE NULL END) as avg_humor_score
+                    FROM ml_humor h
+                    JOIN messages m ON m.id = h.message_id
+                    JOIN users u ON u.id = m.user_id
+                    WHERE h.chat_id = :chat_id
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                        AND u.is_bot = false
+                    GROUP BY m.user_id
+                    HAVING COUNT(*) >= 10
+                ),
+                user_laugh_reactions AS (
+                    SELECT
+                        m.user_id,
+                        COUNT(*) as laugh_reactions,
+                        COUNT(DISTINCT mr.user_id) as distinct_reactors
+                    FROM message_reactions mr
+                    JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
+                    JOIN users u ON u.id = m.user_id
+                    WHERE mr.chat_id = :chat_id
+                        AND mr.emoji_value = ANY(:laugh_emojis)
+                        AND mr.is_removed = false
+                        AND mr.date >= :start_date
+                        AND mr.date < :end_date
+                        AND u.is_bot = false
+                    GROUP BY m.user_id
+                ),
+                max_reactors AS (
+                    SELECT COALESCE(MAX(distinct_reactors), 1) as max_distinct
+                    FROM user_laugh_reactions
+                ),
+                scores AS (
+                    SELECT
+                        COALESCE(uh.user_id, ulr.user_id) as user_id,
+                        COALESCE(uh.messages_analyzed, 0) as messages_analyzed,
+                        COALESCE(uh.humorous_count, 0) as humorous_count,
+                        COALESCE(uh.avg_humor_score, 0) as avg_humor_score,
+                        COALESCE(ulr.laugh_reactions, 0) as laugh_reactions,
+                        COALESCE(ulr.distinct_reactors, 0) as distinct_reactors,
+                        CASE WHEN uh.messages_analyzed > 0 THEN
+                            (uh.humorous_count::float / uh.messages_analyzed) * COALESCE(uh.avg_humor_score, 0) * 100
+                        ELSE 0 END as ml_component,
+                        CASE WHEN COALESCE(ulr.laugh_reactions, 0) > 0 THEN
+                            LOG(2, 1 + ulr.laugh_reactions) * (ulr.distinct_reactors::float / mr.max_distinct) * 10
+                        ELSE 0 END as reaction_component
+                    FROM user_humor uh
+                    FULL OUTER JOIN user_laugh_reactions ulr ON ulr.user_id = uh.user_id
+                    CROSS JOIN max_reactors mr
+                )
+                SELECT
+                    s.user_id,
+                    u.first_name,
+                    s.messages_analyzed,
+                    s.humorous_count,
+                    s.laugh_reactions,
+                    s.distinct_reactors,
+                    ROUND(s.ml_component::numeric, 2) as ml_score,
+                    ROUND(s.reaction_component::numeric, 2) as reaction_score,
+                    ROUND((s.reaction_component * 0.7 + s.ml_component * 0.3)::numeric, 2) as comedy_score
+                FROM scores s
+                JOIN users u ON u.id = s.user_id
+                WHERE s.humorous_count > 0 OR s.laugh_reactions >= 3
+                ORDER BY comedy_score DESC
+                LIMIT :limit
+            """
+            return self._execute_many(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "limit": limit,
+                    "laugh_emojis": list(laugh_emojis_tuple),
+                },
+            )
+
+    def get_comedy_stats(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict:
+        """
+        Get group-level comedy statistics.
+
+        Returns:
+            {
+                'total_laugh_reactions': int,
+                'unique_reactors': int,
+                'messages_with_laughs': int,
+                'humorous_count': int,
+                'total_analyzed': int,
+                'humor_rate': float
+            }
+        """
+        laugh_emojis_tuple = tuple(self.LAUGH_EMOJIS)
+
+        if start_date is None and end_date is None:
+            query = """
+                WITH humor_stats AS (
+                    SELECT
+                        COUNT(*) as total_analyzed,
+                        SUM(CASE WHEN is_humorous THEN 1 ELSE 0 END) as humorous_count
+                    FROM ml_humor h
+                    JOIN messages m ON m.id = h.message_id
+                    WHERE h.chat_id = :chat_id
+                ),
+                laugh_stats AS (
+                    SELECT
+                        COUNT(*) as total_laugh_reactions,
+                        COUNT(DISTINCT user_id) as unique_reactors,
+                        COUNT(DISTINCT message_id) as messages_with_laughs
+                    FROM message_reactions
+                    WHERE chat_id = :chat_id
+                        AND emoji_value = ANY(:laugh_emojis)
+                        AND is_removed = false
+                )
+                SELECT
+                    hs.total_analyzed,
+                    hs.humorous_count,
+                    CASE WHEN hs.total_analyzed > 0
+                        THEN ROUND(hs.humorous_count * 100.0 / hs.total_analyzed, 1)
+                        ELSE 0 END as humor_rate,
+                    ls.total_laugh_reactions,
+                    ls.unique_reactors,
+                    ls.messages_with_laughs
+                FROM humor_stats hs, laugh_stats ls
+            """
+            return self._execute_single(
+                query,
+                {"chat_id": chat_id, "laugh_emojis": list(laugh_emojis_tuple)},
+            ) or {}
+        else:
+            query = """
+                WITH humor_stats AS (
+                    SELECT
+                        COUNT(*) as total_analyzed,
+                        SUM(CASE WHEN is_humorous THEN 1 ELSE 0 END) as humorous_count
+                    FROM ml_humor h
+                    JOIN messages m ON m.id = h.message_id
+                    WHERE h.chat_id = :chat_id
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                ),
+                laugh_stats AS (
+                    SELECT
+                        COUNT(*) as total_laugh_reactions,
+                        COUNT(DISTINCT user_id) as unique_reactors,
+                        COUNT(DISTINCT message_id) as messages_with_laughs
+                    FROM message_reactions
+                    WHERE chat_id = :chat_id
+                        AND emoji_value = ANY(:laugh_emojis)
+                        AND is_removed = false
+                        AND date >= :start_date
+                        AND date < :end_date
+                )
+                SELECT
+                    hs.total_analyzed,
+                    hs.humorous_count,
+                    CASE WHEN hs.total_analyzed > 0
+                        THEN ROUND(hs.humorous_count * 100.0 / hs.total_analyzed, 1)
+                        ELSE 0 END as humor_rate,
+                    ls.total_laugh_reactions,
+                    ls.unique_reactors,
+                    ls.messages_with_laughs
+                FROM humor_stats hs, laugh_stats ls
+            """
+            return self._execute_single(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "laugh_emojis": list(laugh_emojis_tuple),
+                },
+            ) or {}
+
+    def get_top_funny_messages(
+        self,
+        chat_id: int,
+        limit: int = 5,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[dict]:
+        """
+        Get top funny messages by combined score.
+
+        Returns list of:
+            {
+                'message_id': int,
+                'text': str,
+                'date': datetime,
+                'author_name': str,
+                'author_id': int,
+                'humor_type': str,
+                'ml_score': float,
+                'laugh_reactions': int,
+                'combined_score': float
+            }
+        """
+        laugh_emojis_tuple = tuple(self.LAUGH_EMOJIS)
+
+        if start_date is None and end_date is None:
+            query = """
+                SELECT
+                    m.id as message_id,
+                    m.text,
+                    m.date,
+                    u.first_name as author_name,
+                    m.user_id as author_id,
+                    h.humor_type,
+                    ROUND(h.score::numeric, 2) as ml_score,
+                    COALESCE(lr.laugh_count, 0) as laugh_reactions,
+                    ROUND((h.score * 0.3 + COALESCE(LOG(2, 1 + lr.laugh_count) / 10, 0) * 0.7)::numeric, 3) as combined_score
+                FROM ml_humor h
+                JOIN messages m ON m.id = h.message_id
+                JOIN users u ON u.id = m.user_id
+                LEFT JOIN (
+                    SELECT chat_id, message_id, COUNT(*) as laugh_count
+                    FROM message_reactions
+                    WHERE emoji_value = ANY(:laugh_emojis)
+                        AND is_removed = false
+                    GROUP BY chat_id, message_id
+                ) lr ON lr.chat_id = m.chat_id AND lr.message_id = m.message_id
+                WHERE h.chat_id = :chat_id
+                    AND h.is_humorous = true
+                    AND u.is_bot = false
+                ORDER BY combined_score DESC
+                LIMIT :limit
+            """
+            return self._execute_many(
+                query,
+                {"chat_id": chat_id, "limit": limit, "laugh_emojis": list(laugh_emojis_tuple)},
+            )
+        else:
+            query = """
+                SELECT
+                    m.id as message_id,
+                    m.text,
+                    m.date,
+                    u.first_name as author_name,
+                    m.user_id as author_id,
+                    h.humor_type,
+                    ROUND(h.score::numeric, 2) as ml_score,
+                    COALESCE(lr.laugh_count, 0) as laugh_reactions,
+                    ROUND((h.score * 0.3 + COALESCE(LOG(2, 1 + lr.laugh_count) / 10, 0) * 0.7)::numeric, 3) as combined_score
+                FROM ml_humor h
+                JOIN messages m ON m.id = h.message_id
+                JOIN users u ON u.id = m.user_id
+                LEFT JOIN (
+                    SELECT chat_id, message_id, COUNT(*) as laugh_count
+                    FROM message_reactions
+                    WHERE emoji_value = ANY(:laugh_emojis)
+                        AND is_removed = false
+                        AND date >= :start_date
+                        AND date < :end_date
+                    GROUP BY chat_id, message_id
+                ) lr ON lr.chat_id = m.chat_id AND lr.message_id = m.message_id
+                WHERE h.chat_id = :chat_id
+                    AND h.is_humorous = true
+                    AND u.is_bot = false
+                    AND m.date >= :start_date
+                    AND m.date < :end_date
+                ORDER BY combined_score DESC
+                LIMIT :limit
+            """
+            return self._execute_many(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "limit": limit,
+                    "laugh_emojis": list(laugh_emojis_tuple),
+                },
+            )
+
+    def get_comedy_timeline(
+        self,
+        chat_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get daily comedy stats (laugh reactions + humorous messages).
+
+        Returns DataFrame with columns:
+            date, laugh_reactions, humorous_count
+        """
+        laugh_emojis_tuple = tuple(self.LAUGH_EMOJIS)
+
+        if start_date is None and end_date is None:
+            query = """
+                WITH dates AS (
+                    SELECT DISTINCT DATE(date) as date
+                    FROM messages
+                    WHERE chat_id = :chat_id
+                ),
+                laugh_by_date AS (
+                    SELECT DATE(date) as date, COUNT(*) as laugh_reactions
+                    FROM message_reactions
+                    WHERE chat_id = :chat_id
+                        AND emoji_value = ANY(:laugh_emojis)
+                        AND is_removed = false
+                    GROUP BY DATE(date)
+                ),
+                humor_by_date AS (
+                    SELECT DATE(m.date) as date, COUNT(*) as humorous_count
+                    FROM ml_humor h
+                    JOIN messages m ON m.id = h.message_id
+                    WHERE h.chat_id = :chat_id
+                        AND h.is_humorous = true
+                    GROUP BY DATE(m.date)
+                )
+                SELECT
+                    d.date,
+                    COALESCE(l.laugh_reactions, 0) as laugh_reactions,
+                    COALESCE(h.humorous_count, 0) as humorous_count
+                FROM dates d
+                LEFT JOIN laugh_by_date l ON l.date = d.date
+                LEFT JOIN humor_by_date h ON h.date = d.date
+                WHERE COALESCE(l.laugh_reactions, 0) > 0 OR COALESCE(h.humorous_count, 0) > 0
+                ORDER BY d.date
+            """
+            return self._execute_df(
+                query,
+                {"chat_id": chat_id, "laugh_emojis": list(laugh_emojis_tuple)},
+            )
+        else:
+            query = """
+                WITH dates AS (
+                    SELECT DISTINCT DATE(date) as date
+                    FROM messages
+                    WHERE chat_id = :chat_id
+                        AND date >= :start_date
+                        AND date < :end_date
+                ),
+                laugh_by_date AS (
+                    SELECT DATE(date) as date, COUNT(*) as laugh_reactions
+                    FROM message_reactions
+                    WHERE chat_id = :chat_id
+                        AND emoji_value = ANY(:laugh_emojis)
+                        AND is_removed = false
+                        AND date >= :start_date
+                        AND date < :end_date
+                    GROUP BY DATE(date)
+                ),
+                humor_by_date AS (
+                    SELECT DATE(m.date) as date, COUNT(*) as humorous_count
+                    FROM ml_humor h
+                    JOIN messages m ON m.id = h.message_id
+                    WHERE h.chat_id = :chat_id
+                        AND h.is_humorous = true
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                    GROUP BY DATE(m.date)
+                )
+                SELECT
+                    d.date,
+                    COALESCE(l.laugh_reactions, 0) as laugh_reactions,
+                    COALESCE(h.humorous_count, 0) as humorous_count
+                FROM dates d
+                LEFT JOIN laugh_by_date l ON l.date = d.date
+                LEFT JOIN humor_by_date h ON h.date = d.date
+                WHERE COALESCE(l.laugh_reactions, 0) > 0 OR COALESCE(h.humorous_count, 0) > 0
+                ORDER BY d.date
+            """
+            return self._execute_df(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "laugh_emojis": list(laugh_emojis_tuple),
+                },
+            )
+
+    def get_user_comedy_stats(
+        self,
+        chat_id: int,
+        user_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict:
+        """
+        Get personal comedy stats for comparison.
+
+        Returns:
+            {
+                'messages_analyzed': int,
+                'humorous_count': int,
+                'humor_rate': float,
+                'laugh_reactions_received': int,
+                'distinct_reactors': int,
+                'comedy_score': float,
+                'group_avg_comedy_score': float
+            }
+        """
+        laugh_emojis_tuple = tuple(self.LAUGH_EMOJIS)
+
+        if start_date is None and end_date is None:
+            query = """
+                WITH user_humor AS (
+                    SELECT
+                        COUNT(*) as messages_analyzed,
+                        SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                        AVG(CASE WHEN h.is_humorous THEN h.score ELSE NULL END) as avg_humor_score
+                    FROM ml_humor h
+                    JOIN messages m ON m.id = h.message_id
+                    WHERE h.chat_id = :chat_id
+                        AND m.user_id = :user_id
+                ),
+                user_reactions AS (
+                    SELECT
+                        COUNT(*) as laugh_reactions_received,
+                        COUNT(DISTINCT mr.user_id) as distinct_reactors
+                    FROM message_reactions mr
+                    JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
+                    WHERE mr.chat_id = :chat_id
+                        AND m.user_id = :user_id
+                        AND mr.emoji_value = ANY(:laugh_emojis)
+                        AND mr.is_removed = false
+                ),
+                max_reactors AS (
+                    SELECT COALESCE(MAX(cnt), 1) as max_distinct
+                    FROM (
+                        SELECT COUNT(DISTINCT mr.user_id) as cnt
+                        FROM message_reactions mr
+                        JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
+                        WHERE mr.chat_id = :chat_id
+                            AND mr.emoji_value = ANY(:laugh_emojis)
+                            AND mr.is_removed = false
+                        GROUP BY m.user_id
+                    ) sub
+                ),
+                group_scores AS (
+                    SELECT AVG(comedy_score) as avg_score
+                    FROM (
+                        SELECT
+                            (CASE WHEN uh.messages_analyzed > 0 THEN
+                                (uh.humorous_count::float / uh.messages_analyzed) * COALESCE(uh.avg_humor_score, 0) * 100
+                            ELSE 0 END * 0.3) +
+                            (CASE WHEN COALESCE(ulr.laugh_reactions, 0) > 0 THEN
+                                LOG(2, 1 + ulr.laugh_reactions) * (ulr.distinct_reactors::float / mr.max_distinct) * 10
+                            ELSE 0 END * 0.7) as comedy_score
+                        FROM (
+                            SELECT m.user_id, COUNT(*) as messages_analyzed,
+                                SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                                AVG(CASE WHEN h.is_humorous THEN h.score ELSE NULL END) as avg_humor_score
+                            FROM ml_humor h
+                            JOIN messages m ON m.id = h.message_id
+                            JOIN users u ON u.id = m.user_id
+                            WHERE h.chat_id = :chat_id AND u.is_bot = false
+                            GROUP BY m.user_id
+                            HAVING COUNT(*) >= 10
+                        ) uh
+                        LEFT JOIN (
+                            SELECT m.user_id, COUNT(*) as laugh_reactions, COUNT(DISTINCT mr.user_id) as distinct_reactors
+                            FROM message_reactions mr
+                            JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
+                            WHERE mr.chat_id = :chat_id AND mr.emoji_value = ANY(:laugh_emojis) AND mr.is_removed = false
+                            GROUP BY m.user_id
+                        ) ulr ON ulr.user_id = uh.user_id
+                        CROSS JOIN (SELECT COALESCE(MAX(distinct_reactors), 1) as max_distinct FROM (
+                            SELECT COUNT(DISTINCT mr.user_id) as distinct_reactors
+                            FROM message_reactions mr
+                            JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
+                            WHERE mr.chat_id = :chat_id AND mr.emoji_value = ANY(:laugh_emojis) AND mr.is_removed = false
+                            GROUP BY m.user_id
+                        ) sub) mr
+                    ) scores
+                )
+                SELECT
+                    uh.messages_analyzed,
+                    uh.humorous_count,
+                    CASE WHEN uh.messages_analyzed > 0
+                        THEN ROUND(uh.humorous_count * 100.0 / uh.messages_analyzed, 1)
+                        ELSE 0 END as humor_rate,
+                    ur.laugh_reactions_received,
+                    ur.distinct_reactors,
+                    ROUND((
+                        (CASE WHEN uh.messages_analyzed > 0 THEN
+                            (uh.humorous_count::float / uh.messages_analyzed) * COALESCE(uh.avg_humor_score, 0) * 100
+                        ELSE 0 END * 0.3) +
+                        (CASE WHEN ur.laugh_reactions_received > 0 THEN
+                            LOG(2, 1 + ur.laugh_reactions_received) * (ur.distinct_reactors::float / mr.max_distinct) * 10
+                        ELSE 0 END * 0.7)
+                    )::numeric, 2) as comedy_score,
+                    ROUND(gs.avg_score::numeric, 2) as group_avg_comedy_score
+                FROM user_humor uh, user_reactions ur, max_reactors mr, group_scores gs
+            """
+            return self._execute_single(
+                query,
+                {"chat_id": chat_id, "user_id": user_id, "laugh_emojis": list(laugh_emojis_tuple)},
+            ) or {}
+        else:
+            query = """
+                WITH user_humor AS (
+                    SELECT
+                        COUNT(*) as messages_analyzed,
+                        SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                        AVG(CASE WHEN h.is_humorous THEN h.score ELSE NULL END) as avg_humor_score
+                    FROM ml_humor h
+                    JOIN messages m ON m.id = h.message_id
+                    WHERE h.chat_id = :chat_id
+                        AND m.user_id = :user_id
+                        AND m.date >= :start_date
+                        AND m.date < :end_date
+                ),
+                user_reactions AS (
+                    SELECT
+                        COUNT(*) as laugh_reactions_received,
+                        COUNT(DISTINCT mr.user_id) as distinct_reactors
+                    FROM message_reactions mr
+                    JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
+                    WHERE mr.chat_id = :chat_id
+                        AND m.user_id = :user_id
+                        AND mr.emoji_value = ANY(:laugh_emojis)
+                        AND mr.is_removed = false
+                        AND mr.date >= :start_date
+                        AND mr.date < :end_date
+                ),
+                max_reactors AS (
+                    SELECT COALESCE(MAX(cnt), 1) as max_distinct
+                    FROM (
+                        SELECT COUNT(DISTINCT mr.user_id) as cnt
+                        FROM message_reactions mr
+                        JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
+                        WHERE mr.chat_id = :chat_id
+                            AND mr.emoji_value = ANY(:laugh_emojis)
+                            AND mr.is_removed = false
+                            AND mr.date >= :start_date
+                            AND mr.date < :end_date
+                        GROUP BY m.user_id
+                    ) sub
+                ),
+                group_scores AS (
+                    SELECT AVG(comedy_score) as avg_score
+                    FROM (
+                        SELECT
+                            (CASE WHEN uh.messages_analyzed > 0 THEN
+                                (uh.humorous_count::float / uh.messages_analyzed) * COALESCE(uh.avg_humor_score, 0) * 100
+                            ELSE 0 END * 0.3) +
+                            (CASE WHEN COALESCE(ulr.laugh_reactions, 0) > 0 THEN
+                                LOG(2, 1 + ulr.laugh_reactions) * (ulr.distinct_reactors::float / mr.max_distinct) * 10
+                            ELSE 0 END * 0.7) as comedy_score
+                        FROM (
+                            SELECT m.user_id, COUNT(*) as messages_analyzed,
+                                SUM(CASE WHEN h.is_humorous THEN 1 ELSE 0 END) as humorous_count,
+                                AVG(CASE WHEN h.is_humorous THEN h.score ELSE NULL END) as avg_humor_score
+                            FROM ml_humor h
+                            JOIN messages m ON m.id = h.message_id
+                            JOIN users u ON u.id = m.user_id
+                            WHERE h.chat_id = :chat_id AND u.is_bot = false
+                                AND m.date >= :start_date AND m.date < :end_date
+                            GROUP BY m.user_id
+                            HAVING COUNT(*) >= 10
+                        ) uh
+                        LEFT JOIN (
+                            SELECT m.user_id, COUNT(*) as laugh_reactions, COUNT(DISTINCT mr.user_id) as distinct_reactors
+                            FROM message_reactions mr
+                            JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
+                            WHERE mr.chat_id = :chat_id AND mr.emoji_value = ANY(:laugh_emojis) AND mr.is_removed = false
+                                AND mr.date >= :start_date AND mr.date < :end_date
+                            GROUP BY m.user_id
+                        ) ulr ON ulr.user_id = uh.user_id
+                        CROSS JOIN (SELECT COALESCE(MAX(distinct_reactors), 1) as max_distinct FROM (
+                            SELECT COUNT(DISTINCT mr.user_id) as distinct_reactors
+                            FROM message_reactions mr
+                            JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
+                            WHERE mr.chat_id = :chat_id AND mr.emoji_value = ANY(:laugh_emojis) AND mr.is_removed = false
+                                AND mr.date >= :start_date AND mr.date < :end_date
+                            GROUP BY m.user_id
+                        ) sub) mr
+                    ) scores
+                )
+                SELECT
+                    uh.messages_analyzed,
+                    uh.humorous_count,
+                    CASE WHEN uh.messages_analyzed > 0
+                        THEN ROUND(uh.humorous_count * 100.0 / uh.messages_analyzed, 1)
+                        ELSE 0 END as humor_rate,
+                    ur.laugh_reactions_received,
+                    ur.distinct_reactors,
+                    ROUND((
+                        (CASE WHEN uh.messages_analyzed > 0 THEN
+                            (uh.humorous_count::float / uh.messages_analyzed) * COALESCE(uh.avg_humor_score, 0) * 100
+                        ELSE 0 END * 0.3) +
+                        (CASE WHEN ur.laugh_reactions_received > 0 THEN
+                            LOG(2, 1 + ur.laugh_reactions_received) * (ur.distinct_reactors::float / mr.max_distinct) * 10
+                        ELSE 0 END * 0.7)
+                    )::numeric, 2) as comedy_score,
+                    ROUND(gs.avg_score::numeric, 2) as group_avg_comedy_score
+                FROM user_humor uh, user_reactions ur, max_reactors mr, group_scores gs
+            """
+            return self._execute_single(
+                query,
+                {
+                    "chat_id": chat_id,
+                    "user_id": user_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "laugh_emojis": list(laugh_emojis_tuple),
+                },
+            ) or {}

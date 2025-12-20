@@ -441,7 +441,7 @@ class TemplateLoader:
             week_number=week_number,
             period_display=period_display,
             stats=stats_list,
-            badges=badges[:4],  # Limit to 4 badges
+            badges=badges[:8],  # Limit to 8 badges
             activity=activity_ctx,
             mood=mood,
             comedy=comedy,

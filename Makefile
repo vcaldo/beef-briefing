@@ -416,26 +416,46 @@ tf-deploy-check: tf-validate tf-fmt-check tf-plan ## Full pre-deployment check
 # =============================================================================
 # ML PROCESSOR (ml-*)
 # =============================================================================
-# Production API URL (override with: make ml-run-prod API_URL=https://your-domain.com)
-PROD_API_URL ?= https://api.barra-pesada.online
+# Run ml-processor commands inside Docker container
+# Container must be running: make up-build
+# Pass additional args with ML_ARGS: make ml-run ML_ARGS="--limit 100"
+# Use -prod suffix for production: make ml-run-prod (requires: make pg-tunnel)
 
-ml-run: ## Run ml-processor (dev, local API)
-	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py
+# Development (local postgres) - DEFAULT
+ml-run: ## Run ml-processor batch processing (dev)
+	./scripts/ml-processor.sh process $(ML_ARGS)
 
 ml-run-status: ## Show ml-processor status (dev)
-	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py --status
+	./scripts/ml-processor.sh status $(ML_ARGS)
 
-ml-run-once: ## Run ml-processor for a single batch (dev)
-	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py --once
+ml-run-once: ## Run single batch (dev)
+	./scripts/ml-processor.sh process --limit 1 $(ML_ARGS)
 
-ml-run-prod: ## Run ml-processor against production API
-	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py --api-url $(PROD_API_URL)
+ml-run-continuous: ## Run continuous processing (dev)
+	./scripts/ml-processor.sh continuous $(ML_ARGS)
+
+ml-run-cards: ## Generate weekly user cards (dev)
+	./scripts/ml-processor.sh cards $(ML_ARGS)
+
+# Production (requires: make pg-tunnel in another terminal)
+ml-run-prod: ## Run ml-processor batch processing (prod)
+	./scripts/ml-processor.sh --prod process $(ML_ARGS)
 
 ml-run-status-prod: ## Show ml-processor status (prod)
-	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py --status --api-url $(PROD_API_URL)
+	./scripts/ml-processor.sh --prod status $(ML_ARGS)
 
-ml-run-once-prod: ## Run ml-processor for a single batch (prod)
-	cd $(ML_PROCESSOR_DIR) && ./venv/bin/python main.py --once --api-url $(PROD_API_URL)
+ml-run-once-prod: ## Run single batch (prod)
+	./scripts/ml-processor.sh --prod process --limit 1 $(ML_ARGS)
+
+ml-run-continuous-prod: ## Run continuous processing (prod)
+	./scripts/ml-processor.sh --prod continuous $(ML_ARGS)
+
+ml-run-cards-prod: ## Generate weekly user cards (prod)
+	./scripts/ml-processor.sh --prod cards $(ML_ARGS)
+
+# Utility
+ml-shell: ## Open shell in ml-processor container
+	./scripts/ml-processor.sh shell
 
 ml-clean-dev: ## Clean all ML data (dev - PostgreSQL + Qdrant)
 	@echo "Cleaning ML data from dev PostgreSQL..."
@@ -492,6 +512,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	tf-ip tf-ssh tf-ssh-user-host tf-arch tf-root-pass \
 	tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage tf-update-ssh-config tf-docs tf-deploy-check \
-	ml-run ml-run-status ml-run-once ml-run-prod ml-run-status-prod ml-run-once-prod \
-	ml-clean-dev ml-clean-prod \
+	ml-run ml-run-status ml-run-once ml-run-continuous ml-run-cards \
+	ml-run-prod ml-run-status-prod ml-run-once-prod ml-run-continuous-prod ml-run-cards-prod \
+	ml-shell ml-clean-dev ml-clean-prod \
 	mc-setup-prod

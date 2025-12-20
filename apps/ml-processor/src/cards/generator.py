@@ -264,6 +264,8 @@ class CardGenerator:
         chat_id: int,
         week_start: datetime | None = None,
         min_messages: int = 10,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
     ) -> dict:
         """
         Generate cards for all active users in a chat.
@@ -272,6 +274,8 @@ class CardGenerator:
             chat_id: Target chat ID
             week_start: Week to generate cards for (default: current week)
             min_messages: Minimum messages required for card generation
+            from_date: Explicit stats window start (overrides window_days)
+            to_date: Explicit stats window end (overrides window_days)
 
         Returns:
             Dict with generation stats
@@ -283,7 +287,22 @@ class CardGenerator:
             week_start = today - timedelta(days=today.weekday())
 
         week_start, week_end = self._get_week_bounds(week_start)
-        window_start, window_end = self._get_window_bounds(week_end)
+
+        # Use explicit dates if provided, otherwise calculate from window_days
+        if from_date is not None and to_date is not None:
+            window_start = from_date
+            window_end = to_date
+        elif from_date is not None:
+            # from_date provided, use week_end as to_date
+            window_start = from_date
+            window_end = week_end
+        elif to_date is not None:
+            # to_date provided, calculate window_start from window_days
+            window_end = to_date
+            window_start = to_date - timedelta(days=self._window_days - 1)
+        else:
+            # Default: use window_days from week_end
+            window_start, window_end = self._get_window_bounds(week_end)
 
         logger.info(f"Generating cards for chat {chat_id}")
         logger.info(f"Week: {week_start.date()} - {week_end.date()}")

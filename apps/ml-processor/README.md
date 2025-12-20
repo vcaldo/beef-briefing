@@ -55,59 +55,80 @@ cp .env.example .env
 
 ### Using Make (Recommended)
 
+The ml-processor runs inside a Docker container with GPU support. The container starts idle and you execute commands via make targets.
+
 ```bash
-# Start Docker services first (from project root)
+# Start Docker services (from project root)
 make up-build
 
-# Development (local API at localhost:8080)
-make ml-run              # Run continuous processing
-make ml-run-once         # Run single batch
-make ml-run-status       # Check status
+# Development (local postgres) - DEFAULT
+make ml-run              # Run batch processing
+make ml-run-once         # Run single batch (--limit 1)
+make ml-run-status       # Check processing status
+make ml-run-continuous   # Run daemon mode
+make ml-run-cards        # Generate weekly user cards
+make ml-shell            # Open shell in container
 
-# Production (barra-pesada.online)
-make ml-run-prod         # Run continuous processing
-make ml-run-once-prod    # Run single batch
-make ml-run-status-prod  # Check status
+# Production (requires SSH tunnel)
+# Terminal 1: make pg-tunnel
+# Terminal 2:
+make ml-run-prod         # Run batch processing (prod)
+make ml-run-once-prod    # Run single batch (prod)
+make ml-run-status-prod  # Check status (prod)
+make ml-run-continuous-prod  # Daemon mode (prod)
+make ml-run-cards-prod   # Generate cards (prod)
 
-# Custom API URL
-make ml-run-prod PROD_API_URL=https://custom.domain.com
+# Pass additional arguments with ML_ARGS
+make ml-run ML_ARGS="--limit 100"
+make ml-run-prod ML_ARGS="--from-date 2024-11-01 --to-date 2024-12-01"
+make ml-run-cards ML_ARGS="--week 2024-12-16"
+
+# Override default chat ID
+make ml-run ML_ARGS="--chat-id -1003280306634 --limit 500"
 ```
 
-### Direct Python Usage
+### Using the Script Directly
 
 ```bash
-# Activate virtual environment
-source venv/bin/activate
+# Development (default)
+./scripts/ml-processor.sh process --limit 100
+./scripts/ml-processor.sh status
+./scripts/ml-processor.sh continuous
+./scripts/ml-processor.sh cards --week 2024-12-16
 
-# Run continuous processing (daemon mode)
-python main.py continuous --chat-id -1003280306634
+# Production (--prod flag)
+./scripts/ml-processor.sh --prod process --limit 100
+./scripts/ml-processor.sh --prod status
 
-# Run batch processing (all unprocessed messages)
-python main.py process --chat-id -1003280306634
+# Open shell
+./scripts/ml-processor.sh shell
+```
 
-# Run batch with limit
-python main.py process --chat-id -1003280306634 --limit 1000
+### Commands Reference
 
-# Process messages within a date range
-python main.py process --chat-id -1003280306634 --from-date 2024-11-01 --to-date 2024-12-01
+| Command | Description |
+|---------|-------------|
+| `process` | Run batch processing (use `--limit N` for single batch) |
+| `status` | Show processing status for the chat |
+| `continuous` | Run daemon mode (processes continuously with sleep interval) |
+| `cards` | Generate weekly user cards (aggregated ML stats) |
+| `shell` | Open interactive bash shell in the container |
 
-# Process messages from a specific date onwards
-python main.py process --chat-id -1003280306634 --from-date 2024-11-18
+### Command Options
 
-# Process messages until a specific date
-python main.py process --chat-id -1003280306634 --to-date 2024-12-01
+```bash
+# process options
+--chat-id ID        # Target chat ID (default: -1002572302334)
+--limit N           # Max messages to process
+--batch-size N      # Messages per batch (default: 500)
+--from-date D       # Process from date (YYYY-MM-DD)
+--to-date D         # Process until date (YYYY-MM-DD)
 
-# Check processing status
-python main.py status --chat-id -1003280306634
-
-# Generate weekly user cards (aggregates ML results)
-python main.py generate-cards --chat-id -1003280306634
-
-# Generate cards for a specific week
-python main.py generate-cards --chat-id -1003280306634 --week 2024-12-16
-
-# Generate cards with custom window and minimum messages
-python main.py generate-cards --chat-id -1003280306634 --window-days 30 --min-messages 10
+# cards options
+--chat-id ID        # Target chat ID
+--week D            # Week start date (YYYY-MM-DD, should be Monday)
+--window-days N     # Rolling window for stats (default: 30)
+--min-messages N    # Minimum messages for card generation (default: 10)
 ```
 
 ## Configuration

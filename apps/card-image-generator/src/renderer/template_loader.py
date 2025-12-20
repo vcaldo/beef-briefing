@@ -300,124 +300,118 @@ class TemplateLoader:
             medal = RANK_MEDALS.get(cat_rank, "") if cat_rank else ""
             return cat_rank, medal
 
-        # Mood
+        # Mood - always render
         mood = stats_raw.get("mood", {})
-        if mood:
-            score = mood.get("score", 0)
-            config = STAT_CONFIG["mood"]
-            cat_rank, medal = get_category_rank_info("mood")
-            stats_list.append(
-                StatContext(
-                    key="mood",
-                    label=config["label"],
-                    icon=config["icon"],
-                    value=score,
-                    percentage=config["to_pct"](score),
-                    display_value=config["format"](score),
-                    trend=self._make_trend(trends_raw.get("mood")),
-                    category_rank=cat_rank,
-                    category_rank_medal=medal,
-                )
+        score = mood.get("score", 0) if mood else 0
+        config = STAT_CONFIG["mood"]
+        cat_rank, medal = get_category_rank_info("mood")
+        stats_list.append(
+            StatContext(
+                key="mood",
+                label=config["label"],
+                icon=config["icon"],
+                value=score,
+                percentage=config["to_pct"](score),
+                display_value=config["format"](score),
+                trend=self._make_trend(trends_raw.get("mood")),
+                category_rank=cat_rank,
+                category_rank_medal=medal,
             )
+        )
 
-        # Comedy
+        # Comedy - always render
         comedy = stats_raw.get("comedy", {})
-        if comedy:
-            score = comedy.get("score", 0)
-            config = STAT_CONFIG["comedy"]
-            cat_rank, medal = get_category_rank_info("comedy")
-            stats_list.append(
-                StatContext(
-                    key="comedy",
-                    label=config["label"],
-                    icon=config["icon"],
-                    value=score,
-                    percentage=config["to_pct"](score),
-                    display_value=config["format"](score),
-                    trend=self._make_trend(trends_raw.get("comedy")),
-                    category_rank=cat_rank,
-                    category_rank_medal=medal,
-                )
+        score = comedy.get("score", 0) if comedy else 0
+        config = STAT_CONFIG["comedy"]
+        cat_rank, medal = get_category_rank_info("comedy")
+        stats_list.append(
+            StatContext(
+                key="comedy",
+                label=config["label"],
+                icon=config["icon"],
+                value=score,
+                percentage=config["to_pct"](score),
+                display_value=config["format"](score),
+                trend=self._make_trend(trends_raw.get("comedy")),
+                category_rank=cat_rank,
+                category_rank_medal=medal,
             )
+        )
 
-        # Volatility
+        # Volatility - always render
         volatility = stats_raw.get("volatility", {})
-        if volatility:
-            score = volatility.get("score", 0)
-            config = STAT_CONFIG["volatility"]
-            cat_rank, medal = get_category_rank_info("volatility")
-            stats_list.append(
-                StatContext(
-                    key="volatility",
-                    label=config["label"],
-                    icon=config["icon"],
-                    value=score,
-                    percentage=config["to_pct"](score),
-                    display_value=config["format"](score),
-                    trend=self._make_trend(trends_raw.get("volatility")),
-                    category_rank=cat_rank,
-                    category_rank_medal=medal,
-                )
+        score = volatility.get("score", 0) if volatility else 0
+        config = STAT_CONFIG["volatility"]
+        cat_rank, medal = get_category_rank_info("volatility")
+        stats_list.append(
+            StatContext(
+                key="volatility",
+                label=config["label"],
+                icon=config["icon"],
+                value=score,
+                percentage=config["to_pct"](score),
+                display_value=config["format"](score),
+                trend=self._make_trend(trends_raw.get("volatility")),
+                category_rank=cat_rank,
+                category_rank_medal=medal,
             )
+        )
 
-        # Toxicity
+        # Toxicity - always render
         toxicity = stats_raw.get("toxicity", {})
-        if toxicity:
-            pct = toxicity.get("pct", 0)
-            config = STAT_CONFIG["toxicity"]
-            cat_rank, medal = get_category_rank_info("toxicity")
-            stats_list.append(
-                StatContext(
-                    key="toxicity",
-                    label=config["label"],
-                    icon=config["icon"],
-                    value=pct,
-                    percentage=config["to_pct"](pct),
-                    display_value=config["format"](pct),
-                    trend=self._make_trend(trends_raw.get("toxicity")),
-                    category_rank=cat_rank,
-                    category_rank_medal=medal,
-                )
+        pct = toxicity.get("pct", 0) if toxicity else 0
+        config = STAT_CONFIG["toxicity"]
+        cat_rank, medal = get_category_rank_info("toxicity")
+        stats_list.append(
+            StatContext(
+                key="toxicity",
+                label=config["label"],
+                icon=config["icon"],
+                value=pct,
+                percentage=config["to_pct"](pct),
+                display_value=config["format"](pct),
+                trend=self._make_trend(trends_raw.get("toxicity")),
+                category_rank=cat_rank,
+                category_rank_medal=medal,
             )
+        )
 
-        # Activity
+        # Activity - always render
         activity = stats_raw.get("activity", {})
-        if activity:
-            messages = activity.get("messages", 0)
-            config = STAT_CONFIG["activity"]
-            cat_rank, medal = get_category_rank_info("activity")
-            stats_list.append(
-                StatContext(
-                    key="activity",
-                    label=config["label"],
-                    icon=config["icon"],
-                    value=messages,
-                    percentage=config["to_pct"](messages),
-                    display_value=config["format"](messages),
-                    trend=self._make_trend(trends_raw.get("activity")),
-                    category_rank=cat_rank,
-                    category_rank_medal=medal,
-                )
+        messages = activity.get("messages", 0) if activity else 0
+        config = STAT_CONFIG["activity"]
+        cat_rank, medal = get_category_rank_info("activity")
+        stats_list.append(
+            StatContext(
+                key="activity",
+                label=config["label"],
+                icon=config["icon"],
+                value=messages,
+                percentage=config["to_pct"](messages),
+                display_value=config["format"](messages),
+                trend=self._make_trend(trends_raw.get("activity")),
+                category_rank=cat_rank,
+                category_rank_medal=medal,
             )
+        )
 
-        # Reactions
+        # Reactions - always render
         reactions = stats_raw.get("reactions_received", 0)
-        if reactions:
-            config = STAT_CONFIG["reactions"]
-            cat_rank, medal = get_category_rank_info("reactions")
-            stats_list.append(
-                StatContext(
-                    key="reactions",
-                    label=config["label"],
-                    icon=config["icon"],
-                    value=reactions,
-                    percentage=config["to_pct"](reactions),
-                    display_value=config["format"](reactions),
-                    trend=self._make_trend(trends_raw.get("reactions")),
-                    category_rank=cat_rank,
-                    category_rank_medal=medal,
-                )
+        config = STAT_CONFIG["reactions"]
+        cat_rank, medal = get_category_rank_info("reactions")
+        stats_list.append(
+            StatContext(
+                key="reactions",
+                label=config["label"],
+                icon=config["icon"],
+                value=reactions,
+                percentage=config["to_pct"](reactions),
+                display_value=config["format"](reactions),
+                trend=self._make_trend(trends_raw.get("reactions")),
+                category_rank=cat_rank,
+                category_rank_medal=medal,
             )
+        )
 
         # Derive badges
         badges = self._derive_badges(stats_raw)

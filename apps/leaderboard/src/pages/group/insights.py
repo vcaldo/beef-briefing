@@ -430,7 +430,7 @@ def _create_funniest_users_card(users: list[dict], colors: dict) -> dmc.Paper:
                                 dmc.Text(
                                     user.get("first_name", "Unknown"),
                                     size="sm",
-                                    style={"flex": 1},
+                                    flex=1,
                                 ),
                                 dmc.Text(
                                     f"{humor_rate:.1f}%",
@@ -502,7 +502,7 @@ def _create_inquisitive_users_card(users: list[dict], colors: dict) -> dmc.Paper
                                 dmc.Text(
                                     user.get("first_name", "Unknown"),
                                     size="sm",
-                                    style={"flex": 1},
+                                    flex=1,
                                 ),
                                 dmc.Text(
                                     f"{question_rate:.1f}%",

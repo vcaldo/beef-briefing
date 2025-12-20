@@ -15,6 +15,7 @@ from dash_iconify import DashIconify
 
 from src.charts import get_chart_colors
 from src.components import create_group_nav, get_comparison_dates, get_period_dates
+from src.utils import format_number
 
 
 def create_overview_page(
@@ -105,28 +106,28 @@ def create_overview_page(
                 [
                     _create_stat_card(
                         "Messages",
-                        _format_number(stats["total_messages"]),
+                        format_number(stats["total_messages"]),
                         changes["total_messages"],
                         "mdi:message-outline",
                         colors,
                     ),
                     _create_stat_card(
                         "Active Users",
-                        _format_number(stats["total_users"]),
+                        format_number(stats["total_users"]),
                         changes["total_users"],
                         "mdi:account-group-outline",
                         colors,
                     ),
                     _create_stat_card(
                         "Reactions",
-                        _format_number(stats["total_reactions"]),
+                        format_number(stats["total_reactions"]),
                         changes["total_reactions"],
                         "mdi:emoticon-outline",
                         colors,
                     ),
                     _create_stat_card(
                         "Media",
-                        _format_number(stats["total_media"]),
+                        format_number(stats["total_media"]),
                         changes["total_media"],
                         "mdi:image-outline",
                         colors,
@@ -295,7 +296,7 @@ def _create_leaderboard_card(
                             style={"flex": 1},
                         ),
                         dmc.Text(
-                            _format_number(user["score"]),
+                            format_number(user["score"]),
                             size="sm",
                             fw=500,
                         ),
@@ -354,7 +355,7 @@ def _create_reactions_card(top_reactions: list, colors: dict) -> dmc.Paper:
                             style={"flex": 1},
                         ),
                         dmc.Text(
-                            _format_number(reaction["count"]),
+                            format_number(reaction["count"]),
                             size="sm",
                             c="dimmed",
                             miw=50,
@@ -438,15 +439,3 @@ def _create_quick_stats_card(stats: dict, chat_info: dict, colors: dict) -> dmc.
         p="md",
         withBorder=True,
     )
-
-
-def _format_number(n: int | float) -> str:
-    """Format number with K/M suffix for large values."""
-    if n is None:
-        return "0"
-    n = int(n)
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M"
-    elif n >= 1_000:
-        return f"{n / 1_000:.1f}K"
-    return str(n)

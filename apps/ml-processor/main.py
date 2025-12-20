@@ -206,8 +206,10 @@ def run_generate_cards(args, config):
     """Run card generation command."""
     logger.info(f"Generating cards for chat {args.chat_id}")
 
-    # Parse week argument
+    # Parse date arguments
     week_start = parse_date(args.week) if args.week else None
+    from_date = parse_date(getattr(args, "from_date", None))
+    to_date = parse_date(getattr(args, "to_date", None))
 
     add_custom_attributes(
         {
@@ -215,8 +217,15 @@ def run_generate_cards(args, config):
             "week": args.week,
             "window_days": args.window_days,
             "min_messages": args.min_messages,
+            "from_date": str(from_date.date()) if from_date else None,
+            "to_date": str(to_date.date()) if to_date else None,
         }
     )
+
+    if from_date:
+        logger.info(f"From date: {from_date.date()}")
+    if to_date:
+        logger.info(f"To date: {to_date.date()}")
 
     # Create database engine
     engine = create_engine(config.dsn(), pool_pre_ping=True)
@@ -229,6 +238,8 @@ def run_generate_cards(args, config):
         chat_id=args.chat_id,
         week_start=week_start,
         min_messages=args.min_messages,
+        from_date=from_date,
+        to_date=to_date,
     )
 
     # Print results
@@ -361,6 +372,18 @@ def main():
         type=int,
         default=10,
         help="Minimum messages required for card generation (default: 10)",
+    )
+    generate_cards_parser.add_argument(
+        "--from-date",
+        type=str,
+        default=None,
+        help="Stats window start date (YYYY-MM-DD). Overrides --window-days",
+    )
+    generate_cards_parser.add_argument(
+        "--to-date",
+        type=str,
+        default=None,
+        help="Stats window end date (YYYY-MM-DD). Overrides --window-days",
     )
 
     args = parser.parse_args()

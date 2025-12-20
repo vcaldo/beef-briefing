@@ -79,6 +79,11 @@ class Config(BaseSettings):
     environment: str = "development"
     log_level: str = "info"
 
+    # Card Image Generator Service (optional)
+    card_image_generator_url: Optional[str] = None
+    card_image_generator_api_key: Optional[str] = None
+    card_image_generator_timeout: float = 120.0
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

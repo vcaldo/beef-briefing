@@ -55,6 +55,7 @@ def create_sentiment_page(
         Page layout as html.Div
     """
     chat_title = chat_info.get("title", f"Chat {chat_id}")
+    is_admin = user.get("is_admin", False)
     colors = get_chart_colors(theme_name)
 
     # Get date range
@@ -110,6 +111,7 @@ def create_sentiment_page(
                 current_period=period,
                 base_url=base_url,
                 theme_name=theme_name,
+                is_admin=is_admin,
             ),
             dmc.Space(h="xl"),
             # Summary cards

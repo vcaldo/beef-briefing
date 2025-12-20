@@ -12,11 +12,13 @@ Pages:
 - Insights: Humor detection and question analysis
 - Comedy: Funniness rankings and humor analytics
 - Card: Weekly user personality cards with ML stats
+- Gallery: Admin-only gallery of generated card images
 """
 
 from .activity import create_activity_page
 from .card import create_card_page
 from .comedy import create_comedy_page
+from .gallery import create_gallery_page
 from .insights import create_insights_page
 from .leaderboard import create_leaderboard_page
 from .my_stats import create_my_stats_page
@@ -36,4 +38,5 @@ __all__ = [
     "create_insights_page",
     "create_comedy_page",
     "create_card_page",
+    "create_gallery_page",
 ]

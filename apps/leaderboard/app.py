@@ -29,7 +29,7 @@ from sqlalchemy import create_engine
 
 from src.database import DashboardQueries, SessionQueries
 from src.auth import TelegramAuthService
-from src.api import PhotoClient, CardClient
+from src.api import PhotoClient, CardClient, GalleryClient
 from src.routes import auth_bp
 from src.routes.auth import init_auth_routes
 from src.pages import (
@@ -44,6 +44,7 @@ from src.pages import (
     create_insights_page,
     create_comedy_page,
     create_card_page,
+    create_gallery_page,
 )
 from src.utils import filter_chats_for_user
 from src.components import DEFAULT_PERIOD
@@ -243,6 +244,28 @@ def get_card_client() -> CardClient:
                 "CardClient not configured (missing API_SERVICE_URL or API_KEY_FILE)"
             )
     return _card_client
+
+
+# Gallery client (lazy initialization)
+_gallery_client = None
+
+
+def get_gallery_client() -> GalleryClient:
+    """Get or create GalleryClient instance."""
+    global _gallery_client
+    if _gallery_client is None:
+        if cfg.card_image_generator_url and cfg.card_image_generator_api_key:
+            _gallery_client = GalleryClient(
+                cfg.card_image_generator_url, cfg.card_image_generator_api_key
+            )
+            logger.info("GalleryClient initialized")
+        else:
+            # Return a stub client that always returns None
+            _gallery_client = GalleryClient("", "")
+            logger.warning(
+                "GalleryClient not configured (missing CARD_IMAGE_GENERATOR_URL or API key)"
+            )
+    return _gallery_client
 
 
 # Dynamic layout function
@@ -527,6 +550,7 @@ def display_page(pathname, search, theme_name):
             "insights": create_insights_page,
             "comedy": create_comedy_page,
             "card": create_card_page,
+            "gallery": create_gallery_page,
         }
 
         page_creator = page_creators.get(page_name)
@@ -562,6 +586,10 @@ def display_page(pathname, search, theme_name):
                         except (ValueError, TypeError):
                             pass  # Keep default
                 page_kwargs["target_user_id"] = target_user_id
+            elif page_name == "gallery":
+                # Gallery page needs gallery_client and week param (admin only)
+                page_kwargs["gallery_client"] = get_gallery_client()
+                page_kwargs["week"] = query_params.get("week")
 
             try:
                 page_content = page_creator(**page_kwargs)

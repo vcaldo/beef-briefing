@@ -43,7 +43,7 @@ services:
       ENVIRONMENT: production
       LOG_LEVEL: info
     volumes:
-      - ./secrets/api-service:/app/secrets:ro
+      - ./secrets/apps/api-service:/app/secrets:ro
     depends_on:
       - postgres
     networks:
@@ -74,7 +74,7 @@ services:
       ENVIRONMENT: production
       LOG_LEVEL: info
     volumes:
-      - ./secrets/telegram-bot:/app/secrets:ro
+      - ./secrets/apps/telegram-bot:/app/secrets:ro
     depends_on:
       - api-service
     networks:
@@ -101,15 +101,18 @@ services:
       ADMIN_USER_IDS: ${ADMIN_USER_IDS}
       API_SERVICE_URL: http://api-service:${API_PORT}
       API_KEY_FILE: /app/secrets/api_key
+      CARD_IMAGE_GENERATOR_URL: http://card-image-generator:8051
+      CARD_IMAGE_GENERATOR_API_KEY_FILE: /app/secrets/card_image_generator_api_key
       NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: production
       LOG_LEVEL: info
     volumes:
-      - ./secrets/leaderboard:/app/secrets:ro
+      - ./secrets/apps/leaderboard:/app/secrets:ro
     depends_on:
       - postgres
       - api-service
+      - card-image-generator
     networks:
       - beef-prod-network
     labels:
@@ -120,6 +123,40 @@ services:
       - "traefik.http.services.leaderboard.loadbalancer.server.port=8050"
       - "traefik.http.middlewares.leaderboard-strip.stripprefix.prefixes=${LEADERBOARD_PATH:-/leaderboard}"
       - "traefik.http.routers.leaderboard.middlewares=leaderboard-strip"
+    restart: unless-stopped
+
+  card-image-generator:
+    build:
+      context: ..
+      dockerfile: apps/card-image-generator/Dockerfile
+    image: beef-briefing/card-image-generator:${IMAGE_TAG}
+    container_name: beef-card-image-generator-prod
+    environment:
+      DB_HOST: postgres
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_PORT: 5432
+      DB_SSL_MODE: disable
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_USE_SSL: ${MINIO_USE_SSL}
+      MINIO_REGION: ${MINIO_REGION}
+      CARD_GENERATOR_PORT: 8051
+      TEMPLATES_DIR: /app/templates
+      APP_KEYS_DIR: /app/secrets/app_keys
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      ENVIRONMENT: production
+      LOG_LEVEL: info
+    volumes:
+      - ./secrets/apps/card-image-generator:/app/secrets:ro
+    depends_on:
+      - postgres
+    networks:
+      - beef-prod-network
     restart: unless-stopped
 
   traefik:

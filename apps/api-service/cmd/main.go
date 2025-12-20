@@ -224,7 +224,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	mlService := services.NewMLService(db, nrApp)
 	mlHandler := handlers.NewMLHandler(mlService, cfg)
 
-	cardService := services.NewCardService(db, nrApp)
+	cardService := services.NewCardService(db, minioClient, nrApp)
 	cardHandler := handlers.NewCardHandler(cardService, cfg)
 
 	// API v1 routes - ALL AUTHENTICATED
@@ -252,6 +252,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	api.HandleFunc("/cards/weeks", cardHandler.HandleGetAvailableWeeks).Methods("GET")
 	api.HandleFunc("/cards/{user_id}", cardHandler.HandleGetUserCard).Methods("GET")
 	api.HandleFunc("/cards/{user_id}/history", cardHandler.HandleGetUserHistory).Methods("GET")
+	api.HandleFunc("/cards/{user_id}/image", cardHandler.HandleGetCardImage).Methods("GET")
 
 	slog.Info("all API endpoints require authentication", "path_prefix", "/api/v1")
 

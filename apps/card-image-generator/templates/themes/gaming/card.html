@@ -101,7 +101,7 @@
             color: rgba(255, 255, 255, 0.6);
         }
 
-        .week-badge {
+        .rank-box {
             text-align: center;
             padding: 8px 12px;
             background: rgba(0, 217, 255, 0.2);
@@ -109,14 +109,14 @@
             border: 1px solid rgba(0, 217, 255, 0.3);
         }
 
-        .week-label {
+        .rank-label {
             font-size: 10px;
             color: rgba(255, 255, 255, 0.6);
             text-transform: uppercase;
             letter-spacing: 2px;
         }
 
-        .week-number {
+        .rank-number {
             font-family: 'Orbitron', sans-serif;
             font-size: 24px;
             font-weight: 900;
@@ -124,8 +124,12 @@
             display: block;
         }
 
-        /* Rank badge */
-        .rank-badge {
+        .rank-number.medal {
+            font-size: 28px;
+        }
+
+        /* Week badge (yellow circle) */
+        .week-circle-badge {
             position: absolute;
             top: -8px;
             right: -8px;
@@ -316,9 +320,7 @@
 </head>
 <body>
     <div class="card">
-        {% if rank %}
-        <div class="rank-badge">{{ rank }}</div>
-        {% endif %}
+        <div class="week-circle-badge">{{ week_number }}</div>
 
         <!-- Header -->
         <div class="card-header">
@@ -329,10 +331,14 @@
                 <h1 class="username">{{ user.first_name }}{% if user.last_name %} {{ user.last_name }}{% endif %}</h1>
                 {% if user.username %}<span class="handle">@{{ user.username }}</span>{% endif %}
             </div>
-            <div class="week-badge">
-                <span class="week-label">Week</span>
-                <span class="week-number">{{ week_number }}</span>
+            {% if rank %}
+            <div class="rank-box">
+                <span class="rank-label">Rank</span>
+                <span class="rank-number{% if rank <= 3 %} medal{% endif %}">
+                    {%- if rank == 1 -%}🥇{%- elif rank == 2 -%}🥈{%- elif rank == 3 -%}🥉{%- else -%}{{ rank }}{%- endif -%}
+                </span>
             </div>
+            {% endif %}
         </div>
 
         <!-- Stats Grid -->

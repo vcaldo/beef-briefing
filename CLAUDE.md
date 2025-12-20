@@ -224,6 +224,16 @@ Generates a secure random API key for each application. Keys are stored in two l
 - `infrastructure/secrets/apps/api-service/app_keys/{app}` - for api-service to validate incoming requests
 - `infrastructure/secrets/apps/{app}/api_key` - for the app to read when making requests
 
+**Card Image Generator Keys** (for gallery access):
+```bash
+make secrets-card-image-generator APP=leaderboard
+make secrets-card-image-generator APP=ml-processor
+```
+
+Generates API keys for services that need to access the card-image-generator. Keys are stored in:
+- `infrastructure/secrets/apps/card-image-generator/app_keys/{app}` - for card-image-generator to validate incoming requests
+- `infrastructure/secrets/apps/{app}/card_image_generator_api_key` - for the app to read when making requests
+
 This structure allows each container to mount its own secrets directory without collisions. All `/api/v1/*` endpoints require authentication via `Authorization: Bearer <key>` header. Only `/health` is unauthenticated (for load balancer health checks).
 
 ### OpenAI Rate Limiting (ML Processor)

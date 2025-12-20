@@ -302,6 +302,14 @@ secrets-service-api: ## Generate API key for an app (APP=telegram-bot required)
 	@chmod +x $(SCRIPTS_DIR)/generate-api-service-key.sh
 	@$(SCRIPTS_DIR)/generate-api-service-key.sh "$(APP)" "$(SECRETS_DIR)"
 
+secrets-card-image-generator: ## Generate card-image-generator API key for an app (APP=leaderboard required)
+	@if [ -z "$(APP)" ]; then \
+		echo "Error: APP variable is required. Usage: make secrets-card-image-generator APP=leaderboard"; \
+		exit 1; \
+	fi
+	@chmod +x $(SCRIPTS_DIR)/generate-card-image-generator-key.sh
+	@$(SCRIPTS_DIR)/generate-card-image-generator-key.sh "$(APP)" "$(SECRETS_DIR)"
+
 # =============================================================================
 # TERRAFORM (tf-*)
 # =============================================================================
@@ -547,7 +555,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	docker-shell-newrelic docker-shell-leaderboard docker-shell-ml-dashboard \
 	go-build go-build-api go-build-bot go-build-import-cli go-build-import-cli-prod go-clean \
 	go-fmt go-fmt-check \
-	secrets-traefik-password secrets-service-api \
+	secrets-traefik-password secrets-service-api secrets-card-image-generator \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-arch tf-root-pass \

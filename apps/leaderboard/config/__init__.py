@@ -40,6 +40,10 @@ class Config(BaseSettings):
     api_service_url: str = ""
     api_key_file: str = ""
 
+    # Card Image Generator Configuration (for gallery)
+    card_image_generator_url: str = ""
+    card_image_generator_api_key_file: str = ""
+
     # New Relic APM Configuration (optional)
     new_relic_app_name: Optional[str] = None
     new_relic_license_key: Optional[str] = None
@@ -93,6 +97,17 @@ class Config(BaseSettings):
             return ""
         try:
             with open(self.api_key_file) as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            return ""
+
+    @cached_property
+    def card_image_generator_api_key(self) -> str:
+        """Load card-image-generator API key from file."""
+        if not self.card_image_generator_api_key_file:
+            return ""
+        try:
+            with open(self.card_image_generator_api_key_file) as f:
                 return f.read().strip()
         except FileNotFoundError:
             return ""

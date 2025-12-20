@@ -18,6 +18,7 @@ from src.components.theme_switcher import create_theme_switcher
 from src.components.time_filter import create_time_filter_links
 
 # Tab definitions
+# admin_only: True means the tab is only visible to admin users
 TABS = [
     {"value": "overview", "label": "Overview", "icon": "mdi:view-dashboard-outline"},
     {"value": "activity", "label": "Activity", "icon": "mdi:chart-timeline-variant"},
@@ -29,6 +30,7 @@ TABS = [
     {"value": "insights", "label": "Insights", "icon": "mdi:lightbulb-outline"},
     {"value": "comedy", "label": "Comedy", "icon": "mdi:emoticon-lol-outline"},
     {"value": "card", "label": "Card", "icon": "mdi:card-account-details-outline"},
+    {"value": "gallery", "label": "Gallery", "icon": "mdi:image-multiple-outline", "admin_only": True},
 ]
 
 
@@ -39,6 +41,7 @@ def create_group_nav(
     current_period: str,
     base_url: str,
     theme_name: str | None = None,
+    is_admin: bool = False,
 ) -> dmc.Stack:
     """
     Create the group navigation header.
@@ -50,6 +53,7 @@ def create_group_nav(
         current_period: Currently selected time period
         base_url: Base URL path (e.g., "/leaderboard")
         theme_name: Current theme name
+        is_admin: Whether the current user is an admin (shows admin-only tabs)
 
     Returns:
         DMC Stack containing the full navigation header
@@ -76,7 +80,7 @@ def create_group_nav(
             # Tab row with time filter
             dmc.Group(
                 [
-                    _create_tab_links(base_url, chat_id, current_tab, current_period),
+                    _create_tab_links(base_url, chat_id, current_tab, current_period, is_admin),
                     create_time_filter_links(
                         base_url, chat_id, current_tab, current_period
                     ),
@@ -92,11 +96,15 @@ def create_group_nav(
 
 
 def _create_tab_links(
-    base_url: str, chat_id: int, current_tab: str, period: str
+    base_url: str, chat_id: int, current_tab: str, period: str, is_admin: bool = False
 ) -> dmc.Group:
     """Create tab navigation as anchor links."""
     tabs = []
     for tab in TABS:
+        # Skip admin-only tabs for non-admin users
+        if tab.get("admin_only") and not is_admin:
+            continue
+
         is_active = tab["value"] == current_tab
         href = f"{base_url}/group/{chat_id}/{tab['value']}?period={period}"
         tabs.append(

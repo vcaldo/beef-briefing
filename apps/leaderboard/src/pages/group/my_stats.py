@@ -52,6 +52,7 @@ def create_my_stats_page(
         Page layout as html.Div
     """
     chat_title = chat_info.get("title", f"Chat {chat_id}")
+    is_admin = user.get("is_admin", False)
     user_id = user.get("user_id")
     user_name = user.get("first_name", "User")
     colors = get_chart_colors(theme_name)
@@ -126,6 +127,7 @@ def create_my_stats_page(
                 current_period=period,
                 base_url=base_url,
                 theme_name=theme_name,
+                is_admin=is_admin,
             ),
             dmc.Space(h="xl"),
             # Profile header

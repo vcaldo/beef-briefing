@@ -84,6 +84,23 @@ class CardQueries:
             result = conn.execute(query, {"chat_id": chat_id}).scalar()
             return result
 
+    def get_available_weeks(self, chat_id: int) -> list[date]:
+        """
+        Get all distinct weeks with generated card images for a chat.
+
+        Returns list of week_start dates in descending order (most recent first).
+        """
+        query = text("""
+            SELECT DISTINCT week_start
+            FROM ml_user_card_images
+            WHERE chat_id = :chat_id
+            ORDER BY week_start DESC
+        """)
+
+        with self.engine.connect() as conn:
+            result = conn.execute(query, {"chat_id": chat_id})
+            return [row.week_start for row in result]
+
     def get_existing_images(
         self,
         chat_id: int,

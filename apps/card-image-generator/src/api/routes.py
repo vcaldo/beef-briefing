@@ -110,6 +110,29 @@ class ImageUrlResponse(BaseModel):
     expires_in: int
 
 
+class WeekListResponse(BaseModel):
+    """Response with list of available weeks."""
+
+    weeks: list[str]
+
+
+@router.get("/api/v1/weeks", response_model=WeekListResponse)
+async def get_available_weeks(
+    chat_id: Annotated[int, Query(description="Chat ID")],
+    api_key: str = Depends(verify_api_key),
+):
+    """
+    Get list of weeks with generated card images for a chat.
+
+    Returns list of week_start dates (YYYY-MM-DD) in descending order.
+    """
+    if _generator is None:
+        raise HTTPException(status_code=503, detail="Generator not initialized")
+
+    weeks = _generator.queries.get_available_weeks(chat_id)
+    return WeekListResponse(weeks=[w.isoformat() for w in weeks])
+
+
 @router.post("/api/v1/render", response_model=RenderResponse)
 async def render_cards(
     request: RenderRequest,

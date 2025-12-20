@@ -123,6 +123,8 @@ services:
       ADMIN_USER_IDS: ${ADMIN_USER_IDS}
       API_SERVICE_URL: http://api-service:${API_PORT}
       API_KEY_FILE: /app/secrets/api_key
+      CARD_IMAGE_GENERATOR_URL: http://card-image-generator:8051
+      CARD_IMAGE_GENERATOR_API_KEY_FILE: /app/secrets/card_image_generator_api_key
       NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: development
@@ -134,6 +136,7 @@ services:
     depends_on:
       - postgres
       - api-service
+      - card-image-generator
     networks:
       - beef-dev-network
     restart: unless-stopped

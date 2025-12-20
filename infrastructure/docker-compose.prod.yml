@@ -43,7 +43,7 @@ services:
       ENVIRONMENT: production
       LOG_LEVEL: info
     volumes:
-      - ./secrets/api-service:/app/secrets:ro
+      - ./secrets/apps/api-service:/app/secrets:ro
     depends_on:
       - postgres
     networks:
@@ -74,7 +74,7 @@ services:
       ENVIRONMENT: production
       LOG_LEVEL: info
     volumes:
-      - ./secrets/telegram-bot:/app/secrets:ro
+      - ./secrets/apps/telegram-bot:/app/secrets:ro
     depends_on:
       - api-service
     networks:
@@ -101,15 +101,18 @@ services:
       ADMIN_USER_IDS: ${ADMIN_USER_IDS}
       API_SERVICE_URL: http://api-service:${API_PORT}
       API_KEY_FILE: /app/secrets/api_key
+      CARD_IMAGE_GENERATOR_URL: http://card-image-generator:8051
+      CARD_IMAGE_GENERATOR_API_KEY_FILE: /app/secrets/card_image_generator_api_key
       NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: production
       LOG_LEVEL: info
     volumes:
-      - ./secrets/leaderboard:/app/secrets:ro
+      - ./secrets/apps/leaderboard:/app/secrets:ro
     depends_on:
       - postgres
       - api-service
+      - card-image-generator
     networks:
       - beef-prod-network
     labels:
@@ -149,7 +152,7 @@ services:
       ENVIRONMENT: production
       LOG_LEVEL: info
     volumes:
-      - ./secrets/card-image-generator:/app/secrets:ro
+      - ./secrets/apps/card-image-generator:/app/secrets:ro
     depends_on:
       - postgres
     networks:

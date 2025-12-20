@@ -201,6 +201,47 @@ def run_status(args, config):
         processor.cleanup()
 
 
+@background_task(name="generate-cards", group="MLProcessor")
+def run_generate_cards(args, config):
+    """Run card generation command."""
+    logger.info(f"Generating cards for chat {args.chat_id}")
+
+    # Parse week argument
+    week_start = parse_date(args.week) if args.week else None
+
+    add_custom_attributes(
+        {
+            "chat_id": args.chat_id,
+            "week": args.week,
+            "window_days": args.window_days,
+            "min_messages": args.min_messages,
+        }
+    )
+
+    # Create database engine
+    engine = create_engine(config.dsn(), pool_pre_ping=True)
+
+    # Create generator and run
+    from src.cards import CardGenerator
+
+    generator = CardGenerator(engine, window_days=args.window_days)
+    result = generator.generate_cards(
+        chat_id=args.chat_id,
+        week_start=week_start,
+        min_messages=args.min_messages,
+    )
+
+    # Print results
+    print("\nCard Generation Results:")
+    print(f"  Week: {result['week_start']} - {result['week_end']}")
+    print(f"  Stats window: {result['window_start']} - {result['window_end']}")
+    print(f"  Active users: {result['active_users']}")
+    print(f"  Cards generated: {result['generated']}")
+    print(f"  Users skipped: {result['skipped']}")
+
+    return result
+
+
 def run_continuous(args, config):
     """Run continuous processing command."""
     logger.info(f"Starting continuous processing for chat {args.chat_id}")
@@ -292,6 +333,36 @@ def main():
         help="Target chat ID to process",
     )
 
+    # generate-cards command
+    generate_cards_parser = subparsers.add_parser(
+        "generate-cards",
+        help="Generate weekly user cards for a chat",
+    )
+    generate_cards_parser.add_argument(
+        "--chat-id",
+        type=int,
+        required=True,
+        help="Target chat ID to generate cards for",
+    )
+    generate_cards_parser.add_argument(
+        "--week",
+        type=str,
+        default=None,
+        help="Week start date (YYYY-MM-DD, should be Monday). Default: current week",
+    )
+    generate_cards_parser.add_argument(
+        "--window-days",
+        type=int,
+        default=30,
+        help="Rolling window size for stats calculation (default: 30)",
+    )
+    generate_cards_parser.add_argument(
+        "--min-messages",
+        type=int,
+        default=10,
+        help="Minimum messages required for card generation (default: 10)",
+    )
+
     args = parser.parse_args()
 
     # Use module-level config (already loaded for New Relic init)
@@ -325,6 +396,10 @@ def main():
 
         elif args.command == "continuous":
             run_continuous(args, config)
+            sys.exit(0)
+
+        elif args.command == "generate-cards":
+            run_generate_cards(args, config)
             sys.exit(0)
 
     except Exception as e:

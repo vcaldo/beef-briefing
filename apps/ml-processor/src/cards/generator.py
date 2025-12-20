@@ -1,0 +1,353 @@
+"""
+Card generator for aggregating ML results into weekly user cards.
+
+Design Principles:
+1. Uses pluggable calculators from calculators.py
+2. 30-day rolling window for stable personality traits
+3. Weekly cards with trend comparisons
+4. Idempotent upserts (safe to re-run)
+"""
+
+import json
+import logging
+from datetime import datetime, timedelta
+
+from sqlalchemy import text
+from sqlalchemy.engine import Engine
+
+from src.cards.calculators import CALCULATORS
+from src.instrumentation import function_trace
+
+logger = logging.getLogger(__name__)
+
+
+class CardGenerator:
+    """
+    Generates weekly user cards using aggregated ML results.
+
+    Cards are generated for a specific week using a 30-day rolling window
+    ending on the week's end date. Trends compare current week to previous week.
+    """
+
+    def __init__(self, engine: Engine, window_days: int = 30):
+        """
+        Initialize the card generator.
+
+        Args:
+            engine: SQLAlchemy engine
+            window_days: Rolling window size for stats (default: 30)
+        """
+        self._engine = engine
+        self._window_days = window_days
+
+    def _get_week_bounds(self, week_start: datetime) -> tuple[datetime, datetime]:
+        """Get week start (Monday) and end (Sunday) dates."""
+        # Ensure week_start is a Monday
+        days_since_monday = week_start.weekday()
+        if days_since_monday != 0:
+            week_start = week_start - timedelta(days=days_since_monday)
+
+        week_end = week_start + timedelta(days=6)
+        return week_start, week_end
+
+    def _get_window_bounds(self, week_end: datetime) -> tuple[datetime, datetime]:
+        """Get rolling window bounds ending on week_end."""
+        window_end = week_end
+        window_start = week_end - timedelta(days=self._window_days - 1)
+        return window_start, window_end
+
+    @function_trace(name="get_active_users", group="CardGenerator")
+    def _get_active_users(
+        self, chat_id: int, window_start: datetime, window_end: datetime
+    ) -> list[int]:
+        """Get users with messages in the time window."""
+        query = """
+            SELECT DISTINCT m.user_id
+            FROM messages m
+            WHERE m.chat_id = :chat_id
+              AND m.date >= :window_start
+              AND m.date <= :window_end
+              AND m.user_id IS NOT NULL
+        """
+        with self._engine.connect() as conn:
+            result = conn.execute(
+                text(query),
+                {
+                    "chat_id": chat_id,
+                    "window_start": window_start,
+                    "window_end": window_end,
+                },
+            )
+            return [row[0] for row in result.fetchall()]
+
+    @function_trace(name="get_user_message_count", group="CardGenerator")
+    def _get_user_message_count(
+        self, user_id: int, chat_id: int, window_start: datetime, window_end: datetime
+    ) -> int:
+        """Get message count for a user in window."""
+        query = """
+            SELECT COUNT(*) as count
+            FROM messages m
+            WHERE m.user_id = :user_id
+              AND m.chat_id = :chat_id
+              AND m.date >= :window_start
+              AND m.date <= :window_end
+        """
+        with self._engine.connect() as conn:
+            result = conn.execute(
+                text(query),
+                {
+                    "user_id": user_id,
+                    "chat_id": chat_id,
+                    "window_start": window_start,
+                    "window_end": window_end,
+                },
+            )
+            row = result.fetchone()
+            return row[0] if row else 0
+
+    @function_trace(name="compute_stats", group="CardGenerator")
+    def _compute_stats(
+        self,
+        user_id: int,
+        chat_id: int,
+        window_start: datetime,
+        window_end: datetime,
+    ) -> dict:
+        """
+        Compute all stats for a user using registered calculators.
+
+        Runs each calculator and collects results. Stats that return None
+        (due to insufficient data) are skipped.
+        """
+        stats = {}
+
+        for stat_name, calculator in CALCULATORS.items():
+            try:
+                result = calculator(
+                    self._engine, user_id, chat_id, window_start, window_end
+                )
+                if result is not None:
+                    stats[stat_name] = result.value
+            except Exception as e:
+                logger.warning(
+                    f"Calculator {stat_name} failed for user {user_id}: {e}"
+                )
+
+        return stats
+
+    @function_trace(name="compute_trends", group="CardGenerator")
+    def _compute_trends(
+        self,
+        user_id: int,
+        chat_id: int,
+        current_stats: dict,
+        prev_week_start: datetime,
+    ) -> dict | None:
+        """
+        Compute trends by comparing current week to previous week.
+
+        Only computes trends for stats that support it (mood, activity).
+        """
+        # Get previous week's card
+        prev_card = self._get_previous_card(user_id, chat_id, prev_week_start)
+        if not prev_card:
+            return None
+
+        prev_stats = prev_card.get("stats", {})
+        trends = {}
+
+        # Mood trend
+        if "mood" in current_stats and "mood" in prev_stats:
+            curr_mood = current_stats["mood"].get("score", 0)
+            prev_mood = prev_stats["mood"].get("score", 0)
+            delta = round(curr_mood - prev_mood, 1)
+            direction = "up" if delta > 0 else "down" if delta < 0 else "stable"
+            trends["mood"] = {"delta": delta, "direction": direction}
+
+        # Activity trend (message count)
+        if "activity" in current_stats and "activity" in prev_stats:
+            curr_msgs = current_stats["activity"].get("messages", 0)
+            prev_msgs = prev_stats["activity"].get("messages", 0)
+            delta = curr_msgs - prev_msgs
+            direction = "up" if delta > 0 else "down" if delta < 0 else "stable"
+            trends["activity"] = {"delta": delta, "direction": direction}
+
+        return trends if trends else None
+
+    def _get_previous_card(
+        self, user_id: int, chat_id: int, week_start: datetime
+    ) -> dict | None:
+        """Get the card from the previous week."""
+        query = """
+            SELECT stats
+            FROM ml_user_cards
+            WHERE user_id = :user_id
+              AND chat_id = :chat_id
+              AND week_start = :week_start
+        """
+        with self._engine.connect() as conn:
+            result = conn.execute(
+                text(query),
+                {"user_id": user_id, "chat_id": chat_id, "week_start": week_start},
+            )
+            row = result.mappings().fetchone()
+            if row:
+                stats = row["stats"]
+                if isinstance(stats, str):
+                    stats = json.loads(stats)
+                return {"stats": stats}
+            return None
+
+    @function_trace(name="upsert_card", group="CardGenerator")
+    def _upsert_card(
+        self,
+        user_id: int,
+        chat_id: int,
+        week_start: datetime,
+        week_end: datetime,
+        stats_window_start: datetime,
+        stats_window_end: datetime,
+        stats: dict,
+        trends: dict | None,
+        messages_analyzed: int,
+    ) -> bool:
+        """Upsert a user card into the database."""
+        query = """
+            INSERT INTO ml_user_cards (
+                user_id, chat_id, week_start, week_end,
+                stats_window_start, stats_window_end,
+                stats, trends, messages_analyzed,
+                card_version, generated_at
+            ) VALUES (
+                :user_id, :chat_id, :week_start, :week_end,
+                :stats_window_start, :stats_window_end,
+                :stats, :trends, :messages_analyzed,
+                1, NOW()
+            )
+            ON CONFLICT (user_id, chat_id, week_start)
+            DO UPDATE SET
+                week_end = EXCLUDED.week_end,
+                stats_window_start = EXCLUDED.stats_window_start,
+                stats_window_end = EXCLUDED.stats_window_end,
+                stats = EXCLUDED.stats,
+                trends = EXCLUDED.trends,
+                messages_analyzed = EXCLUDED.messages_analyzed,
+                card_version = ml_user_cards.card_version + 1,
+                generated_at = NOW()
+        """
+        try:
+            with self._engine.connect() as conn:
+                conn.execute(
+                    text(query),
+                    {
+                        "user_id": user_id,
+                        "chat_id": chat_id,
+                        "week_start": week_start.date(),
+                        "week_end": week_end.date(),
+                        "stats_window_start": stats_window_start.date(),
+                        "stats_window_end": stats_window_end.date(),
+                        "stats": json.dumps(stats),
+                        "trends": json.dumps(trends) if trends else None,
+                        "messages_analyzed": messages_analyzed,
+                    },
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to upsert card for user {user_id}: {e}")
+            return False
+
+    @function_trace(name="generate_cards", group="CardGenerator")
+    def generate_cards(
+        self,
+        chat_id: int,
+        week_start: datetime | None = None,
+        min_messages: int = 10,
+    ) -> dict:
+        """
+        Generate cards for all active users in a chat.
+
+        Args:
+            chat_id: Target chat ID
+            week_start: Week to generate cards for (default: current week)
+            min_messages: Minimum messages required for card generation
+
+        Returns:
+            Dict with generation stats
+        """
+        # Calculate week bounds
+        if week_start is None:
+            # Use current week (Monday)
+            today = datetime.now()
+            week_start = today - timedelta(days=today.weekday())
+
+        week_start, week_end = self._get_week_bounds(week_start)
+        window_start, window_end = self._get_window_bounds(week_end)
+
+        logger.info(f"Generating cards for chat {chat_id}")
+        logger.info(f"Week: {week_start.date()} - {week_end.date()}")
+        logger.info(f"Stats window: {window_start.date()} - {window_end.date()}")
+
+        # Get active users
+        active_users = self._get_active_users(chat_id, window_start, window_end)
+        logger.info(f"Found {len(active_users)} active users")
+
+        # Calculate previous week for trends
+        prev_week_start = week_start - timedelta(days=7)
+
+        # Generate cards
+        generated = 0
+        skipped = 0
+
+        for user_id in active_users:
+            # Check message count
+            msg_count = self._get_user_message_count(
+                user_id, chat_id, window_start, window_end
+            )
+            if msg_count < min_messages:
+                logger.debug(
+                    f"Skipping user {user_id}: only {msg_count} messages "
+                    f"(min: {min_messages})"
+                )
+                skipped += 1
+                continue
+
+            # Compute stats
+            stats = self._compute_stats(user_id, chat_id, window_start, window_end)
+            if not stats:
+                logger.debug(f"Skipping user {user_id}: no stats computed")
+                skipped += 1
+                continue
+
+            # Compute trends
+            trends = self._compute_trends(user_id, chat_id, stats, prev_week_start)
+
+            # Upsert card
+            if self._upsert_card(
+                user_id=user_id,
+                chat_id=chat_id,
+                week_start=week_start,
+                week_end=week_end,
+                stats_window_start=window_start,
+                stats_window_end=window_end,
+                stats=stats,
+                trends=trends,
+                messages_analyzed=msg_count,
+            ):
+                generated += 1
+                logger.debug(f"Generated card for user {user_id}")
+            else:
+                skipped += 1
+
+        logger.info(f"Card generation complete: {generated} generated, {skipped} skipped")
+
+        return {
+            "week_start": week_start.date().isoformat(),
+            "week_end": week_end.date().isoformat(),
+            "window_start": window_start.date().isoformat(),
+            "window_end": window_end.date().isoformat(),
+            "active_users": len(active_users),
+            "generated": generated,
+            "skipped": skipped,
+        }

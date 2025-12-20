@@ -10,9 +10,11 @@ Pages:
 - Sentiment: Sentiment analysis visualizations
 - Topics: Topic clusters and named entities
 - Insights: Humor detection and question analysis
+- Comedy: Funniness rankings and humor analytics
 """
 
 from .activity import create_activity_page
+from .comedy import create_comedy_page
 from .insights import create_insights_page
 from .leaderboard import create_leaderboard_page
 from .my_stats import create_my_stats_page
@@ -30,4 +32,5 @@ __all__ = [
     "create_sentiment_page",
     "create_topics_page",
     "create_insights_page",
+    "create_comedy_page",
 ]

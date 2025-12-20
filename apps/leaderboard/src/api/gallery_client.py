@@ -8,7 +8,6 @@ Provides GalleryClient class for:
 """
 
 import logging
-from typing import Optional
 
 import httpx
 
@@ -72,8 +71,11 @@ class GalleryClient:
             response.raise_for_status()
             data = response.json()
             return data.get("weeks", [])
-        except Exception as e:
-            logger.warning(f"Failed to fetch available weeks for chat {chat_id}: {e}")
+        except httpx.HTTPStatusError as e:
+            logger.warning(f"HTTP error fetching weeks for chat {chat_id}: {e.response.status_code}")
+            return None
+        except httpx.RequestError as e:
+            logger.warning(f"Request error fetching weeks for chat {chat_id}: {e}")
             return None
 
     def get_gallery_images(
@@ -116,9 +118,14 @@ class GalleryClient:
                 img["url"] = url
 
             return images
-        except Exception as e:
+        except httpx.HTTPStatusError as e:
             logger.warning(
-                f"Failed to fetch gallery images for chat {chat_id}, week {week_start}: {e}"
+                f"HTTP error fetching gallery images for chat {chat_id}, week {week_start}: {e.response.status_code}"
+            )
+            return None
+        except httpx.RequestError as e:
+            logger.warning(
+                f"Request error fetching gallery images for chat {chat_id}, week {week_start}: {e}"
             )
             return None
 
@@ -151,8 +158,11 @@ class GalleryClient:
             response.raise_for_status()
             data = response.json()
             return data.get("url")
-        except Exception as e:
-            logger.warning(f"Failed to fetch image URL for image {image_id}: {e}")
+        except httpx.HTTPStatusError as e:
+            logger.warning(f"HTTP error fetching image URL for image {image_id}: {e.response.status_code}")
+            return None
+        except httpx.RequestError as e:
+            logger.warning(f"Request error fetching image URL for image {image_id}: {e}")
             return None
 
     def close(self):

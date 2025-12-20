@@ -15,6 +15,7 @@ from dash import html
 
 from src.charts import get_chart_colors
 from src.components import create_group_nav, get_period_dates
+from src.utils import format_number
 
 # Metric options for the selector
 METRICS = [
@@ -383,7 +384,7 @@ def _create_leaderboard_table(
                     ),
                     dmc.TableTd(
                         dmc.Text(
-                            _format_number(user["score"]),
+                            format_number(user["score"]),
                             size="sm",
                             fw=500,
                         ),
@@ -409,15 +410,3 @@ def _create_leaderboard_table(
             dmc.TableTbody(rows),
         ],
     )
-
-
-def _format_number(n: int | float) -> str:
-    """Format number with K/M suffix for large values."""
-    if n is None:
-        return "0"
-    n = int(n)
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M"
-    elif n >= 1_000:
-        return f"{n / 1_000:.1f}K"
-    return str(n)

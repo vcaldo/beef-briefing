@@ -12,7 +12,9 @@ import logging
 from dash import html
 from flask import Blueprint, g, make_response, redirect, render_template_string, request
 
+from src.auth.service import SESSION_MAX_AGE_DAYS
 from src.pages import create_login_page
+from src.themes.base import GOOGLE_FONTS_URL
 
 logger = logging.getLogger(__name__)
 
@@ -162,26 +164,16 @@ def logout():
 
 def _get_dashboard_url() -> str:
     """Get URL for main dashboard."""
-    # In production, Traefik handles the path prefix
-    if _config.is_production():
-        return _config.leaderboard_path + "/"
     return _config.leaderboard_path + "/"
 
 
 def _get_login_url() -> str:
     """Get URL for login page."""
-    if _config.is_production():
-        return _config.leaderboard_path + "/login"
     return _config.leaderboard_path + "/login"
 
 
 def _get_callback_url() -> str:
     """Get full URL for OAuth callback."""
-    # The callback URL needs to be absolute for Telegram
-    # In production, use the DOMAIN from headers or config
-    # For now, use a relative path that Telegram will resolve
-    if _config.is_production():
-        return _config.leaderboard_path + "/auth/callback"
     return _config.leaderboard_path + "/auth/callback"
 
 
@@ -193,24 +185,12 @@ def _set_session_cookie(response, session_id: str) -> None:
         httponly=True,
         secure=_config.is_production(),
         samesite="Lax",
-        max_age=7 * 24 * 60 * 60,  # 7 days
+        max_age=SESSION_MAX_AGE_DAYS * 24 * 60 * 60,
     )
 
 
 def _render_login_page(layout) -> str:
     """Render login page HTML with theme support."""
-    # Google Fonts for all themes
-    google_fonts = (
-        "https://fonts.googleapis.com/css2?"
-        "family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700"
-        "&family=Atkinson+Hyperlegible:wght@400;700"
-        "&family=Bebas+Neue"
-        "&family=Source+Sans+3:wght@400;600"
-        "&family=Righteous"
-        "&family=DM+Sans:wght@400;500;600"
-        "&display=swap"
-    )
-
     html_template = """
     <!DOCTYPE html>
     <html>
@@ -362,23 +342,13 @@ def _render_login_page(layout) -> str:
     </script>
     """
 
-    return render_template_string(html_template, telegram_script=telegram_script, google_fonts=google_fonts)
+    return render_template_string(
+        html_template, telegram_script=telegram_script, google_fonts=GOOGLE_FONTS_URL
+    )
 
 
 def _render_error_page(message: str) -> str:
     """Render error page HTML with theme support."""
-    # Google Fonts for all themes
-    google_fonts = (
-        "https://fonts.googleapis.com/css2?"
-        "family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700"
-        "&family=Atkinson+Hyperlegible:wght@400;700"
-        "&family=Bebas+Neue"
-        "&family=Source+Sans+3:wght@400;600"
-        "&family=Righteous"
-        "&family=DM+Sans:wght@400;500;600"
-        "&display=swap"
-    )
-
     html_template = """
     <!DOCTYPE html>
     <html>
@@ -500,4 +470,6 @@ def _render_error_page(message: str) -> str:
     </html>
     """
 
-    return render_template_string(html_template, message=message, login_url=_get_login_url(), google_fonts=google_fonts)
+    return render_template_string(
+        html_template, message=message, login_url=_get_login_url(), google_fonts=GOOGLE_FONTS_URL
+    )

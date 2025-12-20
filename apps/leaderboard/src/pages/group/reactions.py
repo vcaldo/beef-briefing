@@ -14,6 +14,7 @@ from dash import html
 
 from src.charts import get_chart_colors
 from src.components import create_group_nav, get_period_dates
+from src.utils import format_number
 
 
 def create_reactions_page(
@@ -123,7 +124,7 @@ def create_reactions_page(
             # Summary cards
             dmc.SimpleGrid(
                 [
-                    _create_summary_card("Total Reactions", _format_number(total_reactions)),
+                    _create_summary_card("Total Reactions", format_number(total_reactions)),
                     _create_summary_card("Unique Emoji", str(unique_emoji)),
                     _create_summary_card("Reactions/Message", f"{reactions_per_msg:.2f}"),
                 ],
@@ -193,7 +194,7 @@ def _create_reactions_bar_card(data: list, colors: dict) -> dmc.Paper:
                             style={"flex": 1},
                         ),
                         dmc.Text(
-                            _format_number(item["count"]),
+                            format_number(item["count"]),
                             size="sm",
                             fw=500,
                             miw=60,
@@ -293,7 +294,7 @@ def _create_user_tables_card(
                         ),
                         dmc.TableTd(
                             dmc.Text(
-                                _format_number(user["score"]),
+                                format_number(user["score"]),
                                 size="sm",
                                 fw=500,
                             ),
@@ -357,15 +358,3 @@ def _create_user_tables_card(
         p="md",
         withBorder=True,
     )
-
-
-def _format_number(n: int | float) -> str:
-    """Format number with K/M suffix for large values."""
-    if n is None:
-        return "0"
-    n = int(n)
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M"
-    elif n >= 1_000:
-        return f"{n / 1_000:.1f}K"
-    return str(n)

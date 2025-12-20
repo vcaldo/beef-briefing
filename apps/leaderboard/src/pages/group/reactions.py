@@ -191,7 +191,7 @@ def _create_reactions_bar_card(data: list, colors: dict) -> dmc.Paper:
                                 radius="xl",
                                 color=colors["primary"],
                             ),
-                            style={"flex": 1},
+                            flex=1,
                         ),
                         dmc.Text(
                             format_number(item["count"]),
@@ -260,7 +260,7 @@ def _create_user_tables_card(
                     dmc.TableTd(
                         dmc.Text("No data", c="dimmed", size="sm"),
                         colSpan=3,
-                        style={"textAlign": "center"},
+                        ta="center",
                     )
                 )
             ]
@@ -298,7 +298,7 @@ def _create_user_tables_card(
                                 size="sm",
                                 fw=500,
                             ),
-                            style={"textAlign": "right"},
+                            ta="right",
                         ),
                     ]
                 )
@@ -312,9 +312,9 @@ def _create_user_tables_card(
             dmc.TableThead(
                 dmc.TableTr(
                     [
-                        dmc.TableTh("#", style={"width": "50px"}),
+                        dmc.TableTh("#", w="50px"),
                         dmc.TableTh("User"),
-                        dmc.TableTh("Sent", style={"textAlign": "right"}),
+                        dmc.TableTh("Sent", ta="right"),
                     ]
                 )
             ),
@@ -329,9 +329,9 @@ def _create_user_tables_card(
             dmc.TableThead(
                 dmc.TableTr(
                     [
-                        dmc.TableTh("#", style={"width": "50px"}),
+                        dmc.TableTh("#", w="50px"),
                         dmc.TableTh("User"),
-                        dmc.TableTh("Received", style={"textAlign": "right"}),
+                        dmc.TableTh("Received", ta="right"),
                     ]
                 )
             ),

@@ -466,7 +466,7 @@ def _create_reactions_card(reactions: list, colors: dict) -> dmc.Paper:
                                 radius="xl",
                                 color=colors["primary"],
                             ),
-                            style={"flex": 1},
+                            flex=1,
                         ),
                         dmc.Text(
                             format_number(count),
@@ -525,7 +525,7 @@ def _create_reply_stats_card(
                                 size="sm",
                                 lineClamp=1,
                             ),
-                            style={"flex": 1},
+                            flex=1,
                         ),
                         dmc.Badge(
                             str(p["count"]),
@@ -766,7 +766,7 @@ def _create_sentiment_card(sentiment_stats: dict, colors: dict) -> dmc.Paper:
                                         else None,
                                     ],
                                     gap=0,
-                                    style={"width": "100%"},
+                                    w="100%",
                                 ),
                                 # Legend with counts
                                 dmc.Group(
@@ -776,10 +776,8 @@ def _create_sentiment_card(sentiment_stats: dict, colors: dict) -> dmc.Paper:
                                                 dmc.Box(
                                                     w=12,
                                                     h=12,
-                                                    style={
-                                                        "backgroundColor": SENTIMENT_COLORS["positive"],
-                                                        "borderRadius": "2px",
-                                                    },
+                                                    bg=SENTIMENT_COLORS["positive"],
+                                                    radius="2px",
                                                 ),
                                                 dmc.Text(
                                                     f"Positive: {positive_count} ({pos_pct:.0f}%)",
@@ -793,10 +791,8 @@ def _create_sentiment_card(sentiment_stats: dict, colors: dict) -> dmc.Paper:
                                                 dmc.Box(
                                                     w=12,
                                                     h=12,
-                                                    style={
-                                                        "backgroundColor": SENTIMENT_COLORS["neutral"],
-                                                        "borderRadius": "2px",
-                                                    },
+                                                    bg=SENTIMENT_COLORS["neutral"],
+                                                    radius="2px",
                                                 ),
                                                 dmc.Text(
                                                     f"Neutral: {neutral_count} ({neu_pct:.0f}%)",
@@ -810,10 +806,8 @@ def _create_sentiment_card(sentiment_stats: dict, colors: dict) -> dmc.Paper:
                                                 dmc.Box(
                                                     w=12,
                                                     h=12,
-                                                    style={
-                                                        "backgroundColor": SENTIMENT_COLORS["negative"],
-                                                        "borderRadius": "2px",
-                                                    },
+                                                    bg=SENTIMENT_COLORS["negative"],
+                                                    radius="2px",
                                                 ),
                                                 dmc.Text(
                                                     f"Negative: {negative_count} ({neg_pct:.0f}%)",

@@ -267,9 +267,9 @@ def _create_leaderboard_table(
                 dmc.TableThead(
                     dmc.TableTr(
                         [
-                            dmc.TableTh("#", style={"width": "60px"}),
+                            dmc.TableTh("#", w="60px"),
                             dmc.TableTh("User"),
-                            dmc.TableTh(metric_label, style={"textAlign": "right"}),
+                            dmc.TableTh(metric_label, ta="right"),
                         ]
                     )
                 ),
@@ -279,7 +279,7 @@ def _create_leaderboard_table(
                             dmc.TableTd(
                                 dmc.Text("No users yet", c="dimmed", size="sm"),
                                 colSpan=3,
-                                style={"textAlign": "center"},
+                                ta="center",
                             )
                         )
                     ]
@@ -333,7 +333,7 @@ def _create_leaderboard_table(
         rows.append(
             dmc.TableTr(
                 [
-                    dmc.TableTd(rank_badge, style={"width": "60px"}),
+                    dmc.TableTd(rank_badge, w="60px"),
                     dmc.TableTd(
                         dmc.Group(
                             [
@@ -388,7 +388,7 @@ def _create_leaderboard_table(
                             size="sm",
                             fw=500,
                         ),
-                        style={"textAlign": "right"},
+                        ta="right",
                     ),
                 ]
             )
@@ -401,9 +401,9 @@ def _create_leaderboard_table(
             dmc.TableThead(
                 dmc.TableTr(
                     [
-                        dmc.TableTh("#", style={"width": "60px"}),
+                        dmc.TableTh("#", w="60px"),
                         dmc.TableTh("User"),
-                        dmc.TableTh(metric_label, style={"textAlign": "right"}),
+                        dmc.TableTh(metric_label, ta="right"),
                     ]
                 )
             ),

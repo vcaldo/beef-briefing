@@ -303,7 +303,24 @@ def _create_stats_grid(
     stat_cards = []
 
     for stat_key, config in STAT_CONFIG.items():
-        stat_data = stats.get(stat_key, {})
+        # Special handling for influence - derive from reactions_received
+        if stat_key == "influence":
+            reactions = stats.get("reactions_received", 0)
+            if isinstance(reactions, dict):
+                reactions = reactions.get("count", 0)
+            # Create synthetic stat_data for influence
+            # Use log scale: 0 reactions = 0, 10 = ~25, 100 = ~50, 1000 = ~75
+            if reactions > 0:
+                score = min(100, int(math.log10(max(1, reactions)) * 33))
+            else:
+                score = 0
+            stat_data = {"score": score, "label": f"{reactions} reactions", "count": reactions}
+        else:
+            stat_data = stats.get(stat_key, {})
+            # Handle case where stat_data might be a number (not dict)
+            if not isinstance(stat_data, dict):
+                stat_data = {"score": stat_data}
+
         trend_data = trends.get(stat_key) if trends else None
 
         stat_cards.append(
@@ -344,15 +361,46 @@ def _create_stat_card(
         label = stat_data.get("label", f"{messages} msgs, {active_days} days")
         display_value = str(messages)
     elif stat_key == "chronotype":
-        # Chronotype doesn't have a numeric score
-        label = stat_data.get("label", "Unknown")
+        # Chronotype uses "type" field, not "label"
+        label = stat_data.get("type", stat_data.get("label", "Unknown"))
         peak_hour = stat_data.get("peak_hour")
         score = None  # No ring progress for chronotype
         display_value = label
         if peak_hour is not None:
             display_value = f"{label} ({_format_hour(peak_hour)})"
+    elif stat_key == "toxicity":
+        # Toxicity uses "pct" field, not "score"
+        score = stat_data.get("pct", stat_data.get("score", 0))
+        if isinstance(score, (int, float)):
+            score = float(score)
+        else:
+            score = 0
+        label = stat_data.get("label", "")
+        display_value = f"{int(score)}"
+    elif stat_key in ("comedy", "volatility"):
+        # Comedy and volatility scores are 0-1 scale, convert to 0-100
+        score = stat_data.get("score", 0)
+        if isinstance(score, (int, float)):
+            score = float(score)
+            # If score is <= 1, assume it's 0-1 scale and convert to percentage
+            if score <= 1:
+                score = score * 100
+        else:
+            score = 0
+        label = stat_data.get("label", "")
+        display_value = f"{int(score)}"
+    elif stat_key == "influence":
+        # Influence is derived from reactions_received (stored at top level of stats)
+        # We need to get this from the parent stats dict, passed via stat_data
+        score = stat_data.get("score", 0)
+        if isinstance(score, (int, float)):
+            score = float(score)
+        else:
+            score = 0
+        label = stat_data.get("label", "")
+        display_value = f"{int(score)}" if score > 0 else "N/A"
     else:
-        # Standard scored stats (mood, comedy, influence, volatility, toxicity)
+        # Standard scored stats (mood)
         score = stat_data.get("score", 0)
         if isinstance(score, (int, float)):
             score = float(score)

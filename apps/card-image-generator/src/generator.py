@@ -104,6 +104,9 @@ class CardGenerator:
         # Get card data from database
         cards = self.queries.get_cards_for_chat_week(chat_id, week_start, user_ids)
 
+        # Get category rankings for top 3 badges
+        category_rankings = self.queries.get_category_rankings(chat_id, week_start)
+
         if not cards:
             logger.warning(f"No cards found for chat {chat_id} week {week_start}")
             return BatchRenderResult(
@@ -157,6 +160,7 @@ class CardGenerator:
                     template_version=template_version,
                     rank=rank,
                     base_url=base_url,
+                    category_rankings=category_rankings,
                 )
                 results.append(result)
                 if result.status == "generated":
@@ -191,6 +195,7 @@ class CardGenerator:
         template_version: int,
         rank: int,
         base_url: str,
+        category_rankings: dict[str, dict[int, int]] | None = None,
     ) -> RenderResult:
         """Render a single card image."""
         user_id = card_data["user_id"]
@@ -211,7 +216,7 @@ class CardGenerator:
 
         # Transform data to template context
         context = self.template_loader.transform_card_data(
-            card_data, theme=theme, rank=rank
+            card_data, theme=theme, rank=rank, category_rankings=category_rankings
         )
 
         # Render HTML

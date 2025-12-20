@@ -248,7 +248,7 @@ class CardGenerator:
         with self._engine.connect() as conn:
             result = conn.execute(
                 text(query),
-                {"user_id": user_id, "chat_id": chat_id, "week_start": week_start},
+                {"user_id": user_id, "chat_id": chat_id, "week_start": week_start.date()},
             )
             row = result.mappings().fetchone()
             if row:

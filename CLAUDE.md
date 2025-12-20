@@ -226,6 +226,42 @@ Generates a secure random API key for each application. Keys are stored in two l
 
 This structure allows each container to mount its own secrets directory without collisions. All `/api/v1/*` endpoints require authentication via `Authorization: Bearer <key>` header. Only `/health` is unauthenticated (for load balancer health checks).
 
+### OpenAI Rate Limiting (ML Processor)
+
+The ML processor service includes built-in rate limiting for OpenAI API calls to comply with tier limits. Rate limiting is enabled by default with Tier 1 limits.
+
+**Configuration** (in `.env.dev` or `.env.prod`):
+```bash
+# Enable/disable rate limiting
+OPENAI_RATE_LIMIT_ENABLED=true
+OPENAI_RATE_LIMIT_TIMEOUT=120.0  # Max wait time for capacity (seconds)
+
+# gpt-4o-mini limits (sentiment, humor, questions, NER analyzers)
+OPENAI_GPT4O_MINI_TPM=200000     # Tokens per minute
+OPENAI_GPT4O_MINI_RPM=500        # Requests per minute
+
+# text-embedding-3-small limits (embeddings, topics analyzers)
+OPENAI_EMBEDDING_TPM=1000000
+OPENAI_EMBEDDING_RPM=3000
+
+# omni-moderation-latest limits (toxicity analyzer)
+OPENAI_MODERATION_TPM=10000
+OPENAI_MODERATION_RPM=500
+```
+
+**OpenAI Tier Limits Reference**:
+| Tier | gpt-4o-mini TPM | gpt-4o-mini RPM | Embedding TPM | Embedding RPM |
+|------|-----------------|-----------------|---------------|---------------|
+| 1    | 200,000         | 500             | 1,000,000     | 3,000         |
+| 2    | 2,000,000       | 5,000           | 1,000,000     | 5,000         |
+| 3    | 4,000,000       | 5,000           | 5,000,000     | 5,000         |
+
+**How it works**:
+- Uses token bucket algorithm for both RPM and TPM limits per model
+- Multiple analyzers sharing the same model (e.g., sentiment, humor, questions, NER all use gpt-4o-mini) coordinate through a shared rate limiter
+- When limits are reached, requests wait until capacity is available (up to timeout)
+- Token usage is estimated before requests and adjusted after based on actual usage
+
 ## Import CLI Usage
 
 Import Telegram Desktop exports into the system:

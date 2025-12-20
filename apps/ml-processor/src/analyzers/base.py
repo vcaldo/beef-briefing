@@ -5,6 +5,8 @@ Implements the Strategy pattern with lazy loading to minimize
 resource usage when certain providers are not needed.
 """
 
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -12,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from config import Config
+    from src.ratelimit import OpenAIRateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +165,37 @@ class AnalyzerRegistry:
         """
         self.config = config
         self._analyzers: dict[AnalysisType, Analyzer] = {}
+        self._rate_limiter: OpenAIRateLimiter | None = None
+
+    def _get_rate_limiter(self) -> OpenAIRateLimiter | None:
+        """Get or create the shared rate limiter for OpenAI analyzers."""
+        if not self.config.openai_rate_limit_enabled:
+            return None
+
+        if self._rate_limiter is None:
+            from src.ratelimit import ModelLimits, OpenAIRateLimiter
+
+            limits = {
+                "gpt-4o-mini": ModelLimits(
+                    "gpt-4o-mini",
+                    self.config.openai_gpt4o_mini_tpm,
+                    self.config.openai_gpt4o_mini_rpm,
+                ),
+                "text-embedding-3-small": ModelLimits(
+                    "text-embedding-3-small",
+                    self.config.openai_embedding_tpm,
+                    self.config.openai_embedding_rpm,
+                ),
+                "omni-moderation-latest": ModelLimits(
+                    "omni-moderation-latest",
+                    self.config.openai_moderation_tpm,
+                    self.config.openai_moderation_rpm,
+                ),
+            }
+            self._rate_limiter = OpenAIRateLimiter(limits)
+            logger.info("OpenAI rate limiter initialized with configured limits")
+
+        return self._rate_limiter
 
     def _get_provider_for_type(self, analysis_type: AnalysisType) -> str:
         """Get the configured provider for an analysis type."""
@@ -200,6 +234,8 @@ class AnalyzerRegistry:
                     api_key=self.config.openai_api_key,
                     max_retries=self.config.openai_max_retries,
                     timeout=self.config.openai_timeout,
+                    rate_limiter=self._get_rate_limiter(),
+                    rate_limit_timeout=self.config.openai_rate_limit_timeout,
                 )
             elif provider == "anthropic":
                 from src.analyzers.sentiment import AnthropicSentimentAnalyzer
@@ -228,6 +264,8 @@ class AnalyzerRegistry:
                     api_key=self.config.openai_api_key,
                     max_retries=self.config.openai_max_retries,
                     timeout=self.config.openai_timeout,
+                    rate_limiter=self._get_rate_limiter(),
+                    rate_limit_timeout=self.config.openai_rate_limit_timeout,
                 )
 
         # ===== TOPICS =====
@@ -243,6 +281,8 @@ class AnalyzerRegistry:
                     api_key=self.config.openai_api_key,
                     max_retries=self.config.openai_max_retries,
                     timeout=self.config.openai_timeout,
+                    rate_limiter=self._get_rate_limiter(),
+                    rate_limit_timeout=self.config.openai_rate_limit_timeout,
                 )
 
         # ===== NER =====
@@ -258,6 +298,8 @@ class AnalyzerRegistry:
                     api_key=self.config.openai_api_key,
                     max_retries=self.config.openai_max_retries,
                     timeout=self.config.openai_timeout,
+                    rate_limiter=self._get_rate_limiter(),
+                    rate_limit_timeout=self.config.openai_rate_limit_timeout,
                 )
 
         # ===== EMBEDDINGS =====
@@ -276,6 +318,8 @@ class AnalyzerRegistry:
                     api_key=self.config.openai_api_key,
                     max_retries=self.config.openai_max_retries,
                     timeout=self.config.openai_timeout,
+                    rate_limiter=self._get_rate_limiter(),
+                    rate_limit_timeout=self.config.openai_rate_limit_timeout,
                 )
 
         # ===== HUMOR =====
@@ -291,6 +335,8 @@ class AnalyzerRegistry:
                     api_key=self.config.openai_api_key,
                     max_retries=self.config.openai_max_retries,
                     timeout=self.config.openai_timeout,
+                    rate_limiter=self._get_rate_limiter(),
+                    rate_limit_timeout=self.config.openai_rate_limit_timeout,
                 )
 
         # ===== QUESTIONS =====
@@ -309,6 +355,8 @@ class AnalyzerRegistry:
                     api_key=self.config.openai_api_key,
                     max_retries=self.config.openai_max_retries,
                     timeout=self.config.openai_timeout,
+                    rate_limiter=self._get_rate_limiter(),
+                    rate_limit_timeout=self.config.openai_rate_limit_timeout,
                 )
 
         raise ValueError(f"Unknown provider '{provider}' for {analysis_type}")

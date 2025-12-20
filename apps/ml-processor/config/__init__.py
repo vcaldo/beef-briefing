@@ -40,6 +40,19 @@ class Config(BaseSettings):
     openai_max_retries: int = 5
     openai_timeout: float = 60.0
 
+    # OpenAI Rate Limiting Configuration (Tier 1 defaults)
+    openai_rate_limit_enabled: bool = True
+    openai_rate_limit_timeout: float = 120.0  # Max wait time for capacity
+    # gpt-4o-mini limits (shared by sentiment, humor, questions, NER)
+    openai_gpt4o_mini_tpm: int = 200_000
+    openai_gpt4o_mini_rpm: int = 500
+    # text-embedding-3-small limits (embeddings, topics)
+    openai_embedding_tpm: int = 1_000_000
+    openai_embedding_rpm: int = 3_000
+    # omni-moderation-latest limits (toxicity)
+    openai_moderation_tpm: int = 10_000
+    openai_moderation_rpm: int = 500
+
     # New Relic APM Configuration (optional)
     new_relic_app_name: Optional[str] = None
     new_relic_license_key: Optional[str] = None

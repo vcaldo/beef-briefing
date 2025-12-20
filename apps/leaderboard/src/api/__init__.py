@@ -1,14 +1,17 @@
 """
-API client for fetching presigned photo URLs from api-service.
+API clients for fetching data from api-service.
 
-Provides PhotoClient class for fetching user and chat profile photos
-with batch support and graceful error handling.
+Provides:
+- PhotoClient: Fetch user and chat profile photos with presigned URLs
+- CardClient: Fetch weekly user personality cards with stats and trends
 """
 
 import logging
 from typing import Optional
 
 import httpx
+
+from src.api.card_client import CardClient
 
 logger = logging.getLogger(__name__)
 
@@ -144,4 +147,4 @@ class PhotoClient:
             self._client = None
 
 
-__all__ = ["PhotoClient"]
+__all__ = ["PhotoClient", "CardClient"]

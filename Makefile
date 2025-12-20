@@ -437,6 +437,9 @@ ml-run-continuous: ## Run continuous processing (dev)
 ml-run-cards: ## Generate weekly user cards (dev)
 	./scripts/ml-processor.sh cards $(ML_ARGS)
 
+ml-run-render: ## Render card images (dev)
+	./scripts/ml-processor.sh render $(ML_ARGS)
+
 # Production (requires: make pg-tunnel in another terminal)
 ml-run-prod: ## Run ml-processor batch processing (prod)
 	./scripts/ml-processor.sh --prod process $(ML_ARGS)
@@ -452,6 +455,9 @@ ml-run-continuous-prod: ## Run continuous processing (prod)
 
 ml-run-cards-prod: ## Generate weekly user cards (prod)
 	./scripts/ml-processor.sh --prod cards $(ML_ARGS)
+
+ml-run-render-prod: ## Render card images (prod)
+	./scripts/ml-processor.sh --prod render $(ML_ARGS)
 
 # Utility
 ml-shell: ## Open shell in ml-processor container
@@ -547,7 +553,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	tf-ip tf-ssh tf-ssh-user-host tf-arch tf-root-pass \
 	tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage tf-update-ssh-config tf-docs tf-deploy-check \
-	ml-run ml-run-status ml-run-once ml-run-continuous ml-run-cards \
-	ml-run-prod ml-run-status-prod ml-run-once-prod ml-run-continuous-prod ml-run-cards-prod \
+	ml-run ml-run-status ml-run-once ml-run-continuous ml-run-cards ml-run-render \
+	ml-run-prod ml-run-status-prod ml-run-once-prod ml-run-continuous-prod ml-run-cards-prod ml-run-render-prod \
 	ml-shell ml-clean-dev ml-clean-prod ml-clean-cards-dev ml-clean-cards-prod \
 	mc-setup-prod

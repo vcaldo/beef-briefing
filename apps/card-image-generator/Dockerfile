@@ -13,7 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY apps/card-image-generator/requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+# Install to /usr/local (global) instead of --user for multi-stage compatibility
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Runtime stage
 FROM python:3.12-slim
@@ -47,21 +48,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy installed packages from builder
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
-
-# Install Playwright browsers (Chromium only)
-RUN playwright install chromium
-
-# Copy application code
-COPY apps/card-image-generator/config ./config
-COPY apps/card-image-generator/src ./src
-COPY apps/card-image-generator/templates ./templates
-COPY apps/card-image-generator/main.py .
+# Copy installed packages from builder (global site-packages)
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Create non-root user for security
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+RUN useradd -m -u 1000 appuser
+
+# Install Playwright browsers as appuser
+USER appuser
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright
+RUN playwright install chromium
+
+# Switch back to root to copy app files with correct ownership
+USER root
+
+# Copy application code
+COPY --chown=appuser:appuser apps/card-image-generator/config ./config
+COPY --chown=appuser:appuser apps/card-image-generator/src ./src
+COPY --chown=appuser:appuser apps/card-image-generator/templates ./templates
+COPY --chown=appuser:appuser apps/card-image-generator/main.py .
+
 USER appuser
 
 EXPOSE 8051

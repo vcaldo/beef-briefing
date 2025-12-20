@@ -247,11 +247,11 @@ class TemplateLoader:
         Returns:
             TemplateContext ready for template rendering
         """
-        stats_raw = card_data.get("stats", {})
+        stats_raw = card_data.get("stats") or {}
         if isinstance(stats_raw, str):
             stats_raw = json.loads(stats_raw)
 
-        trends_raw = card_data.get("trends", {})
+        trends_raw = card_data.get("trends") or {}
         if isinstance(trends_raw, str):
             trends_raw = json.loads(trends_raw)
 

@@ -11,9 +11,11 @@ Pages:
 - Topics: Topic clusters and named entities
 - Insights: Humor detection and question analysis
 - Comedy: Funniness rankings and humor analytics
+- Card: Weekly user personality cards with ML stats
 """
 
 from .activity import create_activity_page
+from .card import create_card_page
 from .comedy import create_comedy_page
 from .insights import create_insights_page
 from .leaderboard import create_leaderboard_page
@@ -33,4 +35,5 @@ __all__ = [
     "create_topics_page",
     "create_insights_page",
     "create_comedy_page",
+    "create_card_page",
 ]

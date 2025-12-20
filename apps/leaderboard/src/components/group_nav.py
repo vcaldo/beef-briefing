@@ -28,6 +28,7 @@ TABS = [
     {"value": "topics", "label": "Topics", "icon": "mdi:tag-multiple-outline"},
     {"value": "insights", "label": "Insights", "icon": "mdi:lightbulb-outline"},
     {"value": "comedy", "label": "Comedy", "icon": "mdi:emoticon-lol-outline"},
+    {"value": "card", "label": "Card", "icon": "mdi:card-account-details-outline"},
 ]
 
 

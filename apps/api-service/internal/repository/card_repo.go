@@ -34,6 +34,7 @@ type UserCard struct {
 	Stats            json.RawMessage `json:"stats"`
 	Trends           json.RawMessage `json:"trends,omitempty"`
 	MessagesAnalyzed int             `json:"messages_analyzed"`
+	Timezone         *string         `json:"timezone,omitempty"`
 	CardVersion      int             `json:"card_version"`
 	GeneratedAt      time.Time       `json:"generated_at"`
 }
@@ -96,7 +97,7 @@ func (r *CardRepository) GetUserCard(
 			SELECT id, user_id, chat_id, week_start, week_end,
 			       stats_window_start, stats_window_end,
 			       stats, trends, messages_analyzed,
-			       card_version, generated_at
+			       timezone, card_version, generated_at
 			FROM ml_user_cards
 			WHERE user_id = $1 AND chat_id = $2 AND week_start = $3
 		`
@@ -106,7 +107,7 @@ func (r *CardRepository) GetUserCard(
 			SELECT id, user_id, chat_id, week_start, week_end,
 			       stats_window_start, stats_window_end,
 			       stats, trends, messages_analyzed,
-			       card_version, generated_at
+			       timezone, card_version, generated_at
 			FROM ml_user_cards
 			WHERE user_id = $1 AND chat_id = $2
 			ORDER BY week_start DESC
@@ -123,7 +124,7 @@ func (r *CardRepository) GetUserCard(
 		&card.WeekStart, &card.WeekEnd,
 		&card.StatsWindowStart, &card.StatsWindowEnd,
 		&statsJSON, &trendsJSON, &card.MessagesAnalyzed,
-		&card.CardVersion, &card.GeneratedAt,
+		&card.Timezone, &card.CardVersion, &card.GeneratedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -288,7 +289,7 @@ func (r *CardRepository) GetUserHistory(
 		SELECT id, user_id, chat_id, week_start, week_end,
 		       stats_window_start, stats_window_end,
 		       stats, trends, messages_analyzed,
-		       card_version, generated_at
+		       timezone, card_version, generated_at
 		FROM ml_user_cards
 		WHERE user_id = $1 AND chat_id = $2
 		ORDER BY week_start DESC
@@ -311,7 +312,7 @@ func (r *CardRepository) GetUserHistory(
 			&card.WeekStart, &card.WeekEnd,
 			&card.StatsWindowStart, &card.StatsWindowEnd,
 			&statsJSON, &trendsJSON, &card.MessagesAnalyzed,
-			&card.CardVersion, &card.GeneratedAt,
+			&card.Timezone, &card.CardVersion, &card.GeneratedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan history: %w", err)

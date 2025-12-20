@@ -11,6 +11,7 @@ Design Principles:
 import json
 import logging
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -29,25 +30,37 @@ class CardGenerator:
     ending on the week's end date. Trends compare current week to previous week.
     """
 
-    def __init__(self, engine: Engine, window_days: int = 30):
+    def __init__(self, engine: Engine, timezone: str, window_days: int = 30):
         """
         Initialize the card generator.
 
         Args:
             engine: SQLAlchemy engine
+            timezone: IANA timezone identifier (e.g., 'America/Sao_Paulo')
             window_days: Rolling window size for stats (default: 30)
         """
         self._engine = engine
+        self._timezone = timezone
+        self._tz = ZoneInfo(timezone)
         self._window_days = window_days
 
     def _get_week_bounds(self, week_start: datetime) -> tuple[datetime, datetime]:
-        """Get week start (Monday) and end (Sunday) dates."""
+        """Get week start (Monday 00:00) and end (Sunday 23:59:59) in configured timezone."""
+        # If naive datetime, localize to configured timezone
+        if week_start.tzinfo is None:
+            week_start = week_start.replace(tzinfo=self._tz)
+
         # Ensure week_start is a Monday
         days_since_monday = week_start.weekday()
         if days_since_monday != 0:
             week_start = week_start - timedelta(days=days_since_monday)
 
-        week_end = week_start + timedelta(days=6)
+        # Set to Monday 00:00:00 local time
+        week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Sunday 23:59:59 local time
+        week_end = week_start + timedelta(days=6, hours=23, minutes=59, seconds=59)
+
         return week_start, week_end
 
     def _get_window_bounds(self, week_end: datetime) -> tuple[datetime, datetime]:
@@ -125,7 +138,8 @@ class CardGenerator:
         for stat_name, calculator in CALCULATORS.items():
             try:
                 result = calculator(
-                    self._engine, user_id, chat_id, window_start, window_end
+                    self._engine, user_id, chat_id, window_start, window_end,
+                    timezone=self._timezone,
                 )
                 if result is not None:
                     stats[stat_name] = result.value
@@ -218,12 +232,12 @@ class CardGenerator:
                 user_id, chat_id, week_start, week_end,
                 stats_window_start, stats_window_end,
                 stats, trends, messages_analyzed,
-                card_version, generated_at
+                timezone, card_version, generated_at
             ) VALUES (
                 :user_id, :chat_id, :week_start, :week_end,
                 :stats_window_start, :stats_window_end,
                 :stats, :trends, :messages_analyzed,
-                1, NOW()
+                :timezone, 1, NOW()
             )
             ON CONFLICT (user_id, chat_id, week_start)
             DO UPDATE SET
@@ -233,6 +247,7 @@ class CardGenerator:
                 stats = EXCLUDED.stats,
                 trends = EXCLUDED.trends,
                 messages_analyzed = EXCLUDED.messages_analyzed,
+                timezone = EXCLUDED.timezone,
                 card_version = ml_user_cards.card_version + 1,
                 generated_at = NOW()
         """
@@ -250,6 +265,7 @@ class CardGenerator:
                         "stats": json.dumps(stats),
                         "trends": json.dumps(trends) if trends else None,
                         "messages_analyzed": messages_analyzed,
+                        "timezone": self._timezone,
                     },
                 )
                 conn.commit()
@@ -282,8 +298,8 @@ class CardGenerator:
         """
         # Calculate week bounds
         if week_start is None:
-            # Use current week (Monday)
-            today = datetime.now()
+            # Use current week (Monday) in configured timezone
+            today = datetime.now(self._tz)
             week_start = today - timedelta(days=today.weekday())
 
         week_start, week_end = self._get_week_bounds(week_start)

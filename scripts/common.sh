@@ -22,6 +22,7 @@ IMAGES=(
     "beef-briefing/api-service"
     "beef-briefing/telegram-bot"
     "beef-briefing/leaderboard"
+    "beef-briefing/card-image-generator"
 )
 
 # Required environment variables for deployment

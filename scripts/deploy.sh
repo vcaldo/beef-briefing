@@ -160,11 +160,13 @@ fi
 log_step "Saving images to tarball..."
 IMAGE_TARBALL="/tmp/images-${COMMIT_HASH}.tar.gz"
 
-docker save \
-    "beef-briefing/api-service:$COMMIT_HASH" \
-    "beef-briefing/telegram-bot:$COMMIT_HASH" \
-    "beef-briefing/leaderboard:$COMMIT_HASH" \
-    | gzip > "$IMAGE_TARBALL"
+# Build image list with tags from IMAGES array
+IMAGE_ARGS=""
+for image in "${IMAGES[@]}"; do
+    IMAGE_ARGS="$IMAGE_ARGS $image:$COMMIT_HASH"
+done
+
+docker save $IMAGE_ARGS | gzip > "$IMAGE_TARBALL"
 
 TARBALL_SIZE=$(du -h "$IMAGE_TARBALL" | cut -f1)
 log_success "Image archive created: $TARBALL_SIZE"
@@ -243,8 +245,9 @@ remote_exec "$SSH_HOST" "
     mv /tmp/apps ~/beef-briefing/secrets/
 
     # Start services immediately after secrets are in place
+    # Use --no-build since images are pre-loaded (build context doesn't exist on server)
     echo 'Starting services...'
-    cd ~/beef-briefing && docker compose up -d
+    cd ~/beef-briefing && docker compose up -d --no-build
 
     # Cleanup tarball
     rm /tmp/images-${COMMIT_HASH}.tar.gz

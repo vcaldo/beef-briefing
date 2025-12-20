@@ -490,39 +490,11 @@ ml-clean-prod: ## Clean all ML data (prod - PostgreSQL + Qdrant)
 	@echo "ML data cleaned (prod)"
 
 # Card cleanup targets
-ml-clean-cards-dev: ## Clean cards for a chat (dev). Usage: make ml-clean-cards-dev CHAT_ID=-1003280306634 [WEEK=2024-12-16]
-	@if [ -z "$(CHAT_ID)" ]; then \
-		echo "Error: CHAT_ID is required. Usage: make ml-clean-cards-dev CHAT_ID=-1003280306634 [WEEK=2024-12-16]"; \
-		exit 1; \
-	fi
-	@if [ -n "$(WEEK)" ]; then \
-		echo "Deleting cards for chat $(CHAT_ID), week $(WEEK) (dev)..."; \
-		$(DC) exec -T postgres psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c \
-			"DELETE FROM ml_user_cards WHERE chat_id = $(CHAT_ID) AND week_start = '$(WEEK)'::date;"; \
-	else \
-		echo "Deleting ALL cards for chat $(CHAT_ID) (dev)..."; \
-		$(DC) exec -T postgres psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c \
-			"DELETE FROM ml_user_cards WHERE chat_id = $(CHAT_ID);"; \
-	fi
-	@echo "Cards deleted (dev)"
+ml-clean-cards-dev: ## Clean cards for a chat (dev). Usage: make ml-clean-cards-dev ML_ARGS="--chat-id -1003280306634 [--week 2024-12-16]"
+	./scripts/ml-processor.sh clean-cards $(ML_ARGS)
 
-ml-clean-cards-prod: ## Clean cards for a chat (prod). Usage: make ml-clean-cards-prod CHAT_ID=-1003280306634 [WEEK=2024-12-16]
-	@if [ -z "$(CHAT_ID)" ]; then \
-		echo "Error: CHAT_ID is required. Usage: make ml-clean-cards-prod CHAT_ID=-1003280306634 [WEEK=2024-12-16]"; \
-		exit 1; \
-	fi
-	@if [ -n "$(WEEK)" ]; then \
-		echo "Deleting cards for chat $(CHAT_ID), week $(WEEK) (prod)..."; \
-		ssh $$($(MAKE) -s tf-ssh-user-host) "cd ~/beef-briefing && docker compose exec -T postgres psql -U postgres -d beef_briefing -c \
-			\"DELETE FROM ml_user_cards WHERE chat_id = $(CHAT_ID) AND week_start = '$(WEEK)'::date;\""; \
-	else \
-		echo "WARNING: This will delete ALL cards for chat $(CHAT_ID) in production!"; \
-		read -p "Are you sure? (yes/no): " confirm && [ "$$confirm" = "yes" ] || exit 1; \
-		echo "Deleting ALL cards for chat $(CHAT_ID) (prod)..."; \
-		ssh $$($(MAKE) -s tf-ssh-user-host) "cd ~/beef-briefing && docker compose exec -T postgres psql -U postgres -d beef_briefing -c \
-			\"DELETE FROM ml_user_cards WHERE chat_id = $(CHAT_ID);\""; \
-	fi
-	@echo "Cards deleted (prod)"
+ml-clean-cards-prod: ## Clean cards for a chat (prod). Usage: make ml-clean-cards-prod ML_ARGS="--chat-id -1003280306634 [--week 2024-12-16] [--force]"
+	./scripts/ml-processor.sh --prod clean-cards $(ML_ARGS)
 
 # =============================================================================
 # MINIO CLIENT (mc-*)

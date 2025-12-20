@@ -56,7 +56,7 @@ class CardQueries:
             WHERE c.chat_id = :chat_id
               AND c.week_start = :week_start
               AND (:user_ids IS NULL OR c.user_id = ANY(:user_ids))
-            ORDER BY (c.stats->'mood'->>'score')::numeric DESC NULLS LAST
+            ORDER BY (c.stats->'activity'->>'messages')::numeric DESC NULLS LAST
         """)
 
         with self.engine.connect() as conn:

@@ -204,7 +204,16 @@ def run_status(args, config):
 @background_task(name="generate-cards", group="MLProcessor")
 def run_generate_cards(args, config):
     """Run card generation command."""
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
     logger.info(f"Generating cards for chat {args.chat_id}")
+
+    # Validate timezone
+    try:
+        ZoneInfo(args.timezone)
+    except ZoneInfoNotFoundError:
+        logger.error(f"Invalid timezone: {args.timezone}")
+        raise ValueError(f"Invalid timezone: {args.timezone}. Use IANA format (e.g., America/Sao_Paulo)")
 
     # Parse date arguments
     week_start = parse_date(args.week) if args.week else None
@@ -217,11 +226,13 @@ def run_generate_cards(args, config):
             "week": args.week,
             "window_days": args.window_days,
             "min_messages": args.min_messages,
+            "timezone": args.timezone,
             "from_date": str(from_date.date()) if from_date else None,
             "to_date": str(to_date.date()) if to_date else None,
         }
     )
 
+    logger.info(f"Timezone: {args.timezone}")
     if from_date:
         logger.info(f"From date: {from_date.date()}")
     if to_date:
@@ -233,7 +244,7 @@ def run_generate_cards(args, config):
     # Create generator and run
     from src.cards import CardGenerator
 
-    generator = CardGenerator(engine, window_days=args.window_days)
+    generator = CardGenerator(engine, timezone=args.timezone, window_days=args.window_days)
     result = generator.generate_cards(
         chat_id=args.chat_id,
         week_start=week_start,
@@ -244,6 +255,7 @@ def run_generate_cards(args, config):
 
     # Print results
     print("\nCard Generation Results:")
+    print(f"  Timezone: {args.timezone}")
     print(f"  Week: {result['week_start']} - {result['week_end']}")
     print(f"  Stats window: {result['window_start']} - {result['window_end']}")
     print(f"  Active users: {result['active_users']}")
@@ -477,6 +489,12 @@ def main():
         type=str,
         default=None,
         help="Stats window end date (YYYY-MM-DD). Overrides --window-days",
+    )
+    generate_cards_parser.add_argument(
+        "--timezone",
+        type=str,
+        required=True,
+        help="IANA timezone for week boundaries and chronotype (e.g., America/Sao_Paulo)",
     )
 
     # render-cards command

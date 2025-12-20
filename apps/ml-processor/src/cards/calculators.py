@@ -44,7 +44,8 @@ class StatResult:
 
 
 # Type alias for calculator functions
-StatCalculator = Callable[[Engine, int, int, datetime, datetime], StatResult | None]
+# All calculators receive timezone as a keyword argument (optional, used by chronotype)
+StatCalculator = Callable[..., StatResult | None]
 
 
 def _execute_single(engine: Engine, query: str, params: dict) -> dict | None:
@@ -146,6 +147,7 @@ def calculate_mood(
     chat_id: int,
     window_start: datetime,
     window_end: datetime,
+    timezone: str | None = None,
 ) -> StatResult | None:
     """
     Calculate mood score from sentiment analysis.
@@ -191,6 +193,7 @@ def calculate_volatility(
     chat_id: int,
     window_start: datetime,
     window_end: datetime,
+    timezone: str | None = None,
 ) -> StatResult | None:
     """
     Calculate mood volatility from sentiment variance.
@@ -234,6 +237,7 @@ def calculate_toxicity(
     chat_id: int,
     window_start: datetime,
     window_end: datetime,
+    timezone: str | None = None,
 ) -> StatResult | None:
     """
     Calculate toxicity percentage from toxicity detection.
@@ -278,6 +282,7 @@ def calculate_activity(
     chat_id: int,
     window_start: datetime,
     window_end: datetime,
+    timezone: str | None = None,
 ) -> StatResult | None:
     """
     Calculate activity metrics from messages.
@@ -324,6 +329,7 @@ def calculate_reactions_received(
     chat_id: int,
     window_start: datetime,
     window_end: datetime,
+    timezone: str | None = None,
 ) -> StatResult | None:
     """
     Calculate reactions received on user's messages.
@@ -364,22 +370,27 @@ def calculate_chronotype(
     chat_id: int,
     window_start: datetime,
     window_end: datetime,
+    timezone: str | None = None,
 ) -> StatResult | None:
     """
     Calculate peak activity hour (chronotype).
 
     Returns the hour with most messages and a label.
+    Uses AT TIME ZONE to convert UTC timestamps to local time.
     """
+    # Use timezone if provided, otherwise default to UTC
+    tz = timezone or "UTC"
+
     query = """
         SELECT
-            EXTRACT(HOUR FROM m.date) as hour,
+            EXTRACT(HOUR FROM m.date AT TIME ZONE :timezone) as hour,
             COUNT(*) as count
         FROM messages m
         WHERE m.user_id = :user_id
           AND m.chat_id = :chat_id
           AND m.date >= :window_start
           AND m.date <= :window_end
-        GROUP BY EXTRACT(HOUR FROM m.date)
+        GROUP BY EXTRACT(HOUR FROM m.date AT TIME ZONE :timezone)
         ORDER BY count DESC
         LIMIT 1
     """
@@ -391,6 +402,7 @@ def calculate_chronotype(
             "chat_id": chat_id,
             "window_start": window_start,
             "window_end": window_end,
+            "timezone": tz,
         },
     )
 
@@ -409,6 +421,7 @@ def calculate_comedy(
     chat_id: int,
     window_start: datetime,
     window_end: datetime,
+    timezone: str | None = None,
 ) -> StatResult | None:
     """
     Calculate comedy score combining ML humor detection and laugh reactions.

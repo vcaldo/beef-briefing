@@ -13,7 +13,7 @@ terraform {
 }
 
 provider "linode" {
-  token            = var.linode_token
+  token             = var.linode_token
   obj_use_temp_keys = true
 }
 
@@ -79,11 +79,11 @@ resource "linode_firewall" "beef_briefing_firewall" {
 # Cloud-init script to install Docker and Docker Compose
 locals {
   cloud_init_script = templatefile("${path.module}/cloud-init.yaml", {
-    ssh_public_key           = linode_sshkey.beef_briefing_key.ssh_key
-    hostname                 = var.hostname
-    new_relic_license_key    = var.new_relic_license_key
-    new_relic_account_id     = var.new_relic_account_id
-    new_relic_region         = var.new_relic_region
+    ssh_public_key             = linode_sshkey.beef_briefing_key.ssh_key
+    hostname                   = var.hostname
+    new_relic_license_key      = var.new_relic_license_key
+    new_relic_account_id       = var.new_relic_account_id
+    new_relic_region           = var.new_relic_region
     postgres_volume_label      = var.postgres_volume_label
     postgres_volume_mount_path = var.postgres_volume_mount_path
   })
@@ -152,6 +152,15 @@ resource "linode_domain_record" "beef_briefing_api_record" {
   ttl_sec     = 300
 }
 
+# Cards API subdomain for external card-image-generator access
+resource "linode_domain_record" "beef_briefing_cards_api_record" {
+  domain_id   = linode_domain.beef_briefing_domain.id
+  name        = "cards-api"
+  record_type = "A"
+  target      = tolist(linode_instance.beef_briefing.ipv4)[0]
+  ttl_sec     = 300
+}
+
 # PostgreSQL persistent data volume
 resource "linode_volume" "beef_briefing_postgres_volume" {
   label     = var.postgres_volume_label
@@ -163,9 +172,9 @@ resource "linode_volume" "beef_briefing_postgres_volume" {
 
 # Object Storage bucket for media files
 resource "linode_object_storage_bucket" "telegram_media_bucket" {
-  region  = var.object_storage_region
-  label   = local.object_storage_bucket_label
-  acl     = var.object_storage_acl
+  region = var.object_storage_region
+  label  = local.object_storage_bucket_label
+  acl    = var.object_storage_acl
 
   lifecycle_rule {
     enabled = true

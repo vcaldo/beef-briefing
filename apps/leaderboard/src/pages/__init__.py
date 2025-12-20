@@ -4,7 +4,6 @@ from .landing import create_landing_page
 from .login import create_login_page
 from .group import (
     create_activity_page,
-    create_card_page,
     create_comedy_page,
     create_gallery_page,
     create_insights_page,
@@ -29,6 +28,5 @@ __all__ = [
     "create_topics_page",
     "create_insights_page",
     "create_comedy_page",
-    "create_card_page",
     "create_gallery_page",
 ]

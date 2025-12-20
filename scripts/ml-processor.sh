@@ -22,6 +22,9 @@ DEFAULT_CHAT_ID="-1002572302334"
 PROD_DB_HOST="host.docker.internal"
 PROD_DB_PORT="5433"
 
+# Production card-image-generator (external URL via Traefik)
+PROD_CARD_IMAGE_GENERATOR_URL="https://cards-api.barra-pesada.online"
+
 # Environment overrides for docker exec
 ENV_OVERRIDES=""
 
@@ -32,6 +35,7 @@ Usage: $0 [--prod] <command> [options]
 Environment:
   --prod          Target production database (via SSH tunnel)
                   Requires: make pg-tunnel running in another terminal
+                  Also uses external card-image-generator URL for render command
 
 Commands:
   process     Run batch processing
@@ -104,8 +108,9 @@ main() {
     # Parse --prod flag
     if [[ "$1" == "--prod" ]]; then
         shift
-        ENV_OVERRIDES="-e DB_HOST=$PROD_DB_HOST -e DB_PORT=$PROD_DB_PORT"
+        ENV_OVERRIDES="-e DB_HOST=$PROD_DB_HOST -e DB_PORT=$PROD_DB_PORT -e CARD_IMAGE_GENERATOR_URL=$PROD_CARD_IMAGE_GENERATOR_URL"
         log_info "Targeting PRODUCTION database (via SSH tunnel on port $PROD_DB_PORT)"
+        log_info "Card image generator: $PROD_CARD_IMAGE_GENERATOR_URL"
     fi
 
     if [[ $# -lt 1 ]]; then

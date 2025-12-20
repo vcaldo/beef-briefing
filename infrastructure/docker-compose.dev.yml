@@ -165,77 +165,77 @@ services:
     networks:
       - beef-dev-network
 
-  ml-processor:
-    build:
-      context: ..
-      dockerfile: apps/ml-processor/Dockerfile
-    container_name: beef-ml-processor-dev
-    # command: ["python", "main.py", "process", "--chat-id", "-1002572302334"]
-    command: ["python", "main.py", "process", "--chat-id", "-1002572302334", "--from-date", "2025-11-19"]
-    environment:
-      # Database - PROD via SSH tunnel: make pg-tunnel (localhost:5433 -> prod postgres)
-      DB_HOST: host.docker.internal
-      DB_PORT: 5433
-      # Database - DEV (local postgres container)
-      # DB_HOST: postgres
-      # DB_PORT: 5432
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_SSL_MODE: disable
-      # Provider selection (local, openai, anthropic, perspective)
-      SENTIMENT_PROVIDER: ${SENTIMENT_PROVIDER:-local}
-      TOXICITY_PROVIDER: ${TOXICITY_PROVIDER:-local}
-      EMBEDDINGS_PROVIDER: ${EMBEDDINGS_PROVIDER:-local}
-      TOPICS_PROVIDER: ${TOPICS_PROVIDER:-local}
-      NER_PROVIDER: ${NER_PROVIDER:-local}
-      HUMOR_PROVIDER: ${HUMOR_PROVIDER:-local}
-      QUESTIONS_PROVIDER: ${QUESTIONS_PROVIDER:-local}
-      # API keys (for non-local providers)
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      PERSPECTIVE_API_KEY: ${PERSPECTIVE_API_KEY:-}
-      # OpenAI Rate Limiting (Tier 1 defaults)
-      OPENAI_RATE_LIMIT_ENABLED: ${OPENAI_RATE_LIMIT_ENABLED:-true}
-      OPENAI_RATE_LIMIT_TIMEOUT: ${OPENAI_RATE_LIMIT_TIMEOUT:-120.0}
-      OPENAI_GPT4O_MINI_TPM: ${OPENAI_GPT4O_MINI_TPM:-200000}
-      OPENAI_GPT4O_MINI_RPM: ${OPENAI_GPT4O_MINI_RPM:-500}
-      OPENAI_EMBEDDING_TPM: ${OPENAI_EMBEDDING_TPM:-1000000}
-      OPENAI_EMBEDDING_RPM: ${OPENAI_EMBEDDING_RPM:-3000}
-      OPENAI_MODERATION_TPM: ${OPENAI_MODERATION_TPM:-10000}
-      OPENAI_MODERATION_RPM: ${OPENAI_MODERATION_RPM:-500}
-      # Qdrant
-      QDRANT_HOST: qdrant
-      QDRANT_PORT: 6333
-      # Processing
-      BATCH_SIZE: ${ML_BATCH_SIZE:-500}
-      SLEEP_SECONDS: ${ML_SLEEP_SECONDS:-60}
-      DEVICE: ${ML_DEVICE:-cuda}
-      # Application
-      ENVIRONMENT: development
-      LOG_LEVEL: debug
-      # New Relic APM
-      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
-      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
-      NEW_RELIC_AI_MONITORING_ENABLED: "true"
-      TRACK_AI_COSTS: "true"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - ml_models_cache_dev:/root/.cache/huggingface
-    depends_on:
-      - postgres
-      - qdrant
-    networks:
-      - beef-dev-network
-    restart: unless-stopped
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+  # ml-processor:
+  #   build:
+  #     context: ..
+  #     dockerfile: apps/ml-processor/Dockerfile
+  #   container_name: beef-ml-processor-dev
+  #   # command: ["python", "main.py", "process", "--chat-id", "-1002572302334"]
+  #   command: ["python", "main.py", "process", "--chat-id", "-1002572302334", "--from-date", "2025-11-19"]
+  #   environment:
+  #     # Database - PROD via SSH tunnel: make pg-tunnel (localhost:5433 -> prod postgres)
+  #     DB_HOST: host.docker.internal
+  #     DB_PORT: 5433
+  #     # Database - DEV (local postgres container)
+  #     # DB_HOST: postgres
+  #     # DB_PORT: 5432
+  #     DB_USER: ${DB_USER}
+  #     DB_PASSWORD: ${DB_PASSWORD}
+  #     DB_NAME: ${DB_NAME}
+  #     DB_SSL_MODE: disable
+  #     # Provider selection (local, openai, anthropic, perspective)
+  #     SENTIMENT_PROVIDER: ${SENTIMENT_PROVIDER:-local}
+  #     TOXICITY_PROVIDER: ${TOXICITY_PROVIDER:-local}
+  #     EMBEDDINGS_PROVIDER: ${EMBEDDINGS_PROVIDER:-local}
+  #     TOPICS_PROVIDER: ${TOPICS_PROVIDER:-local}
+  #     NER_PROVIDER: ${NER_PROVIDER:-local}
+  #     HUMOR_PROVIDER: ${HUMOR_PROVIDER:-local}
+  #     QUESTIONS_PROVIDER: ${QUESTIONS_PROVIDER:-local}
+  #     # API keys (for non-local providers)
+  #     OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  #     ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  #     PERSPECTIVE_API_KEY: ${PERSPECTIVE_API_KEY:-}
+  #     # OpenAI Rate Limiting (Tier 1 defaults)
+  #     OPENAI_RATE_LIMIT_ENABLED: ${OPENAI_RATE_LIMIT_ENABLED:-true}
+  #     OPENAI_RATE_LIMIT_TIMEOUT: ${OPENAI_RATE_LIMIT_TIMEOUT:-120.0}
+  #     OPENAI_GPT4O_MINI_TPM: ${OPENAI_GPT4O_MINI_TPM:-200000}
+  #     OPENAI_GPT4O_MINI_RPM: ${OPENAI_GPT4O_MINI_RPM:-500}
+  #     OPENAI_EMBEDDING_TPM: ${OPENAI_EMBEDDING_TPM:-1000000}
+  #     OPENAI_EMBEDDING_RPM: ${OPENAI_EMBEDDING_RPM:-3000}
+  #     OPENAI_MODERATION_TPM: ${OPENAI_MODERATION_TPM:-10000}
+  #     OPENAI_MODERATION_RPM: ${OPENAI_MODERATION_RPM:-500}
+  #     # Qdrant
+  #     QDRANT_HOST: qdrant
+  #     QDRANT_PORT: 6333
+  #     # Processing
+  #     BATCH_SIZE: ${ML_BATCH_SIZE:-500}
+  #     SLEEP_SECONDS: ${ML_SLEEP_SECONDS:-60}
+  #     DEVICE: ${ML_DEVICE:-cuda}
+  #     # Application
+  #     ENVIRONMENT: development
+  #     LOG_LEVEL: debug
+  #     # New Relic APM
+  #     NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
+  #     NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+  #     NEW_RELIC_AI_MONITORING_ENABLED: "true"
+  #     TRACK_AI_COSTS: "true"
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   volumes:
+  #     - ml_models_cache_dev:/root/.cache/huggingface
+  #   depends_on:
+  #     - postgres
+  #     - qdrant
+  #   networks:
+  #     - beef-dev-network
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
 
 volumes:
   postgres_data_dev:

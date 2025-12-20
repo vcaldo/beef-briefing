@@ -4,10 +4,15 @@ Toxicity detection implementations.
 Provides local HuggingFace-based and API-based toxicity analyzers.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from src.analyzers.base import Analyzer, AnalysisType
+
+if TYPE_CHECKING:
+    from src.ratelimit import OpenAIRateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -255,11 +260,15 @@ class OpenAIModerationAnalyzer(Analyzer):
     Free with OpenAI API key, supports batching.
     """
 
+    MODEL_NAME = "omni-moderation-latest"
+
     def __init__(
         self,
         api_key: str | None = None,
         max_retries: int = 5,
         timeout: float = 60.0,
+        rate_limiter: OpenAIRateLimiter | None = None,
+        rate_limit_timeout: float = 120.0,
     ):
         """
         Initialize with OpenAI API key.
@@ -268,10 +277,14 @@ class OpenAIModerationAnalyzer(Analyzer):
             api_key: OpenAI API key (required)
             max_retries: Maximum retry attempts for rate limits/errors
             timeout: Request timeout in seconds
+            rate_limiter: Shared rate limiter for OpenAI requests
+            rate_limit_timeout: Max time to wait for rate limit capacity
         """
         self.api_key = api_key
         self.max_retries = max_retries
         self.timeout = timeout
+        self._rate_limiter = rate_limiter
+        self._rate_limit_timeout = rate_limit_timeout
         self._client = None
 
     @property
@@ -279,15 +292,28 @@ class OpenAIModerationAnalyzer(Analyzer):
         return AnalysisType.TOXICITY
 
     def _get_client(self):
-        """Lazy load the OpenAI client with retry configuration."""
+        """Lazy load the OpenAI client, optionally with rate limiting."""
         if self._client is None:
             from openai import OpenAI
 
-            self._client = OpenAI(
+            base_client = OpenAI(
                 api_key=self.api_key,
                 max_retries=self.max_retries,
                 timeout=self.timeout,
             )
+
+            if self._rate_limiter:
+                from src.ratelimit import RateLimitedOpenAI
+
+                self._client = RateLimitedOpenAI(
+                    base_client,
+                    self._rate_limiter,
+                    self.MODEL_NAME,
+                    self._rate_limit_timeout,
+                )
+            else:
+                self._client = base_client
+
         return self._client
 
     def analyze(self, texts: list[str], **kwargs) -> list[dict]:
@@ -306,7 +332,11 @@ class OpenAIModerationAnalyzer(Analyzer):
         client = self._get_client()
 
         # OpenAI moderation supports batching
-        response = client.moderations.create(input=texts)
+        # Use wrapper method if rate-limited, otherwise direct client
+        if hasattr(client, "moderations_create"):
+            response = client.moderations_create(input=texts)
+        else:
+            response = client.moderations.create(input=texts)
 
         results = []
         for result in response.results:

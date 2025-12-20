@@ -139,6 +139,40 @@ API keys (required for non-local providers):
 
 **Important:** OpenAI chat-based analyzers (sentiment, humor, questions, NER) batch all messages into a single prompt. Use `BATCH_SIZE ≤ 100` when using OpenAI providers to avoid exceeding token limits. The embeddings and moderation APIs have proper internal batching and can handle larger batch sizes.
 
+### OpenAI Rate Limiting
+
+When using OpenAI providers, built-in rate limiting ensures you stay within your tier limits. Rate limiting is **enabled by default** with Tier 1 limits.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_RATE_LIMIT_ENABLED` | `true` | Enable/disable rate limiting |
+| `OPENAI_RATE_LIMIT_TIMEOUT` | `120.0` | Max seconds to wait for capacity |
+| `OPENAI_GPT4O_MINI_TPM` | `200000` | gpt-4o-mini tokens per minute |
+| `OPENAI_GPT4O_MINI_RPM` | `500` | gpt-4o-mini requests per minute |
+| `OPENAI_EMBEDDING_TPM` | `1000000` | text-embedding-3-small tokens per minute |
+| `OPENAI_EMBEDDING_RPM` | `3000` | text-embedding-3-small requests per minute |
+| `OPENAI_MODERATION_TPM` | `10000` | omni-moderation-latest tokens per minute |
+| `OPENAI_MODERATION_RPM` | `500` | omni-moderation-latest requests per minute |
+
+**Model to Analyzer Mapping:**
+- `gpt-4o-mini`: sentiment, humor, questions, NER (shared limits)
+- `text-embedding-3-small`: embeddings, topics (shared limits)
+- `omni-moderation-latest`: toxicity
+
+**How it works:**
+- Uses token bucket algorithm for both RPM and TPM limits
+- Multiple analyzers sharing the same model coordinate through a shared rate limiter
+- When limits are reached, requests wait until capacity is available (up to timeout)
+- Token usage is estimated before requests and adjusted after based on actual usage
+
+**Tier Reference (adjust variables for your tier):**
+
+| Tier | gpt-4o-mini TPM | gpt-4o-mini RPM | Embedding TPM | Embedding RPM |
+|------|-----------------|-----------------|---------------|---------------|
+| 1    | 200,000         | 500             | 1,000,000     | 3,000         |
+| 2    | 2,000,000       | 5,000           | 1,000,000     | 5,000         |
+| 3    | 4,000,000       | 5,000           | 5,000,000     | 5,000         |
+
 ### New Relic APM (optional)
 
 Enable APM monitoring by setting both variables:

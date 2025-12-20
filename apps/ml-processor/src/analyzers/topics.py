@@ -5,13 +5,18 @@ Provides clustering of messages into topics using embeddings
 and keyword extraction.
 """
 
+from __future__ import annotations
+
 import logging
 from collections import Counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from src.analyzers.base import Analyzer, AnalysisType
+
+if TYPE_CHECKING:
+    from src.ratelimit import OpenAIRateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +275,8 @@ class OpenAITopicClusterer(Analyzer):
         min_samples: int = 3,
         max_retries: int = 5,
         timeout: float = 60.0,
+        rate_limiter: OpenAIRateLimiter | None = None,
+        rate_limit_timeout: float = 120.0,
     ):
         """
         Initialize with OpenAI API key.
@@ -280,12 +287,16 @@ class OpenAITopicClusterer(Analyzer):
             min_samples: Minimum samples for core point
             max_retries: Maximum retry attempts for rate limits/errors
             timeout: Request timeout in seconds
+            rate_limiter: Shared rate limiter for OpenAI requests
+            rate_limit_timeout: Max time to wait for rate limit capacity
         """
         self.api_key = api_key
         self.min_cluster_size = min_cluster_size
         self.min_samples = min_samples
         self.max_retries = max_retries
         self.timeout = timeout
+        self._rate_limiter = rate_limiter
+        self._rate_limit_timeout = rate_limit_timeout
         self._client = None
         self._last_usage: dict | None = None
 
@@ -294,15 +305,28 @@ class OpenAITopicClusterer(Analyzer):
         return AnalysisType.TOPICS
 
     def _get_client(self):
-        """Lazy load the OpenAI client with retry configuration."""
+        """Lazy load the OpenAI client, optionally with rate limiting."""
         if self._client is None:
             from openai import OpenAI
 
-            self._client = OpenAI(
+            base_client = OpenAI(
                 api_key=self.api_key,
                 max_retries=self.max_retries,
                 timeout=self.timeout,
             )
+
+            if self._rate_limiter:
+                from src.ratelimit import RateLimitedOpenAI
+
+                self._client = RateLimitedOpenAI(
+                    base_client,
+                    self._rate_limiter,
+                    self.MODEL_NAME,
+                    self._rate_limit_timeout,
+                )
+            else:
+                self._client = base_client
+
         return self._client
 
     def analyze(
@@ -327,10 +351,17 @@ class OpenAITopicClusterer(Analyzer):
         client = self._get_client()
 
         # Get embeddings from OpenAI
-        response = client.embeddings.create(
-            model=self.MODEL_NAME,
-            input=texts,
-        )
+        # Use wrapper method if rate-limited, otherwise direct client
+        if hasattr(client, "embeddings_create"):
+            response = client.embeddings_create(
+                model=self.MODEL_NAME,
+                input=texts,
+            )
+        else:
+            response = client.embeddings.create(
+                model=self.MODEL_NAME,
+                input=texts,
+            )
 
         # Capture token usage for monitoring
         if response.usage:

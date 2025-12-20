@@ -104,12 +104,11 @@ class PlaywrightRenderer:
             # Try to find .card element, otherwise screenshot full page
             card_element = await page.query_selector(".card")
             if card_element:
-                screenshot = await card_element.screenshot(type="png", omit_background=True)
+                screenshot = await card_element.screenshot(type="png")
             else:
                 screenshot = await page.screenshot(
                     type="png",
                     full_page=False,
-                    omit_background=True,
                 )
 
             return screenshot

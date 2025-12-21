@@ -330,24 +330,200 @@ Response:
 
 ## Creating Custom Themes
 
-1. Create theme directory:
-   ```bash
-   mkdir -p templates/themes/mytheme
-   ```
+Themes consist of two files: a `theme.json` configuration file and a `card.html` Jinja2 template.
 
-2. Create `card.html` using Jinja2 syntax (see Template Variables above)
+### Directory Structure
 
-3. Add any static assets to `templates/themes/mytheme/assets/`
+```
+templates/themes/
+├── gaming/              # Dark neon gaming theme (default)
+│   ├── theme.json       # Color and typography config
+│   └── card.html        # HTML/CSS template
+├── clean/               # Light minimal theme
+│   ├── theme.json
+│   └── card.html
+└── mytheme/             # Your custom theme
+    ├── theme.json
+    └── card.html
+```
 
-4. Reference assets in CSS:
-   ```css
-   .card { background-image: url('assets/background.png'); }
-   ```
+### Step-by-Step Guide
 
-5. Use the theme:
-   ```bash
-   make ml-run-render ML_ARGS="--week 2025-12-09 --theme mytheme"
-   ```
+**1. Create theme directory:**
+
+```bash
+mkdir -p apps/card-image-generator/templates/themes/mytheme
+```
+
+**2. Create `theme.json`:**
+
+The theme configuration defines colors and typography. All colors in CSS can reference these values via template variables.
+
+```json
+{
+  "name": "mytheme",
+  "colors": {
+    "background_gradient": ["#1a1a2e", "#16213e", "#0f3460"],
+    "primary_accent": "#00d9ff",
+    "secondary_accent": "#e94560",
+    "text_primary": "#ffffff",
+    "text_secondary": "rgba(255, 255, 255, 0.6)",
+    "border_color": "rgba(255, 255, 255, 0.1)",
+    "stat_colors": {
+      "vibe": "#fbbf24",
+      "vibe_gradient": ["#f59e0b", "#fcd34d"],
+      "activity": "#00d9ff",
+      "activity_gradient": ["#00d9ff", "#67e8f9"],
+      "presence": "#14b8a6",
+      "presence_gradient": ["#14b8a6", "#5eead4"],
+      "humor": "#a855f7",
+      "humor_gradient": ["#a855f7", "#d8b4fe"],
+      "toxicity": "#ef4444",
+      "toxicity_gradient": ["#22c55e", "#ef4444"],
+      "popularity": "#e94560",
+      "popularity_gradient": ["#e94560", "#fda4af"]
+    },
+    "badge_rarity_colors": {
+      "common": {
+        "bg_start": "#374151",
+        "bg_end": "#4b5563",
+        "border": "#6b7280",
+        "text": "#d1d5db"
+      },
+      "rare": {
+        "bg_start": "#1e3a8a",
+        "bg_end": "#2563eb",
+        "border": "#3b82f6",
+        "text": "#93c5fd"
+      },
+      "epic": {
+        "bg_start": "#6b21a8",
+        "bg_end": "#9333ea",
+        "border": "#a855f7",
+        "text": "#d8b4fe"
+      },
+      "legendary": {
+        "bg_start": "#92400e",
+        "bg_end": "#f59e0b",
+        "border": "#fbbf24",
+        "text": "#fef3c7",
+        "glow": "rgba(251, 191, 36, 0.4)"
+      }
+    },
+    "tier_colors": {
+      "legendary": ["#fbbf24", "#f59e0b"],
+      "elite": ["#00d9ff", "#0ea5e9"],
+      "outstanding": ["#a855f7", "#7c3aed"],
+      "regular": ["#14b8a6", "#0d9488"],
+      "beginner": ["#9ca3af", "#6b7280"],
+      "rookie": ["#f472b6", "#ec4899"]
+    },
+    "effects": {
+      "avatar_glow": "rgba(233, 69, 96, 0.5)",
+      "username_glow": "rgba(0, 217, 255, 0.5)",
+      "border_gradient": ["#e94560", "#533483", "#00d9ff"],
+      "decoration_pink": "rgba(233, 69, 96, 0.1)",
+      "decoration_cyan": "rgba(0, 217, 255, 0.1)"
+    },
+    "trend_colors": {
+      "up": "#22c55e",
+      "down": "#ef4444",
+      "stable": "rgba(255, 255, 255, 0.5)"
+    }
+  },
+  "typography": {
+    "header_font": "Orbitron",
+    "body_font": "Rajdhani",
+    "header_weights": [400, 700, 900],
+    "body_weights": [400, 500, 700]
+  }
+}
+```
+
+**3. Create `card.html`:**
+
+Copy an existing theme's `card.html` as a starting point, or create from scratch. The template receives theme colors as CSS variables:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        @import url('{{ theme.typography.google_fonts_import }}');
+
+        :root {
+            /* Background */
+            --bg-gradient-start: {{ theme.colors.bg_start }};
+            --bg-gradient-mid: {{ theme.colors.bg_mid }};
+            --bg-gradient-end: {{ theme.colors.bg_end }};
+
+            /* Primary colors */
+            --color-primary: {{ theme.colors.primary }};
+            --color-secondary: {{ theme.colors.secondary }};
+
+            /* Text */
+            --text-primary: {{ theme.colors.text_primary }};
+            --text-secondary: {{ theme.colors.text_secondary }};
+
+            /* Typography */
+            --font-header: '{{ theme.typography.header_font }}', sans-serif;
+            --font-body: '{{ theme.typography.body_font }}', sans-serif;
+
+            /* ... see existing themes for full variable list */
+        }
+
+        .card {
+            background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-mid), var(--bg-gradient-end));
+            font-family: var(--font-body);
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Use template variables for user data, stats, badges -->
+    <div class="card">
+        <h1>{{ user.first_name }}</h1>
+        <!-- ... -->
+    </div>
+</body>
+</html>
+```
+
+**4. Use the theme:**
+
+```bash
+# Via make target
+make ml-run-render ML_ARGS="--week 2025-12-09 --theme mytheme"
+
+# Via API
+curl -X POST http://localhost:8051/api/v1/render \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"chat_id": -1003280306634, "week_start": "2025-12-09", "theme": "mytheme"}'
+```
+
+### Theme Configuration Reference
+
+| Section | Description |
+|---------|-------------|
+| `colors.background_gradient` | 3-color gradient array [start, mid, end] |
+| `colors.primary_accent` | Main accent color (buttons, highlights) |
+| `colors.secondary_accent` | Secondary accent (decorations) |
+| `colors.stat_colors` | Colors for each of the 6 stats (vibe, activity, presence, humor, toxicity, popularity) |
+| `colors.badge_rarity_colors` | Badge styling by rarity (common, rare, epic, legendary) |
+| `colors.tier_colors` | Gradient pairs for overall score tiers |
+| `colors.effects` | Glow effects, border gradients, decorations |
+| `colors.trend_colors` | Colors for trend indicators (up/down/stable) |
+| `typography.header_font` | Google Font for headers |
+| `typography.body_font` | Google Font for body text |
+| `typography.*_weights` | Font weights to load from Google Fonts |
+
+### Available Themes
+
+| Theme | Description |
+|-------|-------------|
+| `gaming` | Dark neon theme with Orbitron/Rajdhani fonts, cyan/pink accents |
+| `clean` | Light minimal theme with Inter font, blue/purple accents |
 
 ## Gaming Theme
 

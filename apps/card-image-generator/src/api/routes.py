@@ -3,34 +3,34 @@
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Security
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Security
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 
+from ..generator import CardGenerator
+
 router = APIRouter()
-
-# Global references set by main.py
-_generator = None
-_api_keys: dict[str, str] = {}
-
-
-def set_generator(generator):
-    """Set the global generator instance."""
-    global _generator
-    _generator = generator
-
-
-def set_api_keys(keys: dict[str, str]):
-    """Set valid API keys."""
-    global _api_keys
-    _api_keys = keys
 
 
 # Security
 api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 
+def get_generator(request: Request) -> CardGenerator:
+    """Get generator from app state."""
+    generator = getattr(request.app.state, "generator", None)
+    if generator is None:
+        raise HTTPException(status_code=503, detail="Generator not initialized")
+    return generator
+
+
+def get_api_keys(request: Request) -> dict[str, str]:
+    """Get API keys from app state."""
+    return getattr(request.app.state, "api_keys", {})
+
+
 async def verify_api_key(
+    request: Request,
     authorization: str = Security(api_key_header),
 ) -> str:
     """Verify API key from Authorization header."""
@@ -43,7 +43,8 @@ async def verify_api_key(
         raise HTTPException(status_code=401, detail="Invalid authorization format")
 
     key = parts[1]
-    if key not in _api_keys.values():
+    api_keys = get_api_keys(request)
+    if key not in api_keys.values():
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     return key
@@ -119,6 +120,7 @@ class WeekListResponse(BaseModel):
 @router.get("/api/v1/weeks", response_model=WeekListResponse)
 async def get_available_weeks(
     chat_id: Annotated[int, Query(description="Chat ID")],
+    generator: CardGenerator = Depends(get_generator),
     api_key: str = Depends(verify_api_key),
 ):
     """
@@ -126,16 +128,14 @@ async def get_available_weeks(
 
     Returns list of week_start dates (YYYY-MM-DD) in descending order.
     """
-    if _generator is None:
-        raise HTTPException(status_code=503, detail="Generator not initialized")
-
-    weeks = _generator.queries.get_available_weeks(chat_id)
+    weeks = generator.queries.get_available_weeks(chat_id)
     return WeekListResponse(weeks=[w.isoformat() for w in weeks])
 
 
 @router.post("/api/v1/render", response_model=RenderResponse)
 async def render_cards(
     request: RenderRequest,
+    generator: CardGenerator = Depends(get_generator),
     api_key: str = Depends(verify_api_key),
 ):
     """
@@ -145,9 +145,6 @@ async def render_cards(
     for a given week, stores them in object storage, and saves
     references in the database.
     """
-    if _generator is None:
-        raise HTTPException(status_code=503, detail="Generator not initialized")
-
     try:
         week_start = date.fromisoformat(request.week_start)
     except ValueError:
@@ -156,7 +153,7 @@ async def render_cards(
             detail="Invalid week_start format. Use YYYY-MM-DD",
         )
 
-    result = await _generator.render_cards(
+    result = await generator.render_cards(
         chat_id=request.chat_id,
         week_start=week_start,
         user_ids=request.user_ids,
@@ -187,6 +184,7 @@ async def get_images(
     week_start: Annotated[str | None, Query(description="Week start (YYYY-MM-DD)")] = None,
     user_id: Annotated[int | None, Query(description="Filter by user ID")] = None,
     theme: Annotated[str | None, Query(description="Filter by theme")] = None,
+    generator: CardGenerator = Depends(get_generator),
     api_key: str = Depends(verify_api_key),
 ):
     """
@@ -194,12 +192,9 @@ async def get_images(
 
     Returns list of image references with metadata.
     """
-    if _generator is None:
-        raise HTTPException(status_code=503, detail="Generator not initialized")
-
     # Get latest week if not specified
     if week_start is None:
-        latest = _generator.queries.get_latest_week_for_chat(chat_id)
+        latest = generator.queries.get_latest_week_for_chat(chat_id)
         if latest is None:
             return ImageListResponse(images=[])
         week_start_date = latest
@@ -212,7 +207,7 @@ async def get_images(
                 detail="Invalid week_start format. Use YYYY-MM-DD",
             )
 
-    images = _generator.repository.get_images_for_chat_week(
+    images = generator.repository.get_images_for_chat_week(
         chat_id=chat_id,
         week_start=week_start_date,
         user_id=user_id,
@@ -242,6 +237,7 @@ async def get_images(
 async def get_image_url(
     image_id: int,
     expires: Annotated[int, Query(ge=60, le=86400)] = 3600,
+    generator: CardGenerator = Depends(get_generator),
     api_key: str = Depends(verify_api_key),
 ):
     """
@@ -249,10 +245,7 @@ async def get_image_url(
 
     The URL expires after the specified duration (default 1 hour).
     """
-    if _generator is None:
-        raise HTTPException(status_code=503, detail="Generator not initialized")
-
-    url = _generator.get_image_url(image_id, expires_seconds=expires)
+    url = generator.get_image_url(image_id, expires_seconds=expires)
     if url is None:
         raise HTTPException(status_code=404, detail="Image not found")
 

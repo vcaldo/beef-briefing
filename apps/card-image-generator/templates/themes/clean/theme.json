@@ -1,0 +1,78 @@
+{
+  "name": "clean",
+  "colors": {
+    "background_gradient": ["#ffffff", "#f8fafc", "#f1f5f9"],
+    "primary_accent": "#3b82f6",
+    "secondary_accent": "#8b5cf6",
+    "text_primary": "#1e293b",
+    "text_secondary": "rgba(30, 41, 59, 0.6)",
+    "border_color": "rgba(30, 41, 59, 0.1)",
+    "stat_colors": {
+      "vibe": "#f59e0b",
+      "vibe_gradient": ["#f59e0b", "#fbbf24"],
+      "activity": "#3b82f6",
+      "activity_gradient": ["#3b82f6", "#60a5fa"],
+      "presence": "#10b981",
+      "presence_gradient": ["#10b981", "#34d399"],
+      "humor": "#8b5cf6",
+      "humor_gradient": ["#8b5cf6", "#a78bfa"],
+      "toxicity": "#ef4444",
+      "toxicity_gradient": ["#22c55e", "#ef4444"],
+      "popularity": "#ec4899",
+      "popularity_gradient": ["#ec4899", "#f472b6"]
+    },
+    "badge_rarity_colors": {
+      "common": {
+        "bg_start": "#e5e7eb",
+        "bg_end": "#f3f4f6",
+        "border": "#d1d5db",
+        "text": "#4b5563"
+      },
+      "rare": {
+        "bg_start": "#dbeafe",
+        "bg_end": "#eff6ff",
+        "border": "#93c5fd",
+        "text": "#1d4ed8"
+      },
+      "epic": {
+        "bg_start": "#ede9fe",
+        "bg_end": "#f5f3ff",
+        "border": "#c4b5fd",
+        "text": "#6d28d9"
+      },
+      "legendary": {
+        "bg_start": "#fef3c7",
+        "bg_end": "#fffbeb",
+        "border": "#fcd34d",
+        "text": "#b45309",
+        "glow": "rgba(251, 191, 36, 0.3)"
+      }
+    },
+    "tier_colors": {
+      "legendary": ["#f59e0b", "#fbbf24"],
+      "elite": ["#3b82f6", "#60a5fa"],
+      "outstanding": ["#8b5cf6", "#a78bfa"],
+      "regular": ["#10b981", "#34d399"],
+      "beginner": ["#9ca3af", "#d1d5db"],
+      "rookie": ["#ec4899", "#f472b6"]
+    },
+    "effects": {
+      "avatar_glow": "rgba(59, 130, 246, 0.3)",
+      "username_glow": "rgba(59, 130, 246, 0.2)",
+      "border_gradient": ["#3b82f6", "#8b5cf6", "#ec4899"],
+      "decoration_pink": "rgba(236, 72, 153, 0.05)",
+      "decoration_cyan": "rgba(59, 130, 246, 0.05)"
+    },
+    "trend_colors": {
+      "up": "#22c55e",
+      "down": "#ef4444",
+      "stable": "rgba(30, 41, 59, 0.4)"
+    }
+  },
+  "typography": {
+    "header_font": "Inter",
+    "body_font": "Inter",
+    "header_weights": [400, 600, 700],
+    "body_weights": [400, 500, 600]
+  }
+}

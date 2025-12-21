@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from minio.error import S3Error
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
@@ -168,7 +169,7 @@ class CardGenerator:
                 else:
                     failed += 1
 
-            except Exception as e:
+            except (ValueError, KeyError, OSError) as e:
                 logger.exception(f"Failed to render card for user {user_id}")
                 results.append(
                     RenderResult(
@@ -210,7 +211,7 @@ class CardGenerator:
                     profile_photo_path,
                     expires_seconds=300,  # 5 minutes is enough for rendering
                 )
-            except Exception as e:
+            except S3Error as e:
                 logger.warning(f"Failed to get presigned URL for profile photo: {e}")
                 card_data["profile_photo_path"] = None
 
@@ -231,6 +232,7 @@ class CardGenerator:
             week_start=week_start.isoformat(),
             user_id=user_id,
             image_data=image_data,
+            theme=theme,
         )
 
         # Save reference to database

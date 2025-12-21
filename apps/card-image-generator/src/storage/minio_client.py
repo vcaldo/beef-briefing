@@ -53,13 +53,14 @@ class CardStorageClient:
         chat_id: int,
         week_start: str,
         user_id: int,
+        theme: str = "gaming",
     ) -> str:
         """
         Generate storage path for a card image.
 
-        Format: cards/{chat_id}/{week_start}/{user_id}.png
+        Format: cards/{chat_id}/{week_start}/{theme}/{user_id}.png
         """
-        return f"cards/{chat_id}/{week_start}/{user_id}.png"
+        return f"cards/{chat_id}/{week_start}/{theme}/{user_id}.png"
 
     def upload_card_image(
         self,
@@ -67,6 +68,7 @@ class CardStorageClient:
         week_start: str,
         user_id: int,
         image_data: bytes,
+        theme: str = "gaming",
     ) -> tuple[str, str, int]:
         """
         Upload card image to MinIO.
@@ -76,12 +78,13 @@ class CardStorageClient:
             week_start: Week start date (YYYY-MM-DD)
             user_id: User ID
             image_data: PNG image bytes
+            theme: Theme name for storage path
 
         Returns:
             Tuple of (storage_path, file_hash, file_size)
         """
         file_hash = self.compute_hash(image_data)
-        storage_path = self.generate_storage_path(chat_id, week_start, user_id)
+        storage_path = self.generate_storage_path(chat_id, week_start, user_id, theme)
         file_size = len(image_data)
 
         # Check if identical file already exists
@@ -91,8 +94,10 @@ class CardStorageClient:
             if existing_hash == file_hash:
                 logger.debug(f"Identical file exists, skipping upload: {storage_path}")
                 return storage_path, file_hash, file_size
-        except S3Error:
-            pass  # Object doesn't exist, proceed with upload
+        except S3Error as e:
+            # Only log unexpected errors (not "object doesn't exist")
+            if e.code != "NoSuchKey":
+                logger.debug(f"S3 stat check failed for {storage_path}: {e.code}")
 
         # Upload with metadata
         self.client.put_object(

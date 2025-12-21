@@ -520,10 +520,13 @@ curl -X POST http://localhost:8051/api/v1/render \
 
 ### Available Themes
 
-| Theme | Description |
-|-------|-------------|
-| `gaming` | Dark neon theme with Orbitron/Rajdhani fonts, cyan/pink accents |
-| `clean` | Light minimal theme with Inter font, blue/purple accents |
+| Theme | Description | Best For |
+|-------|-------------|----------|
+| `gaming` | Dark neon cyberpunk with Orbitron/Rajdhani fonts, cyan/pink accents | Competitive groups, gamers |
+| `clean` | Light minimal professional with Inter font, blue/purple accents | Work chats, formal groups |
+| `sticker` | Telegram-native look with chat bubble shadows, Nunito font, sticker-style badges | Casual groups, new users |
+| `mythic` | Dark fantasy RPG with Cinzel/Lato fonts, golden accents, ember glow effects | Long-term engagement, lore fans |
+| `meme` | Chaotic rainbow with Bangers/Comic Neue fonts, random rotations, oversized emojis | Shitposting, meme groups |
 
 ## Gaming Theme
 

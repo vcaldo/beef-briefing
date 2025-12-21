@@ -117,15 +117,15 @@ def _clamp(value: float, min_val: float = 0.0, max_val: float = 100.0) -> float:
 def _vibe_label(score: float) -> str:
     """Convert vibe score (0-100) to label."""
     if score >= 80:
-        return "Radiante"
+        return "Radiant"
     elif score >= 65:
-        return "Animado"
+        return "Lively"
     elif score >= 50:
-        return "Tranquilo"
+        return "Chill"
     elif score >= 35:
-        return "Reservado"
+        return "Reserved"
     else:
-        return "Introspectivo"
+        return "Introspective"
 
 
 def _presence_label(score: float) -> str:
@@ -133,13 +133,13 @@ def _presence_label(score: float) -> str:
     if score >= 80:
         return "Regular"
     elif score >= 60:
-        return "Frequente"
+        return "Frequent"
     elif score >= 40:
-        return "Ocasional"
+        return "Occasional"
     elif score >= 20:
-        return "Esporadico"
+        return "Sporadic"
     else:
-        return "Fantasma"
+        return "Ghost"
 
 
 def _toxicity_label(pct: float) -> str:
@@ -147,55 +147,55 @@ def _toxicity_label(pct: float) -> str:
     if pct < 2:
         return "Zen"
     elif pct < 5:
-        return "Leve"
+        return "Mild"
     elif pct < 10:
-        return "Moderado"
+        return "Moderate"
     elif pct < 20:
-        return "Picante"
+        return "Spicy"
     else:
-        return "Explosivo"
+        return "Explosive"
 
 
 def _humor_label(score: float) -> str:
     """Convert humor score (0-100) to label."""
     if score >= 70:
-        return "Comediante"
+        return "Comedian"
     elif score >= 50:
-        return "Engracado"
+        return "Funny"
     elif score >= 30:
-        return "Espirituoso"
+        return "Witty"
     elif score >= 10:
-        return "Discreto"
+        return "Low-key"
     else:
-        return "Serio"
+        return "Serious"
 
 
 def _activity_label(score: float) -> str:
     """Convert activity score (0-100) to label."""
     if score >= 80:
-        return "Hiperativo"
+        return "Hyperactive"
     elif score >= 60:
-        return "Ativo"
+        return "Active"
     elif score >= 40:
-        return "Moderado"
+        return "Moderate"
     elif score >= 20:
         return "Casual"
     else:
-        return "Quieto"
+        return "Quiet"
 
 
 def _popularity_label(score: float) -> str:
     """Convert popularity score (0-100) to label."""
     if score >= 80:
-        return "Estrela"
+        return "Star"
     elif score >= 60:
         return "Popular"
     elif score >= 40:
-        return "Conhecido"
+        return "Known"
     elif score >= 20:
-        return "Discreto"
+        return "Low-key"
     else:
-        return "Reservado"
+        return "Reserved"
 
 
 def _overall_label(score: float) -> str:

@@ -58,11 +58,11 @@ BADGE_RULES = [
 ]
 
 BADGE_MODIFIERS = {
-    "legendary": 2,
-    "epic": 1,
-    "negative": -2,
-    "rare": 0,
-    "common": 0,
+    "legendary": 7,
+    "epic": 5,
+    "negative": -5,
+    "rare": 5,
+    "common": 3,
 }
 
 

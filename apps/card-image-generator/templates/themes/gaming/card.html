@@ -320,6 +320,18 @@
             position: relative;
             z-index: 1;
             flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .beef-meter-emoji {
+            font-size: 32px;
+            line-height: 1;
+        }
+
+        .beef-meter-content {
+            flex: 1;
         }
 
         .beef-meter-header {
@@ -387,12 +399,15 @@
 
         <!-- Beef Meter -->
         <div class="beef-meter">
-            <div class="beef-meter-header">
-                <span class="beef-meter-label">Beef Meter</span>
-                <span class="beef-meter-value">{{ overall.score|round|int }} • {{ overall.label }}</span>
-            </div>
-            <div class="beef-meter-bar">
-                <div class="beef-meter-fill {{ overall.label|lower }}" style="width: {{ overall.score }}%;"></div>
+            <span class="beef-meter-emoji">🥩</span>
+            <div class="beef-meter-content">
+                <div class="beef-meter-header">
+                    <span class="beef-meter-label">Beef Meter</span>
+                    <span class="beef-meter-value">{{ overall.score|round|int }} • {{ overall.label }}</span>
+                </div>
+                <div class="beef-meter-bar">
+                    <div class="beef-meter-fill {{ overall.label|lower }}" style="width: {{ overall.score }}%;"></div>
+                </div>
             </div>
         </div>
 

@@ -473,6 +473,8 @@ WHERE parent.user_id = :user_id
 
 Measures negative impact through toxic message detection and negative reactions.
 
+**Important:** Being sad is NOT toxic. Negative sentiment affects the Vibe score, not Toxicity. This metric is reserved for aggressive/offensive content detected by ML classifiers, NOT for emotional expression.
+
 **Components:**
 
 | Component | Weight | Description |

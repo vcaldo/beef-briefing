@@ -252,7 +252,9 @@ Weekly aggregated stats per user, generated via `generate-cards` command:
 | `toxicity` | Negative impact (0-100%) | `ml_toxicity` + negative reactions |
 | `popularity` | Social gravity (0-100) | Unique reactors/repliers + viral messages |
 
-All metrics use **Bayesian smoothing** (k=50) to stabilize scores for low-volume users and **per-chat P90 normalization** for count-based components. Emoji reactions are classified using [emosent-py](https://pypi.org/project/emosent-py/).
+All metrics use **Bayesian smoothing** (k=50) to stabilize scores for low-volume users and **per-chat P90 normalization** for count-based components. Emoji reactions are classified using [emosent-py](https://pypi.org/project/emosent-py/) with thresholds: positive (>0.2), neutral (-0.2 to 0.2), negative (<-0.2).
+
+**Key design principle:** Being sad is NOT toxic. Negative sentiment affects Vibe, not Toxicity. Toxicity is reserved for aggressive/offensive content detected by ML classifiers.
 
 Cards use a 30-day rolling window for stable personality traits, with week-over-week trend comparisons.
 

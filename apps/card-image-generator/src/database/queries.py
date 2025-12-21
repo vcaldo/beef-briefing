@@ -56,7 +56,7 @@ class CardQueries:
             WHERE c.chat_id = :chat_id
               AND c.week_start = :week_start
               AND (:user_ids IS NULL OR c.user_id = ANY(:user_ids))
-            ORDER BY (c.stats->'activity'->>'score')::float DESC NULLS LAST
+            ORDER BY (c.stats->'overall'->>'score')::float DESC NULLS LAST
         """)
 
         with self.engine.connect() as conn:
@@ -152,12 +152,13 @@ class CardQueries:
                     ROW_NUMBER() OVER (ORDER BY (stats->'presence'->>'score')::float DESC NULLS LAST) AS presence_rank,
                     ROW_NUMBER() OVER (ORDER BY (stats->'humor'->>'score')::float DESC NULLS LAST) AS humor_rank,
                     ROW_NUMBER() OVER (ORDER BY (stats->'toxicity'->>'pct')::float ASC NULLS LAST) AS toxicity_rank,
-                    ROW_NUMBER() OVER (ORDER BY (stats->'popularity'->>'score')::float DESC NULLS LAST) AS popularity_rank
+                    ROW_NUMBER() OVER (ORDER BY (stats->'popularity'->>'score')::float DESC NULLS LAST) AS popularity_rank,
+                    ROW_NUMBER() OVER (ORDER BY (stats->'overall'->>'score')::float DESC NULLS LAST) AS overall_rank
                 FROM ml_user_cards
                 WHERE chat_id = :chat_id
                   AND week_start = :week_start
             )
-            SELECT user_id, vibe_rank, activity_rank, presence_rank, humor_rank, toxicity_rank, popularity_rank
+            SELECT user_id, vibe_rank, activity_rank, presence_rank, humor_rank, toxicity_rank, popularity_rank, overall_rank
             FROM category_ranks
             WHERE vibe_rank <= 3
                OR activity_rank <= 3
@@ -165,6 +166,7 @@ class CardQueries:
                OR humor_rank <= 3
                OR toxicity_rank <= 3
                OR popularity_rank <= 3
+               OR overall_rank <= 3
         """)
 
         with self.engine.connect() as conn:
@@ -180,6 +182,7 @@ class CardQueries:
                 "humor": {},
                 "toxicity": {},
                 "popularity": {},
+                "overall": {},
             }
 
             for row in result:
@@ -196,5 +199,7 @@ class CardQueries:
                     rankings["toxicity"][user_id] = row.toxicity_rank
                 if row.popularity_rank <= 3:
                     rankings["popularity"][user_id] = row.popularity_rank
+                if row.overall_rank <= 3:
+                    rankings["overall"][user_id] = row.overall_rank
 
             return rankings

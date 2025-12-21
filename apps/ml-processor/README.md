@@ -245,19 +245,24 @@ Weekly aggregated stats per user, generated via `generate-cards` command:
 
 | Stat | Description | Source |
 |------|-------------|--------|
-| `mood` | Mood score (0-100) with label | `ml_sentiment` |
-| `volatility` | Mood consistency (0-1) | `ml_sentiment` stddev |
-| `toxicity` | % of toxic messages | `ml_toxicity` |
-| `activity` | Messages, active days, avg length | `messages` |
-| `reactions_received` | Total reactions on user's messages | `message_reactions` |
-| `chronotype` | Peak activity hour and label | `messages` hour distribution (timezone-aware) |
-| `comedy` | Combined humor score (ML 30% + laugh reactions 70%) | `ml_humor` + `message_reactions` |
+| `vibe` | Emotional tone + reception (0-100) | `ml_sentiment` + `message_reactions` (emoji sentiment) |
+| `activity` | Engagement volume (0-100) | `messages` + `message_reactions` sent + replies |
+| `presence` | Consistency over time (0-100) | `messages` (active days, streak, hours) |
+| `humor` | Comedy impact (0-100) | `ml_humor` + positive reactions |
+| `toxicity` | Negative impact (0-100%) | `ml_toxicity` + negative reactions |
+| `popularity` | Social gravity (0-100) | Unique reactors/repliers + viral messages |
+
+All metrics use **Bayesian smoothing** (k=50) to stabilize scores for low-volume users and **per-chat P90 normalization** for count-based components. Emoji reactions are classified using [emosent-py](https://pypi.org/project/emosent-py/) with thresholds: positive (>0.2), neutral (-0.2 to 0.2), negative (<-0.2).
+
+**Key design principle:** Being sad is NOT toxic. Negative sentiment affects Vibe, not Toxicity. Toxicity is reserved for aggressive/offensive content detected by ML classifiers.
 
 Cards use a 30-day rolling window for stable personality traits, with week-over-week trend comparisons.
 
+See [CARD_GENERATION.md](CARD_GENERATION.md) for detailed calculation formulas.
+
 **Timezone Support:** The `--timezone` parameter (required) affects:
 - **Week boundaries**: Monday 00:00 to Sunday 23:59:59 calculated in the specified timezone
-- **Chronotype**: Peak activity hours converted to the specified timezone
+- **Presence**: Hours spread and active days calculated in the specified timezone
 - **Storage**: The timezone is stored with each card for reference
 
 ## Development

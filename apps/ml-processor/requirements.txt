@@ -31,5 +31,8 @@ python-dotenv>=1.0.0
 numpy>=1.26.0
 tqdm>=4.66.0
 
+# Emoji sentiment analysis
+emosent-py>=0.1.7
+
 # APM (optional)
 newrelic>=10.0.0

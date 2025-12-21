@@ -25,7 +25,7 @@ class TrendContext:
 class StatContext:
     """Normalized stat for template rendering."""
 
-    key: str  # "mood", "comedy", etc.
+    key: str  # "vibe", "activity", etc.
     label: str  # Display label
     icon: str  # Emoji or icon class
     value: float  # Raw value
@@ -48,10 +48,10 @@ RANK_MEDALS = {
 class BadgeContext:
     """Badge derived from stats."""
 
-    key: str  # "night_owl", "comedian"
-    name: str  # "Night Owl"
+    key: str  # "radiant", "comedian"
+    name: str  # "Radiant"
     icon: str  # Emoji
-    rarity: str  # "common", "rare", "epic", "legendary"
+    rarity: str  # "common", "rare", "epic", "legendary", "negative"
 
 
 @dataclass
@@ -79,6 +79,8 @@ class ActivityContext:
     messages: int
     active_days: int
     avg_length: float
+    reactions_sent: int = 0
+    replies_sent: int = 0
 
 
 @dataclass
@@ -103,13 +105,13 @@ class TemplateContext:
     # Activity summary
     activity: ActivityContext
 
-    # Raw stats for direct access
-    mood: dict = field(default_factory=dict)
-    comedy: dict = field(default_factory=dict)
-    volatility: dict = field(default_factory=dict)
+    # Raw stats for direct access (new 6 metrics)
+    vibe: dict = field(default_factory=dict)
+    activity_stats: dict = field(default_factory=dict)
+    presence: dict = field(default_factory=dict)
+    humor: dict = field(default_factory=dict)
     toxicity: dict = field(default_factory=dict)
-    chronotype: dict = field(default_factory=dict)
-    reactions_received: int = 0
+    popularity: dict = field(default_factory=dict)
 
     # Ranking
     rank: int | None = None
@@ -118,105 +120,107 @@ class TemplateContext:
     theme: str = "gaming"
 
 
-# Badge derivation rules
+# Badge derivation rules - new 6 metrics system
 BADGE_RULES = [
-    # Chronotype badges
+    # Vibe badges
     {
-        "condition": lambda s: s.get("chronotype", {}).get("type") == "Coruja",
-        "badge": BadgeContext("night_owl", "Night Owl", "\U0001F989", "rare"),
+        "condition": lambda s: s.get("vibe", {}).get("score", 0) >= 80,
+        "badge": BadgeContext("radiant", "Radiant", "\U0001F31F", "legendary"),
     },
     {
-        "condition": lambda s: s.get("chronotype", {}).get("type") == "Madrugador",
-        "badge": BadgeContext("early_bird", "Early Bird", "\U0001F305", "rare"),
+        "condition": lambda s: s.get("vibe", {}).get("score", 100) < 30,
+        "badge": BadgeContext("gloomy", "Gloomy", "\U0001F327", "negative"),
     },
-    # Mood badges
+    # Presence badges
     {
-        "condition": lambda s: s.get("mood", {}).get("score", 0) >= 90,
-        "badge": BadgeContext("sunshine", "Ray of Sunshine", "\u2B50", "legendary"),
-    },
-    {
-        "condition": lambda s: s.get("mood", {}).get("score", 0) >= 75,
-        "badge": BadgeContext("optimist", "Optimist", "\U0001F60A", "epic"),
-    },
-    # Comedy badges
-    {
-        "condition": lambda s: s.get("comedy", {}).get("score", 0) >= 0.7,
-        "badge": BadgeContext("comedian", "Stand-Up King", "\U0001F3AD", "legendary"),
+        "condition": lambda s: s.get("presence", {}).get("score", 0) >= 80,
+        "badge": BadgeContext("regular", "Regular", "\U0001F4C5", "epic"),
     },
     {
-        "condition": lambda s: s.get("comedy", {}).get("score", 0) >= 0.5,
-        "badge": BadgeContext("funny", "Class Clown", "\U0001F602", "epic"),
+        "condition": lambda s: (
+            s.get("presence", {}).get("score", 100) < 20
+            and s.get("activity", {}).get("messages", 0) >= 10
+        ),
+        "badge": BadgeContext("tourist", "Tourist", "\U0001F30D", "negative"),
     },
-    # Activity badges
+    # Humor badges
+    {
+        "condition": lambda s: s.get("humor", {}).get("score", 0) >= 70,
+        "badge": BadgeContext("comedian", "Comedian", "\U0001F3AD", "legendary"),
+    },
+    {
+        "condition": lambda s: s.get("humor", {}).get("score", 100) < 10,
+        "badge": BadgeContext("deadpan", "Deadpan", "\U0001F610", "negative"),
+    },
+    # Toxicity badges
+    {
+        "condition": lambda s: s.get("toxicity", {}).get("pct", 100) < 2,
+        "badge": BadgeContext("zen", "Zen", "\u262F\uFE0F", "legendary"),
+    },
+    {
+        "condition": lambda s: s.get("toxicity", {}).get("pct", 0) > 20,
+        "badge": BadgeContext("toxic", "Toxic", "\u2620\uFE0F", "negative"),
+    },
+    # Activity badges (based on message count thresholds)
     {
         "condition": lambda s: s.get("activity", {}).get("messages", 0) >= 500,
-        "badge": BadgeContext("chatterbox", "Chatterbox", "\U0001F4AC", "legendary"),
+        "badge": BadgeContext("hyperactive", "Hyperactive", "\U0001F525", "legendary"),
     },
     {
-        "condition": lambda s: s.get("activity", {}).get("messages", 0) >= 200,
-        "badge": BadgeContext("active", "Active Voice", "\U0001F525", "epic"),
+        "condition": lambda s: s.get("activity", {}).get("messages", 0) < 20,
+        "badge": BadgeContext("ghost", "Ghost", "\U0001F47B", "negative"),
+    },
+    # Popularity badges (based on unique reactors/repliers)
+    {
+        "condition": lambda s: s.get("popularity", {}).get("unique_reactors", 0) >= 10,
+        "badge": BadgeContext("star", "Star", "\u2B50", "legendary"),
     },
     {
-        "condition": lambda s: s.get("activity", {}).get("messages", 0) >= 100,
-        "badge": BadgeContext("regular", "Regular", "\U0001F4DD", "rare"),
-    },
-    # Toxicity badges (inverted - low toxicity is good)
-    {
-        "condition": lambda s: s.get("toxicity", {}).get("pct", 100) < 1,
-        "badge": BadgeContext("zen_master", "Zen Master", "\u262F\uFE0F", "legendary"),
-    },
-    {
-        "condition": lambda s: s.get("toxicity", {}).get("pct", 100) < 5,
-        "badge": BadgeContext("peaceful", "Peacekeeper", "\U0001F54A\uFE0F", "epic"),
-    },
-    # Reactions badges
-    {
-        "condition": lambda s: s.get("reactions_received", 0) >= 100,
-        "badge": BadgeContext("beloved", "Beloved", "\u2764\uFE0F", "legendary"),
-    },
-    {
-        "condition": lambda s: s.get("reactions_received", 0) >= 50,
-        "badge": BadgeContext("popular", "Popular", "\U0001F44D", "epic"),
+        "condition": lambda s: (
+            s.get("popularity", {}).get("total_reactions", 0) == 0
+            and s.get("activity", {}).get("messages", 0) >= 30
+        ),
+        "badge": BadgeContext("cricket", "Cricket", "\U0001F997", "negative"),
     },
 ]
 
-# Stat display configuration
+# Stat display configuration - new 6 metrics
 STAT_CONFIG = {
-    "mood": {
-        "label": "Mood",
-        "icon": "\U0001F60A",
+    "vibe": {
+        "label": "Vibe",
+        "icon": "\U0001F31F",  # 🌟
         "format": lambda v: f"{v:.0f}",
-        "to_pct": lambda v: min(100, max(0, v)),
-    },
-    "comedy": {
-        "label": "Comedy",
-        "icon": "\U0001F3AD",
-        "format": lambda v: f"{v * 100:.0f}%",
-        "to_pct": lambda v: min(100, max(0, v * 100)),
-    },
-    "volatility": {
-        "label": "Volatility",
-        "icon": "\U0001F4C8",
-        "format": lambda v: f"{v * 100:.0f}%",
-        "to_pct": lambda v: min(100, max(0, v * 100)),
-    },
-    "toxicity": {
-        "label": "Toxicity",
-        "icon": "\u2620\uFE0F",
-        "format": lambda v: f"{v:.1f}%",
         "to_pct": lambda v: min(100, max(0, v)),
     },
     "activity": {
         "label": "Activity",
-        "icon": "\U0001F525",
+        "icon": "\U0001F525",  # 🔥
         "format": lambda v: f"{v:.0f}",
-        "to_pct": lambda v: min(100, max(0, min(v, 500) / 5)),  # 500 msgs = 100%
+        "to_pct": lambda v: min(100, max(0, v)),
     },
-    "reactions": {
-        "label": "Reactions",
-        "icon": "\u2764\uFE0F",
+    "presence": {
+        "label": "Presence",
+        "icon": "\U0001F4C5",  # 📅
         "format": lambda v: f"{v:.0f}",
-        "to_pct": lambda v: min(100, max(0, min(v, 100))),  # 100 reactions = 100%
+        "to_pct": lambda v: min(100, max(0, v)),
+    },
+    "humor": {
+        "label": "Humor",
+        "icon": "\U0001F3AD",  # 🎭
+        "format": lambda v: f"{v:.0f}",
+        "to_pct": lambda v: min(100, max(0, v)),
+    },
+    "toxicity": {
+        "label": "Toxicity",
+        "icon": "\u2620\uFE0F",  # ☠️
+        "format": lambda v: f"{v:.1f}%",
+        "to_pct": lambda v: min(100, max(0, v)),
+    },
+    "popularity": {
+        "label": "Popularity",
+        "icon": "\u2B50",  # ⭐
+        "format": lambda v: f"{v:.0f}",
+        "to_pct": lambda v: min(100, max(0, v)),
     },
 }
 
@@ -301,7 +305,15 @@ class TemplateLoader:
         # Display the 30-day stats window period
         period_display = f"{stats_window_start.strftime('%b %d')} - {stats_window_end.strftime('%b %d')}"
 
-        # Extract and normalize stats
+        # Extract raw stats for the 6 metrics
+        vibe = stats_raw.get("vibe", {})
+        activity = stats_raw.get("activity", {})
+        presence = stats_raw.get("presence", {})
+        humor = stats_raw.get("humor", {})
+        toxicity = stats_raw.get("toxicity", {})
+        popularity = stats_raw.get("popularity", {})
+
+        # Extract and normalize stats for display
         stats_list = []
 
         def get_category_rank_info(category: str) -> tuple[int | None, str]:
@@ -311,65 +323,79 @@ class TemplateLoader:
             medal = RANK_MEDALS.get(cat_rank, "") if cat_rank else ""
             return cat_rank, medal
 
-        # Mood - always render
-        mood = stats_raw.get("mood", {})
-        score = mood.get("score", 0) if mood else 0
-        config = STAT_CONFIG["mood"]
-        cat_rank, medal = get_category_rank_info("mood")
+        # Vibe
+        score = vibe.get("score", 0) if vibe else 0
+        config = STAT_CONFIG["vibe"]
+        cat_rank, medal = get_category_rank_info("vibe")
         stats_list.append(
             StatContext(
-                key="mood",
+                key="vibe",
                 label=config["label"],
                 icon=config["icon"],
                 value=score,
                 percentage=config["to_pct"](score),
                 display_value=config["format"](score),
-                trend=self._make_trend(trends_raw.get("mood")),
+                trend=self._make_trend(trends_raw.get("vibe")),
                 category_rank=cat_rank,
                 category_rank_medal=medal,
             )
         )
 
-        # Comedy - always render
-        comedy = stats_raw.get("comedy", {})
-        score = comedy.get("score", 0) if comedy else 0
-        config = STAT_CONFIG["comedy"]
-        cat_rank, medal = get_category_rank_info("comedy")
+        # Activity
+        score = activity.get("score", 0) if activity else 0
+        config = STAT_CONFIG["activity"]
+        cat_rank, medal = get_category_rank_info("activity")
         stats_list.append(
             StatContext(
-                key="comedy",
+                key="activity",
                 label=config["label"],
                 icon=config["icon"],
                 value=score,
                 percentage=config["to_pct"](score),
                 display_value=config["format"](score),
-                trend=self._make_trend(trends_raw.get("comedy")),
+                trend=self._make_trend(trends_raw.get("activity")),
                 category_rank=cat_rank,
                 category_rank_medal=medal,
             )
         )
 
-        # Volatility - always render
-        volatility = stats_raw.get("volatility", {})
-        score = volatility.get("score", 0) if volatility else 0
-        config = STAT_CONFIG["volatility"]
-        cat_rank, medal = get_category_rank_info("volatility")
+        # Presence
+        score = presence.get("score", 0) if presence else 0
+        config = STAT_CONFIG["presence"]
+        cat_rank, medal = get_category_rank_info("presence")
         stats_list.append(
             StatContext(
-                key="volatility",
+                key="presence",
                 label=config["label"],
                 icon=config["icon"],
                 value=score,
                 percentage=config["to_pct"](score),
                 display_value=config["format"](score),
-                trend=self._make_trend(trends_raw.get("volatility")),
+                trend=self._make_trend(trends_raw.get("presence")),
                 category_rank=cat_rank,
                 category_rank_medal=medal,
             )
         )
 
-        # Toxicity - always render
-        toxicity = stats_raw.get("toxicity", {})
+        # Humor
+        score = humor.get("score", 0) if humor else 0
+        config = STAT_CONFIG["humor"]
+        cat_rank, medal = get_category_rank_info("humor")
+        stats_list.append(
+            StatContext(
+                key="humor",
+                label=config["label"],
+                icon=config["icon"],
+                value=score,
+                percentage=config["to_pct"](score),
+                display_value=config["format"](score),
+                trend=self._make_trend(trends_raw.get("humor")),
+                category_rank=cat_rank,
+                category_rank_medal=medal,
+            )
+        )
+
+        # Toxicity
         pct = toxicity.get("pct", 0) if toxicity else 0
         config = STAT_CONFIG["toxicity"]
         cat_rank, medal = get_category_rank_info("toxicity")
@@ -387,38 +413,19 @@ class TemplateLoader:
             )
         )
 
-        # Activity - always render
-        activity = stats_raw.get("activity", {})
-        messages = activity.get("messages", 0) if activity else 0
-        config = STAT_CONFIG["activity"]
-        cat_rank, medal = get_category_rank_info("activity")
+        # Popularity
+        score = popularity.get("score", 0) if popularity else 0
+        config = STAT_CONFIG["popularity"]
+        cat_rank, medal = get_category_rank_info("popularity")
         stats_list.append(
             StatContext(
-                key="activity",
+                key="popularity",
                 label=config["label"],
                 icon=config["icon"],
-                value=messages,
-                percentage=config["to_pct"](messages),
-                display_value=config["format"](messages),
-                trend=self._make_trend(trends_raw.get("activity")),
-                category_rank=cat_rank,
-                category_rank_medal=medal,
-            )
-        )
-
-        # Reactions - always render
-        reactions = stats_raw.get("reactions_received", 0)
-        config = STAT_CONFIG["reactions"]
-        cat_rank, medal = get_category_rank_info("reactions")
-        stats_list.append(
-            StatContext(
-                key="reactions",
-                label=config["label"],
-                icon=config["icon"],
-                value=reactions,
-                percentage=config["to_pct"](reactions),
-                display_value=config["format"](reactions),
-                trend=self._make_trend(trends_raw.get("reactions")),
+                value=score,
+                percentage=config["to_pct"](score),
+                display_value=config["format"](score),
+                trend=self._make_trend(trends_raw.get("popularity")),
                 category_rank=cat_rank,
                 category_rank_medal=medal,
             )
@@ -430,8 +437,10 @@ class TemplateLoader:
         # Activity context
         activity_ctx = ActivityContext(
             messages=activity.get("messages", 0),
-            active_days=activity.get("active_days", 0),
+            active_days=presence.get("active_days", 0),
             avg_length=activity.get("avg_length", 0),
+            reactions_sent=activity.get("reactions_sent", 0),
+            replies_sent=activity.get("replies_sent", 0),
         )
 
         return TemplateContext(
@@ -443,12 +452,12 @@ class TemplateLoader:
             stats=stats_list,
             badges=badges[:8],  # Limit to 8 badges
             activity=activity_ctx,
-            mood=mood,
-            comedy=comedy,
-            volatility=volatility,
+            vibe=vibe,
+            activity_stats=activity,
+            presence=presence,
+            humor=humor,
             toxicity=toxicity,
-            chronotype=stats_raw.get("chronotype", {}),
-            reactions_received=reactions,
+            popularity=popularity,
             rank=rank,
             theme=theme,
         )
@@ -468,7 +477,7 @@ class TemplateLoader:
             icon = "\u2B07\uFE0F"
             pct_str = f"{pct:.0f}%"
         else:
-            icon = "\u27A1\uFE0F"
+            icon = "\u23F9\uFE0F"  # ⏹️
             pct_str = "0%"
 
         return TrendContext(direction=direction, icon=icon, pct_change=pct_str)
@@ -508,12 +517,12 @@ class TemplateLoader:
             "stats": context.stats,
             "badges": context.badges,
             "activity": context.activity,
-            "mood": context.mood,
-            "comedy": context.comedy,
-            "volatility": context.volatility,
+            "vibe": context.vibe,
+            "activity_stats": context.activity_stats,
+            "presence": context.presence,
+            "humor": context.humor,
             "toxicity": context.toxicity,
-            "chronotype": context.chronotype,
-            "reactions_received": context.reactions_received,
+            "popularity": context.popularity,
             "rank": context.rank,
             "theme": context.theme,
         }

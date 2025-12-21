@@ -244,7 +244,12 @@ def run_generate_cards(args, config):
     # Create generator and run
     from src.cards import CardGenerator
 
-    generator = CardGenerator(engine, timezone=args.timezone, window_days=args.window_days)
+    generator = CardGenerator(
+        engine,
+        timezone=args.timezone,
+        tiers=config.tiers,
+        window_days=args.window_days,
+    )
     result = generator.generate_cards(
         chat_id=args.chat_id,
         week_start=week_start,

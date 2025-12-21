@@ -74,18 +74,26 @@ class CardGenerator:
     ending on the week's end date. Trends compare current week to previous week.
     """
 
-    def __init__(self, engine: Engine, timezone: str, window_days: int = 30):
+    def __init__(
+        self,
+        engine: Engine,
+        timezone: str,
+        tiers: list[tuple[str, int]],
+        window_days: int = 30,
+    ):
         """
         Initialize the card generator.
 
         Args:
             engine: SQLAlchemy engine
             timezone: IANA timezone identifier (e.g., 'America/Sao_Paulo')
+            tiers: List of (name, min_score) tuples for tier classification
             window_days: Rolling window size for stats (default: 30)
         """
         self._engine = engine
         self._timezone = timezone
         self._tz = ZoneInfo(timezone)
+        self._tiers = tiers
         self._window_days = window_days
 
     def _get_week_bounds(self, week_start: datetime) -> tuple[datetime, datetime]:
@@ -206,6 +214,7 @@ class CardGenerator:
                     self._engine, user_id, chat_id, window_start, window_end,
                     timezone=self._timezone,
                     existing_stats=stats,
+                    tiers=self._tiers,
                 )
                 if result is not None:
                     stats["overall"] = result.value
@@ -308,7 +317,7 @@ class CardGenerator:
 
         # Update label based on new score
         from src.cards.calculators import _overall_label
-        stats["overall"]["label"] = _overall_label(final_score)
+        stats["overall"]["label"] = _overall_label(final_score, self._tiers)
 
     def _calc_pct_change(self, current: float, previous: float) -> float:
         """Calculate percentage change, handling division by zero."""

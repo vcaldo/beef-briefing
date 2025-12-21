@@ -644,6 +644,90 @@ FROM (
 
 ---
 
+### 7. Overall Score (0-100)
+
+Holistic score combining all 6 metrics with weighted importance, trend modifiers, and badge modifiers. **Used for card ranking.**
+
+**Formula (3 phases):**
+
+**Phase 1: Base Score (70% positive / 30% negative penalty)**
+
+| Component | Type | Weight | Source |
+|-----------|------|--------|--------|
+| Popularity | Positive | 20% | `popularity.score` |
+| Presence | Positive | 15% | `presence.score` |
+| Vibe | Positive | 12% | `vibe.score` |
+| Days Streak | Positive | 10% | `presence.streak` (normalized to 0-100) |
+| Humor | Positive | 8% | `humor.score` |
+| Activity | Positive | 5% | `activity.score` |
+| Toxicity | Negative | 12% | `toxicity.pct` |
+| Negative Reactions | Negative | 7% | `toxicity.negative_reactions` / total |
+| Negative Messages | Negative | 6% | `vibe.negative_ratio` |
+| Longest Gap | Negative | 5% | Max days between posts (normalized) |
+
+```python
+# Calculate positive contribution (70 points max)
+positive = (
+    0.20 * popularity_score +
+    0.15 * presence_score +
+    0.12 * vibe_score +
+    0.10 * streak_normalized +
+    0.08 * humor_score +
+    0.05 * activity_score
+)
+
+# Calculate negative penalty (30 points max)
+negative = (
+    0.12 * toxicity_pct +
+    0.07 * negative_reaction_ratio +
+    0.06 * negative_msg_ratio +
+    0.05 * gap_normalized
+)
+
+base_score = positive - negative  # Range: -30 to +70
+```
+
+**Phase 2: Trend Modifiers**
+
+For each of the 6 base metrics, add points based on trend direction:
+- Upward trend >10% change: **+5 points**
+- Upward trend ≤10% change: **+3 points**
+- Downward trend ≤10% change: **-3 points**
+- Downward trend >10% change: **-5 points**
+
+For toxicity, direction is inverted (decreasing toxicity = good).
+
+Max impact: ±30 points (if all 6 metrics trend same direction).
+
+**Phase 3: Badge Modifiers**
+
+Sum of modifiers for all earned badges:
+- Legendary badge: **+10 points**
+- Epic badge: **+7 points**
+- Rare badge: **+7 points**
+- Common badge: **+3 points**
+- Negative badge: **-5 points**
+
+**Final Score:**
+```python
+final_score = clamp(base_score + trend_modifier + badge_modifier, 0, 100)
+```
+
+**Labels:**
+
+| Score | Label |
+|-------|-------|
+| 85+ | Lendario |
+| 70-84 | Elite |
+| 55-69 | Destacado |
+| 40-54 | Regular |
+| 25-39 | Iniciante |
+| <25 | Novato |
+
+**Source:** [calculators.py](src/cards/calculators.py), [generator.py](src/cards/generator.py)
+
+---
+
 ## Trend Calculations
 
 Each stat includes a trend comparing the current week to the previous week.
@@ -683,6 +767,13 @@ def calc_pct_change(current: float, previous: float) -> float:
 ## Badge Summary
 
 All badges are evaluated per-chat, with percentile-based badges using chat-specific rankings.
+
+**Note:** Badges directly affect the Overall Score via badge modifiers:
+- Legendary badges: +10 points
+- Epic badges: +7 points
+- Rare badges: +7 points
+- Common badges: +3 points
+- Negative badges: -5 points
 
 ### Positive Badges
 
@@ -782,6 +873,15 @@ CREATE TABLE ml_user_cards (
     "unique_reactors": 23,
     "unique_repliers": 18,
     "viral_messages": 3
+  },
+  "overall": {
+    "score": 58.5,
+    "label": "Destacado",
+    "positive_contribution": 45.2,
+    "negative_penalty": 8.7,
+    "longest_gap_days": 3,
+    "trend_modifier": 12.0,
+    "badge_modifier": 10.0
   }
 }
 ```
@@ -852,7 +952,8 @@ WITH category_ranks AS (
         ROW_NUMBER() OVER (ORDER BY (stats->'presence'->>'score')::float DESC NULLS LAST) AS presence_rank,
         ROW_NUMBER() OVER (ORDER BY (stats->'humor'->>'score')::float DESC NULLS LAST) AS humor_rank,
         ROW_NUMBER() OVER (ORDER BY (stats->'toxicity'->>'pct')::float ASC NULLS LAST) AS toxicity_rank,
-        ROW_NUMBER() OVER (ORDER BY (stats->'popularity'->>'score')::float DESC NULLS LAST) AS popularity_rank
+        ROW_NUMBER() OVER (ORDER BY (stats->'popularity'->>'score')::float DESC NULLS LAST) AS popularity_rank,
+        ROW_NUMBER() OVER (ORDER BY (stats->'overall'->>'score')::float DESC NULLS LAST) AS overall_rank
     FROM ml_user_cards
     WHERE chat_id = :chat_id
       AND week_start = :week_start
@@ -860,9 +961,12 @@ WITH category_ranks AS (
 SELECT * FROM category_ranks
 WHERE vibe_rank <= 3 OR activity_rank <= 3 OR presence_rank <= 3
    OR humor_rank <= 3 OR toxicity_rank <= 3 OR popularity_rank <= 3
+   OR overall_rank <= 3
 ```
 
-**Note:** Toxicity is sorted ASC (lowest = best), all others DESC (highest = best).
+**Note:** Toxicity is sorted ASC (lowest = best), all others including Overall DESC (highest = best).
+
+**Card ranking:** Cards are ordered by `overall.score` DESC for the primary ranking display.
 
 ### Image Specifications
 

@@ -16,10 +16,54 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from src.cards.calculators import CALCULATORS
+from src.cards.calculators import CALCULATORS, _clamp
 from src.instrumentation import function_trace
 
 logger = logging.getLogger(__name__)
+
+
+# Badge rules for modifier calculation (copied from template_loader.py)
+# Each badge contributes to overall score: legendary +2, epic +1, negative -2
+BADGE_RULES = [
+    # Vibe badges
+    {"condition": lambda s: s.get("vibe", {}).get("score", 0) >= 80, "rarity": "legendary"},
+    {"condition": lambda s: s.get("vibe", {}).get("score", 100) < 30, "rarity": "negative"},
+    # Presence badges
+    {"condition": lambda s: s.get("presence", {}).get("score", 0) >= 80, "rarity": "epic"},
+    {
+        "condition": lambda s: (
+            s.get("presence", {}).get("score", 100) < 20
+            and s.get("activity", {}).get("messages", 0) >= 10
+        ),
+        "rarity": "negative",
+    },
+    # Humor badges
+    {"condition": lambda s: s.get("humor", {}).get("score", 0) >= 70, "rarity": "legendary"},
+    {"condition": lambda s: s.get("humor", {}).get("score", 100) < 10, "rarity": "negative"},
+    # Toxicity badges
+    {"condition": lambda s: s.get("toxicity", {}).get("pct", 100) < 2, "rarity": "legendary"},
+    {"condition": lambda s: s.get("toxicity", {}).get("pct", 0) > 20, "rarity": "negative"},
+    # Activity badges
+    {"condition": lambda s: s.get("activity", {}).get("messages", 0) >= 500, "rarity": "legendary"},
+    {"condition": lambda s: s.get("activity", {}).get("messages", 0) < 20, "rarity": "negative"},
+    # Popularity badges
+    {"condition": lambda s: s.get("popularity", {}).get("unique_reactors", 0) >= 10, "rarity": "legendary"},
+    {
+        "condition": lambda s: (
+            s.get("popularity", {}).get("total_reactions", 0) == 0
+            and s.get("activity", {}).get("messages", 0) >= 30
+        ),
+        "rarity": "negative",
+    },
+]
+
+BADGE_MODIFIERS = {
+    "legendary": 10,
+    "epic": 7,
+    "negative": -5,
+    "rare": 7,
+    "common": 3,
+}
 
 
 class CardGenerator:
@@ -130,12 +174,19 @@ class CardGenerator:
         """
         Compute all stats for a user using registered calculators.
 
-        Runs each calculator and collects results. Stats that return None
-        (due to insufficient data) are skipped.
+        Two-phase computation:
+        1. Compute all base metrics (vibe, activity, presence, humor, toxicity, popularity)
+        2. Compute overall score using existing stats to avoid re-querying
+
+        Stats that return None (due to insufficient data) are skipped.
         """
         stats = {}
 
+        # Phase 1: Compute base metrics (everything except overall)
         for stat_name, calculator in CALCULATORS.items():
+            if stat_name == "overall":
+                continue  # Computed in phase 2
+
             try:
                 result = calculator(
                     self._engine, user_id, chat_id, window_start, window_end,
@@ -148,7 +199,116 @@ class CardGenerator:
                     f"Calculator {stat_name} failed for user {user_id}: {e}"
                 )
 
+        # Phase 2: Compute overall score with existing stats
+        if "overall" in CALCULATORS and stats:
+            try:
+                result = CALCULATORS["overall"](
+                    self._engine, user_id, chat_id, window_start, window_end,
+                    timezone=self._timezone,
+                    existing_stats=stats,
+                )
+                if result is not None:
+                    stats["overall"] = result.value
+            except Exception as e:
+                logger.warning(
+                    f"Calculator overall failed for user {user_id}: {e}"
+                )
+
         return stats
+
+    def _apply_trend_modifier(self, trends: dict | None) -> float:
+        """
+        Calculate trend modifier for overall score.
+
+        For each metric:
+        - Upward trend >10% change: +5 points
+        - Upward trend ≤10% change: +3 points
+        - Downward trend ≤10% change: -3 points
+        - Downward trend >10% change: -5 points
+
+        For toxicity, direction is inverted (decreasing = good).
+
+        Returns:
+            Total modifier value (can be positive or negative)
+        """
+        if not trends:
+            return 0.0
+
+        modifier = 0.0
+
+        # Positive metrics: up = good, down = bad
+        positive_metrics = ["popularity", "presence", "vibe", "humor", "activity"]
+        for metric in positive_metrics:
+            if metric in trends:
+                pct = abs(trends[metric].get("pct_change", 0))
+                direction = trends[metric].get("direction", "stable")
+                if direction == "up":
+                    modifier += 5 if pct > 10 else 3
+                elif direction == "down":
+                    modifier -= 5 if pct > 10 else 3
+
+        # Toxicity: down = good (decreasing toxicity), up = bad
+        if "toxicity" in trends:
+            pct = abs(trends["toxicity"].get("pct_change", 0))
+            direction = trends["toxicity"].get("direction", "stable")
+            if direction == "down":  # Decreasing toxicity is GOOD
+                modifier += 5 if pct > 10 else 3
+            elif direction == "up":  # Increasing toxicity is BAD
+                modifier -= 5 if pct > 10 else 3
+
+        return modifier
+
+    def _apply_badge_modifier(self, stats: dict) -> float:
+        """
+        Calculate badge modifier for overall score.
+
+        Sums modifiers for all earned badges:
+        - Legendary: +5
+        - Epic: +3
+        - Negative: -5
+
+        Returns:
+            Total modifier value (can be positive or negative)
+        """
+        modifier = 0.0
+
+        for rule in BADGE_RULES:
+            try:
+                if rule["condition"](stats):
+                    rarity = rule["rarity"]
+                    modifier += BADGE_MODIFIERS.get(rarity, 0)
+            except (KeyError, TypeError):
+                continue
+
+        return modifier
+
+    def _apply_overall_modifiers(
+        self, stats: dict, trends: dict | None
+    ) -> None:
+        """
+        Apply trend and badge modifiers to overall score in place.
+
+        Modifies the stats dict's overall.score value with applied modifiers,
+        clamped to 0-100 range.
+        """
+        if "overall" not in stats:
+            return
+
+        base_score = stats["overall"].get("score", 0)
+        trend_modifier = self._apply_trend_modifier(trends)
+        badge_modifier = self._apply_badge_modifier(stats)
+
+        # Apply modifiers and clamp
+        final_score = _clamp(base_score + trend_modifier + badge_modifier, 0, 100)
+
+        # Update stats with final score and modifier info
+        stats["overall"]["score"] = round(final_score, 1)
+        stats["overall"]["trend_modifier"] = round(trend_modifier, 1)
+        stats["overall"]["badge_modifier"] = round(badge_modifier, 1)
+
+        # Update label based on new score
+        from src.cards.calculators import _overall_label
+        stats["overall"]["label"] = _overall_label(final_score)
 
     def _calc_pct_change(self, current: float, previous: float) -> float:
         """Calculate percentage change, handling division by zero."""
@@ -376,6 +536,9 @@ class CardGenerator:
 
             # Compute trends
             trends = self._compute_trends(user_id, chat_id, stats, prev_week_start)
+
+            # Apply modifiers to overall score (in place)
+            self._apply_overall_modifiers(stats, trends)
 
             # Upsert card
             if self._upsert_card(

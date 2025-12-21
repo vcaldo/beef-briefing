@@ -1,0 +1,53 @@
+{
+  "name": "vaporwave",
+  "colors": {
+    "background_gradient": ["#2b061e", "#440a67", "#5b10a2"],
+    "primary_accent": "#00f0ff",
+    "secondary_accent": "#ff0099",
+    "text_primary": "#fff0f5",
+    "text_secondary": "rgba(255, 240, 245, 0.7)",
+    "border_color": "rgba(255, 0, 153, 0.5)",
+    "stat_colors": {
+      "vibe": "#ff71ce",
+      "vibe_gradient": ["#ff71ce", "#b967ff"],
+      "activity": "#05ffa1",
+      "activity_gradient": ["#05ffa1", "#00ffff"],
+      "presence": "#fffb96",
+      "presence_gradient": ["#fffb96", "#ffae00"],
+      "humor": "#ff0099",
+      "humor_gradient": ["#ff0099", "#8a00c2"],
+      "toxicity": "#b967ff",
+      "toxicity_gradient": ["#b967ff", "#440a67"],
+      "popularity": "#00f0ff",
+      "popularity_gradient": ["#00f0ff", "#05ffa1"]
+    },
+    "badge_rarity_colors": {
+      "common": { "bg_start": "#444", "bg_end": "#555", "border": "#666", "text": "#ccc" },
+      "rare": { "bg_start": "#003366", "bg_end": "#005599", "border": "#0099ff", "text": "#fff" },
+      "epic": { "bg_start": "#330033", "bg_end": "#660066", "border": "#ff00ff", "text": "#fff" },
+      "legendary": { "bg_start": "#663300", "bg_end": "#996600", "border": "#ffcc00", "text": "#fff", "glow": "rgba(255, 204, 0, 0.6)" }
+    },
+    "tier_colors": {
+      "legendary": ["#ffd700", "#ffaa00"],
+      "elite": ["#ff0099", "#b967ff"],
+      "outstanding": ["#05ffa1", "#00f0ff"],
+      "regular": ["#fffb96", "#ffae00"],
+      "beginner": ["#666666", "#888888"],
+      "rookie": ["#440a67", "#5b10a2"]
+    },
+    "effects": {
+      "avatar_glow": "rgba(0, 240, 255, 0.5)",
+      "username_glow": "rgba(255, 0, 153, 0.4)",
+      "border_gradient": ["#00f0ff", "#ff0099", "#fffb96"],
+      "decoration_pink": "rgba(255, 0, 153, 0.2)",
+      "decoration_cyan": "rgba(0, 240, 255, 0.2)"
+    },
+    "trend_colors": { "up": "#05ffa1", "down": "#ff0099", "stable": "rgba(255, 255, 255, 0.5)" }
+  },
+  "typography": {
+    "header_font": "Righteous",
+    "body_font": "Quicksand",
+    "header_weights": [400],
+    "body_weights": [400, 600, 700]
+  }
+}

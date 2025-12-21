@@ -1,0 +1,78 @@
+{
+  "name": "meme",
+  "colors": {
+    "background_gradient": ["#ff00ff", "#00ffff", "#ffff00"],
+    "primary_accent": "#000000",
+    "secondary_accent": "#ff0000",
+    "text_primary": "#000000",
+    "text_secondary": "rgba(0, 0, 0, 0.7)",
+    "border_color": "rgba(0, 0, 0, 0.3)",
+    "stat_colors": {
+      "vibe": "#ff6b00",
+      "vibe_gradient": ["#ff0000", "#ffff00"],
+      "activity": "#00ff00",
+      "activity_gradient": ["#00ff00", "#00ffff"],
+      "presence": "#ff00ff",
+      "presence_gradient": ["#ff00ff", "#ff69b4"],
+      "humor": "#ffff00",
+      "humor_gradient": ["#ffff00", "#ff6600"],
+      "toxicity": "#ff0000",
+      "toxicity_gradient": ["#00ff00", "#ff0000"],
+      "popularity": "#00ffff",
+      "popularity_gradient": ["#00ffff", "#ff00ff"]
+    },
+    "badge_rarity_colors": {
+      "common": {
+        "bg_start": "#808080",
+        "bg_end": "#a0a0a0",
+        "border": "#000000",
+        "text": "#000000"
+      },
+      "rare": {
+        "bg_start": "#0000ff",
+        "bg_end": "#00ffff",
+        "border": "#000000",
+        "text": "#ffffff"
+      },
+      "epic": {
+        "bg_start": "#ff00ff",
+        "bg_end": "#ff69b4",
+        "border": "#000000",
+        "text": "#ffffff"
+      },
+      "legendary": {
+        "bg_start": "#ffd700",
+        "bg_end": "#ffff00",
+        "border": "#000000",
+        "text": "#000000",
+        "glow": "rgba(255, 215, 0, 0.8)"
+      }
+    },
+    "tier_colors": {
+      "legendary": ["#ffd700", "#ffff00"],
+      "elite": ["#00ffff", "#00ff00"],
+      "outstanding": ["#ff00ff", "#ff69b4"],
+      "regular": ["#00ff00", "#7fff00"],
+      "beginner": ["#808080", "#c0c0c0"],
+      "rookie": ["#ff6347", "#ff4500"]
+    },
+    "effects": {
+      "avatar_glow": "rgba(255, 0, 255, 0.6)",
+      "username_glow": "rgba(0, 255, 255, 0.6)",
+      "border_gradient": ["#ff0000", "#00ff00", "#0000ff"],
+      "decoration_pink": "rgba(255, 0, 255, 0.15)",
+      "decoration_cyan": "rgba(0, 255, 255, 0.15)"
+    },
+    "trend_colors": {
+      "up": "#00ff00",
+      "down": "#ff0000",
+      "stable": "rgba(0, 0, 0, 0.5)"
+    }
+  },
+  "typography": {
+    "header_font": "Bangers",
+    "body_font": "Comic Neue",
+    "header_weights": [400],
+    "body_weights": [400, 700]
+  }
+}

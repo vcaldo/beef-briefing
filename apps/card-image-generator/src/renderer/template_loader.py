@@ -3,13 +3,22 @@
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from ..themes import ThemeLoader
+
 logger = logging.getLogger(__name__)
+
+# Constants
+MAX_BADGES = 8  # Maximum badges to display on card
+TOP_RANK_COUNT = 3  # Number of top ranks for medals
+
+# Stat keys in display order
+STAT_KEYS = ["vibe", "activity", "presence", "humor", "toxicity", "popularity"]
 
 
 @dataclass
@@ -192,42 +201,49 @@ STAT_CONFIG = {
         "icon": "\U0001F31F",  # 🌟
         "format": lambda v: f"{v:.0f}",
         "to_pct": lambda v: min(100, max(0, v)),
+        "value_key": "score",
     },
     "activity": {
         "label": "Activity",
         "icon": "\U0001F525",  # 🔥
         "format": lambda v: f"{v:.0f}",
         "to_pct": lambda v: min(100, max(0, v)),
+        "value_key": "score",
     },
     "presence": {
         "label": "Presence",
         "icon": "\U0001F4C5",  # 📅
         "format": lambda v: f"{v:.0f}",
         "to_pct": lambda v: min(100, max(0, v)),
+        "value_key": "score",
     },
     "humor": {
         "label": "Humor",
         "icon": "\U0001F3AD",  # 🎭
         "format": lambda v: f"{v:.0f}",
         "to_pct": lambda v: min(100, max(0, v)),
+        "value_key": "score",
     },
     "toxicity": {
         "label": "Toxicity",
         "icon": "\u2620\uFE0F",  # ☠️
         "format": lambda v: f"{v:.1f}%",
         "to_pct": lambda v: min(100, max(0, v)),
+        "value_key": "pct",
     },
     "popularity": {
         "label": "Popularity",
         "icon": "\u2B50",  # ⭐
         "format": lambda v: f"{v:.0f}",
         "to_pct": lambda v: min(100, max(0, v)),
+        "value_key": "score",
     },
     "overall": {
         "label": "Overall",
         "icon": "\U0001F3C6",  # 🏆
         "format": lambda v: f"{v:.0f}",
         "to_pct": lambda v: min(100, max(0, v)),
+        "value_key": "score",
     },
 }
 
@@ -241,6 +257,7 @@ class TemplateLoader:
             loader=FileSystemLoader(templates_dir),
             autoescape=select_autoescape(["html", "xml"]),
         )
+        self.theme_loader = ThemeLoader(templates_dir)
 
     def get_template_path(self, theme: str) -> str:
         """Get template path for a theme."""
@@ -250,6 +267,36 @@ class TemplateLoader:
         """Check if a theme template exists."""
         template_path = self.templates_dir / "themes" / theme / "card.html"
         return template_path.exists()
+
+    def _build_stat_context(
+        self,
+        stat_key: str,
+        stat_data: dict,
+        category_rankings: dict[str, dict[int, int]],
+        user_id: int,
+        trends_raw: dict,
+    ) -> StatContext:
+        """Build a StatContext for a single stat."""
+        config = STAT_CONFIG[stat_key]
+        value_key = config["value_key"]
+        value = stat_data.get(value_key, 0) if stat_data else 0
+
+        # Get category rank info
+        cat_ranks = category_rankings.get(stat_key, {})
+        cat_rank = cat_ranks.get(user_id)
+        medal = RANK_MEDALS.get(cat_rank, "") if cat_rank else ""
+
+        return StatContext(
+            key=stat_key,
+            label=config["label"],
+            icon=config["icon"],
+            value=value,
+            percentage=config["to_pct"](value),
+            display_value=config["format"](value),
+            trend=self._make_trend(trends_raw.get(stat_key)),
+            category_rank=cat_rank,
+            category_rank_medal=medal,
+        )
 
     def transform_card_data(
         self,
@@ -321,123 +368,17 @@ class TemplateLoader:
         popularity = stats_raw.get("popularity", {})
         overall = stats_raw.get("overall", {})
 
-        # Extract and normalize stats for display
-        stats_list = []
-
-        def get_category_rank_info(category: str) -> tuple[int | None, str]:
-            """Get rank and medal for a category."""
-            cat_ranks = category_rankings.get(category, {})
-            cat_rank = cat_ranks.get(user_id)
-            medal = RANK_MEDALS.get(cat_rank, "") if cat_rank else ""
-            return cat_rank, medal
-
-        # Vibe
-        score = vibe.get("score", 0) if vibe else 0
-        config = STAT_CONFIG["vibe"]
-        cat_rank, medal = get_category_rank_info("vibe")
-        stats_list.append(
-            StatContext(
-                key="vibe",
-                label=config["label"],
-                icon=config["icon"],
-                value=score,
-                percentage=config["to_pct"](score),
-                display_value=config["format"](score),
-                trend=self._make_trend(trends_raw.get("vibe")),
-                category_rank=cat_rank,
-                category_rank_medal=medal,
+        # Build stats list using refactored method
+        stats_list = [
+            self._build_stat_context(
+                stat_key,
+                stats_raw.get(stat_key, {}),
+                category_rankings,
+                user_id,
+                trends_raw,
             )
-        )
-
-        # Activity
-        score = activity.get("score", 0) if activity else 0
-        config = STAT_CONFIG["activity"]
-        cat_rank, medal = get_category_rank_info("activity")
-        stats_list.append(
-            StatContext(
-                key="activity",
-                label=config["label"],
-                icon=config["icon"],
-                value=score,
-                percentage=config["to_pct"](score),
-                display_value=config["format"](score),
-                trend=self._make_trend(trends_raw.get("activity")),
-                category_rank=cat_rank,
-                category_rank_medal=medal,
-            )
-        )
-
-        # Presence
-        score = presence.get("score", 0) if presence else 0
-        config = STAT_CONFIG["presence"]
-        cat_rank, medal = get_category_rank_info("presence")
-        stats_list.append(
-            StatContext(
-                key="presence",
-                label=config["label"],
-                icon=config["icon"],
-                value=score,
-                percentage=config["to_pct"](score),
-                display_value=config["format"](score),
-                trend=self._make_trend(trends_raw.get("presence")),
-                category_rank=cat_rank,
-                category_rank_medal=medal,
-            )
-        )
-
-        # Humor
-        score = humor.get("score", 0) if humor else 0
-        config = STAT_CONFIG["humor"]
-        cat_rank, medal = get_category_rank_info("humor")
-        stats_list.append(
-            StatContext(
-                key="humor",
-                label=config["label"],
-                icon=config["icon"],
-                value=score,
-                percentage=config["to_pct"](score),
-                display_value=config["format"](score),
-                trend=self._make_trend(trends_raw.get("humor")),
-                category_rank=cat_rank,
-                category_rank_medal=medal,
-            )
-        )
-
-        # Toxicity
-        pct = toxicity.get("pct", 0) if toxicity else 0
-        config = STAT_CONFIG["toxicity"]
-        cat_rank, medal = get_category_rank_info("toxicity")
-        stats_list.append(
-            StatContext(
-                key="toxicity",
-                label=config["label"],
-                icon=config["icon"],
-                value=pct,
-                percentage=config["to_pct"](pct),
-                display_value=config["format"](pct),
-                trend=self._make_trend(trends_raw.get("toxicity")),
-                category_rank=cat_rank,
-                category_rank_medal=medal,
-            )
-        )
-
-        # Popularity
-        score = popularity.get("score", 0) if popularity else 0
-        config = STAT_CONFIG["popularity"]
-        cat_rank, medal = get_category_rank_info("popularity")
-        stats_list.append(
-            StatContext(
-                key="popularity",
-                label=config["label"],
-                icon=config["icon"],
-                value=score,
-                percentage=config["to_pct"](score),
-                display_value=config["format"](score),
-                trend=self._make_trend(trends_raw.get("popularity")),
-                category_rank=cat_rank,
-                category_rank_medal=medal,
-            )
-        )
+            for stat_key in STAT_KEYS
+        ]
 
         # Derive badges
         badges = self._derive_badges(stats_raw)
@@ -458,7 +399,7 @@ class TemplateLoader:
             week_number=week_number,
             period_display=period_display,
             stats=stats_list,
-            badges=badges[:8],  # Limit to 8 badges
+            badges=badges[:MAX_BADGES],
             activity=activity_ctx,
             vibe=vibe,
             activity_stats=activity,
@@ -516,6 +457,10 @@ class TemplateLoader:
         template_path = self.get_template_path(theme)
         template = self.env.get_template(template_path)
 
+        # Load theme configuration
+        theme_config = self.theme_loader.load_theme(theme)
+        theme_context = theme_config.to_template_context()
+
         # Convert dataclass to dict for Jinja2
         ctx_dict = {
             "user": context.user,
@@ -534,7 +479,7 @@ class TemplateLoader:
             "popularity": context.popularity,
             "overall": context.overall,
             "rank": context.rank,
-            "theme": context.theme,
+            "theme": theme_context,  # Inject theme configuration
         }
 
         return template.render(**ctx_dict)

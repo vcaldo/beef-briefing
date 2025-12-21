@@ -6,6 +6,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from .utils import row_to_dict, rows_to_dicts
+
 
 class CardQueries:
     """Read-only queries for card data from ml_user_cards."""
@@ -68,7 +70,7 @@ class CardQueries:
                     "user_ids": user_ids,
                 },
             )
-            return [dict(row._mapping) for row in result]
+            return rows_to_dicts(result)
 
     def get_latest_week_for_chat(self, chat_id: int) -> date | None:
         """Get the most recent week_start for a chat."""
@@ -130,7 +132,7 @@ class CardQueries:
                 query,
                 {"chat_id": chat_id, "week_start": week_start, "theme": theme},
             )
-            return {row.user_id: dict(row._mapping) for row in result}
+            return {row.user_id: row_to_dict(row) for row in result}
 
     def get_category_rankings(
         self,

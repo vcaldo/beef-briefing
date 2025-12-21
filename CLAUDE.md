@@ -18,7 +18,7 @@ A Go-based Telegram bot system for managing beef briefing subscriptions with RES
 
 ### Services
 
-The system consists of 3 main Go services:
+**Go Services:**
 
 1. **api-service** (port 8080): REST API for ingesting Telegram updates with media uploads
    - Handles multipart uploads with JSON metadata + binary files
@@ -36,7 +36,20 @@ The system consists of 3 main Go services:
    - Resume support with state tracking
    - Handles group→supergroup migration
 
-4. **leaderboard** (port 8050): Analytics dashboard for chat statistics
+**Python Services:**
+
+4. **card-image-generator** (port 8051): Renders gamified user stats cards as PNG images
+   - HTML/CSS templates with Jinja2
+   - Playwright for headless Chromium rendering
+   - Theme system with JSON configuration (see [card-image-generator README](apps/card-image-generator/README.md))
+   - MinIO/S3 storage for generated images
+
+5. **ml-processor**: ML pipeline for message analysis
+   - Sentiment, humor, toxicity analysis using OpenAI
+   - Weekly stats aggregation for user cards
+   - Rate-limited API calls with token bucket algorithm
+
+6. **leaderboard** (port 8050): Analytics dashboard for chat statistics
    - Built with Dash + Dash Mantine Components (DMC)
    - Responsive layout with Dash Bootstrap Components (DBC)
    - Real-time data from PostgreSQL via SQLAlchemy

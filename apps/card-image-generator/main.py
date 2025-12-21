@@ -9,7 +9,6 @@ from sqlalchemy import create_engine
 
 from config import load_config
 from src.api import router
-from src.api.routes import set_api_keys, set_generator
 from src.generator import CardGenerator
 from src.storage import CardStorageClient
 
@@ -74,9 +73,9 @@ async def lifespan(app: FastAPI):
     # Initialize generator (starts Playwright)
     await generator.start()
 
-    # Set up API routes
-    set_generator(generator)
-    set_api_keys(config.get_app_keys())
+    # Store generator and API keys in app state
+    app.state.generator = generator
+    app.state.api_keys = config.get_app_keys()
 
     logger.info(
         f"Service ready on {config.card_generator_host}:{config.card_generator_port}"

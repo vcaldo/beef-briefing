@@ -310,6 +310,58 @@
             font-size: 12px;
             color: rgba(255, 255, 255, 0.4);
         }
+
+        /* Beef Meter */
+        .beef-meter {
+            margin-bottom: 16px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+
+        .beef-meter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .beef-meter-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .beef-meter-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .beef-meter-bar {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .beef-meter-fill {
+            height: 100%;
+            border-radius: 2px;
+        }
+
+        /* Tier-specific colors */
+        .beef-meter-fill.legendary { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+        .beef-meter-fill.elite { background: linear-gradient(90deg, #00d9ff, #0ea5e9); }
+        .beef-meter-fill.outstanding { background: linear-gradient(90deg, #a855f7, #7c3aed); }
+        .beef-meter-fill.regular { background: linear-gradient(90deg, #14b8a6, #0d9488); }
+        .beef-meter-fill.beginner { background: linear-gradient(90deg, #9ca3af, #6b7280); }
+        .beef-meter-fill.rookie { background: linear-gradient(90deg, #f472b6, #ec4899); }
     </style>
 </head>
 <body>
@@ -331,6 +383,17 @@
                 </span>
             </div>
             {% endif %}
+        </div>
+
+        <!-- Beef Meter -->
+        <div class="beef-meter">
+            <div class="beef-meter-header">
+                <span class="beef-meter-label">Beef Meter</span>
+                <span class="beef-meter-value">{{ overall.score|round|int }} • {{ overall.label }}</span>
+            </div>
+            <div class="beef-meter-bar">
+                <div class="beef-meter-fill {{ overall.label|lower }}" style="width: {{ overall.score }}%;"></div>
+            </div>
         </div>
 
         <!-- Stats Grid -->

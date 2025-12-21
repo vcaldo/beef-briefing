@@ -201,17 +201,17 @@ def _popularity_label(score: float) -> str:
 def _overall_label(score: float) -> str:
     """Convert overall score (0-100) to label."""
     if score >= 85:
-        return "Lendario"
+        return "Legendary"
     elif score >= 70:
         return "Elite"
     elif score >= 55:
-        return "Destacado"
+        return "Outstanding"
     elif score >= 40:
         return "Regular"
     elif score >= 25:
-        return "Iniciante"
+        return "Beginner"
     else:
-        return "Novato"
+        return "Rookie"
 
 
 # =========================================

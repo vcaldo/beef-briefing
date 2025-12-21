@@ -6,6 +6,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from .utils import row_to_dict, rows_to_dicts
+
 
 class CardImageRepository:
     """Write operations for card images."""
@@ -89,7 +91,7 @@ class CardImageRepository:
 
         with self.engine.connect() as conn:
             result = conn.execute(query, {"image_id": image_id}).fetchone()
-            return dict(result._mapping) if result else None
+            return row_to_dict(result) if result else None
 
     def get_images_for_chat_week(
         self,
@@ -125,4 +127,4 @@ class CardImageRepository:
                     "theme": theme,
                 },
             )
-            return [dict(row._mapping) for row in result]
+            return rows_to_dicts(result)

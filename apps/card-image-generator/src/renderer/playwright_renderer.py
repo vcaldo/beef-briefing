@@ -1,8 +1,6 @@
 """Playwright-based HTML to PNG renderer."""
 
-import asyncio
 import logging
-from pathlib import Path
 
 from playwright.async_api import async_playwright, Browser, Playwright
 
@@ -115,43 +113,6 @@ class PlaywrightRenderer:
 
         finally:
             await page.close()
-
-    async def render_html_sync(
-        self,
-        html_content: str,
-        base_url: str | None = None,
-    ) -> bytes:
-        """
-        Synchronous wrapper for render_html.
-
-        For use in non-async contexts.
-        """
-        return await self.render_html(html_content, base_url)
-
-    def render_sync(
-        self,
-        html_content: str,
-        base_url: str | None = None,
-    ) -> bytes:
-        """
-        Fully synchronous render method.
-
-        Creates new event loop if needed.
-        """
-        try:
-            loop = asyncio.get_running_loop()
-            # If there's a running loop, we need to run in a thread
-            import concurrent.futures
-
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(
-                    asyncio.run,
-                    self.render_html(html_content, base_url),
-                )
-                return future.result()
-        except RuntimeError:
-            # No running loop, we can use asyncio.run
-            return asyncio.run(self.render_html(html_content, base_url))
 
     async def __aenter__(self):
         await self.start()

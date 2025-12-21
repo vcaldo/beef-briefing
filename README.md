@@ -56,7 +56,9 @@ make logs
 | [api-service](apps/api-service/README.md) | REST API for ingesting Telegram updates with media uploads |
 | [telegram-bot](apps/telegram-bot/README.md) | Telegram bot client that forwards group messages to the API |
 | [import-cli](apps/import-cli/README.md) | CLI tool to import Telegram Desktop exports |
-| [postgres](apps/postgres/README.md) | Database schema with 22 tables modeling Telegram data |
+| [card-image-generator](apps/card-image-generator/README.md) | Renders gamified user stats cards as PNG images using HTML/CSS templates |
+| [ml-processor](apps/ml-processor/README.md) | ML pipeline for sentiment, humor, toxicity analysis |
+| [ml-dashboard](apps/ml-dashboard/README.md) | Dashboard for ML processing status and metrics |
 
 ## Infrastructure Documentation
 

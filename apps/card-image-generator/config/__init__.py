@@ -3,8 +3,8 @@ Configuration module for the card image generator service.
 Uses Pydantic for environment variable parsing.
 """
 
+import os
 from functools import cached_property
-from typing import Optional
 
 from pydantic_settings import BaseSettings
 
@@ -49,8 +49,8 @@ class Config(BaseSettings):
     app_keys_dir: str = "/app/secrets/app_keys"
 
     # New Relic APM Configuration (optional)
-    new_relic_app_name: Optional[str] = None
-    new_relic_license_key: Optional[str] = None
+    new_relic_app_name: str | None = None
+    new_relic_license_key: str | None = None
 
     class Config:
         env_file = ".env"
@@ -81,8 +81,6 @@ class Config(BaseSettings):
 
     def get_app_keys(self) -> dict[str, str]:
         """Load API keys from app_keys_dir."""
-        import os
-
         keys = {}
         if not os.path.isdir(self.app_keys_dir):
             return keys

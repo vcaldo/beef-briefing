@@ -16,9 +16,11 @@ class ThemeColors:
     background_gradient: list[str]  # [start, mid, end]
     primary_accent: str
     secondary_accent: str
-    stat_colors: dict[str, str]  # vibe, activity, presence, etc.
+    stat_colors: dict[str, Any]  # vibe, activity, presence, etc. (includes gradients)
     badge_rarity_colors: dict[str, dict[str, str]]  # common, rare, epic, legendary
     tier_colors: dict[str, list[str]]  # legendary, elite, etc. [start, end]
+    effects: dict[str, Any] = field(default_factory=dict)  # avatar_glow, username_glow, etc.
+    trend_colors: dict[str, str] = field(default_factory=dict)  # up, down, stable
     text_primary: str = "#ffffff"
     text_secondary: str = "rgba(255, 255, 255, 0.6)"
     border_color: str = "rgba(255, 255, 255, 0.1)"
@@ -33,6 +35,18 @@ class ThemeColors:
             stat_colors=data.get("stat_colors", {}),
             badge_rarity_colors=data.get("badge_rarity_colors", {}),
             tier_colors=data.get("tier_colors", {}),
+            effects=data.get("effects", {
+                "avatar_glow": "rgba(233, 69, 96, 0.5)",
+                "username_glow": "rgba(0, 217, 255, 0.5)",
+                "border_gradient": ["#e94560", "#533483", "#00d9ff"],
+                "decoration_pink": "rgba(233, 69, 96, 0.1)",
+                "decoration_cyan": "rgba(0, 217, 255, 0.1)",
+            }),
+            trend_colors=data.get("trend_colors", {
+                "up": "#22c55e",
+                "down": "#ef4444",
+                "stable": "rgba(255, 255, 255, 0.5)",
+            }),
             text_primary=data.get("text_primary", "#ffffff"),
             text_secondary=data.get("text_secondary", "rgba(255, 255, 255, 0.6)"),
             border_color=data.get("border_color", "rgba(255, 255, 255, 0.1)"),
@@ -107,6 +121,8 @@ class ThemeConfig:
                 "stat": self.colors.stat_colors,
                 "badge": self.colors.badge_rarity_colors,
                 "tier": self.colors.tier_colors,
+                "effects": self.colors.effects,
+                "trend_colors": self.colors.trend_colors,
             },
             "typography": {
                 "header_font": self.typography.header_font,
@@ -159,17 +175,23 @@ class ThemeLoader:
                 "secondary_accent": "#e94560",
                 "stat_colors": {
                     "vibe": "#fbbf24",
+                    "vibe_gradient": ["#f59e0b", "#fcd34d"],
                     "activity": "#00d9ff",
+                    "activity_gradient": ["#00d9ff", "#67e8f9"],
                     "presence": "#14b8a6",
+                    "presence_gradient": ["#14b8a6", "#5eead4"],
                     "humor": "#a855f7",
+                    "humor_gradient": ["#a855f7", "#d8b4fe"],
                     "toxicity": "#ef4444",
+                    "toxicity_gradient": ["#22c55e", "#ef4444"],
                     "popularity": "#e94560",
+                    "popularity_gradient": ["#e94560", "#fda4af"],
                 },
                 "badge_rarity_colors": {
                     "common": {"bg_start": "#374151", "bg_end": "#4b5563", "border": "#6b7280", "text": "#d1d5db"},
                     "rare": {"bg_start": "#1e3a8a", "bg_end": "#2563eb", "border": "#3b82f6", "text": "#93c5fd"},
                     "epic": {"bg_start": "#6b21a8", "bg_end": "#9333ea", "border": "#a855f7", "text": "#d8b4fe"},
-                    "legendary": {"bg_start": "#92400e", "bg_end": "#f59e0b", "border": "#fbbf24", "text": "#fef3c7"},
+                    "legendary": {"bg_start": "#92400e", "bg_end": "#f59e0b", "border": "#fbbf24", "text": "#fef3c7", "glow": "rgba(251, 191, 36, 0.4)"},
                 },
                 "tier_colors": {
                     "legendary": ["#fbbf24", "#f59e0b"],
@@ -178,6 +200,18 @@ class ThemeLoader:
                     "regular": ["#14b8a6", "#0d9488"],
                     "beginner": ["#9ca3af", "#6b7280"],
                     "rookie": ["#f472b6", "#ec4899"],
+                },
+                "effects": {
+                    "avatar_glow": "rgba(233, 69, 96, 0.5)",
+                    "username_glow": "rgba(0, 217, 255, 0.5)",
+                    "border_gradient": ["#e94560", "#533483", "#00d9ff"],
+                    "decoration_pink": "rgba(233, 69, 96, 0.1)",
+                    "decoration_cyan": "rgba(0, 217, 255, 0.1)",
+                },
+                "trend_colors": {
+                    "up": "#22c55e",
+                    "down": "#ef4444",
+                    "stable": "rgba(255, 255, 255, 0.5)",
                 },
                 "text_primary": "#ffffff",
                 "text_secondary": "rgba(255, 255, 255, 0.6)",

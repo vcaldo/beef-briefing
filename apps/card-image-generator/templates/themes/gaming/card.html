@@ -12,7 +12,7 @@
             box-sizing: border-box;
         }
 
-        body {
+        html, body {
             font-family: 'Rajdhani', sans-serif;
             background: transparent;
         }
@@ -131,26 +131,6 @@
             font-size: 28px;
         }
 
-        /* Week badge (yellow circle) */
-        .week-circle-badge {
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, #fbbf24, #f59e0b);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 14px;
-            font-weight: 900;
-            color: #1a1a2e;
-            box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
-            z-index: 10;
-        }
-
         /* Stats Grid */
         .stats-grid {
             display: grid;
@@ -248,11 +228,11 @@
         /* Badges Row */
         .badges-row {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
             margin-bottom: 12px;
             margin-top: auto;
-            max-height: 72px;
+            max-height: 56px;
             overflow: hidden;
             position: relative;
             z-index: 1;
@@ -261,16 +241,16 @@
         .badge {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 10px;
             font-weight: 600;
             border: 1px solid;
         }
 
         .badge-icon {
-            font-size: 14px;
+            font-size: 11px;
         }
 
         .badge.common {
@@ -329,8 +309,6 @@
 </head>
 <body>
     <div class="card">
-        <div class="week-circle-badge">{{ week_number }}</div>
-
         <!-- Header -->
         <div class="card-header">
             <div class="avatar" {% if user.photo_url %}style="background-image: url('{{ user.photo_url }}')"{% endif %}>
@@ -389,7 +367,7 @@
         <!-- Footer -->
         <div class="card-footer">
             <span class="messages-count"><strong>{{ activity.messages }}</strong> messages</span>
-            <span class="period">{{ period_display }}</span>
+            <span class="period">Week {{ week_number }} · {{ period_display }}</span>
         </div>
     </div>
 </body>

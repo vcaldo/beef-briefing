@@ -300,18 +300,18 @@ def calculate_vibe(
     )
 
     # Calculate weighted vibe score
-    # Formula: 35*pos + 5*neutral - 30*neg + 5*consistency + 25*pos_reactions
+    # Formula: 55*pos + 5*neutral - 10*neg + 5*consistency + 25*pos_reactions
     raw_score = (
-        35 * positive_ratio
+        55 * positive_ratio
         + 5 * neutral_ratio
-        - 30 * negative_ratio
+        - 10 * negative_ratio
         + 5 * consistency
         + 25 * positive_reactions_ratio
     )
 
-    # Scale to 0-100 (max possible is 35+5+5+25=70, min is -30)
-    # Normalize: (-30 to 70) -> (0 to 100)
-    scaled_score = ((raw_score + 30) / 100) * 100
+    # Scale to 0-100 (max possible is 55+5+5+25=90, min is -10)
+    # Normalize: (-10 to 90) -> (0 to 100)
+    scaled_score = ((raw_score + 10) / 100) * 100
     scaled_score = _clamp(scaled_score, 0, 100)
 
     # Apply Bayesian smoothing
@@ -862,10 +862,12 @@ def calculate_toxicity(
     )
 
     # Calculate weighted score (this is a toxicity percentage)
+    # Being sad is NOT toxic - negative sentiment affects Vibe, not Toxicity
+    # Toxicity is reserved for aggressive/offensive content
     raw_score = (
-        0.60 * toxic_ratio
+        0.70 * toxic_ratio
         + 0.25 * negative_reactions_ratio
-        + 0.15 * unique_negative_ratio
+        + 0.05 * unique_negative_ratio
     )
 
     # Scale to 0-100 (as percentage)

@@ -15,9 +15,9 @@ Refactor the metrics system to incorporate sentiment analysis and create 6 disti
 **Components**:
 | Signal | Weight | Description |
 |--------|--------|-------------|
-| Positive message ratio | 35% | % of messages with positive sentiment |
+| Positive message ratio | 55% | % of messages with positive sentiment |
 | Neutral message ratio | 5% | % of messages with neutral sentiment |
-| Negative message ratio | -30% | % of messages with negative sentiment (reduces score) |
+| Negative message ratio | -10% | % of messages with negative sentiment (reduces score) |
 | Sentiment consistency | 5% | Low volatility = stable mood |
 | Positive reactions received | 25% | People respond well to you |
 
@@ -89,9 +89,9 @@ The "activity variance" signal measures the standard deviation of daily message 
 **Components**:
 | Signal | Weight | Description |
 |--------|--------|-------------|
-| Toxic messages (ml_toxicity) | 60% | ML classifier for offensive content |
+| Toxic messages (ml_toxicity) | 70% | ML classifier for offensive content |
 | Negative reactions received | 25% | Others' rejection (emosent-py < -0.2) |
-| Unique users who reacted negatively | 15% | Broad disapproval |
+| Unique users who reacted negatively | 5% | Broad disapproval |
 
 **Key Point**: Being sad is NOT toxic. Negative sentiment affects Vibe Score, not Toxicity. Toxicity is reserved for aggressive/offensive content.
 

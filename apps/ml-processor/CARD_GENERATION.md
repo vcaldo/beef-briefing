@@ -93,13 +93,15 @@ All stats are computed from a 30-day rolling window ending on the week's Sunday.
 
 Measures overall emotional tone combining message sentiment with reaction reception.
 
+**Key Point:** Combines "how you express yourself" with "how others receive you" for a holistic vibe assessment.
+
 **Components:**
 
 | Component | Weight | Description |
 |-----------|--------|-------------|
-| Positive Ratio | +35% | Messages with positive sentiment (score_positive > 0.5) |
+| Positive Ratio | +55% | Messages with positive sentiment (score_positive > 0.5) |
 | Neutral Ratio | +5% | Messages with neutral sentiment (score_neutral > 0.5) |
-| Negative Ratio | -30% | Messages with negative sentiment (score_negative > 0.5) **[SUBTRACTS]** |
+| Negative Ratio | -10% | Messages with negative sentiment (score_negative > 0.5) **[SUBTRACTS]** |
 | Consistency | +5% | 1 - STDDEV(positive - negative), measures emotional stability |
 | Positive Reactions | +25% | Ratio of positive emoji reactions received |
 
@@ -121,15 +123,16 @@ positive_reaction_ratio = positive_reactions / total_reactions if total > 0 else
 
 # Combined raw score
 raw_score = (
-    35 * positive_ratio +
+    55 * positive_ratio +
     5 * neutral_ratio -
-    30 * negative_ratio +
+    10 * negative_ratio +
     5 * consistency +
     25 * positive_reaction_ratio
 )
 
-# Clamp and smooth
-clamped_score = max(0, min(100, raw_score))
+# Scale to 0-100 (max=90, min=-10)
+scaled_score = ((raw_score + 10) / 100) * 100
+clamped_score = max(0, min(100, scaled_score))
 final_score = bayesian_smooth(clamped_score, total_messages, global_mean=50)
 ```
 
@@ -473,15 +476,15 @@ WHERE parent.user_id = :user_id
 
 Measures negative impact through toxic message detection and negative reactions.
 
-**Important:** Being sad is NOT toxic. Negative sentiment affects the Vibe score, not Toxicity. This metric is reserved for aggressive/offensive content detected by ML classifiers, NOT for emotional expression.
+**Key Point:** Being sad is NOT toxic. Negative sentiment affects Vibe Score, not Toxicity. Toxicity is reserved for aggressive/offensive content.
 
 **Components:**
 
 | Component | Weight | Description |
 |-----------|--------|-------------|
-| Toxic Messages | 60% | % of messages flagged by ML toxicity detector |
+| Toxic Messages | 70% | % of messages flagged by ML toxicity detector |
 | Negative Reactions | 25% | % of reactions received with emoji sentiment < -0.2 |
-| Unique Negative Reactors | 15% | % of reactors giving negative reactions |
+| Unique Negative Reactors | 5% | % of reactors giving negative reactions (broad disapproval) |
 
 **Formula:**
 ```python
@@ -496,9 +499,9 @@ negative_reactors_pct = unique_negative_reactors / total_unique_reactors if tota
 
 # Weighted combination (as percentage)
 raw_pct = (
-    0.60 * toxic_pct +
+    0.70 * toxic_pct +
     0.25 * negative_reactions_pct +
-    0.15 * negative_reactors_pct
+    0.05 * negative_reactors_pct
 ) * 100
 
 # Apply Bayesian smoothing

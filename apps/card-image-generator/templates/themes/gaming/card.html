@@ -540,7 +540,7 @@
             </div>
             <div class="rank-tier-box {{ overall.label|lower }}">
                 {% if rank %}
-                <span class="rank-tier-rank">{%- if rank == 1 -%}🥇{%- elif rank == 2 -%}🥈{%- elif rank == 3 -%}🥉{%- else -%}#{{ rank }}{%- endif -%}</span>
+                <span class="rank-tier-rank">#{{ rank }}</span>
                 {% endif %}
                 <span class="rank-tier-label">{{ overall.label }}</span>
             </div>

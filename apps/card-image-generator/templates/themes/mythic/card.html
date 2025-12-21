@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width={{ 400 }}, height={{ 600 }}">
+    <style>
+        @import url('{{ theme.typography.google_fonts_import }}');
+
+        :root {
+            /* Background */
+            --bg-gradient-start: {{ theme.colors.bg_start }};
+            --bg-gradient-mid: {{ theme.colors.bg_mid }};
+            --bg-gradient-end: {{ theme.colors.bg_end }};
+
+            /* Primary colors */
+            --color-primary: {{ theme.colors.primary }};
+            --color-secondary: {{ theme.colors.secondary }};
+
+            /* Text */
+            --text-primary: {{ theme.colors.text_primary }};
+            --text-secondary: {{ theme.colors.text_secondary }};
+            --border-color: {{ theme.colors.border }};
+
+            /* Stat colors */
+            --color-vibe: {{ theme.colors.stat.vibe }};
+            --color-vibe-gradient-start: {{ theme.colors.stat.vibe_gradient[0] }};
+            --color-vibe-gradient-end: {{ theme.colors.stat.vibe_gradient[1] }};
+            --color-activity: {{ theme.colors.stat.activity }};
+            --color-activity-gradient-start: {{ theme.colors.stat.activity_gradient[0] }};
+            --color-activity-gradient-end: {{ theme.colors.stat.activity_gradient[1] }};
+            --color-presence: {{ theme.colors.stat.presence }};
+            --color-presence-gradient-start: {{ theme.colors.stat.presence_gradient[0] }};
+            --color-presence-gradient-end: {{ theme.colors.stat.presence_gradient[1] }};
+            --color-humor: {{ theme.colors.stat.humor }};
+            --color-humor-gradient-start: {{ theme.colors.stat.humor_gradient[0] }};
+            --color-humor-gradient-end: {{ theme.colors.stat.humor_gradient[1] }};
+            --color-toxicity: {{ theme.colors.stat.toxicity }};
+            --color-toxicity-gradient-start: {{ theme.colors.stat.toxicity_gradient[0] }};
+            --color-toxicity-gradient-end: {{ theme.colors.stat.toxicity_gradient[1] }};
+            --color-popularity: {{ theme.colors.stat.popularity }};
+            --color-popularity-gradient-start: {{ theme.colors.stat.popularity_gradient[0] }};
+            --color-popularity-gradient-end: {{ theme.colors.stat.popularity_gradient[1] }};
+
+            /* Badge rarity colors */
+            --badge-common-bg-start: {{ theme.colors.badge.common.bg_start }};
+            --badge-common-bg-end: {{ theme.colors.badge.common.bg_end }};
+            --badge-common-border: {{ theme.colors.badge.common.border }};
+            --badge-common-text: {{ theme.colors.badge.common.text }};
+            --badge-rare-bg-start: {{ theme.colors.badge.rare.bg_start }};
+            --badge-rare-bg-end: {{ theme.colors.badge.rare.bg_end }};
+            --badge-rare-border: {{ theme.colors.badge.rare.border }};
+            --badge-rare-text: {{ theme.colors.badge.rare.text }};
+            --badge-epic-bg-start: {{ theme.colors.badge.epic.bg_start }};
+            --badge-epic-bg-end: {{ theme.colors.badge.epic.bg_end }};
+            --badge-epic-border: {{ theme.colors.badge.epic.border }};
+            --badge-epic-text: {{ theme.colors.badge.epic.text }};
+            --badge-legendary-bg-start: {{ theme.colors.badge.legendary.bg_start }};
+            --badge-legendary-bg-end: {{ theme.colors.badge.legendary.bg_end }};
+            --badge-legendary-border: {{ theme.colors.badge.legendary.border }};
+            --badge-legendary-text: {{ theme.colors.badge.legendary.text }};
+            --badge-legendary-glow: {{ theme.colors.badge.legendary.glow | default('rgba(245, 196, 107, 0.5)') }};
+
+            /* Tier colors */
+            --tier-legendary-start: {{ theme.colors.tier.legendary[0] }};
+            --tier-legendary-end: {{ theme.colors.tier.legendary[1] }};
+            --tier-elite-start: {{ theme.colors.tier.elite[0] }};
+            --tier-elite-end: {{ theme.colors.tier.elite[1] }};
+            --tier-outstanding-start: {{ theme.colors.tier.outstanding[0] }};
+            --tier-outstanding-end: {{ theme.colors.tier.outstanding[1] }};
+            --tier-regular-start: {{ theme.colors.tier.regular[0] }};
+            --tier-regular-end: {{ theme.colors.tier.regular[1] }};
+            --tier-beginner-start: {{ theme.colors.tier.beginner[0] }};
+            --tier-beginner-end: {{ theme.colors.tier.beginner[1] }};
+            --tier-rookie-start: {{ theme.colors.tier.rookie[0] }};
+            --tier-rookie-end: {{ theme.colors.tier.rookie[1] }};
+
+            /* Effects */
+            --avatar-glow: {{ theme.colors.effects.avatar_glow }};
+            --username-glow: {{ theme.colors.effects.username_glow }};
+            --border-gradient-1: {{ theme.colors.effects.border_gradient[0] }};
+            --border-gradient-2: {{ theme.colors.effects.border_gradient[1] }};
+            --border-gradient-3: {{ theme.colors.effects.border_gradient[2] }};
+            --decoration-pink: {{ theme.colors.effects.decoration_pink }};
+            --decoration-cyan: {{ theme.colors.effects.decoration_cyan }};
+
+            /* Trend colors */
+            --trend-up: {{ theme.colors.trend_colors.up }};
+            --trend-down: {{ theme.colors.trend_colors.down }};
+            --trend-stable: {{ theme.colors.trend_colors.stable }};
+
+            /* Typography */
+            --font-header: '{{ theme.typography.header_font }}', serif;
+            --font-body: '{{ theme.typography.body_font }}', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            font-family: var(--font-body);
+            background: transparent;
+        }
+
+        .card {
+            width: 400px;
+            height: 600px;
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 50%, var(--bg-gradient-end) 100%);
+            border-radius: 20px;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 30px rgba(245, 196, 107, 0.15);
+        }
+
+        /* Background decoration - ember/fire glow */
+        .card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 30%, var(--decoration-pink) 0%, transparent 50%),
+                        radial-gradient(circle at 70% 70%, var(--decoration-cyan) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        /* Ornamental golden border */
+        .card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 20px;
+            padding: 4px;
+            background: linear-gradient(135deg, var(--border-gradient-1), var(--border-gradient-2), var(--border-gradient-3));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        /* Header */
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+
+        .avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--color-secondary), var(--border-gradient-2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-header);
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+            border: 3px solid var(--color-primary);
+            box-shadow: 0 0 20px var(--avatar-glow), inset 0 0 10px rgba(0, 0, 0, 0.3);
+            background-size: cover;
+            background-position: center;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .username {
+            font-family: var(--font-header);
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            text-shadow: 0 0 10px var(--username-glow);
+        }
+
+        .handle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .rank-box {
+            text-align: center;
+            padding: 8px 14px;
+            background: rgba(245, 196, 107, 0.1);
+            border-radius: 8px;
+            border: 2px solid rgba(245, 196, 107, 0.3);
+        }
+
+        .rank-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-family: var(--font-header);
+        }
+
+        .rank-number {
+            font-family: var(--font-header);
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--color-primary);
+            display: block;
+        }
+
+        .rank-number.medal {
+            font-size: 28px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+
+        /* Parchment-style stat cards */
+        .stat-card {
+            background: rgba(43, 29, 14, 0.6);
+            border-radius: 12px;
+            padding: 12px;
+            border: 1px solid rgba(245, 196, 107, 0.15);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .category-medal {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            font-size: 18px;
+            filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.5));
+        }
+
+        .stat-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .stat-icon {
+            font-size: 20px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-family: var(--font-header);
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .stat-bar {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .stat-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        /* Stat colors */
+        .stat-card.vibe .stat-value { color: var(--color-vibe); }
+        .stat-card.vibe .stat-fill { background: linear-gradient(90deg, var(--color-vibe-gradient-start), var(--color-vibe-gradient-end)); }
+
+        .stat-card.activity .stat-value { color: var(--color-activity); }
+        .stat-card.activity .stat-fill { background: linear-gradient(90deg, var(--color-activity-gradient-start), var(--color-activity-gradient-end)); }
+
+        .stat-card.presence .stat-value { color: var(--color-presence); }
+        .stat-card.presence .stat-fill { background: linear-gradient(90deg, var(--color-presence-gradient-start), var(--color-presence-gradient-end)); }
+
+        .stat-card.humor .stat-value { color: var(--color-humor); }
+        .stat-card.humor .stat-fill { background: linear-gradient(90deg, var(--color-humor-gradient-start), var(--color-humor-gradient-end)); }
+
+        .stat-card.toxicity .stat-value { color: var(--color-toxicity); }
+        .stat-card.toxicity .stat-fill { background: linear-gradient(90deg, var(--color-toxicity-gradient-start), var(--color-toxicity-gradient-end)); }
+
+        .stat-card.popularity .stat-value { color: var(--color-popularity); }
+        .stat-card.popularity .stat-fill { background: linear-gradient(90deg, var(--color-popularity-gradient-start), var(--color-popularity-gradient-end)); }
+
+        .stat-trend {
+            font-size: 12px;
+        }
+
+        .stat-trend.up { color: var(--trend-up); }
+        .stat-trend.down { color: var(--trend-down); }
+        .stat-trend.stable { color: var(--trend-stable); }
+
+        /* Badges Row - RPG material tier style */
+        .badges-row {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+            margin-top: auto;
+            max-height: 56px;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+        }
+
+        .badge {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-weight: 600;
+            border: 2px solid;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .badge-icon {
+            font-size: 11px;
+        }
+
+        .badge.common {
+            background: linear-gradient(135deg, var(--badge-common-bg-start), var(--badge-common-bg-end));
+            border-color: var(--badge-common-border);
+            color: var(--badge-common-text);
+        }
+
+        .badge.rare {
+            background: linear-gradient(135deg, var(--badge-rare-bg-start), var(--badge-rare-bg-end));
+            border-color: var(--badge-rare-border);
+            color: var(--badge-rare-text);
+        }
+
+        .badge.epic {
+            background: linear-gradient(135deg, var(--badge-epic-bg-start), var(--badge-epic-bg-end));
+            border-color: var(--badge-epic-border);
+            color: var(--badge-epic-text);
+        }
+
+        .badge.legendary {
+            background: linear-gradient(135deg, var(--badge-legendary-bg-start), var(--badge-legendary-bg-end));
+            border-color: var(--badge-legendary-border);
+            color: var(--badge-legendary-text);
+            animation: ember-glow 2s ease-in-out infinite alternate;
+        }
+
+        /* Animated ember glow for legendary badges */
+        @keyframes ember-glow {
+            from { box-shadow: 0 0 10px var(--badge-legendary-glow); }
+            to { box-shadow: 0 0 20px var(--badge-legendary-glow), 0 0 30px rgba(245, 196, 107, 0.3); }
+        }
+
+        /* Footer */
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            position: relative;
+            z-index: 1;
+            margin-top: auto;
+            flex-shrink: 0;
+        }
+
+        .messages-count {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .messages-count strong {
+            color: var(--color-primary);
+            font-weight: 700;
+        }
+
+        .period {
+            font-size: 12px;
+            color: rgba(255, 243, 214, 0.4);
+        }
+
+        /* Beef Meter - Relic Bar style */
+        .beef-meter {
+            margin-bottom: 16px;
+            padding: 8px 12px;
+            background: rgba(43, 29, 14, 0.6);
+            border-radius: 8px;
+            border: 1px solid rgba(245, 196, 107, 0.2);
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .beef-meter-emoji {
+            font-size: 32px;
+            line-height: 1;
+        }
+
+        .beef-meter-content {
+            flex: 1;
+        }
+
+        .beef-meter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .beef-meter-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
+            font-family: var(--font-header);
+            font-weight: 600;
+        }
+
+        .beef-meter-value {
+            font-family: var(--font-header);
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .beef-meter-bar {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .beef-meter-fill {
+            height: 100%;
+            border-radius: 2px;
+        }
+
+        /* Tier-specific colors - Material progression */
+        .beef-meter-fill.legendary { background: linear-gradient(90deg, var(--tier-legendary-start), var(--tier-legendary-end)); }
+        .beef-meter-fill.elite { background: linear-gradient(90deg, var(--tier-elite-start), var(--tier-elite-end)); }
+        .beef-meter-fill.outstanding { background: linear-gradient(90deg, var(--tier-outstanding-start), var(--tier-outstanding-end)); }
+        .beef-meter-fill.regular { background: linear-gradient(90deg, var(--tier-regular-start), var(--tier-regular-end)); }
+        .beef-meter-fill.beginner { background: linear-gradient(90deg, var(--tier-beginner-start), var(--tier-beginner-end)); }
+        .beef-meter-fill.rookie { background: linear-gradient(90deg, var(--tier-rookie-start), var(--tier-rookie-end)); }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <!-- Header -->
+        <div class="card-header">
+            <div class="avatar" {% if user.photo_url %}style="background-image: url('{{ user.photo_url }}')"{% endif %}>
+                {% if not user.photo_url %}{{ user.initials }}{% endif %}
+            </div>
+            <div class="user-info">
+                <h1 class="username">{{ user.first_name }}{% if user.last_name %} {{ user.last_name }}{% endif %}</h1>
+                {% if user.username %}<span class="handle">@{{ user.username }}</span>{% endif %}
+            </div>
+            {% if rank %}
+            <div class="rank-box">
+                <span class="rank-label">Rank</span>
+                <span class="rank-number{% if rank <= 3 %} medal{% endif %}">
+                    {%- if rank == 1 -%}🥇{%- elif rank == 2 -%}🥈{%- elif rank == 3 -%}🥉{%- else -%}{{ rank }}{%- endif -%}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Beef Meter -->
+        <div class="beef-meter">
+            <span class="beef-meter-emoji">🥩</span>
+            <div class="beef-meter-content">
+                <div class="beef-meter-header">
+                    <span class="beef-meter-label">Beef Meter</span>
+                    <span class="beef-meter-value">{{ overall.score|round|int }} • {{ overall.label }}</span>
+                </div>
+                <div class="beef-meter-bar">
+                    <div class="beef-meter-fill {{ overall.label|lower }}" style="width: {{ overall.score }}%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            {% for stat in stats %}
+            <div class="stat-card {{ stat.key }}">
+                {% if stat.category_rank_medal %}
+                <span class="category-medal">{{ stat.category_rank_medal }}</span>
+                {% endif %}
+                <div class="stat-header">
+                    <span class="stat-icon">{{ stat.icon }}</span>
+                    <span class="stat-label">{{ stat.label }}</span>
+                </div>
+                <div class="stat-value-row">
+                    <div class="stat-value">{{ stat.display_value }}</div>
+                    {% if stat.trend %}
+                    <div class="stat-trend {{ stat.trend.direction }}">
+                        {{ stat.trend.icon }} {{ stat.trend.pct_change }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="stat-bar">
+                    <div class="stat-fill" style="width: {{ stat.percentage }}%"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Badges -->
+        {% if badges %}
+        <div class="badges-row">
+            {% for badge in badges %}
+            <div class="badge {{ badge.rarity }}">
+                <span class="badge-icon">{{ badge.icon }}</span>
+                <span class="badge-name">{{ badge.name }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="card-footer">
+            <span class="messages-count"><strong>{{ activity.messages }}</strong> messages</span>
+            <span class="period">Week {{ week_number }} · {{ period_display }}</span>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,78 @@
+{
+  "name": "mythic",
+  "colors": {
+    "background_gradient": ["#2b1d0e", "#3a2712", "#1e1409"],
+    "primary_accent": "#f5c46b",
+    "secondary_accent": "#b8893c",
+    "text_primary": "#fff3d6",
+    "text_secondary": "rgba(255, 243, 214, 0.6)",
+    "border_color": "rgba(245, 196, 107, 0.2)",
+    "stat_colors": {
+      "vibe": "#f5c46b",
+      "vibe_gradient": ["#b8893c", "#f5c46b"],
+      "activity": "#e85d04",
+      "activity_gradient": ["#dc2f02", "#f48c06"],
+      "presence": "#588157",
+      "presence_gradient": ["#3a5a40", "#a3b18a"],
+      "humor": "#9d4edd",
+      "humor_gradient": ["#7b2cbf", "#c77dff"],
+      "toxicity": "#d00000",
+      "toxicity_gradient": ["#588157", "#d00000"],
+      "popularity": "#e63946",
+      "popularity_gradient": ["#e63946", "#f4a261"]
+    },
+    "badge_rarity_colors": {
+      "common": {
+        "bg_start": "#4a4a4a",
+        "bg_end": "#5c5c5c",
+        "border": "#6b6b6b",
+        "text": "#b0b0b0"
+      },
+      "rare": {
+        "bg_start": "#2c4a6e",
+        "bg_end": "#3d6a9e",
+        "border": "#5a8ac4",
+        "text": "#a8c8e8"
+      },
+      "epic": {
+        "bg_start": "#4a1d6e",
+        "bg_end": "#6b2d9e",
+        "border": "#9b4dce",
+        "text": "#d4a8f4"
+      },
+      "legendary": {
+        "bg_start": "#6b4a0a",
+        "bg_end": "#9a6c12",
+        "border": "#f5c46b",
+        "text": "#fff3d6",
+        "glow": "rgba(245, 196, 107, 0.5)"
+      }
+    },
+    "tier_colors": {
+      "legendary": ["#f5c46b", "#ffe066"],
+      "elite": ["#c0c0c0", "#e8e8e8"],
+      "outstanding": ["#b8893c", "#d4a85a"],
+      "regular": ["#588157", "#8fbc8f"],
+      "beginner": ["#6b6b6b", "#8a8a8a"],
+      "rookie": ["#8b4513", "#a0522d"]
+    },
+    "effects": {
+      "avatar_glow": "rgba(245, 196, 107, 0.4)",
+      "username_glow": "rgba(245, 196, 107, 0.3)",
+      "border_gradient": ["#f5c46b", "#b8893c", "#8b5a2b"],
+      "decoration_pink": "rgba(232, 93, 4, 0.08)",
+      "decoration_cyan": "rgba(245, 196, 107, 0.06)"
+    },
+    "trend_colors": {
+      "up": "#90be6d",
+      "down": "#d00000",
+      "stable": "rgba(255, 243, 214, 0.4)"
+    }
+  },
+  "typography": {
+    "header_font": "Cinzel",
+    "body_font": "Lato",
+    "header_weights": [400, 600, 700],
+    "body_weights": [400, 500, 700]
+  }
+}

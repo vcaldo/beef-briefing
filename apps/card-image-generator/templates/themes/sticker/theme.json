@@ -1,0 +1,78 @@
+{
+  "name": "sticker",
+  "colors": {
+    "background_gradient": ["#fefefe", "#f2f5f9", "#eef2f7"],
+    "primary_accent": "#2aabee",
+    "secondary_accent": "#8bc9ff",
+    "text_primary": "#1a1a1a",
+    "text_secondary": "rgba(26, 26, 26, 0.55)",
+    "border_color": "rgba(0, 0, 0, 0.06)",
+    "stat_colors": {
+      "vibe": "#f5a623",
+      "vibe_gradient": ["#f5a623", "#ffd166"],
+      "activity": "#2aabee",
+      "activity_gradient": ["#2aabee", "#72cff8"],
+      "presence": "#2ecc71",
+      "presence_gradient": ["#2ecc71", "#87d68d"],
+      "humor": "#9b59b6",
+      "humor_gradient": ["#9b59b6", "#c39bd3"],
+      "toxicity": "#e74c3c",
+      "toxicity_gradient": ["#2ecc71", "#e74c3c"],
+      "popularity": "#e91e63",
+      "popularity_gradient": ["#e91e63", "#f48fb1"]
+    },
+    "badge_rarity_colors": {
+      "common": {
+        "bg_start": "#f0f0f0",
+        "bg_end": "#fafafa",
+        "border": "#e0e0e0",
+        "text": "#666666"
+      },
+      "rare": {
+        "bg_start": "#e3f2fd",
+        "bg_end": "#f3f9ff",
+        "border": "#90caf9",
+        "text": "#1976d2"
+      },
+      "epic": {
+        "bg_start": "#f3e5f5",
+        "bg_end": "#faf5fc",
+        "border": "#ce93d8",
+        "text": "#7b1fa2"
+      },
+      "legendary": {
+        "bg_start": "#fff8e1",
+        "bg_end": "#fffef5",
+        "border": "#ffca28",
+        "text": "#f57c00",
+        "glow": "rgba(255, 193, 7, 0.3)"
+      }
+    },
+    "tier_colors": {
+      "legendary": ["#ffc107", "#ffeb3b"],
+      "elite": ["#2aabee", "#72cff8"],
+      "outstanding": ["#9b59b6", "#c39bd3"],
+      "regular": ["#2ecc71", "#87d68d"],
+      "beginner": ["#95a5a6", "#bdc3c7"],
+      "rookie": ["#e91e63", "#f48fb1"]
+    },
+    "effects": {
+      "avatar_glow": "rgba(42, 171, 238, 0.25)",
+      "username_glow": "rgba(42, 171, 238, 0.15)",
+      "border_gradient": ["#2aabee", "#8bc9ff", "#72cff8"],
+      "decoration_pink": "rgba(233, 30, 99, 0.03)",
+      "decoration_cyan": "rgba(42, 171, 238, 0.03)"
+    },
+    "trend_colors": {
+      "up": "#2ecc71",
+      "down": "#e74c3c",
+      "stable": "rgba(26, 26, 26, 0.35)"
+    }
+  },
+  "typography": {
+    "header_font": "Nunito",
+    "body_font": "Nunito",
+    "header_weights": [400, 700, 800],
+    "body_weights": [400, 600, 700]
+  }
+}

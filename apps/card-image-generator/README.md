@@ -527,6 +527,9 @@ curl -X POST http://localhost:8051/api/v1/render \
 | `sticker` | Telegram-native look with chat bubble shadows, Nunito font, sticker-style badges | Casual groups, new users |
 | `mythic` | Dark fantasy RPG with Cinzel/Lato fonts, golden accents, ember glow effects | Long-term engagement, lore fans |
 | `meme` | Chaotic rainbow with Bangers/Comic Neue fonts, random rotations, oversized emojis | Shitposting, meme groups |
+| `vaporwave` | Retro 80s aesthetic with Righteous/Quicksand fonts, cyan/pink on purple gradients | Nostalgic vibes, synthwave fans |
+| `blueprint` | Technical monospace with Space Mono/Roboto Mono fonts, teal on dark navy | Tech groups, developers |
+| `noir_luxury` | Matte black with Playfair Display/Lato serif fonts, gold foil accents | Premium feel, sophisticated groups |
 
 ## Gaming Theme
 

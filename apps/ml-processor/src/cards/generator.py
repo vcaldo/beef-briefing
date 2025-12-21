@@ -167,8 +167,8 @@ class CardGenerator:
         """
         Compute trends by comparing current week to previous week.
 
-        Computes trends for all numeric stats: mood, activity, comedy,
-        volatility, toxicity, and reactions.
+        Computes trends for all 6 metrics: vibe, activity, presence,
+        humor, toxicity, and popularity.
         """
         # Get previous week's card
         prev_card = self._get_previous_card(user_id, chat_id, prev_week_start)
@@ -178,59 +178,33 @@ class CardGenerator:
         prev_stats = prev_card.get("stats", {})
         trends = {}
 
-        # Mood trend
-        if "mood" in current_stats and "mood" in prev_stats:
-            curr_val = current_stats["mood"].get("score", 0)
-            prev_val = prev_stats["mood"].get("score", 0)
-            delta = round(curr_val - prev_val, 1)
-            direction = "up" if delta > 0 else "down" if delta < 0 else "stable"
-            pct_change = self._calc_pct_change(curr_val, prev_val)
-            trends["mood"] = {"delta": delta, "direction": direction, "pct_change": pct_change}
+        # Metrics with "score" field (0-100 scale)
+        score_metrics = ["vibe", "activity", "presence", "humor", "popularity"]
+        for metric in score_metrics:
+            if metric in current_stats and metric in prev_stats:
+                curr_val = current_stats[metric].get("score", 0)
+                prev_val = prev_stats[metric].get("score", 0)
+                delta = round(curr_val - prev_val, 1)
+                direction = "up" if delta > 0 else "down" if delta < 0 else "stable"
+                pct_change = self._calc_pct_change(curr_val, prev_val)
+                trends[metric] = {
+                    "delta": delta,
+                    "direction": direction,
+                    "pct_change": pct_change,
+                }
 
-        # Activity trend (message count)
-        if "activity" in current_stats and "activity" in prev_stats:
-            curr_val = current_stats["activity"].get("messages", 0)
-            prev_val = prev_stats["activity"].get("messages", 0)
-            delta = curr_val - prev_val
-            direction = "up" if delta > 0 else "down" if delta < 0 else "stable"
-            pct_change = self._calc_pct_change(curr_val, prev_val)
-            trends["activity"] = {"delta": delta, "direction": direction, "pct_change": pct_change}
-
-        # Comedy trend
-        if "comedy" in current_stats and "comedy" in prev_stats:
-            curr_val = current_stats["comedy"].get("score", 0)
-            prev_val = prev_stats["comedy"].get("score", 0)
-            delta = round(curr_val - prev_val, 3)
-            direction = "up" if delta > 0 else "down" if delta < 0 else "stable"
-            pct_change = self._calc_pct_change(curr_val, prev_val)
-            trends["comedy"] = {"delta": delta, "direction": direction, "pct_change": pct_change}
-
-        # Volatility trend
-        if "volatility" in current_stats and "volatility" in prev_stats:
-            curr_val = current_stats["volatility"].get("score", 0)
-            prev_val = prev_stats["volatility"].get("score", 0)
-            delta = round(curr_val - prev_val, 3)
-            direction = "up" if delta > 0 else "down" if delta < 0 else "stable"
-            pct_change = self._calc_pct_change(curr_val, prev_val)
-            trends["volatility"] = {"delta": delta, "direction": direction, "pct_change": pct_change}
-
-        # Toxicity trend
+        # Toxicity uses "pct" field (percentage)
         if "toxicity" in current_stats and "toxicity" in prev_stats:
             curr_val = current_stats["toxicity"].get("pct", 0)
             prev_val = prev_stats["toxicity"].get("pct", 0)
             delta = round(curr_val - prev_val, 2)
             direction = "up" if delta > 0 else "down" if delta < 0 else "stable"
             pct_change = self._calc_pct_change(curr_val, prev_val)
-            trends["toxicity"] = {"delta": delta, "direction": direction, "pct_change": pct_change}
-
-        # Reactions trend
-        curr_reactions = current_stats.get("reactions_received", 0)
-        prev_reactions = prev_stats.get("reactions_received", 0)
-        if curr_reactions or prev_reactions:
-            delta = curr_reactions - prev_reactions
-            direction = "up" if delta > 0 else "down" if delta < 0 else "stable"
-            pct_change = self._calc_pct_change(curr_reactions, prev_reactions)
-            trends["reactions"] = {"delta": delta, "direction": direction, "pct_change": pct_change}
+            trends["toxicity"] = {
+                "delta": delta,
+                "direction": direction,
+                "pct_change": pct_change,
+            }
 
         return trends if trends else None
 

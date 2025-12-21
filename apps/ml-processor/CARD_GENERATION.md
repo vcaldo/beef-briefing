@@ -29,21 +29,121 @@ make ml-run-cards ML_ARGS="--timezone America/Sao_Paulo --week 2024-12-16"
 
 ---
 
+## Core Concepts
+
+### Bayesian Smoothing
+
+All metrics use Bayesian smoothing to prevent outliers from dominating when sample sizes are small. This ensures that users with few messages have scores closer to the global mean, while high-volume users' scores reflect their actual behavior.
+
+**Formula:**
+```
+smoothed_score = (n * raw_score + k * global_mean) / (n + k)
+```
+
+Where:
+- `n` = number of samples (messages analyzed)
+- `raw_score` = the calculated raw score
+- `k` = smoothing constant (50 by default)
+- `global_mean` = default mean for the metric
+
+**Practical effect:**
+- User with 1 message and raw score 100: `(1 * 100 + 50 * 50) / (1 + 50) = 51.0`
+- User with 100 messages and raw score 100: `(100 * 100 + 50 * 50) / (100 + 50) = 83.3`
+- User with 500 messages and raw score 100: `(500 * 100 + 50 * 50) / (500 + 50) = 95.5`
+
+### 90th Percentile Normalization
+
+Count-based metrics (messages, reactions, etc.) are normalized using the 90th percentile value of the chat, making scores relative to the chat's activity level.
+
+**Formula:**
+```
+normalized = min(count / p90_value, 1.0)
+```
+
+Where `p90_value` is computed per-chat:
+```sql
+SELECT PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY count) as p90
+FROM (
+    SELECT user_id, COUNT(*) as count
+    FROM messages
+    WHERE chat_id = :chat_id
+      AND date BETWEEN :window_start AND :window_end
+    GROUP BY user_id
+) user_counts
+```
+
+### Emoji Sentiment Classification
+
+Reaction emojis are classified using the [emosent-py](https://pypi.org/project/emosent-py/) library, which provides sentiment scores based on crowdsourced annotations from 751 emojis.
+
+**Thresholds:**
+- **Positive**: sentiment_score > 0.2
+- **Neutral**: sentiment_score between -0.2 and 0.2
+- **Negative**: sentiment_score < -0.2
+
+**Source:** `src/utils/emoji_sentiment.py`
+
+---
+
 ## Stat Calculations
 
-All stats are computed from the 30-day rolling window ending on the week's Sunday.
+All stats are computed from a 30-day rolling window ending on the week's Sunday. Each metric produces a score from 0-100 (except toxicity which is a percentage).
 
-### 1. Mood (0-100)
+### 1. Vibe Score (0-100)
 
-Measures overall emotional tone from sentiment analysis.
+Measures overall emotional tone combining message sentiment with reaction reception.
+
+**Key Point:** Combines "how you express yourself" with "how others receive you" for a holistic vibe assessment.
+
+**Components:**
+
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| Positive Ratio | +55% | Messages with positive sentiment (score_positive > 0.5) |
+| Neutral Ratio | +5% | Messages with neutral sentiment (score_neutral > 0.5) |
+| Negative Ratio | -10% | Messages with negative sentiment (score_negative > 0.5) **[SUBTRACTS]** |
+| Consistency | +5% | 1 - STDDEV(positive - negative), measures emotional stability |
+| Positive Reactions | +25% | Ratio of positive emoji reactions received |
 
 **Formula:**
+```python
+# Sentiment ratios from ml_sentiment
+positive_ratio = COUNT(score_positive > 0.5) / total_messages
+neutral_ratio = COUNT(score_neutral > 0.5) / total_messages
+negative_ratio = COUNT(score_negative > 0.5) / total_messages
+
+# Consistency (lower variance = higher consistency)
+sentiment_stddev = STDDEV(score_positive - score_negative)
+consistency = max(0, 1 - sentiment_stddev)
+
+# Positive reactions ratio (using emosent classification)
+positive_reactions = COUNT(*) WHERE emoji sentiment > 0.2
+total_reactions = COUNT(*) all reactions received
+positive_reaction_ratio = positive_reactions / total_reactions if total > 0 else 0.5
+
+# Combined raw score
+raw_score = (
+    55 * positive_ratio +
+    5 * neutral_ratio -
+    10 * negative_ratio +
+    5 * consistency +
+    25 * positive_reaction_ratio
+)
+
+# Scale to 0-100 (max=90, min=-10)
+scaled_score = ((raw_score + 10) / 100) * 100
+clamped_score = max(0, min(100, scaled_score))
+final_score = bayesian_smooth(clamped_score, total_messages, global_mean=50)
+```
+
+**SQL for sentiment analysis:**
 ```sql
-SELECT AVG(
-    score_positive * 100 +
-    score_neutral * 50 +
-    score_negative * 0
-) as mood_score
+SELECT
+    COUNT(*) as total,
+    COUNT(*) FILTER (WHERE score_positive > 0.5) as positive_count,
+    COUNT(*) FILTER (WHERE score_neutral > 0.5) as neutral_count,
+    COUNT(*) FILTER (WHERE score_negative > 0.5) as negative_count,
+    STDDEV(score_positive - score_negative) as sentiment_stddev
 FROM ml_sentiment ms
 JOIN messages m ON ms.message_id = m.id
 WHERE m.user_id = :user_id
@@ -51,63 +151,364 @@ WHERE m.user_id = :user_id
   AND m.date BETWEEN :window_start AND :window_end
 ```
 
-**Interpretation:**
-- Positive messages contribute 100 points
-- Neutral messages contribute 50 points
-- Negative messages contribute 0 points
-- Average across all messages in window
+**SQL for positive reactions received:**
+```sql
+SELECT
+    COUNT(*) as total_reactions,
+    array_agg(DISTINCT mr.emoji_value) as unique_emojis
+FROM message_reactions mr
+JOIN messages m ON mr.chat_id = m.chat_id AND mr.message_id = m.message_id
+WHERE m.user_id = :user_id
+  AND m.chat_id = :chat_id
+  AND m.date BETWEEN :window_start AND :window_end
+  AND (mr.is_removed = false OR mr.is_removed IS NULL)
+```
+
+The emoji values are then classified in Python using the emosent library.
 
 **Labels:**
 
 | Score | Label | Description |
 |-------|-------|-------------|
-| 80+ | Radiante | Overwhelmingly positive |
-| 65-79 | Animado | Generally upbeat |
+| 80+ | Radiante | Overwhelmingly positive, high engagement |
+| 65-79 | Animado | Generally upbeat, well-received |
 | 50-64 | Tranquilo | Balanced, neutral-leaning |
 | 35-49 | Reservado | Reserved, slightly negative |
-| <35 | Introspectivo | Predominantly negative |
+| <35 | Introspectivo | Predominantly negative or isolated |
 
-**Source:** `ml_sentiment` table → [calculators.py:144-187](src/cards/calculators.py#L144-L187)
+**Badges:**
+
+| Badge | Condition | Rarity |
+|-------|-----------|--------|
+| Radiant | score >= 80 | legendary |
+| Gloomy | score < 30 | negative |
+
+**Source:** [calculators.py:139-252](src/cards/calculators.py#L139-L252)
 
 ---
 
-### 2. Volatility (0-1)
+### 2. Activity (0-100)
 
-Measures emotional consistency - how much sentiment varies between messages.
+Measures engagement level through volume of messages, reactions, and replies.
+
+**Components:**
+
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| Messages Sent | 35% | Total message count, normalized to P90 |
+| Avg Message Length | 20% | Average text length, normalized to P90 |
+| Reactions Sent | 25% | Reactions given to others, normalized to P90 |
+| Replies Sent | 20% | Replies to other users' messages, normalized to P90 |
 
 **Formula:**
+```python
+# Normalize each component to 0-1 using chat's 90th percentile
+msg_norm = min(messages_sent / p90_messages, 1.0)
+len_norm = min(avg_length / p90_length, 1.0)
+react_norm = min(reactions_sent / p90_reactions, 1.0)
+reply_norm = min(replies_sent / p90_replies, 1.0)
+
+# Weighted combination
+raw_score = (
+    0.35 * msg_norm +
+    0.20 * len_norm +
+    0.25 * react_norm +
+    0.20 * reply_norm
+) * 100
+
+# Apply Bayesian smoothing
+final_score = bayesian_smooth(raw_score, messages_sent, global_mean=50)
+```
+
+**SQL for user metrics:**
 ```sql
-SELECT STDDEV(score_positive - score_negative) as volatility
-FROM ml_sentiment ms
-JOIN messages m ON ms.message_id = m.id
+SELECT
+    COUNT(*) as messages_sent,
+    AVG(LENGTH(COALESCE(text, caption, ''))) as avg_length
+FROM messages
+WHERE user_id = :user_id
+  AND chat_id = :chat_id
+  AND date BETWEEN :window_start AND :window_end
+```
+
+**SQL for reactions sent:**
+```sql
+SELECT COUNT(*) as reactions_sent
+FROM message_reactions mr
+WHERE mr.user_id = :user_id
+  AND mr.chat_id = :chat_id
+  AND mr.date >= :window_start
+  AND mr.date <= :window_end
+  AND (mr.is_removed = false OR mr.is_removed IS NULL)
+```
+
+**SQL for replies sent to others:**
+```sql
+SELECT COUNT(*) as replies_sent
+FROM messages m
+JOIN messages parent ON m.reply_to_message_id = parent.message_id
+                     AND m.chat_id = parent.chat_id
 WHERE m.user_id = :user_id
   AND m.chat_id = :chat_id
   AND m.date BETWEEN :window_start AND :window_end
+  AND parent.user_id != m.user_id  -- Only replies to OTHER users
 ```
 
-**Interpretation:**
-- Low values = consistent emotional tone
-- High values = frequent mood swings
-- Capped at 1.0
+**SQL for P90 normalization (example for messages):**
+```sql
+SELECT PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY count) as p90
+FROM (
+    SELECT user_id, COUNT(*) as count
+    FROM messages
+    WHERE chat_id = :chat_id
+      AND date BETWEEN :window_start AND :window_end
+    GROUP BY user_id
+) user_counts
+```
 
-**Labels:**
+**Badges:**
 
-| Score | Label | Description |
-|-------|-------|-------------|
-| <0.15 | Estavel | Very consistent tone |
-| 0.15-0.29 | Equilibrado | Mostly stable |
-| 0.30-0.49 | Dinamico | Variable moods |
-| ≥0.50 | Intenso | Highly variable |
+| Badge | Condition | Rarity |
+|-------|-----------|--------|
+| Hyperactive | Top 10% in chat | epic |
+| Ghost | Bottom 10% in chat | negative |
 
-**Source:** `ml_sentiment` table → [calculators.py:190-231](src/cards/calculators.py#L190-L231)
+**Note:** Percentile badges are calculated per-chat, not globally.
+
+**Source:** [calculators.py:255-407](src/cards/calculators.py#L255-L407)
 
 ---
 
-### 3. Toxicity (%)
+### 3. Presence (0-100)
 
-Percentage of messages flagged as toxic by the toxicity detector.
+Measures consistency of participation over time.
+
+**Components:**
+
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| Active Days Ratio | 25% | active_days / total_window_days |
+| Streak | 40% | Consecutive days active ending on window_end |
+| Hours Spread | 25% | unique_hours / 24, measures hourly diversity |
+| Daily Consistency | 10% | 1 - normalized_stddev(daily_message_counts) |
 
 **Formula:**
+```python
+# Calculate total days in window
+total_days = (window_end - window_start).days + 1
+
+# Active days ratio
+active_days_ratio = active_days / total_days
+
+# Streak calculation (consecutive days ending on window_end)
+# Walk backwards from window_end counting consecutive active days
+streak_days = consecutive_active_days_from_end
+
+# Normalize streak (cap at window size for 0-1)
+streak_norm = min(streak_days / total_days, 1.0)
+
+# Hours spread (how many different hours user is active)
+hours_spread = unique_hours / 24
+
+# Daily consistency (lower variance = higher consistency)
+# Calculate stddev of daily message counts, normalize by max observed
+daily_consistency = 1 - (stddev_daily / max_daily_count) if max > 0 else 1.0
+
+# Weighted combination
+raw_score = (
+    0.25 * active_days_ratio +
+    0.40 * streak_norm +
+    0.25 * hours_spread +
+    0.10 * daily_consistency
+) * 100
+
+# Apply Bayesian smoothing
+final_score = bayesian_smooth(raw_score, total_messages, global_mean=50)
+```
+
+**SQL for presence metrics:**
+```sql
+SELECT
+    COUNT(DISTINCT date_trunc('day', date AT TIME ZONE :timezone)) as active_days,
+    COUNT(DISTINCT EXTRACT(HOUR FROM date AT TIME ZONE :timezone)) as unique_hours
+FROM messages
+WHERE user_id = :user_id
+  AND chat_id = :chat_id
+  AND date BETWEEN :window_start AND :window_end
+```
+
+**SQL for daily consistency:**
+```sql
+SELECT
+    date_trunc('day', date AT TIME ZONE :timezone) as day,
+    COUNT(*) as daily_count
+FROM messages
+WHERE user_id = :user_id
+  AND chat_id = :chat_id
+  AND date BETWEEN :window_start AND :window_end
+GROUP BY date_trunc('day', date AT TIME ZONE :timezone)
+```
+
+**Streak Algorithm (Python):**
+```python
+def calculate_streak(daily_dates: list[date], window_end: date) -> int:
+    """Count consecutive active days ending on window_end."""
+    if not daily_dates:
+        return 0
+
+    active_set = set(daily_dates)
+    streak = 0
+    current = window_end.date()
+
+    while current in active_set:
+        streak += 1
+        current -= timedelta(days=1)
+
+    return streak
+```
+
+**Badges:**
+
+| Badge | Condition | Rarity |
+|-------|-----------|--------|
+| Regular | score >= 80 | epic |
+| Tourist | score < 20 AND messages >= 10 | negative |
+
+**Source:** [calculators.py:410-545](src/cards/calculators.py#L410-L545)
+
+---
+
+### 4. Humor (0-100)
+
+Measures comedy impact through ML humor detection and positive reactions.
+
+**Components:**
+
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| Positive Reactions | 45% | Reactions with emoji sentiment > 0.2 |
+| Unique Positive Reactors | 25% | Distinct users giving positive reactions |
+| Humorous Messages | 15% | % of messages flagged by ML humor detector |
+| Humorous Replies | 15% | % of replies to user that are humorous |
+
+**Formula:**
+```python
+# Positive reactions score
+positive_reactions_score = positive_reaction_count / total_reactions if total > 0 else 0
+
+# Unique reactors breadth
+unique_reactors_score = unique_positive_reactors / total_chat_users
+
+# ML humor percentage (excluding emoji-only messages)
+# Messages that are ONLY emojis are filtered out to avoid false positives
+humorous_pct = humorous_count / total_analyzed if total > 0 else 0
+
+# Humorous replies received
+humorous_replies_score = humorous_replies / total_replies if total > 0 else 0
+
+# Weighted combination
+raw_score = (
+    0.45 * positive_reactions_score +
+    0.25 * unique_reactors_score +
+    0.15 * humorous_pct +
+    0.15 * humorous_replies_score
+) * 100
+
+# Apply Bayesian smoothing
+final_score = bayesian_smooth(raw_score, total_messages, global_mean=30)
+```
+
+**SQL for reactions with emoji sentiment:**
+```sql
+SELECT
+    COUNT(*) as total_reactions,
+    array_agg(DISTINCT mr.emoji_value) as unique_emojis,
+    array_agg(DISTINCT mr.user_id) as reactor_user_ids
+FROM message_reactions mr
+JOIN messages m ON mr.chat_id = m.chat_id AND mr.message_id = m.message_id
+WHERE m.user_id = :user_id
+  AND m.chat_id = :chat_id
+  AND m.date BETWEEN :window_start AND :window_end
+  AND (mr.is_removed = false OR mr.is_removed IS NULL)
+```
+
+**SQL for ML humor (excluding emoji-only messages):**
+```sql
+SELECT
+    COUNT(*) as total_analyzed,
+    COUNT(*) FILTER (WHERE mh.is_humorous = true) as humorous_count
+FROM ml_humor mh
+JOIN messages m ON mh.message_id = m.id
+WHERE m.user_id = :user_id
+  AND m.chat_id = :chat_id
+  AND m.date BETWEEN :window_start AND :window_end
+  -- Exclude emoji-only messages (only emojis/symbols/whitespace)
+  AND LENGTH(REGEXP_REPLACE(COALESCE(m.text, m.caption, ''), '[^\w\s]', '', 'g')) > 0
+```
+
+**SQL for humorous replies received:**
+```sql
+SELECT
+    COUNT(*) as total_replies,
+    COUNT(*) FILTER (WHERE mh.is_humorous = true) as humorous_replies
+FROM messages reply
+JOIN messages parent ON reply.reply_to_message_id = parent.message_id
+                     AND reply.chat_id = parent.chat_id
+LEFT JOIN ml_humor mh ON mh.message_id = reply.id
+WHERE parent.user_id = :user_id
+  AND parent.chat_id = :chat_id
+  AND parent.date BETWEEN :window_start AND :window_end
+  AND reply.user_id != parent.user_id
+```
+
+**Badges:**
+
+| Badge | Condition | Rarity |
+|-------|-----------|--------|
+| Comedian | score >= 70 | legendary |
+| Deadpan | score < 10 | negative |
+
+**Source:** [calculators.py:548-709](src/cards/calculators.py#L548-L709)
+
+---
+
+### 5. Toxicity (0-100%)
+
+Measures negative impact through toxic message detection and negative reactions.
+
+**Key Point:** Being sad is NOT toxic. Negative sentiment affects Vibe Score, not Toxicity. Toxicity is reserved for aggressive/offensive content.
+
+**Components:**
+
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| Toxic Messages | 70% | % of messages flagged by ML toxicity detector |
+| Negative Reactions | 25% | % of reactions received with emoji sentiment < -0.2 |
+| Unique Negative Reactors | 5% | % of reactors giving negative reactions (broad disapproval) |
+
+**Formula:**
+```python
+# Toxic message percentage from ML
+toxic_pct = toxic_count / total_analyzed if total > 0 else 0
+
+# Negative reactions percentage
+negative_reactions_pct = negative_reaction_count / total_reactions if total > 0 else 0
+
+# Unique negative reactors breadth
+negative_reactors_pct = unique_negative_reactors / total_unique_reactors if total > 0 else 0
+
+# Weighted combination (as percentage)
+raw_pct = (
+    0.70 * toxic_pct +
+    0.25 * negative_reactions_pct +
+    0.05 * negative_reactors_pct
+) * 100
+
+# Apply Bayesian smoothing
+final_pct = bayesian_smooth(raw_pct, total_messages, global_mean=5)
+```
+
+**SQL for toxic messages:**
 ```sql
 SELECT
     COUNT(*) as total,
@@ -117,8 +518,20 @@ JOIN messages m ON mt.message_id = m.id
 WHERE m.user_id = :user_id
   AND m.chat_id = :chat_id
   AND m.date BETWEEN :window_start AND :window_end
+```
 
--- Result: (toxic_count / total) * 100
+**SQL for reactions:**
+```sql
+SELECT
+    COUNT(*) as total_reactions,
+    array_agg(mr.emoji_value) as emojis,
+    array_agg(DISTINCT mr.user_id) as reactor_ids
+FROM message_reactions mr
+JOIN messages m ON mr.chat_id = m.chat_id AND mr.message_id = m.message_id
+WHERE m.user_id = :user_id
+  AND m.chat_id = :chat_id
+  AND m.date BETWEEN :window_start AND :window_end
+  AND (mr.is_removed = false OR mr.is_removed IS NULL)
 ```
 
 **Labels:**
@@ -131,154 +544,103 @@ WHERE m.user_id = :user_id
 | 10-19% | Picante | Frequently spicy |
 | ≥20% | Explosivo | Often toxic |
 
-**Source:** `ml_toxicity` table → [calculators.py:234-276](src/cards/calculators.py#L234-L276)
+**Badges:**
+
+| Badge | Condition | Rarity |
+|-------|-----------|--------|
+| Zen | pct < 2 | legendary |
+| Toxic | pct > 20 | negative |
+
+**Source:** [calculators.py:712-821](src/cards/calculators.py#L712-L821)
 
 ---
 
-### 4. Activity
+### 6. Popularity (0-100)
 
-Measures engagement level through message metrics.
-
-**Formulas:**
-```sql
-SELECT
-    COUNT(*) as messages,
-    COUNT(DISTINCT DATE(date)) as active_days,
-    AVG(LENGTH(COALESCE(text, caption, ''))) as avg_length
-FROM messages
-WHERE user_id = :user_id
-  AND chat_id = :chat_id
-  AND date BETWEEN :window_start AND :window_end
-```
+Measures social gravity through engagement breadth and viral content.
 
 **Components:**
-- `messages`: Total message count in window
-- `active_days`: Number of distinct days with messages
-- `avg_length`: Average message length (text or caption)
 
-**Source:** `messages` table → [calculators.py:279-323](src/cards/calculators.py#L279-L323)
-
----
-
-### 5. Reactions Received
-
-Count of reactions received on the user's messages.
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| Unique Reactors | 25% | Distinct users who reacted, normalized to P90 |
+| Unique Repliers | 25% | Distinct users who replied, normalized to P90 |
+| Total Reactions | 15% | Total reaction count, normalized to P90 |
+| Total Replies | 15% | Total reply count, normalized to P90 |
+| Viral Messages | 20% | Messages with 4+ reactions, normalized to P90 |
 
 **Formula:**
+```python
+# Normalize each component to 0-1 using chat's 90th percentile
+unique_reactors_norm = min(unique_reactors / p90_unique_reactors, 1.0)
+unique_repliers_norm = min(unique_repliers / p90_unique_repliers, 1.0)
+total_reactions_norm = min(total_reactions / p90_total_reactions, 1.0)
+total_replies_norm = min(total_replies / p90_total_replies, 1.0)
+viral_norm = min(viral_count / p90_viral, 1.0)
+
+# Weighted combination
+raw_score = (
+    0.25 * unique_reactors_norm +
+    0.25 * unique_repliers_norm +
+    0.15 * total_reactions_norm +
+    0.15 * total_replies_norm +
+    0.20 * viral_norm
+) * 100
+
+# Apply Bayesian smoothing
+final_score = bayesian_smooth(raw_score, total_messages, global_mean=30)
+```
+
+**SQL for unique reactors:**
 ```sql
-SELECT COUNT(*) as reactions
+SELECT COUNT(DISTINCT mr.user_id) as unique_reactors
 FROM message_reactions mr
-JOIN messages m ON mr.chat_id = m.chat_id
-                AND mr.message_id = m.message_id
+JOIN messages m ON mr.chat_id = m.chat_id AND mr.message_id = m.message_id
 WHERE m.user_id = :user_id
   AND m.chat_id = :chat_id
   AND m.date BETWEEN :window_start AND :window_end
   AND (mr.is_removed = false OR mr.is_removed IS NULL)
 ```
 
-**Note:** The `message_reactions` table uses Telegram's `message_id` (not our internal FK), so the join is on `(chat_id, message_id)`.
-
-**Source:** `message_reactions` + `messages` tables → [calculators.py:326-364](src/cards/calculators.py#L326-L364)
-
----
-
-### 6. Comedy (0-1)
-
-Hybrid score combining ML humor detection with laugh reactions received.
-
-**Formula:**
-```python
-# ML Component (30% weight)
-ml_score = AVG(score) WHERE is_humorous = true
-
-# Reactions Component (70% weight)
-laugh_reactions = COUNT(*) of laugh emoji reactions on user's messages
-reactions_score = min(log2(1 + laugh_reactions) / 10, 1.0)
-
-# Combined Score
-comedy_score = (ml_score * 0.3) + (reactions_score * 0.7)
-```
-
-**SQL for laugh reactions:**
+**SQL for unique repliers:**
 ```sql
-SELECT COUNT(*) as laugh_count
-FROM message_reactions mr
-JOIN messages m ON mr.chat_id = m.chat_id
-                AND mr.message_id = m.message_id
+SELECT COUNT(DISTINCT reply.user_id) as unique_repliers
+FROM messages reply
+JOIN messages m ON reply.reply_to_message_id = m.message_id
+               AND reply.chat_id = m.chat_id
 WHERE m.user_id = :user_id
   AND m.chat_id = :chat_id
   AND m.date BETWEEN :window_start AND :window_end
-  AND mr.emoji_value = ANY(:laugh_emojis)
-  AND (mr.is_removed = false OR mr.is_removed IS NULL)
+  AND reply.user_id != m.user_id
 ```
 
-**Laugh Emojis:**
-```python
-LAUGH_EMOJIS = [
-    # Classic laughs
-    "😂", "🤣", "😆", "😄", "😅", "😸", "😹",
-    # "I'm dead" / melting
-    "🫠", "💀", "☠️", "⚰️",
-    # Crying (from laughing)
-    "😭",
-    # Loud reactions
-    "📢", "🗣️",
-    # Physical comedy reactions
-    "🤸", "🏃", "💨", "🐒", "🤡",
-]
-```
-
-**Labels:**
-
-| Score | Label | Description |
-|-------|-------|-------------|
-| ≥0.7 | Comediante | Professional-level funny |
-| 0.4-0.69 | Engracado | Reliably funny |
-| 0.2-0.39 | Espirituoso | Occasionally witty |
-| <0.2 | Serio | Not focused on humor |
-
-**Output includes:**
-- `score`: Combined comedy score (0-1)
-- `label`: Category label
-- `humor_pct`: % of messages flagged as humorous by ML
-- `laugh_reactions`: Raw count of laugh reactions
-
-**Source:** `ml_humor` + `message_reactions` tables → [calculators.py:418-508](src/cards/calculators.py#L418-L508)
-
----
-
-### 7. Chronotype
-
-Peak activity hour, identifying when the user is most active.
-
-**Formula:**
+**SQL for viral messages (4+ reactions):**
 ```sql
-SELECT
-    EXTRACT(HOUR FROM date AT TIME ZONE :timezone) as hour,
-    COUNT(*) as count
-FROM messages
-WHERE user_id = :user_id
-  AND chat_id = :chat_id
-  AND date BETWEEN :window_start AND :window_end
-GROUP BY EXTRACT(HOUR FROM date AT TIME ZONE :timezone)
-ORDER BY count DESC
-LIMIT 1
+SELECT COUNT(*) as viral_count
+FROM (
+    SELECT m.message_id
+    FROM messages m
+    JOIN message_reactions mr ON mr.chat_id = m.chat_id
+                              AND mr.message_id = m.message_id
+    WHERE m.user_id = :user_id
+      AND m.chat_id = :chat_id
+      AND m.date BETWEEN :window_start AND :window_end
+      AND (mr.is_removed = false OR mr.is_removed IS NULL)
+    GROUP BY m.message_id
+    HAVING COUNT(*) >= 4
+) viral
 ```
 
-**Labels:**
+**Badges:**
 
-| Hour Range | Label | Description |
-|------------|-------|-------------|
-| 5-8 | Madrugador | Early bird |
-| 9-11 | Matutino | Morning person |
-| 12-13 | Almoceiro | Lunch-time active |
-| 14-17 | Vespertino | Afternoon person |
-| 18-21 | Noturno | Evening person |
-| 22-4 | Coruja | Night owl |
+| Badge | Condition | Rarity |
+|-------|-----------|--------|
+| Star | Top 10% in chat | legendary |
+| Cricket | Bottom 10% in chat AND messages >= 30 | negative |
 
-**Note:** The timezone parameter affects both week boundaries and chronotype calculation.
+**Note:** Percentile badges are calculated per-chat, not globally.
 
-**Source:** `messages` table → [calculators.py:367-415](src/cards/calculators.py#L367-L415)
+**Source:** [calculators.py:824-979](src/cards/calculators.py#L824-L979)
 
 ---
 
@@ -295,42 +657,54 @@ Each stat includes a trend comparing the current week to the previous week.
 }
 ```
 
-**Direction Thresholds:**
-- `up`: Change > +5%
-- `down`: Change < -5%
-- `stable`: Change within ±5%
+**Direction Logic:**
+- `up`: delta > 0
+- `down`: delta < 0
+- `stable`: delta == 0
+
+**Percentage Change Formula:**
+```python
+def calc_pct_change(current: float, previous: float) -> float:
+    if previous == 0:
+        return 100.0 if current > 0 else 0.0
+    return round((current - previous) / abs(previous) * 100, 1)
+```
 
 **Stats with trends:**
-- `mood`: Delta in score
-- `activity`: Delta in message count
-- `comedy`: Delta in score
-- `volatility`: Delta in score
-- `toxicity`: Delta in percentage
-- `reactions`: Delta in count
+- `vibe`: Delta in score (0-100)
+- `activity`: Delta in score (0-100)
+- `presence`: Delta in score (0-100)
+- `humor`: Delta in score (0-100)
+- `popularity`: Delta in score (0-100)
+- `toxicity`: Delta in percentage (0-100%)
 
 ---
 
-## Badge Derivation
+## Badge Summary
 
-Badges are derived from stats by the card-image-generator service. Up to 4 badges are displayed per card.
+All badges are evaluated per-chat, with percentile-based badges using chat-specific rankings.
 
-### Available Badges
+### Positive Badges
 
-| Badge | Condition | Rarity | Color |
-|-------|-----------|--------|-------|
-| Ray of Sunshine | mood ≥ 90 | Legendary | Gold gradient |
-| Optimist | mood ≥ 75 | Epic | Purple gradient |
-| Stand-Up King | comedy ≥ 0.7 | Legendary | Gold gradient |
-| Class Clown | comedy ≥ 0.5 | Epic | Purple gradient |
-| Night Owl | chronotype = "Coruja" | Rare | Blue gradient |
-| Early Bird | chronotype = "Madrugador" | Rare | Blue gradient |
-| Chatterbox | messages ≥ 500 | Legendary | Gold gradient |
-| Active Voice | messages ≥ 200 | Epic | Purple gradient |
-| Regular | messages ≥ 100 | Rare | Blue gradient |
-| Zen Master | toxicity < 1% | Legendary | Gold gradient |
-| Peacekeeper | toxicity < 5% | Epic | Purple gradient |
-| Beloved | reactions ≥ 100 | Legendary | Gold gradient |
-| Popular | reactions ≥ 50 | Epic | Purple gradient |
+| Badge | Metric | Condition | Rarity |
+|-------|--------|-----------|--------|
+| Radiant | Vibe | score >= 80 | legendary |
+| Hyperactive | Activity | Top 10% in chat | epic |
+| Regular | Presence | score >= 80 | epic |
+| Comedian | Humor | score >= 70 | legendary |
+| Zen | Toxicity | pct < 2% | legendary |
+| Star | Popularity | Top 10% in chat | legendary |
+
+### Negative Badges
+
+| Badge | Metric | Condition | Rarity |
+|-------|--------|-----------|--------|
+| Gloomy | Vibe | score < 30 | negative |
+| Ghost | Activity | Bottom 10% in chat | negative |
+| Tourist | Presence | score < 20 AND msgs >= 10 | negative |
+| Deadpan | Humor | score < 10 | negative |
+| Toxic | Toxicity | pct > 20% | negative |
+| Cricket | Popularity | Bottom 10% in chat AND msgs >= 30 | negative |
 
 ### Rarity Levels
 
@@ -338,8 +712,9 @@ Badges are derived from stats by the card-image-generator service. Up to 4 badge
 2. **Rare** - Notable achievements (blue)
 3. **Epic** - Impressive achievements (purple)
 4. **Legendary** - Exceptional achievements (gold)
+5. **Negative** - Anti-achievements (red)
 
-**Source:** [card-image-generator/src/renderer/template_loader.py:112-171](../card-image-generator/src/renderer/template_loader.py#L112-L171)
+**Source:** [card-image-generator/src/renderer/template_loader.py](../card-image-generator/src/renderer/template_loader.py)
 
 ---
 
@@ -362,7 +737,7 @@ CREATE TABLE ml_user_cards (
     timezone VARCHAR(64) NOT NULL,
     card_version INTEGER NOT NULL DEFAULT 1,
     generated_at TIMESTAMPTZ NOT NULL,
-    UNIQUE(user_id, chat_id, week_start, card_version)
+    UNIQUE(user_id, chat_id, week_start)
 );
 ```
 
@@ -370,33 +745,43 @@ CREATE TABLE ml_user_cards (
 
 ```json
 {
-  "mood": {
+  "vibe": {
     "score": 72.5,
-    "label": "Animado"
+    "label": "Animado",
+    "positive_ratio": 0.45,
+    "negative_ratio": 0.12,
+    "positive_reactions_ratio": 0.68
   },
-  "volatility": {
-    "score": 0.23,
-    "label": "Equilibrado"
+  "activity": {
+    "score": 65.3,
+    "messages": 145,
+    "avg_length": 42.3,
+    "reactions_sent": 87,
+    "replies_sent": 34
+  },
+  "presence": {
+    "score": 78.2,
+    "active_days": 22,
+    "streak": 8,
+    "hours_spread": 14
+  },
+  "humor": {
+    "score": 55.0,
+    "label": "Engracado",
+    "humorous_pct": 15.2,
+    "positive_reactions": 42
   },
   "toxicity": {
     "pct": 3.2,
-    "label": "Leve"
+    "label": "Leve",
+    "toxic_count": 5,
+    "total_analyzed": 156
   },
-  "activity": {
-    "messages": 145,
-    "active_days": 12,
-    "avg_length": 42.3
-  },
-  "reactions_received": 67,
-  "chronotype": {
-    "peak_hour": 21,
-    "type": "Noturno"
-  },
-  "comedy": {
-    "score": 0.45,
-    "label": "Engracado",
-    "humor_pct": 15.2,
-    "laugh_reactions": 23
+  "popularity": {
+    "score": 61.8,
+    "unique_reactors": 23,
+    "unique_repliers": 18,
+    "viral_messages": 3
   }
 }
 ```
@@ -405,20 +790,35 @@ CREATE TABLE ml_user_cards (
 
 ```json
 {
-  "mood": {
+  "vibe": {
     "delta": 5.2,
     "direction": "up",
     "pct_change": 7.7
   },
   "activity": {
-    "delta": -12,
+    "delta": -8.1,
     "direction": "down",
-    "pct_change": -8.3
+    "pct_change": -11.0
   },
-  "comedy": {
-    "delta": 0.05,
+  "presence": {
+    "delta": 0.0,
     "direction": "stable",
-    "pct_change": 3.1
+    "pct_change": 0.0
+  },
+  "humor": {
+    "delta": 3.5,
+    "direction": "up",
+    "pct_change": 6.8
+  },
+  "toxicity": {
+    "delta": -1.2,
+    "direction": "down",
+    "pct_change": -27.3
+  },
+  "popularity": {
+    "delta": 12.4,
+    "direction": "up",
+    "pct_change": 25.1
   }
 }
 ```
@@ -432,11 +832,37 @@ After stats are computed, the card-image-generator service renders PNG images.
 ### Process
 
 1. **Query cards** from `ml_user_cards` for specified chat/week
-2. **Transform stats** to template context (normalize percentages, derive badges)
-3. **Render HTML** using Jinja2 templates with theme
-4. **Screenshot** HTML using Playwright (Chromium headless)
-5. **Upload PNG** to MinIO with SHA256 hash
-6. **Store reference** in `ml_user_card_images` table
+2. **Transform stats** to template context (normalize, derive badges)
+3. **Compute rankings** per category for top 3 display
+4. **Render HTML** using Jinja2 templates with theme
+5. **Screenshot** HTML using Playwright (Chromium headless)
+6. **Upload PNG** to MinIO with SHA256 hash
+7. **Store reference** in `ml_user_card_images` table
+
+### Category Rankings
+
+Top 3 users per category are shown on cards. Rankings are computed with this query:
+
+```sql
+WITH category_ranks AS (
+    SELECT
+        user_id,
+        ROW_NUMBER() OVER (ORDER BY (stats->'vibe'->>'score')::float DESC NULLS LAST) AS vibe_rank,
+        ROW_NUMBER() OVER (ORDER BY (stats->'activity'->>'score')::float DESC NULLS LAST) AS activity_rank,
+        ROW_NUMBER() OVER (ORDER BY (stats->'presence'->>'score')::float DESC NULLS LAST) AS presence_rank,
+        ROW_NUMBER() OVER (ORDER BY (stats->'humor'->>'score')::float DESC NULLS LAST) AS humor_rank,
+        ROW_NUMBER() OVER (ORDER BY (stats->'toxicity'->>'pct')::float ASC NULLS LAST) AS toxicity_rank,
+        ROW_NUMBER() OVER (ORDER BY (stats->'popularity'->>'score')::float DESC NULLS LAST) AS popularity_rank
+    FROM ml_user_cards
+    WHERE chat_id = :chat_id
+      AND week_start = :week_start
+)
+SELECT * FROM category_ranks
+WHERE vibe_rank <= 3 OR activity_rank <= 3 OR presence_rank <= 3
+   OR humor_rank <= 3 OR toxicity_rank <= 3 OR popularity_rank <= 3
+```
+
+**Note:** Toxicity is sorted ASC (lowest = best), all others DESC (highest = best).
 
 ### Image Specifications
 
@@ -455,23 +881,6 @@ make ml-run-render ML_ARGS="--week 2024-12-16"
 make ml-run-render ML_ARGS="--week 2024-12-16 --force"
 ```
 
-### API Endpoints
-
-```bash
-# Render cards
-POST /api/v1/render
-{
-  "chat_id": -1003280306634,
-  "week_start": "2024-12-16",
-  "theme": "gaming"
-}
-
-# Get image URL
-GET /api/v1/image/{image_id}?expires=3600
-```
-
-See [card-image-generator README](../card-image-generator/README.md) for full API documentation.
-
 ---
 
 ## Adding New Stats
@@ -489,7 +898,9 @@ To add a new stat calculator:
        timezone: str | None = None,
    ) -> StatResult | None:
        # Query and compute
-       return StatResult(value={"score": 42, "label": "Example"})
+       raw_score = ...
+       smoothed = _bayesian_smooth(raw_score, sample_count, global_mean=50)
+       return StatResult(value={"score": smoothed, "label": "Example"})
    ```
 
 2. **Add to registry**:
@@ -500,9 +911,14 @@ To add a new stat calculator:
    }
    ```
 
-3. **Update template** in card-image-generator to display the new stat
+3. **Update generator.py** to include new stat in trends calculation
 
-4. **(Optional) Add badge derivation** in template_loader.py
+4. **Update template_loader.py** in card-image-generator:
+   - Add to `STAT_CONFIG`
+   - Add badge rules if applicable
+   - Update `TemplateContext` dataclass
+
+5. **Update queries.py** to include in category rankings if needed
 
 ---
 
@@ -524,12 +940,21 @@ If a stat returns `None`, check:
 - ML analysis tables have data for the user/window
 - The query filters are correct (user_id, chat_id, date range)
 - Sufficient messages exist (some stats need minimum data)
+- Bayesian smoothing may pull low-sample scores toward global mean
 
 ### Timezone issues
 
 - Always use IANA timezone names: `America/Sao_Paulo`, not `BRT`
 - Timezone affects week boundaries (Monday 00:00 local time)
-- Chronotype peak hours are calculated in the specified timezone
+- Presence streak and hours spread are timezone-aware
+- Storage: timezone is stored with each card for reference
+
+### Low scores with few messages
+
+This is expected behavior due to Bayesian smoothing:
+- Users with few messages have scores closer to the global mean
+- As message count increases, score reflects actual behavior
+- This prevents outliers from dominating rankings
 
 ### Re-generating cards
 

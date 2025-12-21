@@ -56,7 +56,7 @@ class CardQueries:
             WHERE c.chat_id = :chat_id
               AND c.week_start = :week_start
               AND (:user_ids IS NULL OR c.user_id = ANY(:user_ids))
-            ORDER BY (c.stats->'activity'->>'messages')::numeric DESC NULLS LAST
+            ORDER BY (c.stats->'activity'->>'score')::float DESC NULLS LAST
         """)
 
         with self.engine.connect() as conn:
@@ -141,30 +141,30 @@ class CardQueries:
         Get top 3 rankings per category for a chat/week.
 
         Returns dict mapping category -> {user_id: rank} (only top 3 users)
-        Example: {"mood": {123: 1, 456: 2, 789: 3}, "comedy": {...}, ...}
+        Example: {"vibe": {123: 1, 456: 2, 789: 3}, "activity": {...}, ...}
         """
         query = text("""
             WITH category_ranks AS (
                 SELECT
                     user_id,
-                    ROW_NUMBER() OVER (ORDER BY (stats->'mood'->>'score')::float DESC NULLS LAST) AS mood_rank,
-                    ROW_NUMBER() OVER (ORDER BY (stats->'comedy'->>'score')::float DESC NULLS LAST) AS comedy_rank,
-                    ROW_NUMBER() OVER (ORDER BY (stats->'volatility'->>'score')::float DESC NULLS LAST) AS volatility_rank,
-                    ROW_NUMBER() OVER (ORDER BY (stats->'toxicity'->>'pct')::float DESC NULLS LAST) AS toxicity_rank,
-                    ROW_NUMBER() OVER (ORDER BY (stats->'activity'->>'messages')::int DESC NULLS LAST) AS activity_rank,
-                    ROW_NUMBER() OVER (ORDER BY (stats->>'reactions_received')::int DESC NULLS LAST) AS reactions_rank
+                    ROW_NUMBER() OVER (ORDER BY (stats->'vibe'->>'score')::float DESC NULLS LAST) AS vibe_rank,
+                    ROW_NUMBER() OVER (ORDER BY (stats->'activity'->>'score')::float DESC NULLS LAST) AS activity_rank,
+                    ROW_NUMBER() OVER (ORDER BY (stats->'presence'->>'score')::float DESC NULLS LAST) AS presence_rank,
+                    ROW_NUMBER() OVER (ORDER BY (stats->'humor'->>'score')::float DESC NULLS LAST) AS humor_rank,
+                    ROW_NUMBER() OVER (ORDER BY (stats->'toxicity'->>'pct')::float ASC NULLS LAST) AS toxicity_rank,
+                    ROW_NUMBER() OVER (ORDER BY (stats->'popularity'->>'score')::float DESC NULLS LAST) AS popularity_rank
                 FROM ml_user_cards
                 WHERE chat_id = :chat_id
                   AND week_start = :week_start
             )
-            SELECT user_id, mood_rank, comedy_rank, volatility_rank, toxicity_rank, activity_rank, reactions_rank
+            SELECT user_id, vibe_rank, activity_rank, presence_rank, humor_rank, toxicity_rank, popularity_rank
             FROM category_ranks
-            WHERE mood_rank <= 3
-               OR comedy_rank <= 3
-               OR volatility_rank <= 3
-               OR toxicity_rank <= 3
+            WHERE vibe_rank <= 3
                OR activity_rank <= 3
-               OR reactions_rank <= 3
+               OR presence_rank <= 3
+               OR humor_rank <= 3
+               OR toxicity_rank <= 3
+               OR popularity_rank <= 3
         """)
 
         with self.engine.connect() as conn:
@@ -174,27 +174,27 @@ class CardQueries:
             )
 
             rankings: dict[str, dict[int, int]] = {
-                "mood": {},
-                "comedy": {},
-                "volatility": {},
-                "toxicity": {},
+                "vibe": {},
                 "activity": {},
-                "reactions": {},
+                "presence": {},
+                "humor": {},
+                "toxicity": {},
+                "popularity": {},
             }
 
             for row in result:
                 user_id = row.user_id
-                if row.mood_rank <= 3:
-                    rankings["mood"][user_id] = row.mood_rank
-                if row.comedy_rank <= 3:
-                    rankings["comedy"][user_id] = row.comedy_rank
-                if row.volatility_rank <= 3:
-                    rankings["volatility"][user_id] = row.volatility_rank
-                if row.toxicity_rank <= 3:
-                    rankings["toxicity"][user_id] = row.toxicity_rank
+                if row.vibe_rank <= 3:
+                    rankings["vibe"][user_id] = row.vibe_rank
                 if row.activity_rank <= 3:
                     rankings["activity"][user_id] = row.activity_rank
-                if row.reactions_rank <= 3:
-                    rankings["reactions"][user_id] = row.reactions_rank
+                if row.presence_rank <= 3:
+                    rankings["presence"][user_id] = row.presence_rank
+                if row.humor_rank <= 3:
+                    rankings["humor"][user_id] = row.humor_rank
+                if row.toxicity_rank <= 3:
+                    rankings["toxicity"][user_id] = row.toxicity_rank
+                if row.popularity_rank <= 3:
+                    rankings["popularity"][user_id] = row.popularity_rank
 
             return rankings

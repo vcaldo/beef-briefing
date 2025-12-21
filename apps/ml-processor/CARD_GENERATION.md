@@ -702,9 +702,9 @@ Max impact: ±30 points (if all 6 metrics trend same direction).
 **Phase 3: Badge Modifiers**
 
 Sum of modifiers for all earned badges:
-- Legendary badge: **+5 points**
-- Epic badge: **+3 points**
-- Negative badge: **-5 points**
+- Legendary badge: **+2 points**
+- Epic badge: **+1 point**
+- Negative badge: **-2 points**
 
 **Final Score:**
 ```python
@@ -767,9 +767,9 @@ def calc_pct_change(current: float, previous: float) -> float:
 All badges are evaluated per-chat, with percentile-based badges using chat-specific rankings.
 
 **Note:** Badges directly affect the Overall Score via badge modifiers:
-- Legendary badges: +5 points
-- Epic badges: +3 points
-- Negative badges: -5 points
+- Legendary badges: +2 points
+- Epic badges: +1 point
+- Negative badges: -2 points
 
 ### Positive Badges
 

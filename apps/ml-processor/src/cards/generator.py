@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 # Badge rules for modifier calculation (copied from template_loader.py)
-# Each badge contributes to overall score: legendary +5, epic +3, negative -5
+# Each badge contributes to overall score: legendary +2, epic +1, negative -2
 BADGE_RULES = [
     # Vibe badges
     {"condition": lambda s: s.get("vibe", {}).get("score", 0) >= 80, "rarity": "legendary"},
@@ -58,9 +58,9 @@ BADGE_RULES = [
 ]
 
 BADGE_MODIFIERS = {
-    "legendary": 5,
-    "epic": 3,
-    "negative": -5,
+    "legendary": 2,
+    "epic": 1,
+    "negative": -2,
     "rare": 0,
     "common": 0,
 }

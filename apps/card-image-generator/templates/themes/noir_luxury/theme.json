@@ -1,0 +1,53 @@
+{
+  "name": "noir_luxury",
+  "colors": {
+    "background_gradient": ["#111111", "#1a1a1a", "#050505"],
+    "primary_accent": "#d4af37",
+    "secondary_accent": "#f2f0e6",
+    "text_primary": "#f2f0e6",
+    "text_secondary": "#999999",
+    "border_color": "rgba(212, 175, 55, 0.3)",
+    "stat_colors": {
+      "vibe": "#d4af37",
+      "vibe_gradient": ["#d4af37", "#aa8c2c"],
+      "activity": "#f2f0e6",
+      "activity_gradient": ["#f2f0e6", "#cccccc"],
+      "presence": "#999999",
+      "presence_gradient": ["#999999", "#666666"],
+      "humor": "#d4af37",
+      "humor_gradient": ["#d4af37", "#aa8c2c"],
+      "toxicity": "#800000",
+      "toxicity_gradient": ["#800000", "#4d0000"],
+      "popularity": "#d4af37",
+      "popularity_gradient": ["#d4af37", "#aa8c2c"]
+    },
+    "badge_rarity_colors": {
+      "common": { "bg_start": "#222", "bg_end": "#111", "border": "#444", "text": "#888" },
+      "rare": { "bg_start": "#1a2a3a", "bg_end": "#0f1f2f", "border": "#3b5998", "text": "#aabbee" },
+      "epic": { "bg_start": "#2a1a3a", "bg_end": "#1f0f2f", "border": "#800080", "text": "#dcbbe2" },
+      "legendary": { "bg_start": "#3a2a0a", "bg_end": "#2f1f00", "border": "#d4af37", "text": "#d4af37", "glow": "rgba(212, 175, 55, 0.4)" }
+    },
+    "tier_colors": {
+      "legendary": ["#d4af37", "#f7e7ce"],
+      "elite": ["#c0c0c0", "#e0e0e0"],
+      "outstanding": ["#b87333", "#cd7f32"],
+      "regular": ["#444444", "#666666"],
+      "beginner": ["#333333", "#444444"],
+      "rookie": ["#222222", "#333333"]
+    },
+    "effects": {
+      "avatar_glow": "rgba(212, 175, 55, 0.2)",
+      "username_glow": "rgba(0,0,0,0)",
+      "border_gradient": ["#d4af37", "#333333", "#d4af37"],
+      "decoration_pink": "rgba(0,0,0,0)",
+      "decoration_cyan": "rgba(212, 175, 55, 0.1)"
+    },
+    "trend_colors": { "up": "#d4af37", "down": "#800000", "stable": "#666666" }
+  },
+  "typography": {
+    "header_font": "Playfair Display",
+    "body_font": "Lato",
+    "header_weights": [400, 700],
+    "body_weights": [300, 400]
+  }
+}

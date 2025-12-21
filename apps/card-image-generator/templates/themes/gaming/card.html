@@ -177,11 +177,17 @@
             letter-spacing: 1px;
         }
 
+        .stat-value-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
         .stat-value {
             font-family: 'Orbitron', sans-serif;
             font-size: 24px;
             font-weight: 700;
-            margin-bottom: 8px;
         }
 
         .stat-bar {
@@ -218,7 +224,6 @@
 
         .stat-trend {
             font-size: 12px;
-            margin-top: 4px;
         }
 
         .stat-trend.up { color: #22c55e; }
@@ -339,15 +344,17 @@
                     <span class="stat-icon">{{ stat.icon }}</span>
                     <span class="stat-label">{{ stat.label }}</span>
                 </div>
-                <div class="stat-value">{{ stat.display_value }}</div>
+                <div class="stat-value-row">
+                    <div class="stat-value">{{ stat.display_value }}</div>
+                    {% if stat.trend %}
+                    <div class="stat-trend {{ stat.trend.direction }}">
+                        {{ stat.trend.icon }} {{ stat.trend.pct_change }}
+                    </div>
+                    {% endif %}
+                </div>
                 <div class="stat-bar">
                     <div class="stat-fill" style="width: {{ stat.percentage }}%"></div>
                 </div>
-                {% if stat.trend %}
-                <div class="stat-trend {{ stat.trend.direction }}">
-                    {{ stat.trend.icon }} {{ stat.trend.pct_change }}
-                </div>
-                {% endif %}
             </div>
             {% endfor %}
         </div>

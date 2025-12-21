@@ -477,7 +477,7 @@ class TemplateLoader:
             icon = "\u2B07\uFE0F"
             pct_str = f"{pct:.0f}%"
         else:
-            icon = "\u27A1\uFE0F"
+            icon = "\u23F9\uFE0F"  # ⏹️
             pct_str = "0%"
 
         return TrendContext(direction=direction, icon=icon, pct_change=pct_str)

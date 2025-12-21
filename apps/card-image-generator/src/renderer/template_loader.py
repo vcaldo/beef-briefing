@@ -105,13 +105,14 @@ class TemplateContext:
     # Activity summary
     activity: ActivityContext
 
-    # Raw stats for direct access (new 6 metrics)
+    # Raw stats for direct access (new 6 metrics + overall)
     vibe: dict = field(default_factory=dict)
     activity_stats: dict = field(default_factory=dict)
     presence: dict = field(default_factory=dict)
     humor: dict = field(default_factory=dict)
     toxicity: dict = field(default_factory=dict)
     popularity: dict = field(default_factory=dict)
+    overall: dict = field(default_factory=dict)
 
     # Ranking
     rank: int | None = None
@@ -222,6 +223,12 @@ STAT_CONFIG = {
         "format": lambda v: f"{v:.0f}",
         "to_pct": lambda v: min(100, max(0, v)),
     },
+    "overall": {
+        "label": "Overall",
+        "icon": "\U0001F3C6",  # 🏆
+        "format": lambda v: f"{v:.0f}",
+        "to_pct": lambda v: min(100, max(0, v)),
+    },
 }
 
 
@@ -305,13 +312,14 @@ class TemplateLoader:
         # Display the 30-day stats window period
         period_display = f"{stats_window_start.strftime('%b %d')} - {stats_window_end.strftime('%b %d')}"
 
-        # Extract raw stats for the 6 metrics
+        # Extract raw stats for the 6 metrics + overall
         vibe = stats_raw.get("vibe", {})
         activity = stats_raw.get("activity", {})
         presence = stats_raw.get("presence", {})
         humor = stats_raw.get("humor", {})
         toxicity = stats_raw.get("toxicity", {})
         popularity = stats_raw.get("popularity", {})
+        overall = stats_raw.get("overall", {})
 
         # Extract and normalize stats for display
         stats_list = []
@@ -458,6 +466,7 @@ class TemplateLoader:
             humor=humor,
             toxicity=toxicity,
             popularity=popularity,
+            overall=overall,
             rank=rank,
             theme=theme,
         )
@@ -523,6 +532,7 @@ class TemplateLoader:
             "humor": context.humor,
             "toxicity": context.toxicity,
             "popularity": context.popularity,
+            "overall": context.overall,
             "rank": context.rank,
             "theme": context.theme,
         }

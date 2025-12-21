@@ -198,6 +198,22 @@ def _popularity_label(score: float) -> str:
         return "Reservado"
 
 
+def _overall_label(score: float) -> str:
+    """Convert overall score (0-100) to label."""
+    if score >= 85:
+        return "Lendario"
+    elif score >= 70:
+        return "Elite"
+    elif score >= 55:
+        return "Destacado"
+    elif score >= 40:
+        return "Regular"
+    elif score >= 25:
+        return "Iniciante"
+    else:
+        return "Novato"
+
+
 # =========================================
 # STAT CALCULATORS
 # =========================================
@@ -1099,6 +1115,158 @@ def calculate_popularity(
     )
 
 
+def _calculate_longest_gap(
+    active_dates: list[date], window_start: date, window_end: date
+) -> int:
+    """
+    Calculate the longest gap (in days) between posts within the window.
+
+    Considers gaps:
+    1. From window_start to first post
+    2. Between consecutive posts
+    3. From last post to window_end
+    """
+    if not active_dates:
+        return (window_end - window_start).days + 1  # Entire window is a gap
+
+    sorted_dates = sorted(active_dates)
+
+    gaps = []
+    # Gap from window start to first post
+    gaps.append((sorted_dates[0] - window_start).days)
+
+    # Gaps between consecutive posts
+    for i in range(1, len(sorted_dates)):
+        gaps.append((sorted_dates[i] - sorted_dates[i - 1]).days - 1)
+
+    # Gap from last post to window end
+    gaps.append((window_end - sorted_dates[-1]).days)
+
+    return max(gaps) if gaps else 0
+
+
+def calculate_overall_score(
+    engine: Engine,
+    user_id: int,
+    chat_id: int,
+    window_start: datetime,
+    window_end: datetime,
+    timezone: str | None = None,
+    existing_stats: dict | None = None,
+) -> StatResult | None:
+    """
+    Calculate Overall Score (0-100) combining all metrics with weighted importance.
+
+    Formula:
+    - 70% from positive metrics (Popularity 20%, Presence 15%, Vibe 12%,
+      Streak 10%, Humor 8%, Activity 5%)
+    - 30% penalty from negative metrics (Toxicity 12%, Negative Reactions 7%,
+      Negative Messages 6%, Longest Gap 5%)
+
+    Uses existing_stats to avoid re-querying if available.
+    """
+    if existing_stats is None:
+        return None  # Requires pre-computed stats from generator
+
+    # Extract scores from existing stats (default to 0 if missing)
+    popularity_score = existing_stats.get("popularity", {}).get("score", 0)
+    presence_score = existing_stats.get("presence", {}).get("score", 0)
+    vibe_score = existing_stats.get("vibe", {}).get("score", 0)
+    humor_score = existing_stats.get("humor", {}).get("score", 0)
+    activity_score = existing_stats.get("activity", {}).get("score", 0)
+    toxicity_pct = existing_stats.get("toxicity", {}).get("pct", 0)
+
+    # Extract streak from presence (normalize to 0-100 based on window days)
+    streak_days = existing_stats.get("presence", {}).get("streak", 0)
+    total_days = existing_stats.get("presence", {}).get("total_days", 30)
+    streak_normalized = min((streak_days / total_days) * 100, 100) if total_days > 0 else 0
+
+    # Extract negative message ratio from vibe (already 0-100)
+    negative_msg_ratio = existing_stats.get("vibe", {}).get("negative_ratio", 0)
+
+    # Extract negative reactions ratio from toxicity
+    negative_reactions = existing_stats.get("toxicity", {}).get("negative_reactions", 0)
+    total_reactions = existing_stats.get("vibe", {}).get("total_reactions", 0)
+    if total_reactions == 0:
+        total_reactions = existing_stats.get("popularity", {}).get("total_reactions", 0)
+    negative_reaction_ratio = (
+        (negative_reactions / total_reactions * 100) if total_reactions > 0 else 0
+    )
+
+    # Query active dates for longest gap calculation
+    tz = timezone or "UTC"
+    daily_query = """
+        SELECT DISTINCT DATE(m.date AT TIME ZONE :timezone) as activity_date
+        FROM messages m
+        WHERE m.user_id = :user_id
+          AND m.chat_id = :chat_id
+          AND m.date >= :window_start
+          AND m.date <= :window_end
+    """
+    active_dates_result = _execute_many(
+        engine,
+        daily_query,
+        {
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "window_start": window_start,
+            "window_end": window_end,
+            "timezone": tz,
+        },
+    )
+
+    # Convert to date objects
+    active_dates = []
+    for r in active_dates_result:
+        d = r["activity_date"]
+        if isinstance(d, datetime):
+            active_dates.append(d.date())
+        elif isinstance(d, date):
+            active_dates.append(d)
+        else:
+            active_dates.append(d)
+
+    # Calculate longest gap
+    longest_gap = _calculate_longest_gap(
+        active_dates, window_start.date(), window_end.date()
+    )
+    gap_normalized = min((longest_gap / total_days) * 100, 100) if total_days > 0 else 0
+
+    # Calculate positive contribution (70 points max)
+    positive = (
+        0.20 * popularity_score
+        + 0.15 * presence_score
+        + 0.12 * vibe_score
+        + 0.10 * streak_normalized
+        + 0.08 * humor_score
+        + 0.05 * activity_score
+    )
+
+    # Calculate negative penalty (30 points max)
+    negative = (
+        0.12 * toxicity_pct
+        + 0.07 * negative_reaction_ratio
+        + 0.06 * negative_msg_ratio
+        + 0.05 * gap_normalized
+    )
+
+    # Base score (before modifiers)
+    base_score = positive - negative
+
+    # Clamp to 0-100 (modifiers will be applied in generator.py)
+    final_score = round(_clamp(base_score, 0, 100), 1)
+
+    return StatResult(
+        value={
+            "score": final_score,
+            "label": _overall_label(final_score),
+            "positive_contribution": round(positive, 1),
+            "negative_penalty": round(negative, 1),
+            "longest_gap_days": longest_gap,
+        }
+    )
+
+
 # =========================================
 # CALCULATOR REGISTRY
 # =========================================
@@ -1111,4 +1279,5 @@ CALCULATORS: dict[str, StatCalculator] = {
     "humor": calculate_humor,
     "toxicity": calculate_toxicity,
     "popularity": calculate_popularity,
+    "overall": calculate_overall_score,
 }

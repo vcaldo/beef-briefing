@@ -1,22 +1,22 @@
-<b>Detalhes Tecnicos</b>
+<b>Detalhes Técnicos</b>
 
-Informacoes sobre os modelos e algoritmos usados para gerar seu card.
+Informações sobre os modelos e algoritmos usados para gerar seu card.
 
 <b>Modelos de ML</b>
 
-<i>Analise de Sentimento</i>
+<i>Análise de Sentimento</i>
 Modelo: <code>distilbert-base-multilingual-cased-sentiments-student</code>
   • Classifica mensagens como positiva, neutra ou negativa
-  • Suporta 6 idiomas incluindo portugues
+  • Suporta 6 idiomas incluindo português
   • Framework: HuggingFace Transformers
 
-<i>Deteccao de Toxicidade</i>
+<i>Detecção de Toxicidade</i>
 Modelo: <code>bert-base-portuguese-cased-hatebr</code>
-  • Treinado no corpus HateBR de discurso de odio brasileiro
-  • Detecta mensagens com conteudo toxico ou ofensivo
+  • Treinado no corpus HateBR de discurso de ódio brasileiro
+  • Detecta mensagens com conteúdo tóxico ou ofensivo
 
-<i>Deteccao de Humor</i>
-Metodo: Heuristicas baseadas em padroes
+<i>Detecção de Humor</i>
+Método: Heurísticas baseadas em padrões
   • Detecta risadas: kkkk, hahaha, rsrsrs, huahua
   • Analisa emojis de risada
   • Threshold: score &gt;= 0.4 para classificar como humor
@@ -27,19 +27,19 @@ Biblioteca: emosent-py
   • Positivo: score &gt; 0.2
   • Negativo: score &lt; -0.2
 
-<b>Normalizacao Estatistica</b>
+<b>Normalização Estatística</b>
 
 <i>Bayesian Smoothing</i>
-Todos os scores usam suavizacao Bayesiana com k=50:
-  <code>score = (n * raw + 50 * media) / (n + 50)</code>
+Todos os scores usam suavização Bayesiana com k=50:
+  <code>score = (n * raw + 50 * média) / (n + 50)</code>
 
-Isso evita que usuarios com poucas mensagens tenham scores extremos, aproximando amostras pequenas da media do grupo.
+Isso evita que usuários com poucas mensagens tenham scores extremos, aproximando amostras pequenas da média do grupo.
 
-<i>Normalizacao p90</i>
-Metricas de volume (mensagens, reacoes) sao normalizadas pelo percentil 90 do chat, evitando que outliers distorcam os resultados.
+<i>Normalização p90</i>
+Métricas de volume (mensagens, reações) são normalizadas pelo percentil 90 do chat, evitando que outliers distorçam os resultados.
 
 <b>Janela de Dados</b>
 
-  • Periodo: 30 dias (janela deslizante)
+  • Período: 30 dias (janela deslizante)
   • Cards: Gerados semanalmente (segunda a domingo)
-  • Minimo: 10 mensagens para aparecer no ranking
+  • Mínimo: 10 mensagens para aparecer no ranking

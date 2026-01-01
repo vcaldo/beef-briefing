@@ -459,6 +459,79 @@ func (c *APIClient) SendUserProfilePhotos(ctx context.Context, userID int64, pho
 	return nil
 }
 
+// CardImageResponse represents the response from the card image endpoint
+type CardImageResponse struct {
+	ImageID     int64  `json:"image_id"`
+	URL         string `json:"url"`
+	ExpiresIn   int    `json:"expires_in"`
+	Width       int    `json:"width"`
+	Height      int    `json:"height"`
+	Theme       string `json:"theme"`
+	WeekStart   string `json:"week_start"`
+	GeneratedAt string `json:"generated_at"`
+}
+
+// ErrCardNotFound is returned when no card exists for the user
+var ErrCardNotFound = fmt.Errorf("card not found")
+
+// GetCardImageURL fetches the presigned URL for a user's card image
+func (c *APIClient) GetCardImageURL(ctx context.Context, userID, chatID int64) (*CardImageResponse, error) {
+	txn := newrelic.FromContext(ctx)
+
+	apiURL := fmt.Sprintf("%s/api/v1/cards/%d/image?chat_id=%d", c.baseURL, userID, chatID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "GET",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrCardNotFound
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result CardImageResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
 // SendChatProfilePhotos uploads chat profile photos to the API
 func (c *APIClient) SendChatProfilePhotos(ctx context.Context, chatID int64, photos []ProfilePhotoMeta, files map[string][]byte) error {
 	txn := newrelic.FromContext(ctx)

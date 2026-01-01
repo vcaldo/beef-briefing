@@ -65,6 +65,7 @@ func main() {
 	// Initialize handlers
 	updateHandler := handlers.NewUpdateHandler(apiClient, nrApp)
 	photoUpdateHandler := handlers.NewPhotoUpdateHandler(apiClient, cfg, nrApp)
+	meHandler := handlers.NewMeHandler(apiClient, nrApp)
 
 	// Create bot instance with allowed updates including reactions
 	opts := []bot.Option{
@@ -101,6 +102,7 @@ func main() {
 
 	// Register command handlers
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/update_photos", bot.MatchTypePrefix, photoUpdateHandler.Handle)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/me", bot.MatchTypePrefix, meHandler.Handle)
 
 	slog.Info("bot initialized successfully, starting long polling...")
 

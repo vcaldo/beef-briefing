@@ -468,6 +468,11 @@
             font-weight: 700;
         }
 
+        .messages-period {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
         .period {
             font-size: 12px;
             color: rgba(255, 243, 214, 0.4);
@@ -614,7 +619,7 @@
 
         <!-- Footer -->
         <div class="card-footer">
-            <span class="messages-count"><strong>{{ activity.messages }}</strong> messages</span>
+            <span class="messages-count"><strong>{{ activity.messages }}</strong> messages <span class="messages-period">past 30 days</span></span>
             <span class="period">Week {{ week_number }} · {{ period_display }}</span>
         </div>
     </div>

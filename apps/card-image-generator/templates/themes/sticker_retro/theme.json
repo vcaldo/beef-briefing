@@ -1,7 +1,7 @@
 {
   "name": "sticker_retro",
   "colors": {
-    "background_gradient": ["#fefefe", "#f2f5f9", "#eef2f7"],
+    "background_gradient": ["#f5f9ff", "#eaf3fc", "#e1edf8"],
     "primary_accent": "#2aabee",
     "secondary_accent": "#8bc9ff",
     "text_primary": "#1a1a1a",

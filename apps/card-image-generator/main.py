@@ -62,6 +62,7 @@ generator = CardGenerator(
     card_width=config.card_width,
     card_height=config.card_height,
     card_scale=config.card_scale,
+    tier_class_fn=config.get_tier_class,
 )
 
 

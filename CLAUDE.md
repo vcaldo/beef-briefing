@@ -298,12 +298,12 @@ The tier system labels users based on their overall score. Tiers are configurabl
 ```bash
 # Format: NAME:MIN_SCORE (ordered from highest to lowest tier)
 # Users are assigned to the first tier where their score >= MIN_SCORE
-TIER_1=Legendary:85
-TIER_2=Elite:70
-TIER_3=Outstanding:55
-TIER_4=Regular:40
-TIER_5=Beginner:25
-TIER_6=Rookie:0
+TIER_1=Lenda:80
+TIER_2=Pica:64
+TIER_3=CLT:48
+TIER_4=Fióti:32
+TIER_5=Meia-Bomba:16
+TIER_6=Turista:0
 ```
 
 | Env Var | Default | Description |

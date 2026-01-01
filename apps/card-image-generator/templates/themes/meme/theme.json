@@ -49,12 +49,12 @@
       }
     },
     "tier_colors": {
-      "legendary": ["#ffd700", "#ffff00"],
-      "elite": ["#00ffff", "#00ff00"],
-      "outstanding": ["#ff00ff", "#ff69b4"],
-      "regular": ["#00ff00", "#7fff00"],
-      "beginner": ["#808080", "#c0c0c0"],
-      "rookie": ["#ff6347", "#ff4500"]
+      "tier_1": ["#ffd700", "#ffff00"],
+      "tier_2": ["#00ffff", "#00ff00"],
+      "tier_3": ["#ff00ff", "#ff69b4"],
+      "tier_4": ["#00ff00", "#7fff00"],
+      "tier_5": ["#808080", "#c0c0c0"],
+      "tier_6": ["#ff6347", "#ff4500"]
     },
     "effects": {
       "avatar_glow": "rgba(255, 0, 255, 0.6)",

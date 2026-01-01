@@ -403,8 +403,6 @@
             font-size: 10px;
             font-weight: 600;
             border: 1px solid;
-            /* Sticker cutout effect */
-            outline: 2px solid white;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
         }
 
@@ -416,6 +414,7 @@
             background: linear-gradient(135deg, var(--badge-common-bg-start), var(--badge-common-bg-end));
             border-color: var(--badge-common-border);
             color: var(--badge-common-text);
+            transform: rotate(1.5deg);
         }
 
         .badge.rare {
@@ -437,6 +436,7 @@
             border-color: var(--badge-legendary-border);
             color: var(--badge-legendary-text);
             box-shadow: 0 2px 8px var(--badge-legendary-glow), 0 2px 6px rgba(0, 0, 0, 0.12);
+            transform: rotate(-1.5deg);
         }
 
         /* Footer */

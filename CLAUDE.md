@@ -317,6 +317,24 @@ TIER_6=Turista:0
 
 **Format**: `NAME:MIN_SCORE` where MIN_SCORE is the minimum overall score (0-100) for that tier.
 
+### Card Theme Configuration
+
+The default theme for card image generation is configurable via environment variable.
+
+**Configuration** (in `.env.dev` or `.env.prod`):
+```bash
+# Default theme for card generation
+DEFAULT_CARD_THEME=neon_arcade
+```
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| DEFAULT_CARD_THEME | gaming | Theme used when generating card images |
+
+**Available themes**: gaming, clean, sticker, meme, vaporwave, blueprint, mythic, noir_luxury, neon_arcade, sticker_retro
+
+Theme files are located in `apps/card-image-generator/templates/themes/`. Each theme has a `theme.json` (colors/typography) and `card.html` (template).
+
 ## Import CLI Usage
 
 Import Telegram Desktop exports into the system:

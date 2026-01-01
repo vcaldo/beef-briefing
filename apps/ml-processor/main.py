@@ -585,8 +585,8 @@ def main():
     render_cards_parser.add_argument(
         "--theme",
         type=str,
-        default="gaming",
-        help="Template theme name (default: gaming)",
+        default=_config.default_card_theme,
+        help=f"Template theme name (default: {_config.default_card_theme})",
     )
     render_cards_parser.add_argument(
         "--force",

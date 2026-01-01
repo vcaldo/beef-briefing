@@ -313,10 +313,10 @@ func (h *CardHandler) HandleGetCardImage(w http.ResponseWriter, r *http.Request)
 		weekStart = &parsed
 	}
 
-	// Optional theme parameter
+	// Optional theme parameter (uses DEFAULT_CARD_THEME from config if not specified)
 	theme := r.URL.Query().Get("theme")
 	if theme == "" {
-		theme = "gaming"
+		theme = h.config.DefaultCardTheme
 	}
 
 	// Optional expires parameter (seconds)

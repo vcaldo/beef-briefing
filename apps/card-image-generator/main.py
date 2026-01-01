@@ -74,9 +74,10 @@ async def lifespan(app: FastAPI):
     # Initialize generator (starts Playwright)
     await generator.start()
 
-    # Store generator and API keys in app state
+    # Store generator, API keys, and default theme in app state
     app.state.generator = generator
     app.state.api_keys = config.get_app_keys()
+    app.state.default_theme = config.default_card_theme
 
     logger.info(
         f"Service ready on {config.card_generator_host}:{config.card_generator_port}"

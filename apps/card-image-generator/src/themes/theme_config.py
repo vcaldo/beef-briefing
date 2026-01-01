@@ -194,12 +194,12 @@ class ThemeLoader:
                     "legendary": {"bg_start": "#92400e", "bg_end": "#f59e0b", "border": "#fbbf24", "text": "#fef3c7", "glow": "rgba(251, 191, 36, 0.4)"},
                 },
                 "tier_colors": {
-                    "legendary": ["#fbbf24", "#f59e0b"],
-                    "elite": ["#00d9ff", "#0ea5e9"],
-                    "outstanding": ["#a855f7", "#7c3aed"],
-                    "regular": ["#14b8a6", "#0d9488"],
-                    "beginner": ["#9ca3af", "#6b7280"],
-                    "rookie": ["#f472b6", "#ec4899"],
+                    "tier_1": ["#fbbf24", "#f59e0b"],
+                    "tier_2": ["#00d9ff", "#0ea5e9"],
+                    "tier_3": ["#a855f7", "#7c3aed"],
+                    "tier_4": ["#14b8a6", "#0d9488"],
+                    "tier_5": ["#9ca3af", "#6b7280"],
+                    "tier_6": ["#f472b6", "#ec4899"],
                 },
                 "effects": {
                     "avatar_glow": "rgba(233, 69, 96, 0.5)",

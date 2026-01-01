@@ -29,6 +29,11 @@ def get_api_keys(request: Request) -> dict[str, str]:
     return getattr(request.app.state, "api_keys", {})
 
 
+def get_default_theme(request: Request) -> str:
+    """Get default theme from app state."""
+    return getattr(request.app.state, "default_theme", "gaming")
+
+
 async def verify_api_key(
     request: Request,
     authorization: str = Security(api_key_header),
@@ -59,7 +64,7 @@ class RenderRequest(BaseModel):
     user_ids: list[int] | None = Field(
         None, description="Optional list of specific user IDs"
     )
-    theme: str = Field("gaming", description="Template theme name")
+    theme: str | None = Field(None, description="Template theme name (uses DEFAULT_CARD_THEME if not specified)")
     force_regenerate: bool = Field(False, description="Regenerate even if exists")
 
 
@@ -134,7 +139,8 @@ async def get_available_weeks(
 
 @router.post("/api/v1/render", response_model=RenderResponse)
 async def render_cards(
-    request: RenderRequest,
+    render_request: RenderRequest,
+    request: Request,
     generator: CardGenerator = Depends(get_generator),
     api_key: str = Depends(verify_api_key),
 ):
@@ -146,19 +152,22 @@ async def render_cards(
     references in the database.
     """
     try:
-        week_start = date.fromisoformat(request.week_start)
+        week_start = date.fromisoformat(render_request.week_start)
     except ValueError:
         raise HTTPException(
             status_code=400,
             detail="Invalid week_start format. Use YYYY-MM-DD",
         )
 
+    # Use default theme from config if not specified
+    theme = render_request.theme or get_default_theme(request)
+
     result = await generator.render_cards(
-        chat_id=request.chat_id,
+        chat_id=render_request.chat_id,
         week_start=week_start,
-        user_ids=request.user_ids,
-        theme=request.theme,
-        force_regenerate=request.force_regenerate,
+        user_ids=render_request.user_ids,
+        theme=theme,
+        force_regenerate=render_request.force_regenerate,
     )
 
     return RenderResponse(

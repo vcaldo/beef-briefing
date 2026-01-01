@@ -298,11 +298,11 @@ The tier system labels users based on their overall score. Tiers are configurabl
 ```bash
 # Format: NAME:MIN_SCORE (ordered from highest to lowest tier)
 # Users are assigned to the first tier where their score >= MIN_SCORE
-TIER_1=Lenda:80
-TIER_2=Pica:64
-TIER_3=CLT:48
-TIER_4=Fióti:32
-TIER_5=Meia-Bomba:16
+TIER_1=Lenda:85
+TIER_2=Pica:70
+TIER_3=CLT:55
+TIER_4=Meia-Bomba:40
+TIER_5=Fióti:25
 TIER_6=Turista:0
 ```
 
@@ -316,6 +316,24 @@ TIER_6=Turista:0
 | TIER_6 | Rookie:0 | Lowest tier (score < 25) |
 
 **Format**: `NAME:MIN_SCORE` where MIN_SCORE is the minimum overall score (0-100) for that tier.
+
+### Card Theme Configuration
+
+The default theme for card image generation is configurable via environment variable.
+
+**Configuration** (in `.env.dev` or `.env.prod`):
+```bash
+# Default theme for card generation
+DEFAULT_CARD_THEME=neon_arcade
+```
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| DEFAULT_CARD_THEME | gaming | Theme used when generating card images |
+
+**Available themes**: gaming, clean, sticker, meme, vaporwave, blueprint, mythic, noir_luxury, neon_arcade, sticker_retro
+
+Theme files are located in `apps/card-image-generator/templates/themes/`. Each theme has a `theme.json` (colors/typography) and `card.html` (template).
 
 ## Import CLI Usage
 

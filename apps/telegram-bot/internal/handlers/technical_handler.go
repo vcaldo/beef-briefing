@@ -58,7 +58,7 @@ func (h *TechnicalHandler) Handle(ctx context.Context, b *bot.Bot, update *model
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:    chatID,
 		Text:      content.TechnicalContent,
-		ParseMode: models.ParseModeMarkdown,
+		ParseMode: models.ParseModeHTML,
 	})
 	if err != nil {
 		slog.Error("failed to send technical message", "chat_id", chatID, "error", err)

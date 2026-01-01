@@ -1,38 +1,38 @@
-*Como seu card e calculado*
+<b>Como seu card e calculado</b>
 
 Seu card semanal mede sua participacao no grupo usando 7 metricas. Cada uma analisa um aspecto diferente da sua atividade.
 
-*As 7 Metricas*
+<b>As 7 Metricas</b>
 
-_Vibe_ - Mede o tom das suas mensagens e como os outros reagem a voce
+<i>Vibe</i> - Mede o tom das suas mensagens e como os outros reagem a voce
   • Mensagens positivas, neutras e negativas
   • Reacoes positivas recebidas
 
-_Atividade_ - Volume de contribuicao
+<i>Atividade</i> - Volume de contribuicao
   • Quantidade de mensagens
   • Tamanho medio das mensagens
   • Reacoes e respostas enviadas
 
-_Presenca_ - Consistencia vs aparicoes esporadicas
+<i>Presenca</i> - Consistencia vs aparicoes esporadicas
   • Dias ativos no periodo
   • Sequencia de dias consecutivos
   • Variedade de horarios
 
-_Humor_ - Impacto comico
+<i>Humor</i> - Impacto comico
   • Reacoes positivas em mensagens suas
   • Usuarios unicos que reagiram
   • Mensagens classificadas como humor
 
-_Toxicidade_ - Impacto negativo (penalidade)
+<i>Toxicidade</i> - Impacto negativo (penalidade)
   • Mensagens toxicas detectadas
   • Reacoes negativas recebidas
 
-_Popularidade_ - Atracao social
+<i>Popularidade</i> - Atracao social
   • Usuarios unicos que reagiram
   • Usuarios unicos que responderam
   • Mensagens virais (4+ reacoes)
 
-*Como o Score Geral e Calculado*
+<b>Como o Score Geral e Calculado</b>
 
 Contribuicao positiva:
   • Popularidade: 20%
@@ -48,20 +48,20 @@ Penalidades:
   • Mensagens negativas: -6%
   • Maior intervalo: -5%
 
-*Modificadores*
+<b>Modificadores</b>
 
-_Tendencia semanal_: Comparando com a semana anterior
+<i>Tendencia semanal</i>: Comparando com a semana anterior
   • Melhora significativa: +5 pontos
   • Pequena melhora: +3 pontos
   • Pequena piora: -3 pontos
   • Piora significativa: -5 pontos
 
-_Badges_: Conquistas especiais
+<i>Badges</i>: Conquistas especiais
   • Badges legendarios: +10 pontos
   • Badges epicos: +7 pontos
   • Badges negativos: -5 pontos
 
-*Tiers (Niveis)*
+<b>Tiers (Niveis)</b>
 
 Seu tier e definido pelo score geral:
   • 85+ pontos: Tier 1 (topo)

@@ -58,7 +58,7 @@ func (h *CriteriaHandler) Handle(ctx context.Context, b *bot.Bot, update *models
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:    chatID,
 		Text:      content.CriteriaContent,
-		ParseMode: models.ParseModeMarkdown,
+		ParseMode: models.ParseModeHTML,
 	})
 	if err != nil {
 		slog.Error("failed to send criteria message", "chat_id", chatID, "error", err)

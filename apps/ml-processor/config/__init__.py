@@ -83,6 +83,7 @@ class Config(BaseSettings):
     card_image_generator_url: Optional[str] = None
     card_image_generator_api_key_file: str = ""
     card_image_generator_timeout: float = 120.0
+    default_card_theme: str = "gaming"
 
     # Tier Configuration (format: "Name:MinScore")
     tier_1: str = "Legendary:85"

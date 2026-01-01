@@ -34,7 +34,7 @@ class Config(BaseSettings):
 
     # Template Configuration
     templates_dir: str = "/app/templates"
-    default_theme: str = "gaming"
+    default_card_theme: str = "gaming"
 
     # Card Dimensions
     card_width: int = 400

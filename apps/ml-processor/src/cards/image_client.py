@@ -37,7 +37,7 @@ class CardImageClient:
         chat_id: int,
         week_start: str,
         user_ids: list[int] | None = None,
-        theme: str = "gaming",
+        theme: str = "gaming",  # Fallback if caller doesn't specify; prefer using config.default_card_theme
         force_regenerate: bool = False,
     ) -> RenderResult:
         """

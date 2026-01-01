@@ -1,0 +1,72 @@
+<b>Como seu card é calculado</b>
+
+Seu card semanal mede sua participação no grupo usando 7 métricas. Cada uma analisa um aspecto diferente da sua atividade.
+
+<b>As 7 Métricas</b>
+
+<i>Vibe</i> - Mede o tom das suas mensagens e como os outros reagem a você
+  • Mensagens positivas, neutras e negativas
+  • Reações positivas recebidas
+
+<i>Atividade</i> - Volume de contribuição
+  • Quantidade de mensagens
+  • Tamanho médio das mensagens
+  • Reações e respostas enviadas
+
+<i>Presença</i> - Consistência vs aparições esporádicas
+  • Dias ativos no período
+  • Sequência de dias consecutivos
+  • Variedade de horários
+
+<i>Humor</i> - Impacto cômico
+  • Reações positivas em mensagens suas
+  • Usuários únicos que reagiram
+  • Mensagens classificadas como humor
+
+<i>Toxicidade</i> - Impacto negativo (penalidade)
+  • Mensagens tóxicas detectadas
+  • Reações negativas recebidas
+
+<i>Popularidade</i> - Atração social
+  • Usuários únicos que reagiram
+  • Usuários únicos que responderam
+  • Mensagens virais (4+ reações)
+
+<b>Como o Score Geral é Calculado</b>
+
+Contribuição positiva:
+  • Popularidade: 20%
+  • Presença: 15%
+  • Vibe: 12%
+  • Sequência: 10%
+  • Humor: 8%
+  • Atividade: 5%
+
+Penalidades:
+  • Toxicidade: -12%
+  • Reações negativas: -7%
+  • Mensagens negativas: -6%
+  • Maior intervalo: -5%
+
+<b>Modificadores</b>
+
+<i>Tendência semanal</i>: Comparando com a semana anterior
+  • Melhora significativa: +5 pontos
+  • Pequena melhora: +3 pontos
+  • Pequena piora: -3 pontos
+  • Piora significativa: -5 pontos
+
+<i>Badges</i>: Conquistas especiais
+  • Badges lendários: +10 pontos
+  • Badges epicos: +7 pontos
+  • Badges negativos: -5 pontos
+
+<b>Tiers (Niveis)</b>
+
+Seu tier e definido pelo score geral:
+  • 85+ pontos: Tier 1 (topo)
+  • 70+ pontos: Tier 2
+  • 55+ pontos: Tier 3
+  • 40+ pontos: Tier 4
+  • 25+ pontos: Tier 5
+  • 0+ pontos: Tier 6

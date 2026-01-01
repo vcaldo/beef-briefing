@@ -1,0 +1,45 @@
+*Detalhes Tecnicos*
+
+Informacoes sobre os modelos e algoritmos usados para gerar seu card.
+
+*Modelos de ML*
+
+_Analise de Sentimento_
+Modelo: `distilbert-base-multilingual-cased-sentiments-student`
+  • Classifica mensagens como positiva, neutra ou negativa
+  • Suporta 6 idiomas incluindo portugues
+  • Framework: HuggingFace Transformers
+
+_Deteccao de Toxicidade_
+Modelo: `bert-base-portuguese-cased-hatebr`
+  • Treinado no corpus HateBR de discurso de odio brasileiro
+  • Detecta mensagens com conteudo toxico ou ofensivo
+
+_Deteccao de Humor_
+Metodo: Heuristicas baseadas em padroes
+  • Detecta risadas: kkkk, hahaha, rsrsrs, huahua
+  • Analisa emojis de risada
+  • Threshold: score >= 0.4 para classificar como humor
+
+_Sentimento de Emojis_
+Biblioteca: emosent-py
+  • Base de 751 emojis com scores de sentimento
+  • Positivo: score > 0.2
+  • Negativo: score < -0.2
+
+*Normalizacao Estatistica*
+
+_Bayesian Smoothing_
+Todos os scores usam suavizacao Bayesiana com k=50:
+  `score = (n * raw + 50 * media) / (n + 50)`
+
+Isso evita que usuarios com poucas mensagens tenham scores extremos, aproximando amostras pequenas da media do grupo.
+
+_Normalizacao p90_
+Metricas de volume (mensagens, reacoes) sao normalizadas pelo percentil 90 do chat, evitando que outliers distorcam os resultados.
+
+*Janela de Dados*
+
+  • Periodo: 30 dias (janela deslizante)
+  • Cards: Gerados semanalmente (segunda a domingo)
+  • Minimo: 10 mensagens para aparecer no ranking

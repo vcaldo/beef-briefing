@@ -194,33 +194,96 @@
             font-weight: 700;
         }
 
-        .rank-box {
-            text-align: center;
+        /* Rank-Tier Box with wavy pattern */
+        .rank-tier-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             padding: 8px 14px;
-            background: rgba(255, 255, 255, 0.9);
             border-radius: 8px;
-            border: 3px solid #000000;
+            border: 3px solid var(--tier-border);
+            position: relative;
+            overflow: hidden;
+            min-width: 70px;
             transform: rotate(3deg);
         }
 
-        .rank-label {
-            font-size: 10px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            font-weight: 700;
+        /* Wavy pattern background */
+        .rank-tier-box::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            --s: 24px;
+            --c1: var(--tier-color-1);
+            --c2: var(--tier-color-2);
+            --_g: 50%, #0000 37%, var(--c1) 39% 70%, #0000 72%;
+            --_s: 47% 50% at;
+            background:
+                radial-gradient(var(--_s) -10% var(--_g)) 0 calc(var(--s)/2),
+                radial-gradient(var(--_s) -10% var(--_g)) calc(var(--s)/2) 0,
+                radial-gradient(var(--_s) 110% var(--_g)),
+                radial-gradient(var(--_s) 110% var(--_g)) calc(var(--s)/2) calc(var(--s)/2),
+                var(--c2);
+            background-size: var(--s) var(--s);
+            opacity: 0.5;
+            z-index: 0;
         }
 
-        .rank-number {
+        .rank-tier-box > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .rank-tier-rank {
             font-family: var(--font-header);
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 400;
-            color: var(--color-primary);
-            display: block;
+            color: var(--text-primary);
+            line-height: 1.1;
+            text-shadow: 2px 2px 0 #000;
         }
 
-        .rank-number.medal {
-            font-size: 32px;
+        .rank-tier-label {
+            font-family: var(--font-header);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-primary);
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        /* Tier-specific colors for rank-tier-box */
+        .rank-tier-box.legendary {
+            --tier-color-1: var(--tier-legendary-start);
+            --tier-color-2: var(--tier-legendary-end);
+            --tier-border: var(--tier-legendary-start);
+        }
+        .rank-tier-box.elite {
+            --tier-color-1: var(--tier-elite-start);
+            --tier-color-2: var(--tier-elite-end);
+            --tier-border: var(--tier-elite-start);
+        }
+        .rank-tier-box.outstanding {
+            --tier-color-1: var(--tier-outstanding-start);
+            --tier-color-2: var(--tier-outstanding-end);
+            --tier-border: var(--tier-outstanding-start);
+        }
+        .rank-tier-box.regular {
+            --tier-color-1: var(--tier-regular-start);
+            --tier-color-2: var(--tier-regular-end);
+            --tier-border: var(--tier-regular-start);
+        }
+        .rank-tier-box.beginner {
+            --tier-color-1: var(--tier-beginner-start);
+            --tier-color-2: var(--tier-beginner-end);
+            --tier-border: var(--tier-beginner-start);
+        }
+        .rank-tier-box.rookie {
+            --tier-color-1: var(--tier-rookie-start);
+            --tier-color-2: var(--tier-rookie-end);
+            --tier-border: var(--tier-rookie-start);
         }
 
         /* Stats Grid */
@@ -513,14 +576,12 @@
                 <h1 class="username">{{ user.first_name }}{% if user.last_name %} {{ user.last_name }}{% endif %}</h1>
                 {% if user.username %}<span class="handle">@{{ user.username }}</span>{% endif %}
             </div>
-            {% if rank %}
-            <div class="rank-box">
-                <span class="rank-label">Rank</span>
-                <span class="rank-number{% if rank <= 3 %} medal{% endif %}">
-                    {%- if rank == 1 -%}🥇{%- elif rank == 2 -%}🥈{%- elif rank == 3 -%}🥉{%- else -%}{{ rank }}{%- endif -%}
-                </span>
+            <div class="rank-tier-box {{ overall.label|lower }}">
+                {% if rank %}
+                <span class="rank-tier-rank">#{{ rank }}</span>
+                {% endif %}
+                <span class="rank-tier-label">{{ overall.label }}</span>
             </div>
-            {% endif %}
         </div>
 
         <!-- Beef Meter -->
@@ -529,7 +590,7 @@
             <div class="beef-meter-content">
                 <div class="beef-meter-header">
                     <span class="beef-meter-label">Beef Meter</span>
-                    <span class="beef-meter-value">{{ overall.score|round|int }} • {{ overall.label }}</span>
+                    <span class="beef-meter-value">{{ overall.score|round|int }}</span>
                 </div>
                 <div class="beef-meter-bar">
                     <div class="beef-meter-fill {{ overall.label|lower }}" style="width: {{ overall.score }}%;"></div>

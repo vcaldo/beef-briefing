@@ -198,20 +198,25 @@ def _popularity_label(score: float) -> str:
         return "Reserved"
 
 
-def _overall_label(score: float) -> str:
-    """Convert overall score (0-100) to label."""
-    if score >= 85:
-        return "Legendary"
-    elif score >= 70:
-        return "Elite"
-    elif score >= 55:
-        return "Outstanding"
-    elif score >= 40:
-        return "Regular"
-    elif score >= 25:
-        return "Beginner"
-    else:
-        return "Rookie"
+# Default tiers (used when tiers not provided via config)
+DEFAULT_TIERS: list[tuple[str, int]] = [
+    ("Legendary", 85),
+    ("Elite", 70),
+    ("Outstanding", 55),
+    ("Regular", 40),
+    ("Beginner", 25),
+    ("Rookie", 0),
+]
+
+
+def _overall_label(score: float, tiers: list[tuple[str, int]] | None = None) -> str:
+    """Convert overall score (0-100) to label using configured tiers."""
+    if tiers is None:
+        tiers = DEFAULT_TIERS
+    for name, min_score in tiers:
+        if score >= min_score:
+            return name
+    return tiers[-1][0] if tiers else "Unknown"
 
 
 # =========================================
@@ -1153,6 +1158,7 @@ def calculate_overall_score(
     window_end: datetime,
     timezone: str | None = None,
     existing_stats: dict | None = None,
+    tiers: list[tuple[str, int]] | None = None,
 ) -> StatResult | None:
     """
     Calculate Overall Score (0-100) combining all metrics with weighted importance.
@@ -1259,7 +1265,7 @@ def calculate_overall_score(
     return StatResult(
         value={
             "score": final_score,
-            "label": _overall_label(final_score),
+            "label": _overall_label(final_score, tiers),
             "positive_contribution": round(positive, 1),
             "negative_penalty": round(negative, 1),
             "longest_gap_days": longest_gap,

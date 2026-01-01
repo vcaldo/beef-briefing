@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -251,13 +251,26 @@ STAT_CONFIG = {
 class TemplateLoader:
     """Loads and renders card templates with Jinja2."""
 
-    def __init__(self, templates_dir: str):
+    def __init__(
+        self,
+        templates_dir: str,
+        tier_class_fn: Callable[[str], str] | None = None,
+    ):
+        """
+        Initialize template loader.
+
+        Args:
+            templates_dir: Path to templates directory
+            tier_class_fn: Optional function to map tier label to CSS class.
+                          If not provided, uses label.lower() as class name.
+        """
         self.templates_dir = Path(templates_dir)
         self.env = Environment(
             loader=FileSystemLoader(templates_dir),
             autoescape=select_autoescape(["html", "xml"]),
         )
         self.theme_loader = ThemeLoader(templates_dir)
+        self._tier_class_fn = tier_class_fn or (lambda label: label.lower())
 
     def get_template_path(self, theme: str) -> str:
         """Get template path for a theme."""
@@ -367,6 +380,10 @@ class TemplateLoader:
         toxicity = stats_raw.get("toxicity", {})
         popularity = stats_raw.get("popularity", {})
         overall = stats_raw.get("overall", {})
+
+        # Add tier_class for CSS styling (maps tier label to position-based class)
+        tier_label = overall.get("label", "")
+        overall["tier_class"] = self._tier_class_fn(tier_label) if tier_label else "tier-6"
 
         # Build stats list using refactored method
         stats_list = [

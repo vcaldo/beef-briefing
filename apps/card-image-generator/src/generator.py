@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from minio.error import S3Error
 from sqlalchemy import create_engine
@@ -49,12 +49,13 @@ class CardGenerator:
         card_width: int = 400,
         card_height: int = 600,
         card_scale: int = 2,
+        tier_class_fn: Callable[[str], str] | None = None,
     ):
         self.engine = engine
         self.storage = storage
         self.queries = CardQueries(engine)
         self.repository = CardImageRepository(engine)
-        self.template_loader = TemplateLoader(templates_dir)
+        self.template_loader = TemplateLoader(templates_dir, tier_class_fn=tier_class_fn)
         self.renderer = PlaywrightRenderer(
             width=card_width,
             height=card_height,

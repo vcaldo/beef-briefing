@@ -61,18 +61,18 @@
             --badge-legendary-glow: {{ theme.colors.badge.legendary.glow | default('rgba(245, 196, 107, 0.5)') }};
 
             /* Tier colors */
-            --tier-legendary-start: {{ theme.colors.tier.legendary[0] }};
-            --tier-legendary-end: {{ theme.colors.tier.legendary[1] }};
-            --tier-elite-start: {{ theme.colors.tier.elite[0] }};
-            --tier-elite-end: {{ theme.colors.tier.elite[1] }};
-            --tier-outstanding-start: {{ theme.colors.tier.outstanding[0] }};
-            --tier-outstanding-end: {{ theme.colors.tier.outstanding[1] }};
-            --tier-regular-start: {{ theme.colors.tier.regular[0] }};
-            --tier-regular-end: {{ theme.colors.tier.regular[1] }};
-            --tier-beginner-start: {{ theme.colors.tier.beginner[0] }};
-            --tier-beginner-end: {{ theme.colors.tier.beginner[1] }};
-            --tier-rookie-start: {{ theme.colors.tier.rookie[0] }};
-            --tier-rookie-end: {{ theme.colors.tier.rookie[1] }};
+            --tier-1-start: {{ theme.colors.tier.tier_1[0] }};
+            --tier-1-end: {{ theme.colors.tier.tier_1[1] }};
+            --tier-2-start: {{ theme.colors.tier.tier_2[0] }};
+            --tier-2-end: {{ theme.colors.tier.tier_2[1] }};
+            --tier-3-start: {{ theme.colors.tier.tier_3[0] }};
+            --tier-3-end: {{ theme.colors.tier.tier_3[1] }};
+            --tier-4-start: {{ theme.colors.tier.tier_4[0] }};
+            --tier-4-end: {{ theme.colors.tier.tier_4[1] }};
+            --tier-5-start: {{ theme.colors.tier.tier_5[0] }};
+            --tier-5-end: {{ theme.colors.tier.tier_5[1] }};
+            --tier-6-start: {{ theme.colors.tier.tier_6[0] }};
+            --tier-6-end: {{ theme.colors.tier.tier_6[1] }};
 
             /* Effects */
             --avatar-glow: {{ theme.colors.effects.avatar_glow }};
@@ -253,35 +253,35 @@
         }
 
         /* Tier-specific colors for rank-tier-box */
-        .rank-tier-box.legendary {
-            --tier-color-1: var(--tier-legendary-start);
-            --tier-color-2: var(--tier-legendary-end);
-            --tier-border: var(--tier-legendary-start);
+        .rank-tier-box.tier-1 {
+            --tier-color-1: var(--tier-1-start);
+            --tier-color-2: var(--tier-1-end);
+            --tier-border: var(--tier-1-start);
         }
-        .rank-tier-box.elite {
-            --tier-color-1: var(--tier-elite-start);
-            --tier-color-2: var(--tier-elite-end);
-            --tier-border: var(--tier-elite-start);
+        .rank-tier-box.tier-2 {
+            --tier-color-1: var(--tier-2-start);
+            --tier-color-2: var(--tier-2-end);
+            --tier-border: var(--tier-2-start);
         }
-        .rank-tier-box.outstanding {
-            --tier-color-1: var(--tier-outstanding-start);
-            --tier-color-2: var(--tier-outstanding-end);
-            --tier-border: var(--tier-outstanding-start);
+        .rank-tier-box.tier-3 {
+            --tier-color-1: var(--tier-3-start);
+            --tier-color-2: var(--tier-3-end);
+            --tier-border: var(--tier-3-start);
         }
-        .rank-tier-box.regular {
-            --tier-color-1: var(--tier-regular-start);
-            --tier-color-2: var(--tier-regular-end);
-            --tier-border: var(--tier-regular-start);
+        .rank-tier-box.tier-4 {
+            --tier-color-1: var(--tier-4-start);
+            --tier-color-2: var(--tier-4-end);
+            --tier-border: var(--tier-4-start);
         }
-        .rank-tier-box.beginner {
-            --tier-color-1: var(--tier-beginner-start);
-            --tier-color-2: var(--tier-beginner-end);
-            --tier-border: var(--tier-beginner-start);
+        .rank-tier-box.tier-5 {
+            --tier-color-1: var(--tier-5-start);
+            --tier-color-2: var(--tier-5-end);
+            --tier-border: var(--tier-5-start);
         }
-        .rank-tier-box.rookie {
-            --tier-color-1: var(--tier-rookie-start);
-            --tier-color-2: var(--tier-rookie-end);
-            --tier-border: var(--tier-rookie-start);
+        .rank-tier-box.tier-6 {
+            --tier-color-1: var(--tier-6-start);
+            --tier-color-2: var(--tier-6-end);
+            --tier-border: var(--tier-6-start);
         }
 
         /* Stats Grid */
@@ -538,12 +538,12 @@
         }
 
         /* Tier-specific colors - Material progression */
-        .beef-meter-fill.legendary { background: linear-gradient(90deg, var(--tier-legendary-start), var(--tier-legendary-end)); }
-        .beef-meter-fill.elite { background: linear-gradient(90deg, var(--tier-elite-start), var(--tier-elite-end)); }
-        .beef-meter-fill.outstanding { background: linear-gradient(90deg, var(--tier-outstanding-start), var(--tier-outstanding-end)); }
-        .beef-meter-fill.regular { background: linear-gradient(90deg, var(--tier-regular-start), var(--tier-regular-end)); }
-        .beef-meter-fill.beginner { background: linear-gradient(90deg, var(--tier-beginner-start), var(--tier-beginner-end)); }
-        .beef-meter-fill.rookie { background: linear-gradient(90deg, var(--tier-rookie-start), var(--tier-rookie-end)); }
+        .beef-meter-fill.tier-1 { background: linear-gradient(90deg, var(--tier-1-start), var(--tier-1-end)); }
+        .beef-meter-fill.tier-2 { background: linear-gradient(90deg, var(--tier-2-start), var(--tier-2-end)); }
+        .beef-meter-fill.tier-3 { background: linear-gradient(90deg, var(--tier-3-start), var(--tier-3-end)); }
+        .beef-meter-fill.tier-4 { background: linear-gradient(90deg, var(--tier-4-start), var(--tier-4-end)); }
+        .beef-meter-fill.tier-5 { background: linear-gradient(90deg, var(--tier-5-start), var(--tier-5-end)); }
+        .beef-meter-fill.tier-6 { background: linear-gradient(90deg, var(--tier-6-start), var(--tier-6-end)); }
     </style>
 </head>
 <body>
@@ -557,7 +557,7 @@
                 <h1 class="username">{{ user.first_name }}{% if user.last_name %} {{ user.last_name }}{% endif %}</h1>
                 {% if user.username %}<span class="handle">@{{ user.username }}</span>{% endif %}
             </div>
-            <div class="rank-tier-box {{ overall.label|lower }}">
+            <div class="rank-tier-box {{ overall.tier_class }}">
                 {% if rank %}
                 <span class="rank-tier-rank">#{{ rank }}</span>
                 {% endif %}
@@ -574,7 +574,7 @@
                     <span class="beef-meter-value">{{ overall.score|round|int }}</span>
                 </div>
                 <div class="beef-meter-bar">
-                    <div class="beef-meter-fill {{ overall.label|lower }}" style="width: {{ overall.score }}%;"></div>
+                    <div class="beef-meter-fill {{ overall.tier_class }}" style="width: {{ overall.score }}%;"></div>
                 </div>
             </div>
         </div>

@@ -52,6 +52,14 @@ class Config(BaseSettings):
     new_relic_app_name: str | None = None
     new_relic_license_key: str | None = None
 
+    # Tier Configuration (same format as ml-processor: "Name:MinScore")
+    tier_1: str = "Legendary:85"
+    tier_2: str = "Elite:70"
+    tier_3: str = "Outstanding:55"
+    tier_4: str = "Regular:40"
+    tier_5: str = "Beginner:25"
+    tier_6: str = "Rookie:0"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
@@ -78,6 +86,25 @@ class Config(BaseSettings):
         if self.new_relic_app_name:
             return f"{self.new_relic_app_name}-card-image-generator-{self.environment}"
         return ""
+
+    @cached_property
+    def tiers(self) -> list[tuple[str, int]]:
+        """Parse tier configuration into list of (name, min_score) tuples, ordered tier_1 to tier_6."""
+        result = []
+        for tier_str in [self.tier_1, self.tier_2, self.tier_3, self.tier_4, self.tier_5, self.tier_6]:
+            if tier_str:
+                name, score = tier_str.split(":")
+                result.append((name.strip(), int(score.strip())))
+        return result
+
+    @cached_property
+    def tier_name_to_class(self) -> dict[str, str]:
+        """Map tier names (case-insensitive) to CSS class names (tier-1 through tier-6)."""
+        return {name.lower(): f"tier-{i+1}" for i, (name, _) in enumerate(self.tiers)}
+
+    def get_tier_class(self, label: str) -> str:
+        """Get CSS class for a tier label. Returns 'tier-6' as fallback."""
+        return self.tier_name_to_class.get(label.lower(), "tier-6")
 
     def get_app_keys(self) -> dict[str, str]:
         """Load API keys from app_keys_dir."""

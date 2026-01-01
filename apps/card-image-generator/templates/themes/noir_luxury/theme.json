@@ -28,12 +28,12 @@
       "legendary": { "bg_start": "#3a2a0a", "bg_end": "#2f1f00", "border": "#d4af37", "text": "#d4af37", "glow": "rgba(212, 175, 55, 0.4)" }
     },
     "tier_colors": {
-      "legendary": ["#d4af37", "#f7e7ce"],
-      "elite": ["#c0c0c0", "#e0e0e0"],
-      "outstanding": ["#b87333", "#cd7f32"],
-      "regular": ["#444444", "#666666"],
-      "beginner": ["#333333", "#444444"],
-      "rookie": ["#222222", "#333333"]
+      "tier_1": ["#d4af37", "#f7e7ce"],
+      "tier_2": ["#c0c0c0", "#e0e0e0"],
+      "tier_3": ["#b87333", "#cd7f32"],
+      "tier_4": ["#444444", "#666666"],
+      "tier_5": ["#333333", "#444444"],
+      "tier_6": ["#222222", "#333333"]
     },
     "effects": {
       "avatar_glow": "rgba(212, 175, 55, 0.2)",

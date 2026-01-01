@@ -84,6 +84,14 @@ class Config(BaseSettings):
     card_image_generator_api_key_file: str = ""
     card_image_generator_timeout: float = 120.0
 
+    # Tier Configuration (format: "Name:MinScore")
+    tier_1: str = "Legendary:85"
+    tier_2: str = "Elite:70"
+    tier_3: str = "Outstanding:55"
+    tier_4: str = "Regular:40"
+    tier_5: str = "Beginner:25"
+    tier_6: str = "Rookie:0"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
@@ -115,6 +123,17 @@ class Config(BaseSettings):
     def qdrant_url(self) -> str:
         """Return Qdrant connection URL."""
         return f"http://{self.qdrant_host}:{self.qdrant_port}"
+
+    @cached_property
+    def tiers(self) -> list[tuple[str, int]]:
+        """Parse tier configuration into sorted list of (name, min_score) tuples."""
+        result = []
+        for tier_str in [self.tier_1, self.tier_2, self.tier_3, self.tier_4, self.tier_5, self.tier_6]:
+            if tier_str:
+                name, score = tier_str.split(":")
+                result.append((name.strip(), int(score.strip())))
+        # Sort by score descending (highest tier first)
+        return sorted(result, key=lambda x: x[1], reverse=True)
 
     @cached_property
     def card_image_generator_api_key(self) -> str:

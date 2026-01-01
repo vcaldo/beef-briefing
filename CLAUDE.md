@@ -290,6 +290,33 @@ OPENAI_MODERATION_RPM=500
 - When limits are reached, requests wait until capacity is available (up to timeout)
 - Token usage is estimated before requests and adjusted after based on actual usage
 
+### Tier Configuration (ML Processor)
+
+The tier system labels users based on their overall score. Tiers are configurable via environment variables.
+
+**Configuration** (in `.env.dev` or `.env.prod`):
+```bash
+# Format: NAME:MIN_SCORE (ordered from highest to lowest tier)
+# Users are assigned to the first tier where their score >= MIN_SCORE
+TIER_1=Legendary:85
+TIER_2=Elite:70
+TIER_3=Outstanding:55
+TIER_4=Regular:40
+TIER_5=Beginner:25
+TIER_6=Rookie:0
+```
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| TIER_1 | Legendary:85 | Highest tier (score >= 85) |
+| TIER_2 | Elite:70 | Second tier (score >= 70) |
+| TIER_3 | Outstanding:55 | Third tier (score >= 55) |
+| TIER_4 | Regular:40 | Fourth tier (score >= 40) |
+| TIER_5 | Beginner:25 | Fifth tier (score >= 25) |
+| TIER_6 | Rookie:0 | Lowest tier (score < 25) |
+
+**Format**: `NAME:MIN_SCORE` where MIN_SCORE is the minimum overall score (0-100) for that tier.
+
 ## Import CLI Usage
 
 Import Telegram Desktop exports into the system:

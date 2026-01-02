@@ -586,6 +586,23 @@ def calculate_presence(
     hours_result = _execute_single(engine, hours_query, base_params)
     unique_hours = int(hours_result.get("unique_hours") or 0) if hours_result else 0
 
+    # Get all-time active dates for streak calculation (not bounded by window_start)
+    streak_dates_query = """
+        SELECT DISTINCT DATE(m.date AT TIME ZONE :timezone) as activity_date
+        FROM messages m
+        WHERE m.user_id = :user_id
+          AND m.chat_id = :chat_id
+          AND m.date <= :window_end
+        ORDER BY activity_date
+    """
+    streak_params = {
+        "user_id": user_id,
+        "chat_id": chat_id,
+        "window_end": window_end,
+        "timezone": tz,
+    }
+    streak_date_results = _execute_many(engine, streak_dates_query, streak_params)
+
     # Calculate metrics
     active_dates = [r["activity_date"] for r in daily_results]
     daily_counts = [r["daily_count"] for r in daily_results]
@@ -600,23 +617,24 @@ def calculate_presence(
     # Hours spread ratio
     hours_spread = unique_hours / 24
 
-    # Calculate streak (consecutive days ending on window_end)
+    # Calculate streak (consecutive days ending on window_end) - ALL TIME
     window_end_date = window_end.date()
     streak = 0
-    if active_dates:
-        # Convert to date objects if needed
-        active_date_set = set()
-        for d in active_dates:
+    if streak_date_results:
+        # Build set of all-time active dates
+        all_time_date_set = set()
+        for r in streak_date_results:
+            d = r["activity_date"]
             if isinstance(d, datetime):
-                active_date_set.add(d.date())
+                all_time_date_set.add(d.date())
             elif isinstance(d, date):
-                active_date_set.add(d)
+                all_time_date_set.add(d)
             else:
-                active_date_set.add(d)
+                all_time_date_set.add(d)
 
-        # Count consecutive days from window_end backwards
+        # Count consecutive days from window_end backwards (no window_start limit)
         check_date = window_end_date
-        while check_date in active_date_set and check_date >= window_start.date():
+        while check_date in all_time_date_set:
             streak += 1
             check_date -= timedelta(days=1)
 

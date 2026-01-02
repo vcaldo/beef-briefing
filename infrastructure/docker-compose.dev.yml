@@ -223,6 +223,7 @@ services:
       # Card Image Generator (for render-cards command)
       CARD_IMAGE_GENERATOR_URL: http://card-image-generator:8051
       CARD_IMAGE_GENERATOR_API_KEY_FILE: /app/secrets/card_image_generator_api_key
+      DEFAULT_CARD_THEME: ${DEFAULT_CARD_THEME:-gaming}
       # Tier Configuration (same as card-image-generator)
       TIER_1: ${TIER_1:-Legendary:85}
       TIER_2: ${TIER_2:-Elite:70}

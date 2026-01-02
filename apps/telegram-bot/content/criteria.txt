@@ -27,19 +27,39 @@ Penalidades:
   • Piora significativa: -5 pontos
 
 <i>Badges</i>: Conquistas especiais
-  • Badges lendários: +10 pontos
-  • Badges epicos: +7 pontos
-  • Badges negativos: -5 pontos
+  • Lendários: +10 pontos
+  • Épicos: +7 pontos
+  • Comuns: +3 pontos
+  • Negativos: -5 pontos
+
+<b>Badges Positivos</b>
+
+  🌟 <i>Radiant</i> - Aura >= 80 (Lendário)
+  🔥 <i>Hyperactive</i> - 500+ mensagens (Lendário)
+  📅 <i>Regular</i> - Presença >= 80 (Épico)
+  🎭 <i>Comedian</i> - Humor >= 70 (Lendário)
+  ☮️ <i>Zen</i> - Toxicidade < 2% (Lendário)
+  ⭐ <i>Star</i> - 10+ reatores únicos (Lendário)
+  📈 <i>N-day streak</i> - 7+ dias consecutivos (Comum)
+
+<b>Badges Negativos</b>
+
+  🌧️ <i>Gloomy</i> - Aura < 30
+  👻 <i>Ghost</i> - < 20 mensagens
+  🌍 <i>Tourist</i> - Presença < 20 (com 10+ msgs)
+  😐 <i>Deadpan</i> - Humor < 10
+  ☠️ <i>Toxic</i> - Toxicidade > 20%
+  🦗 <i>Cricket</i> - 0 reações (com 30+ msgs)
 
 <b>Tiers (Niveis)</b>
 
-Seu tier e definido pelo score geral:
-  • 85+ pontos: Tier 1 (topo)
-  • 70+ pontos: Tier 2
-  • 55+ pontos: Tier 3
-  • 40+ pontos: Tier 4
-  • 25+ pontos: Tier 5
-  • 0+ pontos: Tier 6
+Seu tier é definido pelo score geral:
+  • 81+ pontos: Lendário
+  • 77+ pontos: Bichão
+  • 72+ pontos: CLT
+  • 55+ pontos: Coadjuvante
+  • 32+ pontos: Fióti
+  • 10+ pontos: Random
 
 <b>As 7 Métricas</b>
 

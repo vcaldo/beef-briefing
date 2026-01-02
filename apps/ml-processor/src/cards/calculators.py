@@ -218,12 +218,12 @@ def _popularity_label(score: float) -> str:
 
 # Default tiers (used when tiers not provided via config)
 DEFAULT_TIERS: list[tuple[str, int]] = [
-    ("Legendary", 85),
-    ("Elite", 70),
-    ("Outstanding", 55),
-    ("Regular", 40),
-    ("Beginner", 25),
-    ("Rookie", 0),
+    ("Legendary", 81),
+    ("Elite", 77),
+    ("Outstanding", 72),
+    ("Regular", 55),
+    ("Beginner", 32),
+    ("Rookie", 10),
 ]
 
 
@@ -600,9 +600,9 @@ def calculate_presence(
     # Hours spread ratio
     hours_spread = unique_hours / 24
 
-    # Calculate streak (consecutive days ending on window_end)
+    # Calculate window-bounded streak for presence score
     window_end_date = window_end.date()
-    streak = 0
+    window_streak = 0
     if active_dates:
         # Convert to date objects if needed
         active_date_set = set()
@@ -614,15 +614,50 @@ def calculate_presence(
             else:
                 active_date_set.add(d)
 
-        # Count consecutive days from window_end backwards
+        # Count consecutive days from window_end backwards (bounded by window_start)
         check_date = window_end_date
         while check_date in active_date_set and check_date >= window_start.date():
-            streak += 1
+            window_streak += 1
             check_date -= timedelta(days=1)
 
-    # Normalize streak (max meaningful streak is window_days)
+    # Normalize streak for presence score (window-bounded)
     max_streak = total_days
-    streak_ratio = streak / max_streak if max_streak > 0 else 0
+    streak_ratio = window_streak / max_streak if max_streak > 0 else 0
+
+    # Calculate all-time streak for badge display (separate from presence score)
+    all_time_streak_query = """
+        SELECT DISTINCT DATE(m.date AT TIME ZONE :timezone) as activity_date
+        FROM messages m
+        WHERE m.user_id = :user_id
+          AND m.chat_id = :chat_id
+          AND m.date <= :window_end
+        ORDER BY activity_date
+    """
+    all_time_params = {
+        "user_id": user_id,
+        "chat_id": chat_id,
+        "window_end": window_end,
+        "timezone": tz,
+    }
+    all_time_results = _execute_many(engine, all_time_streak_query, all_time_params)
+
+    all_time_streak = 0
+    if all_time_results:
+        all_time_date_set = set()
+        for r in all_time_results:
+            d = r["activity_date"]
+            if isinstance(d, datetime):
+                all_time_date_set.add(d.date())
+            elif isinstance(d, date):
+                all_time_date_set.add(d)
+            else:
+                all_time_date_set.add(d)
+
+        # Count consecutive days from window_end backwards (no window_start limit)
+        check_date = window_end_date
+        while check_date in all_time_date_set:
+            all_time_streak += 1
+            check_date -= timedelta(days=1)
 
     # Calculate activity variance (stddev of daily counts)
     if len(daily_counts) > 1:
@@ -658,7 +693,7 @@ def calculate_presence(
             "label": _presence_label(final_score),
             "active_days": active_days,
             "total_days": total_days,
-            "streak": streak,
+            "streak": all_time_streak,  # All-time streak for badge display
             "unique_hours": unique_hours,
         }
     )

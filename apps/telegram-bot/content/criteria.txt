@@ -53,13 +53,13 @@ Penalidades:
 
 <b>Tiers (Niveis)</b>
 
-Seu tier e definido pelo score geral:
-  • 85+ pontos: Tier 1 (topo)
-  • 70+ pontos: Tier 2
-  • 55+ pontos: Tier 3
-  • 40+ pontos: Tier 4
-  • 25+ pontos: Tier 5
-  • 0+ pontos: Tier 6
+Seu tier é definido pelo score geral:
+  • 81+ pontos: Lendário
+  • 77+ pontos: Bichão
+  • 72+ pontos: CLT
+  • 55+ pontos: Coadjuvante
+  • 32+ pontos: Fióti
+  • 10+ pontos: Random
 
 <b>As 7 Métricas</b>
 

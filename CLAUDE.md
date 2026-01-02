@@ -329,7 +329,7 @@ DEFAULT_CARD_THEME=neon_arcade
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| DEFAULT_CARD_THEME | gaming | Theme used when generating card images |
+| DEFAULT_CARD_THEME | neon_arcade | Theme used when generating card images |
 
 **Available themes**: gaming, clean, sticker, meme, vaporwave, blueprint, mythic, noir_luxury, neon_arcade, sticker_retro
 

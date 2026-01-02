@@ -437,12 +437,19 @@ class TemplateLoader:
         direction = trend_data.get("direction", "stable")
         pct = trend_data.get("pct_change", 0)
 
-        if direction == "up":
+        # Round first to check if it's effectively zero
+        rounded_pct = round(pct)
+
+        if rounded_pct == 0:
+            # Never show sign for 0%
+            icon = "\u23F9\uFE0F"  # ⏹️
+            pct_str = "0%"
+        elif direction == "up":
             icon = "\u2B06\uFE0F"
-            pct_str = f"+{pct:.0f}%"
+            pct_str = f"+{rounded_pct}%"
         elif direction == "down":
             icon = "\u2B07\uFE0F"
-            pct_str = f"{pct:.0f}%"
+            pct_str = f"{rounded_pct}%"
         else:
             icon = "\u23F9\uFE0F"  # ⏹️
             pct_str = "0%"

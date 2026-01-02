@@ -1798,6 +1798,9 @@ class DashboardQueries:
         - Users with many messages keep their observed score
         - Formula: smoothed = (n * raw + k * global) / (n + k) where k=50
 
+        Note: This uses a fixed k=50 for dashboard rankings. Card generation
+        uses progressive k (30→5) - see ml-processor/src/cards/calculators.py.
+
         Args:
             chat_id: Chat ID
             start_date: Start date filter (inclusive)

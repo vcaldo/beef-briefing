@@ -2,36 +2,6 @@
 
 Seu card semanal mede sua participação no grupo usando 7 métricas. Cada uma analisa um aspecto diferente da sua atividade.
 
-<b>As 7 Métricas</b>
-
-<i>Vibe</i> - Mede o tom das suas mensagens e como os outros reagem a você
-  • Mensagens positivas, neutras e negativas
-  • Reações positivas recebidas
-
-<i>Atividade</i> - Volume de contribuição
-  • Quantidade de mensagens
-  • Tamanho médio das mensagens
-  • Reações e respostas enviadas
-
-<i>Presença</i> - Consistência vs aparições esporádicas
-  • Dias ativos no período
-  • Sequência de dias consecutivos
-  • Variedade de horários
-
-<i>Humor</i> - Impacto cômico
-  • Reações positivas em mensagens suas
-  • Usuários únicos que reagiram
-  • Mensagens classificadas como humor
-
-<i>Toxicidade</i> - Impacto negativo (penalidade)
-  • Mensagens tóxicas detectadas
-  • Reações negativas recebidas
-
-<i>Popularidade</i> - Atração social
-  • Usuários únicos que reagiram
-  • Usuários únicos que responderam
-  • Mensagens virais (4+ reações)
-
 <b>Como o Score Geral é Calculado</b>
 
 Contribuição positiva:
@@ -70,3 +40,33 @@ Seu tier e definido pelo score geral:
   • 40+ pontos: Tier 4
   • 25+ pontos: Tier 5
   • 0+ pontos: Tier 6
+
+<b>As 7 Métricas</b>
+
+<i>Vibe</i> - Mede o tom das suas mensagens e como os outros reagem a você
+  • Mensagens positivas, neutras e negativas
+  • Reações positivas recebidas
+
+<i>Atividade</i> - Volume de contribuição
+  • Quantidade de mensagens
+  • Tamanho médio das mensagens
+  • Reações e respostas enviadas
+
+<i>Presença</i> - Consistência vs aparições esporádicas
+  • Dias ativos no período
+  • Sequência de dias consecutivos
+  • Variedade de horários
+
+<i>Humor</i> - Impacto cômico
+  • Reações positivas em mensagens suas
+  • Usuários únicos que reagiram
+  • Mensagens classificadas como humor
+
+<i>Toxicidade</i> - Impacto negativo (penalidade)
+  • Mensagens tóxicas detectadas
+  • Reações negativas recebidas
+
+<i>Popularidade</i> - Atração social
+  • Usuários únicos que reagiram
+  • Usuários únicos que responderam
+  • Mensagens virais (4+ reações)

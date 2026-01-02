@@ -183,6 +183,7 @@ Badges are special achievements displayed on your card. They affect your Overall
 | Comedian | Humor score 70 or higher | Legendary |
 | Zen | Toxicity under 2% | Legendary |
 | Star | Top 10% popularity in the chat | Legendary |
+| {N}-day streak | 7+ consecutive days posting | Common |
 
 ### Negative Badges
 

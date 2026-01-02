@@ -298,22 +298,22 @@ The tier system labels users based on their overall score. Tiers are configurabl
 ```bash
 # Format: NAME:MIN_SCORE (ordered from highest to lowest tier)
 # Users are assigned to the first tier where their score >= MIN_SCORE
-TIER_1=Lendário:85
-TIER_2=Bichão:70
-TIER_3=CLT:55
-TIER_4=Coadjuvante:40
-TIER_5=Fióti:25
-TIER_6=Random:0
+TIER_1=Lendário:81
+TIER_2=Bichão:77
+TIER_3=CLT:72
+TIER_4=Coadjuvante:55
+TIER_5=Fióti:32
+TIER_6=Random:10
 ```
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| TIER_1 | Legendary:85 | Highest tier (score >= 85) |
-| TIER_2 | Elite:70 | Second tier (score >= 70) |
-| TIER_3 | Outstanding:55 | Third tier (score >= 55) |
-| TIER_4 | Regular:40 | Fourth tier (score >= 40) |
-| TIER_5 | Beginner:25 | Fifth tier (score >= 25) |
-| TIER_6 | Rookie:0 | Lowest tier (score < 25) |
+| TIER_1 | Legendary:81 | Highest tier (score >= 81) |
+| TIER_2 | Elite:77 | Second tier (score >= 77) |
+| TIER_3 | Outstanding:72 | Third tier (score >= 72) |
+| TIER_4 | Regular:55 | Fourth tier (score >= 55) |
+| TIER_5 | Beginner:32 | Fifth tier (score >= 32) |
+| TIER_6 | Rookie:10 | Lowest tier (score >= 10) |
 
 **Format**: `NAME:MIN_SCORE` where MIN_SCORE is the minimum overall score (0-100) for that tier.
 

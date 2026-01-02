@@ -86,12 +86,12 @@ class Config(BaseSettings):
     default_card_theme: str = "gaming"
 
     # Tier Configuration (format: "Name:MinScore")
-    tier_1: str = "Legendary:85"
-    tier_2: str = "Elite:70"
-    tier_3: str = "Outstanding:55"
-    tier_4: str = "Regular:40"
-    tier_5: str = "Beginner:25"
-    tier_6: str = "Rookie:0"
+    tier_1: str = "Legendary:81"
+    tier_2: str = "Elite:77"
+    tier_3: str = "Outstanding:72"
+    tier_4: str = "Regular:55"
+    tier_5: str = "Beginner:32"
+    tier_6: str = "Rookie:10"
 
     class Config:
         env_file = ".env"

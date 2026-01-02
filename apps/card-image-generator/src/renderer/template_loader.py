@@ -192,6 +192,16 @@ BADGE_RULES = [
         ),
         "badge": BadgeContext("cricket", "Cricket", "\U0001F997", "negative"),
     },
+    # Streak badge (dynamic name based on actual streak count)
+    {
+        "condition": lambda s: s.get("presence", {}).get("streak", 0) >= 7,
+        "badge_factory": lambda s: BadgeContext(
+            "streak",
+            f"{s['presence']['streak']}-day streak",
+            "\U0001F4C8",  # 📈
+            "common",
+        ),
+    },
 ]
 
 # Stat display configuration - new 6 metrics
@@ -437,12 +447,20 @@ class TemplateLoader:
         direction = trend_data.get("direction", "stable")
         pct = trend_data.get("pct_change", 0)
 
-        if direction == "up":
+        # Round first to check if it's effectively zero
+        rounded_pct = round(pct)
+
+        if rounded_pct == 0:
+            # Neutral: no sign, no color
+            direction = "stable"
+            icon = "\u23F9\uFE0F"  # ⏹️
+            pct_str = "0%"
+        elif direction == "up":
             icon = "\u2B06\uFE0F"
-            pct_str = f"+{pct:.0f}%"
+            pct_str = f"+{rounded_pct}%"
         elif direction == "down":
             icon = "\u2B07\uFE0F"
-            pct_str = f"{pct:.0f}%"
+            pct_str = f"{rounded_pct}%"
         else:
             icon = "\u23F9\uFE0F"  # ⏹️
             pct_str = "0%"
@@ -455,7 +473,11 @@ class TemplateLoader:
         for rule in BADGE_RULES:
             try:
                 if rule["condition"](stats):
-                    badges.append(rule["badge"])
+                    # Support both static badge and dynamic badge_factory
+                    if "badge_factory" in rule:
+                        badges.append(rule["badge_factory"](stats))
+                    else:
+                        badges.append(rule["badge"])
             except (KeyError, TypeError):
                 continue
         return badges

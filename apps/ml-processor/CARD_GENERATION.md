@@ -797,6 +797,7 @@ All badges are evaluated per-chat, with percentile-based badges using chat-speci
 | Comedian | Humor | score >= 70 | legendary |
 | Zen | Toxicity | pct < 2% | legendary |
 | Star | Popularity | Top 10% in chat | legendary |
+| {N}-day streak | Presence | streak >= 7 | common |
 
 ### Negative Badges
 

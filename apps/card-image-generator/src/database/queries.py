@@ -143,13 +143,13 @@ class CardQueries:
         Get top 3 rankings per category for a chat/week.
 
         Returns dict mapping category -> {user_id: rank} (only top 3 users)
-        Example: {"vibe": {123: 1, 456: 2, 789: 3}, "activity": {...}, ...}
+        Example: {"aura": {123: 1, 456: 2, 789: 3}, "activity": {...}, ...}
         """
         query = text("""
             WITH category_ranks AS (
                 SELECT
                     user_id,
-                    ROW_NUMBER() OVER (ORDER BY (stats->'vibe'->>'score')::float DESC NULLS LAST) AS vibe_rank,
+                    ROW_NUMBER() OVER (ORDER BY (stats->'aura'->>'score')::float DESC NULLS LAST) AS aura_rank,
                     ROW_NUMBER() OVER (ORDER BY (stats->'activity'->>'score')::float DESC NULLS LAST) AS activity_rank,
                     ROW_NUMBER() OVER (ORDER BY (stats->'presence'->>'score')::float DESC NULLS LAST) AS presence_rank,
                     ROW_NUMBER() OVER (ORDER BY (stats->'humor'->>'score')::float DESC NULLS LAST) AS humor_rank,
@@ -160,9 +160,9 @@ class CardQueries:
                 WHERE chat_id = :chat_id
                   AND week_start = :week_start
             )
-            SELECT user_id, vibe_rank, activity_rank, presence_rank, humor_rank, toxicity_rank, popularity_rank, overall_rank
+            SELECT user_id, aura_rank, activity_rank, presence_rank, humor_rank, toxicity_rank, popularity_rank, overall_rank
             FROM category_ranks
-            WHERE vibe_rank <= 3
+            WHERE aura_rank <= 3
                OR activity_rank <= 3
                OR presence_rank <= 3
                OR humor_rank <= 3
@@ -178,7 +178,7 @@ class CardQueries:
             )
 
             rankings: dict[str, dict[int, int]] = {
-                "vibe": {},
+                "aura": {},
                 "activity": {},
                 "presence": {},
                 "humor": {},
@@ -189,8 +189,8 @@ class CardQueries:
 
             for row in result:
                 user_id = row.user_id
-                if row.vibe_rank <= 3:
-                    rankings["vibe"][user_id] = row.vibe_rank
+                if row.aura_rank <= 3:
+                    rankings["aura"][user_id] = row.aura_rank
                 if row.activity_rank <= 3:
                     rankings["activity"][user_id] = row.activity_rank
                 if row.presence_rank <= 3:

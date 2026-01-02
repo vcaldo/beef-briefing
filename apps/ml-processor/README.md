@@ -245,7 +245,7 @@ Weekly aggregated stats per user, generated via `generate-cards` command:
 
 | Stat | Description | Source |
 |------|-------------|--------|
-| `vibe` | Emotional tone + reception (0-100) | `ml_sentiment` + `message_reactions` (emoji sentiment) |
+| `aura` | Emotional tone + reception (0-100) | `ml_sentiment` + `message_reactions` (emoji sentiment) |
 | `activity` | Engagement volume (0-100) | `messages` + `message_reactions` sent + replies |
 | `presence` | Consistency over time (0-100) | `messages` (active days, streak, hours) |
 | `humor` | Comedy impact (0-100) | `ml_humor` + positive reactions |
@@ -254,7 +254,7 @@ Weekly aggregated stats per user, generated via `generate-cards` command:
 
 All metrics use **Bayesian smoothing** (k=50) to stabilize scores for low-volume users and **per-chat P90 normalization** for count-based components. Emoji reactions are classified using [emosent-py](https://pypi.org/project/emosent-py/) with thresholds: positive (>0.2), neutral (-0.2 to 0.2), negative (<-0.2).
 
-**Key design principle:** Being sad is NOT toxic. Negative sentiment affects Vibe, not Toxicity. Toxicity is reserved for aggressive/offensive content detected by ML classifiers.
+**Key design principle:** Being sad is NOT toxic. Negative sentiment affects Aura, not Toxicity. Toxicity is reserved for aggressive/offensive content detected by ML classifiers.
 
 Cards use a 30-day rolling window for stable personality traits, with week-over-week trend comparisons.
 

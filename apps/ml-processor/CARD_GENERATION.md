@@ -89,11 +89,11 @@ Reaction emojis are classified using the [emosent-py](https://pypi.org/project/e
 
 All stats are computed from a 30-day rolling window ending on the week's Sunday. Each metric produces a score from 0-100 (except toxicity which is a percentage).
 
-### 1. Vibe Score (0-100)
+### 1. Aura Score (0-100)
 
 Measures overall emotional tone combining message sentiment with reaction reception.
 
-**Key Point:** Combines "how you express yourself" with "how others receive you" for a holistic vibe assessment.
+**Key Point:** Combines "how you express yourself" with "how others receive you" for a holistic aura assessment.
 
 **Components:**
 
@@ -476,7 +476,7 @@ WHERE parent.user_id = :user_id
 
 Measures negative impact through toxic message detection and negative reactions.
 
-**Key Point:** Being sad is NOT toxic. Negative sentiment affects Vibe Score, not Toxicity. Toxicity is reserved for aggressive/offensive content.
+**Key Point:** Being sad is NOT toxic. Negative sentiment affects Aura Score, not Toxicity. Toxicity is reserved for aggressive/offensive content.
 
 **Components:**
 
@@ -656,13 +656,13 @@ Holistic score combining all 6 metrics with weighted importance, trend modifiers
 |-----------|------|--------|--------|
 | Popularity | Positive | 20% | `popularity.score` |
 | Presence | Positive | 15% | `presence.score` |
-| Vibe | Positive | 12% | `vibe.score` |
+| Aura | Positive | 12% | `aura.score` |
 | Days Streak | Positive | 10% | `presence.streak` (normalized to 0-100) |
 | Humor | Positive | 8% | `humor.score` |
 | Activity | Positive | 5% | `activity.score` |
 | Toxicity | Negative | 12% | `toxicity.pct` |
 | Negative Reactions | Negative | 7% | `toxicity.negative_reactions` / total |
-| Negative Messages | Negative | 6% | `vibe.negative_ratio` |
+| Negative Messages | Negative | 6% | `aura.negative_ratio` |
 | Longest Gap | Negative | 5% | Max days between posts (normalized) |
 
 ```python
@@ -670,7 +670,7 @@ Holistic score combining all 6 metrics with weighted importance, trend modifiers
 positive = (
     0.20 * popularity_score +
     0.15 * presence_score +
-    0.12 * vibe_score +
+    0.12 * aura_score +
     0.10 * streak_normalized +
     0.08 * humor_score +
     0.05 * activity_score
@@ -755,7 +755,7 @@ def calc_pct_change(current: float, previous: float) -> float:
 ```
 
 **Stats with trends:**
-- `vibe`: Delta in score (0-100)
+- `aura`: Delta in score (0-100)
 - `activity`: Delta in score (0-100)
 - `presence`: Delta in score (0-100)
 - `humor`: Delta in score (0-100)
@@ -779,7 +779,7 @@ All badges are evaluated per-chat, with percentile-based badges using chat-speci
 
 | Badge | Metric | Condition | Rarity |
 |-------|--------|-----------|--------|
-| Radiant | Vibe | score >= 80 | legendary |
+| Radiant | Aura | score >= 80 | legendary |
 | Hyperactive | Activity | Top 10% in chat | epic |
 | Regular | Presence | score >= 80 | epic |
 | Comedian | Humor | score >= 70 | legendary |
@@ -790,7 +790,7 @@ All badges are evaluated per-chat, with percentile-based badges using chat-speci
 
 | Badge | Metric | Condition | Rarity |
 |-------|--------|-----------|--------|
-| Gloomy | Vibe | score < 30 | negative |
+| Gloomy | Aura | score < 30 | negative |
 | Ghost | Activity | Bottom 10% in chat | negative |
 | Tourist | Presence | score < 20 AND msgs >= 10 | negative |
 | Deadpan | Humor | score < 10 | negative |
@@ -836,7 +836,7 @@ CREATE TABLE ml_user_cards (
 
 ```json
 {
-  "vibe": {
+  "aura": {
     "score": 72.5,
     "label": "Animado",
     "positive_ratio": 0.45,
@@ -890,7 +890,7 @@ CREATE TABLE ml_user_cards (
 
 ```json
 {
-  "vibe": {
+  "aura": {
     "delta": 5.2,
     "direction": "up",
     "pct_change": 7.7
@@ -947,7 +947,7 @@ Top 3 users per category are shown on cards. Rankings are computed with this que
 WITH category_ranks AS (
     SELECT
         user_id,
-        ROW_NUMBER() OVER (ORDER BY (stats->'vibe'->>'score')::float DESC NULLS LAST) AS vibe_rank,
+        ROW_NUMBER() OVER (ORDER BY (stats->'aura'->>'score')::float DESC NULLS LAST) AS aura_rank,
         ROW_NUMBER() OVER (ORDER BY (stats->'activity'->>'score')::float DESC NULLS LAST) AS activity_rank,
         ROW_NUMBER() OVER (ORDER BY (stats->'presence'->>'score')::float DESC NULLS LAST) AS presence_rank,
         ROW_NUMBER() OVER (ORDER BY (stats->'humor'->>'score')::float DESC NULLS LAST) AS humor_rank,
@@ -959,7 +959,7 @@ WITH category_ranks AS (
       AND week_start = :week_start
 )
 SELECT * FROM category_ranks
-WHERE vibe_rank <= 3 OR activity_rank <= 3 OR presence_rank <= 3
+WHERE aura_rank <= 3 OR activity_rank <= 3 OR presence_rank <= 3
    OR humor_rank <= 3 OR toxicity_rank <= 3 OR popularity_rank <= 3
    OR overall_rank <= 3
 ```

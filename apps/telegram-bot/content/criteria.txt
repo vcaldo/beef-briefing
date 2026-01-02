@@ -7,7 +7,7 @@ Seu card semanal mede sua participação no grupo usando 7 métricas. Cada uma a
 Contribuição positiva:
   • Popularidade: 20%
   • Presença: 15%
-  • Vibe: 12%
+  • Aura: 12%
   • Sequência: 10%
   • Humor: 8%
   • Atividade: 5%
@@ -43,7 +43,7 @@ Seu tier e definido pelo score geral:
 
 <b>As 7 Métricas</b>
 
-<i>Vibe</i> - Mede o tom das suas mensagens e como os outros reagem a você
+<i>Aura</i> - Mede o tom das suas mensagens e como os outros reagem a você
   • Mensagens positivas, neutras e negativas
   • Reações positivas recebidas
 

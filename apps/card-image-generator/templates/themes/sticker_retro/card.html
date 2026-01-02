@@ -22,9 +22,9 @@
             --border-color: {{ theme.colors.border }};
 
             /* Stat colors */
-            --color-vibe: {{ theme.colors.stat.vibe }};
-            --color-vibe-gradient-start: {{ theme.colors.stat.vibe_gradient[0] }};
-            --color-vibe-gradient-end: {{ theme.colors.stat.vibe_gradient[1] }};
+            --color-aura: {{ theme.colors.stat.aura }};
+            --color-aura-gradient-start: {{ theme.colors.stat.aura_gradient[0] }};
+            --color-aura-gradient-end: {{ theme.colors.stat.aura_gradient[1] }};
             --color-activity: {{ theme.colors.stat.activity }};
             --color-activity-gradient-start: {{ theme.colors.stat.activity_gradient[0] }};
             --color-activity-gradient-end: {{ theme.colors.stat.activity_gradient[1] }};
@@ -343,8 +343,8 @@
         }
 
         /* Stat colors */
-        .stat-card.vibe .stat-value { color: var(--color-vibe); }
-        .stat-card.vibe .stat-fill { background: linear-gradient(90deg, var(--color-vibe-gradient-start), var(--color-vibe-gradient-end)); }
+        .stat-card.aura .stat-value { color: var(--color-aura); }
+        .stat-card.aura .stat-fill { background: linear-gradient(90deg, var(--color-aura-gradient-start), var(--color-aura-gradient-end)); }
 
         .stat-card.activity .stat-value { color: var(--color-activity); }
         .stat-card.activity .stat-fill { background: linear-gradient(90deg, var(--color-activity-gradient-start), var(--color-activity-gradient-end)); }

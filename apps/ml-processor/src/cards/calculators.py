@@ -25,11 +25,11 @@ from src.utils.emoji_sentiment import is_positive_reaction, is_negative_reaction
 logger = logging.getLogger(__name__)
 
 # Bayesian smoothing constant (minimum effective samples)
-BAYESIAN_K = 50
+BAYESIAN_K = 20
 
 # Default global means for Bayesian smoothing (when chat has insufficient data)
 DEFAULT_GLOBAL_MEANS = {
-    "aura": 50.0,  # Neutral aura
+    "aura": 55.0,  # Slightly positive baseline
     "activity": 50.0,  # Average activity
     "presence": 50.0,  # Average presence
     "humor": 30.0,  # Most people aren't comedians
@@ -321,18 +321,18 @@ def calculate_aura(
     )
 
     # Calculate weighted aura score
-    # Formula: 55*pos + 5*neutral - 10*neg + 5*consistency + 25*pos_reactions
+    # Formula: 55*pos + 5*neutral - 5*neg + 5*consistency + 30*pos_reactions
     raw_score = (
         55 * positive_ratio
         + 5 * neutral_ratio
-        - 10 * negative_ratio
+        - 5 * negative_ratio
         + 5 * consistency
-        + 25 * positive_reactions_ratio
+        + 30 * positive_reactions_ratio
     )
 
-    # Scale to 0-100 (max possible is 55+5+5+25=90, min is -10)
-    # Normalize: (-10 to 90) -> (0 to 100)
-    scaled_score = ((raw_score + 10) / 100) * 100
+    # Scale to 0-100 (max possible is 55+5+5+30=95, min is -5)
+    # Normalize: (-5 to 95) -> (0 to 100)
+    scaled_score = ((raw_score + 5) / 100) * 100
     scaled_score = _clamp(scaled_score, 0, 100)
 
     # Apply Bayesian smoothing

@@ -22,9 +22,9 @@ Cards are weekly summaries of your chat activity. They capture your personality 
 |-----------|--------|-------------|
 | Positive sentiment | 55% | Messages with positive emotional tone |
 | Neutral sentiment | 5% | Messages with neutral tone |
-| Negative sentiment | -10% | Messages with negative tone (subtracts from score) |
+| Negative sentiment | -5% | Messages with negative tone (subtracts from score) |
 | Consistency | 5% | How stable your emotional tone is |
-| Positive reactions | 25% | Positive emoji reactions others give you |
+| Positive reactions | 30% | Positive emoji reactions others give you |
 
 **Labels:**
 | Score | Label | Meaning |
@@ -218,8 +218,8 @@ If you've only sent a few messages, your scores will be closer to 50 (the averag
 **Why?** Without this, someone who sends one amazing message could dominate the rankings over users with hundreds of consistent contributions.
 
 As you send more messages, your scores become more reflective of your actual behavior:
-- With 1 message: Your score is mostly pulled toward 50
-- With 100 messages: Your score reflects about 67% of your actual performance
-- With 500 messages: Your score reflects about 91% of your actual performance
+- With 1 message: Your score is mostly pulled toward the baseline
+- With 50 messages: Your score reflects about 71% of your actual performance
+- With 100 messages: Your score reflects about 83% of your actual performance
 
 This ensures that rankings are fair and stable, rewarding consistent participation over lucky outliers.

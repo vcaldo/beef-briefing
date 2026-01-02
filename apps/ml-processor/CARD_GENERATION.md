@@ -43,13 +43,13 @@ smoothed_score = (n * raw_score + k * global_mean) / (n + k)
 Where:
 - `n` = number of samples (messages analyzed)
 - `raw_score` = the calculated raw score
-- `k` = smoothing constant (50 by default)
+- `k` = smoothing constant (20 by default)
 - `global_mean` = default mean for the metric
 
 **Practical effect:**
-- User with 1 message and raw score 100: `(1 * 100 + 50 * 50) / (1 + 50) = 51.0`
-- User with 100 messages and raw score 100: `(100 * 100 + 50 * 50) / (100 + 50) = 83.3`
-- User with 500 messages and raw score 100: `(500 * 100 + 50 * 50) / (500 + 50) = 95.5`
+- User with 1 message and raw score 100: `(1 * 100 + 20 * 50) / (1 + 20) = 52.4`
+- User with 100 messages and raw score 100: `(100 * 100 + 20 * 50) / (100 + 20) = 91.7`
+- User with 500 messages and raw score 100: `(500 * 100 + 20 * 50) / (500 + 20) = 98.1`
 
 ### 90th Percentile Normalization
 
@@ -101,9 +101,9 @@ Measures overall emotional tone combining message sentiment with reaction recept
 |-----------|--------|-------------|
 | Positive Ratio | +55% | Messages with positive sentiment (score_positive > 0.5) |
 | Neutral Ratio | +5% | Messages with neutral sentiment (score_neutral > 0.5) |
-| Negative Ratio | -10% | Messages with negative sentiment (score_negative > 0.5) **[SUBTRACTS]** |
+| Negative Ratio | -5% | Messages with negative sentiment (score_negative > 0.5) **[SUBTRACTS]** |
 | Consistency | +5% | 1 - STDDEV(positive - negative), measures emotional stability |
-| Positive Reactions | +25% | Ratio of positive emoji reactions received |
+| Positive Reactions | +30% | Ratio of positive emoji reactions received |
 
 **Formula:**
 ```python
@@ -125,15 +125,15 @@ positive_reaction_ratio = positive_reactions / total_reactions if total > 0 else
 raw_score = (
     55 * positive_ratio +
     5 * neutral_ratio -
-    10 * negative_ratio +
+    5 * negative_ratio +
     5 * consistency +
-    25 * positive_reaction_ratio
+    30 * positive_reaction_ratio
 )
 
-# Scale to 0-100 (max=90, min=-10)
-scaled_score = ((raw_score + 10) / 100) * 100
+# Scale to 0-100 (max=95, min=-5)
+scaled_score = ((raw_score + 5) / 100) * 100
 clamped_score = max(0, min(100, scaled_score))
-final_score = bayesian_smooth(clamped_score, total_messages, global_mean=50)
+final_score = bayesian_smooth(clamped_score, total_messages, global_mean=55)
 ```
 
 **SQL for sentiment analysis:**

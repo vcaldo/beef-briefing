@@ -29,11 +29,18 @@ Biblioteca: emosent-py
 
 <b>Normalização Estatística</b>
 
-<i>Bayesian Smoothing</i>
-Todos os scores usam suavização Bayesiana com k=50:
-  <code>score = (n * raw + 50 * média) / (n + 50)</code>
+<i>Bayesian Smoothing Progressivo</i>
+Todos os scores usam suavização Bayesiana com k progressivo:
+  <code>k = 5 + 25 × (0.5 ^ (n / 20))</code>
+  <code>score = (n * raw + k * média) / (n + k)</code>
 
-Isso evita que usuários com poucas mensagens tenham scores extremos, aproximando amostras pequenas da média do grupo.
+O valor de k diminui conforme aumenta o número de mensagens:
+  • 1 msg → k≈29 (forte suavização)
+  • 20 msgs → k≈18 (moderada)
+  • 50 msgs → k≈9 (leve)
+  • 100 msgs → k≈6 (mínima)
+
+Isso protege usuários com poucas mensagens de scores extremos, enquanto permite que usuários ativos alcancem seus scores reais.
 
 <i>Normalização p90</i>
 Métricas de volume (mensagens, reações) são normalizadas pelo percentil 90 do chat, evitando que outliers distorçam os resultados.

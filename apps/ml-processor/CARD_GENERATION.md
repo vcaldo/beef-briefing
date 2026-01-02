@@ -31,25 +31,37 @@ make ml-run-cards ML_ARGS="--timezone America/Sao_Paulo --week 2024-12-16"
 
 ## Core Concepts
 
-### Bayesian Smoothing
+### Progressive Bayesian Smoothing
 
-All metrics use Bayesian smoothing to prevent outliers from dominating when sample sizes are small. This ensures that users with few messages have scores closer to the global mean, while high-volume users' scores reflect their actual behavior.
+All metrics use progressive Bayesian smoothing to prevent outliers from dominating when sample sizes are small. The smoothing strength (k) decays exponentially as sample size grows, allowing high-volume users to reach their true scores faster.
 
 **Formula:**
 ```
+k = k_min + (k_max - k_min) * (0.5 ^ (n / half_life))
 smoothed_score = (n * raw_score + k * global_mean) / (n + k)
 ```
 
 Where:
 - `n` = number of samples (messages analyzed)
 - `raw_score` = the calculated raw score
-- `k` = smoothing constant (20 by default)
+- `k_max` = 30 (maximum k for very few samples)
+- `k_min` = 5 (minimum k for many samples)
+- `half_life` = 20 (messages needed to halve the difference from k_min)
 - `global_mean` = default mean for the metric
 
-**Practical effect:**
-- User with 1 message and raw score 100: `(1 * 100 + 20 * 50) / (1 + 20) = 52.4`
-- User with 100 messages and raw score 100: `(100 * 100 + 20 * 50) / (100 + 20) = 91.7`
-- User with 500 messages and raw score 100: `(500 * 100 + 20 * 50) / (500 + 20) = 98.1`
+**Progressive k values:**
+| Messages | k value |
+|----------|---------|
+| 1        | ~29     |
+| 10       | ~23     |
+| 20       | ~18     |
+| 50       | ~9      |
+| 100      | ~6      |
+
+**Practical effect (with global_mean=50):**
+- User with 1 message and raw score 100: `(1 * 100 + 29 * 50) / 30 = 51.7`
+- User with 50 messages and raw score 100: `(50 * 100 + 9 * 50) / 59 = 92.4`
+- User with 100 messages and raw score 100: `(100 * 100 + 6 * 50) / 106 = 97.2`
 
 ### 90th Percentile Normalization
 

@@ -8,7 +8,7 @@ Design Principles:
 1. Each calculator is self-contained with its own query
 2. Calculators return None if insufficient data
 3. Labels are computed from scores using simple thresholds
-4. Bayesian smoothing applied with k=50 for sample-size fairness
+4. Progressive Bayesian smoothing: k decays from 30 to 5 as samples grow
 5. All rankings are per-chat
 """
 
@@ -24,8 +24,10 @@ from src.utils.emoji_sentiment import is_positive_reaction, is_negative_reaction
 
 logger = logging.getLogger(__name__)
 
-# Bayesian smoothing constant (minimum effective samples)
-BAYESIAN_K = 20
+# Bayesian smoothing parameters for progressive k
+BAYESIAN_K_MAX = 30  # Max k for very few samples (1-5 messages)
+BAYESIAN_K_MIN = 5   # Min k for many samples (100+ messages)
+BAYESIAN_K_HALF_LIFE = 20  # Messages needed to halve the difference from k_min
 
 # Default global means for Bayesian smoothing (when chat has insufficient data)
 DEFAULT_GLOBAL_MEANS = {
@@ -69,17 +71,33 @@ def _execute_many(engine: Engine, query: str, params: dict) -> list[dict]:
 # =========================================
 
 
-def _bayesian_smooth(
-    raw_score: float, n_samples: int, global_mean: float, k: int = BAYESIAN_K
-) -> float:
+def _get_progressive_k(n_samples: int) -> float:
+    """
+    Calculate progressive k that decays exponentially as sample size grows.
+
+    - k_max (30): Maximum k for very few samples (1-5 messages)
+    - k_min (5): Minimum k for many samples (100+ messages)
+    - half_life (20): Messages needed to halve the difference from k_min
+
+    This allows users with more data to reach their true scores faster,
+    while still protecting against outliers for low-message users.
+    """
+    return BAYESIAN_K_MIN + (BAYESIAN_K_MAX - BAYESIAN_K_MIN) * (
+        0.5 ** (n_samples / BAYESIAN_K_HALF_LIFE)
+    )
+
+
+def _bayesian_smooth(raw_score: float, n_samples: int, global_mean: float) -> float:
     """
     Apply Bayesian smoothing to adjust for sample size.
 
     Formula: smoothed = (n * raw + k * global) / (n + k)
 
-    With few samples, the score regresses toward the global mean.
-    With many samples, the raw score dominates.
+    Uses progressive k: with few samples, k is high and the score regresses
+    toward the global mean. With many samples, k decreases and the raw score
+    dominates.
     """
+    k = _get_progressive_k(n_samples)
     return (n_samples * raw_score + k * global_mean) / (n_samples + k)
 
 

@@ -8,8 +8,8 @@
     "text_secondary": "rgba(255, 243, 214, 0.6)",
     "border_color": "rgba(245, 196, 107, 0.2)",
     "stat_colors": {
-      "vibe": "#f5c46b",
-      "vibe_gradient": ["#b8893c", "#f5c46b"],
+      "aura": "#f5c46b",
+      "aura_gradient": ["#b8893c", "#f5c46b"],
       "activity": "#e85d04",
       "activity_gradient": ["#dc2f02", "#f48c06"],
       "presence": "#588157",

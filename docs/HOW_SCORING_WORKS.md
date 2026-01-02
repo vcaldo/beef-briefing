@@ -14,7 +14,7 @@ Cards are weekly summaries of your chat activity. They capture your personality 
 
 ## The 6 Stats
 
-### 1. Vibe (0-100)
+### 1. Aura (0-100)
 
 **What it measures:** Your emotional tone combined with how others receive your messages.
 
@@ -22,9 +22,9 @@ Cards are weekly summaries of your chat activity. They capture your personality 
 |-----------|--------|-------------|
 | Positive sentiment | 55% | Messages with positive emotional tone |
 | Neutral sentiment | 5% | Messages with neutral tone |
-| Negative sentiment | -10% | Messages with negative tone (subtracts from score) |
+| Negative sentiment | -5% | Messages with negative tone (subtracts from score) |
 | Consistency | 5% | How stable your emotional tone is |
-| Positive reactions | 25% | Positive emoji reactions others give you |
+| Positive reactions | 30% | Positive emoji reactions others give you |
 
 **Labels:**
 | Score | Label | Meaning |
@@ -92,7 +92,7 @@ This stat is harder to score high on. The global average is around 30, not 50.
 | Negative reactions | 25% | Negative emoji reactions you receive (thumbs down, angry, etc.) |
 | Negative reactors | 5% | How many different people react negatively to you |
 
-**Important:** Being sad or expressing negative emotions does NOT increase toxicity. That affects your Vibe score instead. Toxicity is specifically about aggressive, offensive, or harmful content.
+**Important:** Being sad or expressing negative emotions does NOT increase toxicity. That affects your Aura score instead. Toxicity is specifically about aggressive, offensive, or harmful content.
 
 **Labels:**
 | Percentage | Label | Meaning |
@@ -132,7 +132,7 @@ Your Overall Score combines all 6 stats into a single number used for ranking.
 |-----------|--------|
 | Popularity | 20% |
 | Presence | 15% |
-| Vibe | 12% |
+| Aura | 12% |
 | Days streak | 10% |
 | Humor | 8% |
 | Activity | 5% |
@@ -177,7 +177,7 @@ Badges are special achievements displayed on your card. They affect your Overall
 
 | Badge | How to Earn | Rarity |
 |-------|-------------|--------|
-| Radiant | Vibe score 80 or higher | Legendary |
+| Radiant | Aura score 80 or higher | Legendary |
 | Hyperactive | Top 10% activity in the chat | Epic |
 | Regular | Presence score 80 or higher | Epic |
 | Comedian | Humor score 70 or higher | Legendary |
@@ -188,7 +188,7 @@ Badges are special achievements displayed on your card. They affect your Overall
 
 | Badge | What Triggers It | Rarity |
 |-------|-----------------|--------|
-| Gloomy | Vibe score under 30 | Negative |
+| Gloomy | Aura score under 30 | Negative |
 | Ghost | Bottom 10% activity in the chat | Negative |
 | Tourist | Presence under 20 (with at least 10 messages) | Negative |
 | Deadpan | Humor score under 10 | Negative |
@@ -218,8 +218,8 @@ If you've only sent a few messages, your scores will be closer to 50 (the averag
 **Why?** Without this, someone who sends one amazing message could dominate the rankings over users with hundreds of consistent contributions.
 
 As you send more messages, your scores become more reflective of your actual behavior:
-- With 1 message: Your score is mostly pulled toward 50
-- With 100 messages: Your score reflects about 67% of your actual performance
-- With 500 messages: Your score reflects about 91% of your actual performance
+- With 1 message: Your score is mostly pulled toward the baseline
+- With 50 messages: Your score reflects about 71% of your actual performance
+- With 100 messages: Your score reflects about 83% of your actual performance
 
 This ensures that rankings are fair and stable, rewarding consistent participation over lucky outliers.

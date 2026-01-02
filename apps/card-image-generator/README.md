@@ -370,8 +370,8 @@ The theme configuration defines colors and typography. All colors in CSS can ref
     "text_secondary": "rgba(255, 255, 255, 0.6)",
     "border_color": "rgba(255, 255, 255, 0.1)",
     "stat_colors": {
-      "vibe": "#fbbf24",
-      "vibe_gradient": ["#f59e0b", "#fcd34d"],
+      "aura": "#fbbf24",
+      "aura_gradient": ["#f59e0b", "#fcd34d"],
       "activity": "#00d9ff",
       "activity_gradient": ["#00d9ff", "#67e8f9"],
       "presence": "#14b8a6",
@@ -509,7 +509,7 @@ curl -X POST http://localhost:8051/api/v1/render \
 | `colors.background_gradient` | 3-color gradient array [start, mid, end] |
 | `colors.primary_accent` | Main accent color (buttons, highlights) |
 | `colors.secondary_accent` | Secondary accent (decorations) |
-| `colors.stat_colors` | Colors for each of the 6 stats (vibe, activity, presence, humor, toxicity, popularity) |
+| `colors.stat_colors` | Colors for each of the 6 stats (aura, activity, presence, humor, toxicity, popularity) |
 | `colors.badge_rarity_colors` | Badge styling by rarity (common, rare, epic, legendary) |
 | `colors.tier_colors` | Gradient pairs for overall score tiers |
 | `colors.effects` | Glow effects, border gradients, decorations |

@@ -17,7 +17,7 @@ Modelo: <code>bert-base-portuguese-cased-hatebr</code>
 
 <i>Detecção de Humor</i>
 Método: Heurísticas baseadas em padrões
-  • Detecta risadas: kkkk, hahaha, rsrsrs, huahua
+  • Detecta risadas
   • Analisa emojis de risada
   • Threshold: score &gt;= 0.4 para classificar como humor
 

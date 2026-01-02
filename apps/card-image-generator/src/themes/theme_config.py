@@ -16,7 +16,7 @@ class ThemeColors:
     background_gradient: list[str]  # [start, mid, end]
     primary_accent: str
     secondary_accent: str
-    stat_colors: dict[str, Any]  # vibe, activity, presence, etc. (includes gradients)
+    stat_colors: dict[str, Any]  # aura, activity, presence, etc. (includes gradients)
     badge_rarity_colors: dict[str, dict[str, str]]  # common, rare, epic, legendary
     tier_colors: dict[str, list[str]]  # legendary, elite, etc. [start, end]
     effects: dict[str, Any] = field(default_factory=dict)  # avatar_glow, username_glow, etc.
@@ -174,8 +174,8 @@ class ThemeLoader:
                 "primary_accent": "#00d9ff",
                 "secondary_accent": "#e94560",
                 "stat_colors": {
-                    "vibe": "#fbbf24",
-                    "vibe_gradient": ["#f59e0b", "#fcd34d"],
+                    "aura": "#fbbf24",
+                    "aura_gradient": ["#f59e0b", "#fcd34d"],
                     "activity": "#00d9ff",
                     "activity_gradient": ["#00d9ff", "#67e8f9"],
                     "presence": "#14b8a6",

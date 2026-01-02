@@ -25,9 +25,9 @@ logger = logging.getLogger(__name__)
 # Badge rules for modifier calculation (copied from template_loader.py)
 # Each badge contributes to overall score: legendary +2, epic +1, negative -2
 BADGE_RULES = [
-    # Vibe badges
-    {"condition": lambda s: s.get("vibe", {}).get("score", 0) >= 80, "rarity": "legendary"},
-    {"condition": lambda s: s.get("vibe", {}).get("score", 100) < 30, "rarity": "negative"},
+    # Aura badges
+    {"condition": lambda s: s.get("aura", {}).get("score", 0) >= 80, "rarity": "legendary"},
+    {"condition": lambda s: s.get("aura", {}).get("score", 100) < 30, "rarity": "negative"},
     # Presence badges
     {"condition": lambda s: s.get("presence", {}).get("score", 0) >= 80, "rarity": "epic"},
     {
@@ -246,7 +246,7 @@ class CardGenerator:
         modifier = 0.0
 
         # Positive metrics: up = good, down = bad
-        positive_metrics = ["popularity", "presence", "vibe", "humor", "activity"]
+        positive_metrics = ["popularity", "presence", "aura", "humor", "activity"]
         for metric in positive_metrics:
             if metric in trends:
                 pct = abs(trends[metric].get("pct_change", 0))
@@ -348,7 +348,7 @@ class CardGenerator:
         trends = {}
 
         # Metrics with "score" field (0-100 scale)
-        score_metrics = ["vibe", "activity", "presence", "humor", "popularity"]
+        score_metrics = ["aura", "activity", "presence", "humor", "popularity"]
         for metric in score_metrics:
             if metric in current_stats and metric in prev_stats:
                 curr_val = current_stats[metric].get("score", 0)

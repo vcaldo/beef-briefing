@@ -279,6 +279,10 @@ services:
       TIER_4: ${TIER_4:-Regular:40}
       TIER_5: ${TIER_5:-Beginner:25}
       TIER_6: ${TIER_6:-Rookie:0}
+      # Mini App authentication
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-jwt-secret-key-change-in-production}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      CORS_ORIGINS: http://localhost:5173
     ports:
       - "8051:8051"
     volumes:
@@ -290,12 +294,31 @@ services:
       - beef-dev-network
     restart: unless-stopped
 
+  # Deck Mini App - Development with hot reload
+  # Note: For development, run manually with npm outside Docker for best DX
+  # or use this container for consistency with production
+  deck-mini-app-dev:
+    image: node:22-alpine
+    container_name: beef-deck-mini-app-dev
+    working_dir: /app
+    volumes:
+      - ../apps/deck-mini-app:/app
+      - deck_mini_app_node_modules_dev:/app/node_modules
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_API_URL: http://localhost:8051
+    networks:
+      - beef-dev-network
+
 volumes:
   postgres_data_dev:
   minio_data_dev:
   qdrant_data_dev:
   ml_dashboard_cache_dev:
   ml_models_cache_dev:
+  deck_mini_app_node_modules_dev:
 
 networks:
   beef-dev-network:

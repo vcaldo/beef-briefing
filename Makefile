@@ -310,6 +310,10 @@ secrets-card-image-generator: ## Generate card-image-generator API key for an ap
 	@chmod +x $(SCRIPTS_DIR)/generate-card-image-generator-key.sh
 	@$(SCRIPTS_DIR)/generate-card-image-generator-key.sh "$(APP)" "$(SECRETS_DIR)"
 
+secrets-jwt: ## Generate JWT secret key for Mini App authentication
+	@chmod +x $(SCRIPTS_DIR)/generate-jwt-secret.sh
+	@$(SCRIPTS_DIR)/generate-jwt-secret.sh
+
 # =============================================================================
 # TERRAFORM (tf-*)
 # =============================================================================
@@ -527,7 +531,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	docker-shell-newrelic docker-shell-leaderboard docker-shell-ml-dashboard \
 	go-build go-build-api go-build-bot go-build-import-cli go-build-import-cli-prod go-clean \
 	go-fmt go-fmt-check \
-	secrets-traefik-password secrets-service-api secrets-card-image-generator \
+	secrets-traefik-password secrets-service-api secrets-card-image-generator secrets-jwt \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-arch tf-root-pass \

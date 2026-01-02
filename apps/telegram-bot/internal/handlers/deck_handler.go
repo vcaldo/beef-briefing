@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -11,13 +13,15 @@ import (
 
 // DeckHandler handles the /deck command
 type DeckHandler struct {
-	nrApp *newrelic.Application
+	nrApp      *newrelic.Application
+	domainName string
 }
 
 // NewDeckHandler creates a new DeckHandler
 func NewDeckHandler(nrApp *newrelic.Application) *DeckHandler {
 	return &DeckHandler{
-		nrApp: nrApp,
+		nrApp:      nrApp,
+		domainName: os.Getenv("DOMAIN_NAME"),
 	}
 }
 
@@ -52,10 +56,38 @@ func (h *DeckHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Upd
 		txn.AddAttribute("user_id", userID)
 	}
 
-	// Send coming soon message
+	// Check if Mini App is configured
+	if h.domainName == "" {
+		slog.Warn("DOMAIN_NAME not configured, deck Mini App unavailable", "chat_id", chatID)
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: chatID,
+			Text:   "The deck feature is not configured. Please contact the administrator.",
+		})
+		if err != nil {
+			slog.Error("failed to send deck error message", "chat_id", chatID, "error", err)
+		}
+		return
+	}
+
+	// Build Mini App URL with chat context passed via startapp parameter
+	miniAppURL := fmt.Sprintf("https://deck.%s", h.domainName)
+
+	// Create inline keyboard with Mini App button
+	keyboard := &models.InlineKeyboardMarkup{
+		InlineKeyboard: [][]models.InlineKeyboardButton{{
+			{
+				Text: "View Cards",
+				WebApp: &models.WebAppInfo{
+					URL: miniAppURL,
+				},
+			},
+		}},
+	}
+
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: chatID,
-		Text:   "The /deck command is coming soon! Stay tuned for the ability to browse all player cards.",
+		ChatID:      chatID,
+		Text:        "Tap the button below to browse all player cards for this group:",
+		ReplyMarkup: keyboard,
 	})
 	if err != nil {
 		slog.Error("failed to send deck message", "chat_id", chatID, "error", err)
@@ -65,5 +97,5 @@ func (h *DeckHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Upd
 		return
 	}
 
-	slog.Debug("deck message sent successfully", "chat_id", chatID)
+	slog.Debug("deck message sent successfully", "chat_id", chatID, "mini_app_url", miniAppURL)
 }

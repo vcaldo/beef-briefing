@@ -218,12 +218,12 @@ def _popularity_label(score: float) -> str:
 
 # Default tiers (used when tiers not provided via config)
 DEFAULT_TIERS: list[tuple[str, int]] = [
-    ("Legendary", 85),
-    ("Elite", 70),
-    ("Outstanding", 55),
-    ("Regular", 40),
-    ("Beginner", 25),
-    ("Rookie", 0),
+    ("Legendary", 81),
+    ("Elite", 77),
+    ("Outstanding", 72),
+    ("Regular", 55),
+    ("Beginner", 32),
+    ("Rookie", 10),
 ]
 
 

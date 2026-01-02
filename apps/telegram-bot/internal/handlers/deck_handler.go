@@ -13,15 +13,15 @@ import (
 
 // DeckHandler handles the /deck command
 type DeckHandler struct {
-	nrApp      *newrelic.Application
-	domainName string
+	nrApp       *newrelic.Application
+	botUsername string
 }
 
 // NewDeckHandler creates a new DeckHandler
 func NewDeckHandler(nrApp *newrelic.Application) *DeckHandler {
 	return &DeckHandler{
-		nrApp:      nrApp,
-		domainName: os.Getenv("DOMAIN_NAME"),
+		nrApp:       nrApp,
+		botUsername: os.Getenv("TELEGRAM_BOT_USERNAME"),
 	}
 }
 
@@ -57,8 +57,8 @@ func (h *DeckHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Upd
 	}
 
 	// Check if Mini App is configured
-	if h.domainName == "" {
-		slog.Warn("DOMAIN_NAME not configured, deck Mini App unavailable", "chat_id", chatID)
+	if h.botUsername == "" {
+		slog.Warn("TELEGRAM_BOT_USERNAME not configured, deck Mini App unavailable", "chat_id", chatID)
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: chatID,
 			Text:   "The deck feature is not configured. Please contact the administrator.",
@@ -69,17 +69,17 @@ func (h *DeckHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Upd
 		return
 	}
 
-	// Build Mini App URL with chat context passed via startapp parameter
-	miniAppURL := fmt.Sprintf("https://deck.%s", h.domainName)
+	// Build Mini App URL using t.me direct link format
+	// This works in group chats (unlike WebApp buttons which only work in private chats)
+	// Format: https://t.me/<bot_username>/<app_short_name>?startapp=<chat_id>
+	miniAppURL := fmt.Sprintf("https://t.me/%s/deck?startapp=%d", h.botUsername, chatID)
 
-	// Create inline keyboard with Mini App button
+	// Create inline keyboard with URL button to Mini App
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{{
 			{
-				Text: "View Cards",
-				WebApp: &models.WebAppInfo{
-					URL: miniAppURL,
-				},
+				Text: "🃏 Open Deck",
+				URL:  miniAppURL,
 			},
 		}},
 	}

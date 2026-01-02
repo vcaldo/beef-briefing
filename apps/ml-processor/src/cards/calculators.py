@@ -25,11 +25,11 @@ from src.utils.emoji_sentiment import is_positive_reaction, is_negative_reaction
 logger = logging.getLogger(__name__)
 
 # Bayesian smoothing constant (minimum effective samples)
-BAYESIAN_K = 50
+BAYESIAN_K = 20
 
 # Default global means for Bayesian smoothing (when chat has insufficient data)
 DEFAULT_GLOBAL_MEANS = {
-    "vibe": 50.0,  # Neutral vibe
+    "aura": 55.0,  # Slightly positive baseline
     "activity": 50.0,  # Average activity
     "presence": 50.0,  # Average presence
     "humor": 30.0,  # Most people aren't comedians
@@ -114,8 +114,8 @@ def _clamp(value: float, min_val: float = 0.0, max_val: float = 100.0) -> float:
 # =========================================
 
 
-def _vibe_label(score: float) -> str:
-    """Convert vibe score (0-100) to label."""
+def _aura_label(score: float) -> str:
+    """Convert aura score (0-100) to label."""
     if score >= 80:
         return "Radiant"
     elif score >= 65:
@@ -224,7 +224,7 @@ def _overall_label(score: float, tiers: list[tuple[str, int]] | None = None) -> 
 # =========================================
 
 
-def calculate_vibe(
+def calculate_aura(
     engine: Engine,
     user_id: int,
     chat_id: int,
@@ -233,7 +233,7 @@ def calculate_vibe(
     timezone: str | None = None,
 ) -> StatResult | None:
     """
-    Calculate Vibe Score (0-100) combining sentiment and social reception.
+    Calculate Aura Score (0-100) combining sentiment and social reception.
 
     Components:
     - 35% positive message ratio
@@ -320,30 +320,30 @@ def calculate_vibe(
         positive_reactions / total_reactions if total_reactions > 0 else 0.5
     )
 
-    # Calculate weighted vibe score
-    # Formula: 55*pos + 5*neutral - 10*neg + 5*consistency + 25*pos_reactions
+    # Calculate weighted aura score
+    # Formula: 55*pos + 5*neutral - 5*neg + 5*consistency + 30*pos_reactions
     raw_score = (
         55 * positive_ratio
         + 5 * neutral_ratio
-        - 10 * negative_ratio
+        - 5 * negative_ratio
         + 5 * consistency
-        + 25 * positive_reactions_ratio
+        + 30 * positive_reactions_ratio
     )
 
-    # Scale to 0-100 (max possible is 55+5+5+25=90, min is -10)
-    # Normalize: (-10 to 90) -> (0 to 100)
-    scaled_score = ((raw_score + 10) / 100) * 100
+    # Scale to 0-100 (max possible is 55+5+5+30=95, min is -5)
+    # Normalize: (-5 to 95) -> (0 to 100)
+    scaled_score = ((raw_score + 5) / 100) * 100
     scaled_score = _clamp(scaled_score, 0, 100)
 
     # Apply Bayesian smoothing
-    global_mean = DEFAULT_GLOBAL_MEANS["vibe"]
+    global_mean = DEFAULT_GLOBAL_MEANS["aura"]
     smoothed_score = _bayesian_smooth(scaled_score, total_msgs, global_mean)
     final_score = round(_clamp(smoothed_score, 0, 100), 1)
 
     return StatResult(
         value={
             "score": final_score,
-            "label": _vibe_label(final_score),
+            "label": _aura_label(final_score),
             "positive_ratio": round(positive_ratio * 100, 1),
             "negative_ratio": round(negative_ratio * 100, 1),
             "positive_reactions": positive_reactions,
@@ -883,7 +883,7 @@ def calculate_toxicity(
     )
 
     # Calculate weighted score (this is a toxicity percentage)
-    # Being sad is NOT toxic - negative sentiment affects Vibe, not Toxicity
+    # Being sad is NOT toxic - negative sentiment affects Aura, not Toxicity
     # Toxicity is reserved for aggressive/offensive content
     raw_score = (
         0.70 * toxic_ratio
@@ -1164,7 +1164,7 @@ def calculate_overall_score(
     Calculate Overall Score (0-100) combining all metrics with weighted importance.
 
     Formula:
-    - 70% from positive metrics (Popularity 20%, Presence 15%, Vibe 12%,
+    - 70% from positive metrics (Popularity 20%, Presence 15%, Aura 12%,
       Streak 10%, Humor 8%, Activity 5%)
     - 30% penalty from negative metrics (Toxicity 12%, Negative Reactions 7%,
       Negative Messages 6%, Longest Gap 5%)
@@ -1177,7 +1177,7 @@ def calculate_overall_score(
     # Extract scores from existing stats (default to 0 if missing)
     popularity_score = existing_stats.get("popularity", {}).get("score", 0)
     presence_score = existing_stats.get("presence", {}).get("score", 0)
-    vibe_score = existing_stats.get("vibe", {}).get("score", 0)
+    aura_score = existing_stats.get("aura", {}).get("score", 0)
     humor_score = existing_stats.get("humor", {}).get("score", 0)
     activity_score = existing_stats.get("activity", {}).get("score", 0)
     toxicity_pct = existing_stats.get("toxicity", {}).get("pct", 0)
@@ -1187,12 +1187,12 @@ def calculate_overall_score(
     total_days = existing_stats.get("presence", {}).get("total_days", 30)
     streak_normalized = min((streak_days / total_days) * 100, 100) if total_days > 0 else 0
 
-    # Extract negative message ratio from vibe (already 0-100)
-    negative_msg_ratio = existing_stats.get("vibe", {}).get("negative_ratio", 0)
+    # Extract negative message ratio from aura (already 0-100)
+    negative_msg_ratio = existing_stats.get("aura", {}).get("negative_ratio", 0)
 
     # Extract negative reactions ratio from toxicity
     negative_reactions = existing_stats.get("toxicity", {}).get("negative_reactions", 0)
-    total_reactions = existing_stats.get("vibe", {}).get("total_reactions", 0)
+    total_reactions = existing_stats.get("aura", {}).get("total_reactions", 0)
     if total_reactions == 0:
         total_reactions = existing_stats.get("popularity", {}).get("total_reactions", 0)
     negative_reaction_ratio = (
@@ -1242,7 +1242,7 @@ def calculate_overall_score(
     positive = (
         0.20 * popularity_score
         + 0.15 * presence_score
-        + 0.12 * vibe_score
+        + 0.12 * aura_score
         + 0.10 * streak_normalized
         + 0.08 * humor_score
         + 0.05 * activity_score
@@ -1279,7 +1279,7 @@ def calculate_overall_score(
 
 # Registry of all stat calculators - add/remove entries to change what gets computed
 CALCULATORS: dict[str, StatCalculator] = {
-    "vibe": calculate_vibe,
+    "aura": calculate_aura,
     "activity": calculate_activity,
     "presence": calculate_presence,
     "humor": calculate_humor,

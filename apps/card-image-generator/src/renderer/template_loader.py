@@ -18,7 +18,7 @@ MAX_BADGES = 8  # Maximum badges to display on card
 TOP_RANK_COUNT = 3  # Number of top ranks for medals
 
 # Stat keys in display order
-STAT_KEYS = ["vibe", "activity", "presence", "humor", "toxicity", "popularity"]
+STAT_KEYS = ["aura", "activity", "presence", "humor", "toxicity", "popularity"]
 
 
 @dataclass
@@ -34,7 +34,7 @@ class TrendContext:
 class StatContext:
     """Normalized stat for template rendering."""
 
-    key: str  # "vibe", "activity", etc.
+    key: str  # "aura", "activity", etc.
     label: str  # Display label
     icon: str  # Emoji or icon class
     value: float  # Raw value
@@ -115,7 +115,7 @@ class TemplateContext:
     activity: ActivityContext
 
     # Raw stats for direct access (new 6 metrics + overall)
-    vibe: dict = field(default_factory=dict)
+    aura: dict = field(default_factory=dict)
     activity_stats: dict = field(default_factory=dict)
     presence: dict = field(default_factory=dict)
     humor: dict = field(default_factory=dict)
@@ -132,13 +132,13 @@ class TemplateContext:
 
 # Badge derivation rules - new 6 metrics system
 BADGE_RULES = [
-    # Vibe badges
+    # Aura badges
     {
-        "condition": lambda s: s.get("vibe", {}).get("score", 0) >= 80,
+        "condition": lambda s: s.get("aura", {}).get("score", 0) >= 80,
         "badge": BadgeContext("radiant", "Radiant", "\U0001F31F", "legendary"),
     },
     {
-        "condition": lambda s: s.get("vibe", {}).get("score", 100) < 30,
+        "condition": lambda s: s.get("aura", {}).get("score", 100) < 30,
         "badge": BadgeContext("gloomy", "Gloomy", "\U0001F327", "negative"),
     },
     # Presence badges
@@ -196,8 +196,8 @@ BADGE_RULES = [
 
 # Stat display configuration - new 6 metrics
 STAT_CONFIG = {
-    "vibe": {
-        "label": "Vibe",
+    "aura": {
+        "label": "Aura",
         "icon": "\U0001F31F",  # 🌟
         "format": lambda v: f"{v:.0f}",
         "to_pct": lambda v: min(100, max(0, v)),
@@ -373,7 +373,7 @@ class TemplateLoader:
         period_display = f"{stats_window_start.strftime('%b %d')} - {stats_window_end.strftime('%b %d')}"
 
         # Extract raw stats for the 6 metrics + overall
-        vibe = stats_raw.get("vibe", {})
+        aura = stats_raw.get("aura", {})
         activity = stats_raw.get("activity", {})
         presence = stats_raw.get("presence", {})
         humor = stats_raw.get("humor", {})
@@ -418,7 +418,7 @@ class TemplateLoader:
             stats=stats_list,
             badges=badges[:MAX_BADGES],
             activity=activity_ctx,
-            vibe=vibe,
+            aura=aura,
             activity_stats=activity,
             presence=presence,
             humor=humor,
@@ -488,7 +488,7 @@ class TemplateLoader:
             "stats": context.stats,
             "badges": context.badges,
             "activity": context.activity,
-            "vibe": context.vibe,
+            "aura": context.aura,
             "activity_stats": context.activity_stats,
             "presence": context.presence,
             "humor": context.humor,

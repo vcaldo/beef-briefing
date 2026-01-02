@@ -8,8 +8,8 @@
     "text_secondary": "rgba(255, 255, 255, 0.6)",
     "border_color": "rgba(255, 255, 255, 0.1)",
     "stat_colors": {
-      "vibe": "#fbbf24",
-      "vibe_gradient": ["#f59e0b", "#fcd34d"],
+      "aura": "#fbbf24",
+      "aura_gradient": ["#f59e0b", "#fcd34d"],
       "activity": "#00d9ff",
       "activity_gradient": ["#00d9ff", "#67e8f9"],
       "presence": "#14b8a6",
@@ -49,12 +49,12 @@
       }
     },
     "tier_colors": {
-      "tier_1": ["#fbbf24", "#f59e0b"],
-      "tier_2": ["#00d9ff", "#0ea5e9"],
-      "tier_3": ["#a855f7", "#7c3aed"],
-      "tier_4": ["#14b8a6", "#0d9488"],
-      "tier_5": ["#9ca3af", "#6b7280"],
-      "tier_6": ["#f472b6", "#ec4899"]
+      "tier_1": ["#ffe000", "#ffc400"],
+      "tier_2": ["#39ff14", "#00e600"],
+      "tier_3": ["#4d7fff", "#2b5fff"],
+      "tier_4": ["#ff6b00", "#ff4500"],
+      "tier_5": ["#a8b2bd", "#78838f"],
+      "tier_6": ["#8b7355", "#6b5344"]
     },
     "effects": {
       "avatar_glow": "rgba(233, 69, 96, 0.5)",

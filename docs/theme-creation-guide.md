@@ -115,8 +115,8 @@ Jinja2 template that generates HTML with embedded CSS. Uses theme values via tem
     "border_color": "rgba(r, g, b, a)",
 
     "stat_colors": {
-      "vibe": "#hex",
-      "vibe_gradient": ["#start", "#end"],
+      "aura": "#hex",
+      "aura_gradient": ["#start", "#end"],
       "activity": "#hex",
       "activity_gradient": ["#start", "#end"],
       "presence": "#hex",
@@ -214,7 +214,7 @@ Each stat has a solid color and a gradient pair for progress bars:
 
 | Stat | Purpose | Icon |
 |------|---------|------|
-| `vibe` | Mood/sentiment score | Emoji varies |
+| `aura` | Mood/sentiment score | Emoji varies |
 | `activity` | Message frequency | Lightning bolt |
 | `presence` | Days active | Calendar |
 | `humor` | Comedy percentage | Laugh emoji |
@@ -340,8 +340,8 @@ The system generates a Google Fonts import URL automatically.
 ### Stats Array
 ```jinja2
 {% for stat in stats %}
-  {{ stat.key }}           {# "vibe", "activity", etc. #}
-  {{ stat.label }}         {# "Vibe", "Activity" #}
+  {{ stat.key }}           {# "aura", "activity", etc. #}
+  {{ stat.label }}         {# "Aura", "Activity" #}
   {{ stat.icon }}          {# emoji #}
   {{ stat.value }}         {# raw numeric value #}
   {{ stat.percentage }}    {# 0-100 for progress bars #}
@@ -382,8 +382,8 @@ The system generates a Google Fonts import URL automatically.
 {{ theme.colors.text_primary }}
 {{ theme.colors.text_secondary }}
 {{ theme.colors.border }}
-{{ theme.colors.stat.vibe }}
-{{ theme.colors.stat.vibe_gradient[0] }}
+{{ theme.colors.stat.aura }}
+{{ theme.colors.stat.aura_gradient[0] }}
 {{ theme.colors.badge.legendary.glow }}
 {{ theme.colors.tier.elite[0] }}
 {{ theme.colors.effects.avatar_glow }}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useLaunchParams, useThemeParams, useBackButton } from '@telegram-apps/sdk-react'
+import { useLaunchParams, backButton } from '@telegram-apps/sdk-react'
 
 import { apiClient, CardImageWithUrl } from './api/client'
 import { WeekSelector } from './components/WeekSelector'
@@ -9,8 +9,6 @@ type AppState = 'loading' | 'authenticated' | 'error'
 
 function App() {
   const launchParams = useLaunchParams()
-  const themeParams = useThemeParams()
-  const backButton = useBackButton()
 
   const [state, setState] = useState<AppState>('loading')
   const [error, setError] = useState<string | null>(null)
@@ -22,21 +20,25 @@ function App() {
 
   // Handle back button for card zoom
   useEffect(() => {
-    if (selectedCard) {
-      backButton.show()
-    } else {
-      backButton.hide()
+    if (backButton.show.isAvailable()) {
+      if (selectedCard) {
+        backButton.show()
+      } else {
+        backButton.hide()
+      }
     }
-  }, [selectedCard, backButton])
+  }, [selectedCard])
 
   useEffect(() => {
-    const unsubscribe = backButton.onClick(() => {
+    if (!backButton.onClick.isAvailable()) return
+
+    const off = backButton.onClick(() => {
       if (selectedCard) {
         setSelectedCard(null)
       }
     })
-    return () => unsubscribe()
-  }, [backButton, selectedCard])
+    return () => off()
+  }, [selectedCard])
 
   // Authenticate on mount
   useEffect(() => {
@@ -112,16 +114,9 @@ function App() {
     setSelectedCard(card)
   }, [])
 
-  // Apply Telegram theme
-  const style: React.CSSProperties = {
-    backgroundColor: themeParams.backgroundColor || 'var(--tg-theme-bg-color)',
-    color: themeParams.textColor || 'var(--tg-theme-text-color)',
-    minHeight: '100vh',
-  }
-
   if (state === 'loading') {
     return (
-      <div style={style} className="app loading-container">
+      <div className="app loading-container">
         <div className="loading-spinner">
           <div className="spinner"></div>
           <p>Loading...</p>
@@ -132,7 +127,7 @@ function App() {
 
   if (state === 'error') {
     return (
-      <div style={style} className="app error-container">
+      <div className="app error-container">
         <div className="error-content">
           <div className="error-icon">!</div>
           <p>{error}</p>
@@ -144,7 +139,7 @@ function App() {
   // Card zoom overlay
   if (selectedCard) {
     return (
-      <div style={style} className="app">
+      <div className="app">
         <div className="card-zoom-overlay" onClick={() => setSelectedCard(null)}>
           <div className="card-zoom-content" onClick={(e) => e.stopPropagation()}>
             <img src={selectedCard.url} alt={selectedCard.first_name || 'Card'} />
@@ -163,7 +158,7 @@ function App() {
   }
 
   return (
-    <div style={style} className="app">
+    <div className="app">
       <header className="app-header">
         <h1>Deck Gallery</h1>
       </header>

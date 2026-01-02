@@ -55,7 +55,7 @@ type Config struct {
 	AdminUserIDs string `envconfig:"ADMIN_USER_IDS"` // Comma-separated list of admin user IDs
 
 	// Card Theme Configuration
-	DefaultCardTheme string `envconfig:"DEFAULT_CARD_THEME" default:"gaming"`
+	DefaultCardTheme string `envconfig:"DEFAULT_CARD_THEME" default:"neon_arcade"`
 }
 
 // DSN returns PostgreSQL connection string

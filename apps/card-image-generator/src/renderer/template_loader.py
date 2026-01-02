@@ -451,7 +451,8 @@ class TemplateLoader:
         rounded_pct = round(pct)
 
         if rounded_pct == 0:
-            # Never show sign for 0%
+            # Neutral: no sign, no color
+            direction = "stable"
             icon = "\u23F9\uFE0F"  # ⏹️
             pct_str = "0%"
         elif direction == "up":

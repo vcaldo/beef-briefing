@@ -47,6 +47,8 @@ PROD_IMAGES=(
     "beef-briefing/api-service"
     "beef-briefing/telegram-bot"
     "beef-briefing/leaderboard"
+    "beef-briefing/card-image-generator"
+    "beef-briefing/deck-mini-app"
 )
 
 # =============================================================================

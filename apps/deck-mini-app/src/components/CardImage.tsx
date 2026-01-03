@@ -18,13 +18,6 @@ export function CardImage({ card, onClick }: CardImageProps) {
 
   return (
     <div className="card-item" onClick={onClick}>
-      <div className="card-header">
-        <span className="card-name">{displayName}</span>
-        <span className="card-username">
-          {card.username ? `@${card.username}` : '\u00A0'}
-        </span>
-      </div>
-
       <div className="card-image-container">
         {isLoading && <div className="card-skeleton" />}
         {hasError ? (

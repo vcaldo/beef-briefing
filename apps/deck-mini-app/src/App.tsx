@@ -1,10 +1,89 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useLaunchParams, backButton, shareStory } from '@telegram-apps/sdk-react'
+import { useLaunchParams, backButton, shareStory, cloudStorage } from '@telegram-apps/sdk-react'
 
 import { apiClient, CardImageWithUrl } from './api/client'
 import { WeekSelector } from './components/WeekSelector'
 import { CardGallery } from './components/CardGallery'
 import { InfoModal } from './components/InfoModal'
+import { CardReveal } from './components/CardReveal'
+
+const REVEAL_SEEN_KEY = 'card_reveal_seen_v1'
+
+function useCardRevealState(weekStart: string | null) {
+  const [hasSeenReveal, setHasSeenReveal] = useState<boolean | null>(null)
+  const [isCheckingStorage, setIsCheckingStorage] = useState(true)
+
+  useEffect(() => {
+    if (!weekStart) return
+
+    const checkStorage = async () => {
+      try {
+        if (!cloudStorage.getItem.isAvailable()) {
+          setHasSeenReveal(false)
+          setIsCheckingStorage(false)
+          return
+        }
+
+        const stored = await cloudStorage.getItem(REVEAL_SEEN_KEY)
+        if (stored) {
+          const seen = JSON.parse(stored) as Record<string, boolean>
+          setHasSeenReveal(seen[weekStart] === true)
+        } else {
+          setHasSeenReveal(false)
+        }
+      } catch (error) {
+        console.error('Failed to check CloudStorage:', error)
+        setHasSeenReveal(false)
+      } finally {
+        setIsCheckingStorage(false)
+      }
+    }
+
+    checkStorage()
+  }, [weekStart])
+
+  const markAsSeen = useCallback(async (week: string) => {
+    // Update local state immediately to prevent re-triggering
+    setHasSeenReveal(true)
+
+    try {
+      if (!cloudStorage.setItem.isAvailable()) return
+
+      let seen: Record<string, boolean> = {}
+      if (cloudStorage.getItem.isAvailable()) {
+        const stored = await cloudStorage.getItem(REVEAL_SEEN_KEY)
+        if (stored) {
+          seen = JSON.parse(stored)
+        }
+      }
+
+      seen[week] = true
+
+      // Keep only last 10 weeks
+      const keys = Object.keys(seen).sort().reverse()
+      if (keys.length > 10) {
+        keys.slice(10).forEach((k) => delete seen[k])
+      }
+
+      await cloudStorage.setItem(REVEAL_SEEN_KEY, JSON.stringify(seen))
+    } catch (error) {
+      console.error('Failed to save to CloudStorage:', error)
+    }
+  }, [])
+
+  const resetReveal = useCallback(async () => {
+    setHasSeenReveal(false)
+    try {
+      if (cloudStorage.deleteItem.isAvailable()) {
+        await cloudStorage.deleteItem(REVEAL_SEEN_KEY)
+      }
+    } catch (error) {
+      console.error('Failed to reset CloudStorage:', error)
+    }
+  }, [])
+
+  return { hasSeenReveal, isCheckingStorage, markAsSeen, resetReveal }
+}
 
 type AppState = 'loading' | 'authenticated' | 'error'
 
@@ -22,9 +101,30 @@ function App() {
   const [swipeOffset, setSwipeOffset] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const [showReveal, setShowReveal] = useState(false)
+  const [revealCard, setRevealCard] = useState<CardImageWithUrl | null>(null)
 
   // Derive selected card from index
   const selectedCard = selectedCardIndex !== null ? cards[selectedCardIndex] : null
+
+  // Card reveal state
+  const { hasSeenReveal, isCheckingStorage, markAsSeen, resetReveal } = useCardRevealState(selectedWeek)
+  const userCard = cards.find((c) => c.user_id === currentUserId)
+
+  // Debug: long-press header to reset reveal (hold 3 seconds)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleHeaderPressStart = useCallback(() => {
+    longPressTimer.current = setTimeout(async () => {
+      await resetReveal()
+      alert('Card reveal reset! Reload to see animation again.')
+    }, 3000)
+  }, [resetReveal])
+  const handleHeaderPressEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }, [])
 
   // Swipe gesture tracking (horizontal for mobile)
   const touchStartX = useRef<number | null>(null)
@@ -118,6 +218,48 @@ function App() {
     fetchCards()
   }, [state, selectedWeek])
 
+  // Trigger card reveal when conditions are met
+  useEffect(() => {
+    if (
+      state === 'authenticated' &&
+      !isLoadingCards &&
+      cards.length > 0 &&
+      userCard &&
+      hasSeenReveal === false &&
+      !isCheckingStorage &&
+      !showReveal
+    ) {
+      setRevealCard(userCard)
+      setShowReveal(true)
+    }
+  }, [state, isLoadingCards, cards, userCard, hasSeenReveal, isCheckingStorage, showReveal])
+
+  // Handle slow CloudStorage - timeout after 500ms
+  useEffect(() => {
+    if (
+      state === 'authenticated' &&
+      !isLoadingCards &&
+      cards.length > 0 &&
+      userCard &&
+      isCheckingStorage &&
+      !showReveal
+    ) {
+      const timeout = setTimeout(() => {
+        setRevealCard(userCard)
+        setShowReveal(true)
+      }, 500)
+      return () => clearTimeout(timeout)
+    }
+  }, [state, isLoadingCards, cards, userCard, isCheckingStorage, showReveal])
+
+  const handleRevealComplete = useCallback(async () => {
+    if (selectedWeek) {
+      await markAsSeen(selectedWeek)
+    }
+    setShowReveal(false)
+    setRevealCard(null)
+  }, [selectedWeek, markAsSeen])
+
   const handleWeekSelect = useCallback((week: string) => {
     setSelectedWeek(week)
     setSelectedCardIndex(null)
@@ -146,6 +288,32 @@ function App() {
       text: 'Check out my Deck card!',
     })
   }, [selectedCard])
+
+  // Handlers for card reveal
+  const handleRevealShareStory = useCallback(() => {
+    if (!revealCard) return
+    shareStory(revealCard.url, {
+      text: 'Check out my Deck card!',
+    })
+  }, [revealCard])
+
+  const handleRevealDownload = useCallback(async () => {
+    if (!revealCard || !selectedWeek) return
+    try {
+      const response = await fetch(revealCard.url)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `deck-card-${selectedWeek}.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Download failed:', err)
+    }
+  }, [revealCard, selectedWeek])
 
   const handleDownload = useCallback(async () => {
     if (!selectedCard) return
@@ -279,6 +447,23 @@ function App() {
     )
   }
 
+  // Card reveal animation
+  if (showReveal && revealCard && selectedWeek) {
+    const cardName = [revealCard.first_name, revealCard.last_name].filter(Boolean).join(' ')
+    return (
+      <div className="app">
+        <CardReveal
+          cardUrl={revealCard.url}
+          cardName={cardName}
+          onComplete={handleRevealComplete}
+          onShareStory={handleRevealShareStory}
+          onDownload={handleRevealDownload}
+          showShareStory={shareStory.isAvailable()}
+        />
+      </div>
+    )
+  }
+
   // Card zoom overlay with navigation
   if (selectedCard) {
     const prevIndex = (selectedCardIndex! - 1 + cards.length) % cards.length
@@ -306,14 +491,6 @@ function App() {
             {/* Current card */}
             <div className="card-carousel-item card-current" onClick={(e) => e.stopPropagation()}>
               <img src={selectedCard.url} alt={selectedCard.first_name || 'Card'} />
-              <div className="card-zoom-info">
-                <span className="card-zoom-name">
-                  {[selectedCard.first_name, selectedCard.last_name].filter(Boolean).join(' ')}
-                </span>
-                {selectedCard.username && (
-                  <span className="card-zoom-username">@{selectedCard.username}</span>
-                )}
-              </div>
               {currentUserId === selectedCard.user_id && (
                 <div className="card-actions">
                   {shareStory.isAvailable() && (
@@ -342,10 +519,6 @@ function App() {
               <img src={cards[nextIndex].url} alt="" />
             </div>
           </div>
-
-          <div className="card-carousel-indicator">
-            {selectedCardIndex! + 1} / {cards.length}
-          </div>
         </div>
       </div>
     )
@@ -353,7 +526,14 @@ function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
+      <header
+        className="app-header"
+        onMouseDown={handleHeaderPressStart}
+        onMouseUp={handleHeaderPressEnd}
+        onMouseLeave={handleHeaderPressEnd}
+        onTouchStart={handleHeaderPressStart}
+        onTouchEnd={handleHeaderPressEnd}
+      >
         <h1>Deck Gallery</h1>
         <button className="info-btn" onClick={() => setIsInfoOpen(true)} aria-label="Info">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

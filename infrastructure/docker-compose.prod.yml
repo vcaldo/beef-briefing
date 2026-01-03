@@ -175,7 +175,6 @@ services:
       - "traefik.http.routers.card-image-generator.entrypoints=websecure"
       - "traefik.http.routers.card-image-generator.tls.certresolver=letsencrypt"
       - "traefik.http.services.card-image-generator.loadbalancer.server.port=8051"
-      - "traefik.http.routers.card-image-generator.middlewares=api-ipallow"
     restart: unless-stopped
 
   deck-mini-app:

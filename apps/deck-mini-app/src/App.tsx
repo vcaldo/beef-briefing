@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useLaunchParams, backButton } from '@telegram-apps/sdk-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useLaunchParams, backButton, shareStory } from '@telegram-apps/sdk-react'
 
 import { apiClient, CardImageWithUrl } from './api/client'
 import { WeekSelector } from './components/WeekSelector'
@@ -17,8 +17,18 @@ function App() {
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null)
   const [cards, setCards] = useState<CardImageWithUrl[]>([])
   const [isLoadingCards, setIsLoadingCards] = useState(false)
-  const [selectedCard, setSelectedCard] = useState<CardImageWithUrl | null>(null)
+  const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null)
   const [isInfoOpen, setIsInfoOpen] = useState(false)
+  const [swipeOffset, setSwipeOffset] = useState(0)
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+
+  // Derive selected card from index
+  const selectedCard = selectedCardIndex !== null ? cards[selectedCardIndex] : null
+
+  // Swipe gesture tracking (horizontal for mobile)
+  const touchStartX = useRef<number | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // Handle back button for card zoom
   useEffect(() => {
@@ -36,7 +46,7 @@ function App() {
 
     const off = backButton.onClick(() => {
       if (selectedCard) {
-        setSelectedCard(null)
+        setSelectedCardIndex(null)
       }
     })
     return () => off()
@@ -59,6 +69,7 @@ function App() {
         }
 
         const auth = await apiClient.authenticate(initDataRaw)
+        setCurrentUserId(auth.user_id)
 
         if (!auth.chat_id) {
           setError('Please open this app from a group chat using the /deck command')
@@ -109,12 +120,142 @@ function App() {
 
   const handleWeekSelect = useCallback((week: string) => {
     setSelectedWeek(week)
-    setSelectedCard(null)
+    setSelectedCardIndex(null)
   }, [])
 
   const handleCardClick = useCallback((card: CardImageWithUrl) => {
-    setSelectedCard(card)
-  }, [])
+    const index = cards.findIndex(c => c.id === card.id)
+    setSelectedCardIndex(index >= 0 ? index : null)
+  }, [cards])
+
+  // Navigation functions with wrap-around
+  const goToNextCard = useCallback(() => {
+    if (selectedCardIndex === null || cards.length === 0) return
+    setSelectedCardIndex((selectedCardIndex + 1) % cards.length)
+  }, [selectedCardIndex, cards.length])
+
+  const goToPrevCard = useCallback(() => {
+    if (selectedCardIndex === null || cards.length === 0) return
+    setSelectedCardIndex((selectedCardIndex - 1 + cards.length) % cards.length)
+  }, [selectedCardIndex, cards.length])
+
+  // Share to story handler (only for own card)
+  const handleShareToStory = useCallback(() => {
+    if (!selectedCard) return
+    shareStory(selectedCard.url, {
+      text: 'Check out my Deck card!',
+    })
+  }, [selectedCard])
+
+  const handleDownload = useCallback(async () => {
+    if (!selectedCard) return
+    try {
+      const response = await fetch(selectedCard.url)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `deck-card-${selectedCard.week_start}.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Download failed:', err)
+    }
+  }, [selectedCard])
+
+  // Swipe gesture handlers (horizontal: swipe left = next, swipe right = prev)
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isAnimating) return
+    touchStartX.current = e.touches[0].clientX
+  }, [isAnimating])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null || isAnimating) return
+    const diff = e.touches[0].clientX - touchStartX.current
+    setSwipeOffset(diff)
+  }, [isAnimating])
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null || isAnimating) return
+
+    const diff = e.changedTouches[0].clientX - touchStartX.current
+    const threshold = 50
+    const containerWidth = containerRef.current?.offsetWidth || window.innerWidth
+
+    setIsAnimating(true)
+
+    if (diff < -threshold) {
+      // Swipe left → next card
+      setSwipeOffset(-containerWidth)
+      setTimeout(() => {
+        goToNextCard()
+        setSwipeOffset(0)
+        setIsAnimating(false)
+      }, 300)
+    } else if (diff > threshold) {
+      // Swipe right → prev card
+      setSwipeOffset(containerWidth)
+      setTimeout(() => {
+        goToPrevCard()
+        setSwipeOffset(0)
+        setIsAnimating(false)
+      }, 300)
+    } else {
+      // Below threshold → snap back
+      setSwipeOffset(0)
+      setTimeout(() => setIsAnimating(false), 300)
+    }
+
+    touchStartX.current = null
+  }, [isAnimating, goToNextCard, goToPrevCard])
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (selectedCardIndex === null) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isAnimating) return
+      const containerWidth = containerRef.current?.offsetWidth || window.innerWidth
+
+      if (e.key === 'ArrowLeft') {
+        setIsAnimating(true)
+        setSwipeOffset(containerWidth)
+        setTimeout(() => {
+          goToPrevCard()
+          setSwipeOffset(0)
+          setIsAnimating(false)
+        }, 300)
+      }
+      if (e.key === 'ArrowRight') {
+        setIsAnimating(true)
+        setSwipeOffset(-containerWidth)
+        setTimeout(() => {
+          goToNextCard()
+          setSwipeOffset(0)
+          setIsAnimating(false)
+        }, 300)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedCardIndex, isAnimating, goToPrevCard, goToNextCard])
+
+  // Preload adjacent card images
+  useEffect(() => {
+    if (selectedCardIndex === null || cards.length === 0) return
+
+    const preload = (url: string) => {
+      const img = new Image()
+      img.src = url
+    }
+
+    const prevIndex = (selectedCardIndex - 1 + cards.length) % cards.length
+    const nextIndex = (selectedCardIndex + 1) % cards.length
+
+    preload(cards[prevIndex].url)
+    preload(cards[nextIndex].url)
+  }, [selectedCardIndex, cards])
 
   if (state === 'loading') {
     return (
@@ -138,21 +279,72 @@ function App() {
     )
   }
 
-  // Card zoom overlay
+  // Card zoom overlay with navigation
   if (selectedCard) {
+    const prevIndex = (selectedCardIndex! - 1 + cards.length) % cards.length
+    const nextIndex = (selectedCardIndex! + 1) % cards.length
+
     return (
       <div className="app">
-        <div className="card-zoom-overlay" onClick={() => setSelectedCard(null)}>
-          <div className="card-zoom-content" onClick={(e) => e.stopPropagation()}>
-            <img src={selectedCard.url} alt={selectedCard.first_name || 'Card'} />
-            <div className="card-zoom-info">
-              <span className="card-zoom-name">
-                {[selectedCard.first_name, selectedCard.last_name].filter(Boolean).join(' ')}
-              </span>
-              {selectedCard.username && (
-                <span className="card-zoom-username">@{selectedCard.username}</span>
+        <div className="card-zoom-overlay" onClick={() => setSelectedCardIndex(null)}>
+          <div
+            ref={containerRef}
+            className="card-carousel-track"
+            style={{
+              transform: `translate3d(${swipeOffset}px, 0, 0)`,
+              transition: isAnimating ? 'transform 0.3s ease-out' : 'none'
+            }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            {/* Previous card */}
+            <div className="card-carousel-item card-prev">
+              <img src={cards[prevIndex].url} alt="" />
+            </div>
+
+            {/* Current card */}
+            <div className="card-carousel-item card-current" onClick={(e) => e.stopPropagation()}>
+              <img src={selectedCard.url} alt={selectedCard.first_name || 'Card'} />
+              <div className="card-zoom-info">
+                <span className="card-zoom-name">
+                  {[selectedCard.first_name, selectedCard.last_name].filter(Boolean).join(' ')}
+                </span>
+                {selectedCard.username && (
+                  <span className="card-zoom-username">@{selectedCard.username}</span>
+                )}
+              </div>
+              {currentUserId === selectedCard.user_id && (
+                <div className="card-actions">
+                  {shareStory.isAvailable() && (
+                    <button className="card-action-btn" onClick={(e) => { e.stopPropagation(); handleShareToStory(); }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                      Story
+                    </button>
+                  )}
+                  <button className="card-action-btn" onClick={(e) => { e.stopPropagation(); handleDownload(); }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download
+                  </button>
+                </div>
               )}
             </div>
+
+            {/* Next card */}
+            <div className="card-carousel-item card-next">
+              <img src={cards[nextIndex].url} alt="" />
+            </div>
+          </div>
+
+          <div className="card-carousel-indicator">
+            {selectedCardIndex! + 1} / {cards.length}
           </div>
         </div>
       </div>

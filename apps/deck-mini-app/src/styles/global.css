@@ -54,21 +54,22 @@ body {
 .info-btn {
   position: absolute;
   right: 16px;
-  background: none;
+  background: var(--tg-theme-button-color);
   border: none;
-  padding: 4px;
+  padding: 0;
+  width: 32px;
+  height: 32px;
   cursor: pointer;
-  color: var(--tg-theme-hint-color);
+  color: var(--tg-theme-button-text-color);
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: color 0.2s ease, background 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .info-btn:hover {
-  color: var(--tg-theme-button-color);
-  background: var(--tg-theme-secondary-bg-color);
+  opacity: 0.85;
 }
 
 .info-btn:active {
@@ -294,6 +295,9 @@ body {
   justify-content: center;
   z-index: 100;
   padding: 20px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .card-zoom-content {
@@ -329,6 +333,101 @@ body {
   display: block;
   font-size: 14px;
   opacity: 0.7;
+}
+
+/* Card Carousel */
+.card-carousel-track {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  will-change: transform;
+  touch-action: pan-y pinch-zoom;
+}
+
+.card-carousel-item {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+.card-carousel-item img {
+  max-width: 100%;
+  max-height: calc(100vh - 120px);
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.card-prev {
+  transform: translateX(calc(-100vw - 20px));
+  opacity: 0.6;
+}
+
+.card-current {
+  transform: translateX(0);
+}
+
+.card-next {
+  transform: translateX(calc(100vw + 20px));
+  opacity: 0.6;
+}
+
+.card-carousel-indicator {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+/* Card Action Buttons */
+.card-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.card-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.card-action-btn:hover {
+  opacity: 0.85;
+}
+
+.card-action-btn:active {
+  transform: scale(0.95);
+}
+
+.card-action-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 /* Info Modal */

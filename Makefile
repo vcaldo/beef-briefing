@@ -21,7 +21,6 @@ DC_PROD := docker compose -f $(PROD_COMPOSE_FILE) --env-file $(PROD_ENV_FILE)
 API_SERVICE := api-service
 TELEGRAM_BOT := telegram-bot
 LEADERBOARD := leaderboard
-ML_DASHBOARD := ml-dashboard
 POSTGRES_SERVICE := postgres
 MINIO_SERVICE := minio
 NEWRELIC_INFRA := newrelic-infra
@@ -36,7 +35,6 @@ PKG_DIR := pkg/config
 # Python directories
 LEADERBOARD_DIR := apps/leaderboard
 ML_PROCESSOR_DIR := apps/ml-processor
-ML_DASHBOARD_DIR := apps/ml-dashboard
 
 # Git
 COMMIT_HASH ?= $(shell git rev-parse --short HEAD)
@@ -178,9 +176,6 @@ docker-build-bot: ## Rebuild telegram-bot image
 docker-build-leaderboard: ## Rebuild leaderboard image
 	$(DC) build $(LEADERBOARD)
 
-docker-build-ml-dashboard: ## Rebuild ml-dashboard image
-	$(DC) build $(ML_DASHBOARD)
-
 # =============================================================================
 # DOCKER LOGS (docker-logs-*)
 # =============================================================================
@@ -205,9 +200,6 @@ docker-logs-newrelic: ## Tail logs from newrelic-infra
 docker-logs-leaderboard: ## Tail logs from leaderboard
 	$(DC) logs -f $(LEADERBOARD)
 
-docker-logs-ml-dashboard: ## Tail logs from ml-dashboard
-	$(DC) logs -f $(ML_DASHBOARD)
-
 # =============================================================================
 # DOCKER SHELL (docker-shell-*)
 # =============================================================================
@@ -228,9 +220,6 @@ docker-shell-newrelic: ## Open shell in newrelic-infra container
 
 docker-shell-leaderboard: ## Open shell in leaderboard container
 	$(DC) exec $(LEADERBOARD) /bin/sh
-
-docker-shell-ml-dashboard: ## Open shell in ml-dashboard container
-	$(DC) exec $(ML_DASHBOARD) /bin/bash
 
 # =============================================================================
 # GO BUILD (go-build-*)
@@ -524,11 +513,11 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	dev-up dev-up-build dev-up-logs dev-down dev-restart dev-ps dev-clean dev-prune \
 	prod-deploy prod-deploy-skip-build prod-deploy-skip-cleanup prod-deploy-regenerate-certs \
 	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik prod-update-ip pg-tunnel \
-	docker-build docker-build-api docker-build-bot docker-build-leaderboard docker-build-ml-dashboard \
+	docker-build docker-build-api docker-build-bot docker-build-leaderboard \
 	docker-logs docker-logs-api docker-logs-bot docker-logs-postgres docker-logs-minio \
-	docker-logs-newrelic docker-logs-leaderboard docker-logs-ml-dashboard \
+	docker-logs-newrelic docker-logs-leaderboard \
 	docker-shell-api docker-shell-bot docker-shell-postgres docker-shell-minio \
-	docker-shell-newrelic docker-shell-leaderboard docker-shell-ml-dashboard \
+	docker-shell-newrelic docker-shell-leaderboard \
 	go-build go-build-api go-build-bot go-build-import-cli go-build-import-cli-prod go-clean \
 	go-fmt go-fmt-check \
 	secrets-traefik-password secrets-service-api secrets-card-image-generator secrets-jwt \

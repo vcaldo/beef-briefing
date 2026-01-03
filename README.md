@@ -58,7 +58,6 @@ make logs
 | [import-cli](apps/import-cli/README.md) | CLI tool to import Telegram Desktop exports |
 | [card-image-generator](apps/card-image-generator/README.md) | Renders gamified user stats cards as PNG images using HTML/CSS templates |
 | [ml-processor](apps/ml-processor/README.md) | ML pipeline for sentiment, humor, toxicity analysis |
-| [ml-dashboard](apps/ml-dashboard/README.md) | Dashboard for ML processing status and metrics |
 
 ## Infrastructure Documentation
 

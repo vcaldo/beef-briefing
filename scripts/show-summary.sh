@@ -39,7 +39,6 @@ DEV_IMAGES=(
     "infrastructure-api-service"
     "infrastructure-telegram-bot"
     "infrastructure-leaderboard"
-    "infrastructure-leaderboard-mini-app-dev"
 )
 
 PROD_IMAGES=(
@@ -48,7 +47,6 @@ PROD_IMAGES=(
     "beef-briefing/leaderboard"
     "beef-briefing/card-image-generator"
     "beef-briefing/deck-mini-app"
-    "beef-briefing/leaderboard-mini-app"
 )
 
 # =============================================================================

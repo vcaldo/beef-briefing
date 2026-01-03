@@ -24,7 +24,6 @@ IMAGES=(
     "beef-briefing/leaderboard"
     "beef-briefing/card-image-generator"
     "beef-briefing/deck-mini-app"
-    "beef-briefing/leaderboard-mini-app"
 )
 
 # Required environment variables for deployment

@@ -317,10 +317,19 @@ function App() {
 
   const handleDownload = useCallback(async () => {
     if (!selectedCard) return
-    if (openLink.isAvailable()) {
-      openLink(selectedCard.url)
-    } else {
-      window.open(selectedCard.url, '_blank')
+    try {
+      const response = await fetch(selectedCard.url)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `deck-card-${selectedCard.week_start}.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Download failed:', err)
     }
   }, [selectedCard])
 

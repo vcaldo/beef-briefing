@@ -169,15 +169,6 @@ resource "linode_domain_record" "beef_briefing_deck_record" {
   ttl_sec     = 300
 }
 
-# Leaderboard subdomain for Telegram Mini App access
-resource "linode_domain_record" "beef_briefing_leaderboard_record" {
-  domain_id   = linode_domain.beef_briefing_domain.id
-  name        = "leaderboard"
-  record_type = "A"
-  target      = tolist(linode_instance.beef_briefing.ipv4)[0]
-  ttl_sec     = 300
-}
-
 # PostgreSQL persistent data volume
 resource "linode_volume" "beef_briefing_postgres_volume" {
   label     = var.postgres_volume_label

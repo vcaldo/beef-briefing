@@ -19,12 +19,15 @@ function App() {
   const [isLoadingCards, setIsLoadingCards] = useState(false)
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null)
   const [isInfoOpen, setIsInfoOpen] = useState(false)
+  const [swipeOffset, setSwipeOffset] = useState(0)
+  const [isAnimating, setIsAnimating] = useState(false)
 
   // Derive selected card from index
   const selectedCard = selectedCardIndex !== null ? cards[selectedCardIndex] : null
 
   // Swipe gesture tracking (horizontal for mobile)
   const touchStartX = useRef<number | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // Handle back button for card zoom
   useEffect(() => {
@@ -136,28 +139,95 @@ function App() {
 
   // Swipe gesture handlers (horizontal: swipe left = next, swipe right = prev)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isAnimating) return
     touchStartX.current = e.touches[0].clientX
-  }, [])
+  }, [isAnimating])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null || isAnimating) return
+    const diff = e.touches[0].clientX - touchStartX.current
+    setSwipeOffset(diff)
+  }, [isAnimating])
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (touchStartX.current === null) return
+    if (touchStartX.current === null || isAnimating) return
+
     const diff = e.changedTouches[0].clientX - touchStartX.current
     const threshold = 50
-    if (diff < -threshold) goToNextCard()  // swipe left = next
-    else if (diff > threshold) goToPrevCard()  // swipe right = prev
+    const containerWidth = containerRef.current?.offsetWidth || window.innerWidth
+
+    setIsAnimating(true)
+
+    if (diff < -threshold) {
+      // Swipe left → next card
+      setSwipeOffset(-containerWidth)
+      setTimeout(() => {
+        goToNextCard()
+        setSwipeOffset(0)
+        setIsAnimating(false)
+      }, 300)
+    } else if (diff > threshold) {
+      // Swipe right → prev card
+      setSwipeOffset(containerWidth)
+      setTimeout(() => {
+        goToPrevCard()
+        setSwipeOffset(0)
+        setIsAnimating(false)
+      }, 300)
+    } else {
+      // Below threshold → snap back
+      setSwipeOffset(0)
+      setTimeout(() => setIsAnimating(false), 300)
+    }
+
     touchStartX.current = null
-  }, [goToPrevCard, goToNextCard])
+  }, [isAnimating, goToNextCard, goToPrevCard])
 
   // Keyboard navigation
   useEffect(() => {
     if (selectedCardIndex === null) return
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') goToPrevCard()
-      if (e.key === 'ArrowRight') goToNextCard()
+      if (isAnimating) return
+      const containerWidth = containerRef.current?.offsetWidth || window.innerWidth
+
+      if (e.key === 'ArrowLeft') {
+        setIsAnimating(true)
+        setSwipeOffset(containerWidth)
+        setTimeout(() => {
+          goToPrevCard()
+          setSwipeOffset(0)
+          setIsAnimating(false)
+        }, 300)
+      }
+      if (e.key === 'ArrowRight') {
+        setIsAnimating(true)
+        setSwipeOffset(-containerWidth)
+        setTimeout(() => {
+          goToNextCard()
+          setSwipeOffset(0)
+          setIsAnimating(false)
+        }, 300)
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedCardIndex, goToPrevCard, goToNextCard])
+  }, [selectedCardIndex, isAnimating, goToPrevCard, goToNextCard])
+
+  // Preload adjacent card images
+  useEffect(() => {
+    if (selectedCardIndex === null || cards.length === 0) return
+
+    const preload = (url: string) => {
+      const img = new Image()
+      img.src = url
+    }
+
+    const prevIndex = (selectedCardIndex - 1 + cards.length) % cards.length
+    const nextIndex = (selectedCardIndex + 1) % cards.length
+
+    preload(cards[prevIndex].url)
+    preload(cards[nextIndex].url)
+  }, [selectedCardIndex, cards])
 
   if (state === 'loading') {
     return (
@@ -183,24 +253,49 @@ function App() {
 
   // Card zoom overlay with navigation
   if (selectedCard) {
+    const prevIndex = (selectedCardIndex! - 1 + cards.length) % cards.length
+    const nextIndex = (selectedCardIndex! + 1) % cards.length
+
     return (
       <div className="app">
-        <div
-          className="card-zoom-overlay"
-          onClick={() => setSelectedCardIndex(null)}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div className="card-zoom-content" onClick={(e) => e.stopPropagation()}>
-            <img src={selectedCard.url} alt={selectedCard.first_name || 'Card'} />
-            <div className="card-zoom-info">
-              <span className="card-zoom-name">
-                {[selectedCard.first_name, selectedCard.last_name].filter(Boolean).join(' ')}
-              </span>
-              {selectedCard.username && (
-                <span className="card-zoom-username">@{selectedCard.username}</span>
-              )}
+        <div className="card-zoom-overlay" onClick={() => setSelectedCardIndex(null)}>
+          <div
+            ref={containerRef}
+            className="card-carousel-track"
+            style={{
+              transform: `translate3d(${swipeOffset}px, 0, 0)`,
+              transition: isAnimating ? 'transform 0.3s ease-out' : 'none'
+            }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            {/* Previous card */}
+            <div className="card-carousel-item card-prev">
+              <img src={cards[prevIndex].url} alt="" />
             </div>
+
+            {/* Current card */}
+            <div className="card-carousel-item card-current" onClick={(e) => e.stopPropagation()}>
+              <img src={selectedCard.url} alt={selectedCard.first_name || 'Card'} />
+              <div className="card-zoom-info">
+                <span className="card-zoom-name">
+                  {[selectedCard.first_name, selectedCard.last_name].filter(Boolean).join(' ')}
+                </span>
+                {selectedCard.username && (
+                  <span className="card-zoom-username">@{selectedCard.username}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Next card */}
+            <div className="card-carousel-item card-next">
+              <img src={cards[nextIndex].url} alt="" />
+            </div>
+          </div>
+
+          <div className="card-carousel-indicator">
+            {selectedCardIndex! + 1} / {cards.length}
           </div>
         </div>
       </div>

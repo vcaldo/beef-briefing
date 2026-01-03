@@ -54,21 +54,22 @@ body {
 .info-btn {
   position: absolute;
   right: 16px;
-  background: none;
+  background: var(--tg-theme-button-color);
   border: none;
-  padding: 4px;
+  padding: 0;
+  width: 32px;
+  height: 32px;
   cursor: pointer;
-  color: var(--tg-theme-hint-color);
+  color: var(--tg-theme-button-text-color);
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: color 0.2s ease, background 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .info-btn:hover {
-  color: var(--tg-theme-button-color);
-  background: var(--tg-theme-secondary-bg-color);
+  opacity: 0.85;
 }
 
 .info-btn:active {

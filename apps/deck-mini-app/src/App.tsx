@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useLaunchParams, backButton, shareStory, cloudStorage } from '@telegram-apps/sdk-react'
+import { useLaunchParams, backButton, shareStory, cloudStorage, openLink } from '@telegram-apps/sdk-react'
 
 import { apiClient, CardImageWithUrl } from './api/client'
 import { WeekSelector } from './components/WeekSelector'
@@ -317,19 +317,10 @@ function App() {
 
   const handleDownload = useCallback(async () => {
     if (!selectedCard) return
-    try {
-      const response = await fetch(selectedCard.url)
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `deck-card-${selectedCard.week_start}.png`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('Download failed:', err)
+    if (openLink.isAvailable()) {
+      openLink(selectedCard.url)
+    } else {
+      window.open(selectedCard.url, '_blank')
     }
   }, [selectedCard])
 

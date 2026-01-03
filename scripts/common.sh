@@ -22,7 +22,7 @@ IMAGES=(
     "beef-briefing/api-service"
     "beef-briefing/telegram-bot"
     "beef-briefing/leaderboard"
-    "beef-briefing/card-image-generator"
+    "beef-briefing/card-renderer"
     "beef-briefing/deck-mini-app"
     "beef-briefing/leaderboard-mini-app"
 )

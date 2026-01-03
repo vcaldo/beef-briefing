@@ -13,8 +13,8 @@ fi
 # Generate key
 KEY=$(openssl rand -base64 32)
 
-# Save to card-image-generator/app_keys/{app} (for card-image-generator to validate incoming requests)
-CARD_GEN_DIR="$SECRETS_DIR/apps/card-image-generator/app_keys"
+# Save to card-renderer/app_keys/{app} (for card-renderer to validate incoming requests)
+CARD_GEN_DIR="$SECRETS_DIR/apps/card-renderer/app_keys"
 mkdir -p "$CARD_GEN_DIR"
 echo -n "$KEY" > "$CARD_GEN_DIR/$APP_NAME"
 chmod 600 "$CARD_GEN_DIR/$APP_NAME"
@@ -26,5 +26,5 @@ echo -n "$KEY" > "$APP_DIR/card_image_generator_api_key"
 chmod 600 "$APP_DIR/card_image_generator_api_key"
 
 echo "API key generated for: $APP_NAME"
-echo "  card-image-generator reads from: $CARD_GEN_DIR/$APP_NAME"
+echo "  card-renderer reads from: $CARD_GEN_DIR/$APP_NAME"
 echo "  $APP_NAME reads from:            $APP_DIR/card_image_generator_api_key"

@@ -43,6 +43,9 @@ services:
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: development
       LOG_LEVEL: debug
+      # Mini App authentication
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CORS_ORIGINS: http://localhost:5174
     ports:
       - "${API_PORT}:${API_PORT}"
     volumes:
@@ -123,8 +126,8 @@ services:
       ADMIN_USER_IDS: ${ADMIN_USER_IDS}
       API_SERVICE_URL: http://api-service:${API_PORT}
       API_KEY_FILE: /app/secrets/api_key
-      CARD_IMAGE_GENERATOR_URL: http://card-image-generator:8051
-      CARD_IMAGE_GENERATOR_API_KEY_FILE: /app/secrets/card_image_generator_api_key
+      CARD_RENDERER_URL: http://card-renderer:8051
+      CARD_RENDERER_API_KEY_FILE: /app/secrets/card_image_generator_api_key
       NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: development
@@ -136,7 +139,7 @@ services:
     depends_on:
       - postgres
       - api-service
-      - card-image-generator
+      - card-renderer
     networks:
       - beef-dev-network
     restart: unless-stopped
@@ -194,10 +197,10 @@ services:
       NEW_RELIC_AI_MONITORING_ENABLED: "true"
       TRACK_AI_COSTS: "true"
       # Card Image Generator (for render-cards command)
-      CARD_IMAGE_GENERATOR_URL: http://card-image-generator:8051
-      CARD_IMAGE_GENERATOR_API_KEY_FILE: /app/secrets/card_image_generator_api_key
+      CARD_RENDERER_URL: http://card-renderer:8051
+      CARD_RENDERER_API_KEY_FILE: /app/secrets/card_image_generator_api_key
       DEFAULT_CARD_THEME: ${DEFAULT_CARD_THEME:-gaming}
-      # Tier Configuration (same as card-image-generator)
+      # Tier Configuration (same as card-renderer)
       TIER_1: ${TIER_1:-Legendary:85}
       TIER_2: ${TIER_2:-Elite:70}
       TIER_3: ${TIER_3:-Outstanding:55}
@@ -212,7 +215,7 @@ services:
     depends_on:
       - postgres
       - qdrant
-      - card-image-generator
+      - card-renderer
     networks:
       - beef-dev-network
     restart: unless-stopped
@@ -224,11 +227,11 @@ services:
               count: 1
               capabilities: [gpu]
 
-  card-image-generator:
+  card-renderer:
     build:
       context: ..
-      dockerfile: apps/card-image-generator/Dockerfile
-    container_name: beef-card-image-generator-dev
+      dockerfile: apps/card-renderer/Dockerfile
+    container_name: beef-card-renderer-dev
     environment:
       DB_HOST: postgres
       DB_USER: ${DB_USER}
@@ -259,7 +262,7 @@ services:
     ports:
       - "8051:8051"
     volumes:
-      - ./secrets/apps/card-image-generator:/app/secrets:ro
+      - ./secrets/apps/card-renderer:/app/secrets:ro
     depends_on:
       - postgres
       - minio
@@ -302,7 +305,7 @@ services:
       - "5174:5174"
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     environment:
-      VITE_API_URL: http://localhost:8051
+      VITE_API_URL: http://localhost:8080
       # New Relic Browser monitoring (optional)
       VITE_NEW_RELIC_BROWSER_ACCOUNT_ID: ${NEW_RELIC_ACCOUNT_ID:-}
       VITE_NEW_RELIC_BROWSER_APP_ID: ${NEW_RELIC_BROWSER_LEADERBOARD_APP_ID:-}

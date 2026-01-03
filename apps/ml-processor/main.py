@@ -277,15 +277,15 @@ def run_render_cards(args, config):
 
     # Validate config
     if not config.card_image_generator_url:
-        logger.error("CARD_IMAGE_GENERATOR_URL not configured")
+        logger.error("CARD_RENDERER_URL not configured")
         print("\nError: Card image generator service not configured.")
-        print("Set CARD_IMAGE_GENERATOR_URL and CARD_IMAGE_GENERATOR_API_KEY environment variables.")
+        print("Set CARD_RENDERER_URL and CARD_RENDERER_API_KEY environment variables.")
         return None
 
     if not config.card_image_generator_api_key:
-        logger.error("CARD_IMAGE_GENERATOR_API_KEY not configured")
+        logger.error("CARD_RENDERER_API_KEY not configured")
         print("\nError: Card image generator API key not configured.")
-        print("Set CARD_IMAGE_GENERATOR_API_KEY environment variable.")
+        print("Set CARD_RENDERER_API_KEY environment variable.")
         return None
 
     add_custom_attributes(

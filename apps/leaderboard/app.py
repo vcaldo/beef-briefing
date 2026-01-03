@@ -242,7 +242,7 @@ def get_gallery_client() -> GalleryClient:
             # Return a stub client that always returns None
             _gallery_client = GalleryClient("", "")
             logger.warning(
-                "GalleryClient not configured (missing CARD_IMAGE_GENERATOR_URL or API key)"
+                "GalleryClient not configured (missing CARD_RENDERER_URL or API key)"
             )
     return _gallery_client
 

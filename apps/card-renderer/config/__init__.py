@@ -48,13 +48,6 @@ class Config(BaseSettings):
     # API Authentication
     app_keys_dir: str = "/app/secrets/app_keys"
 
-    # Mini App JWT Authentication
-    jwt_secret_key: str = ""  # Required for Mini App auth
-    telegram_bot_token: str = ""  # Required for init data validation
-
-    # CORS Configuration
-    cors_origins: str = ""  # Comma-separated list of allowed origins
-
     # New Relic APM Configuration (optional)
     new_relic_app_name: str | None = None
     new_relic_license_key: str | None = None

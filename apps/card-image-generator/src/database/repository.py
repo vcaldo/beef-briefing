@@ -110,11 +110,12 @@ class CardImageRepository:
                 u.first_name, u.last_name, u.username
             FROM ml_user_card_images i
             JOIN users u ON i.user_id = u.id
+            JOIN ml_user_cards c ON i.card_id = c.id
             WHERE i.chat_id = :chat_id
               AND i.week_start = :week_start
               AND (:user_id IS NULL OR i.user_id = :user_id)
               AND (:theme IS NULL OR i.theme = :theme)
-            ORDER BY i.generated_at DESC
+            ORDER BY (c.stats->'overall'->>'score')::float DESC NULLS LAST
         """)
 
         with self.engine.connect() as conn:

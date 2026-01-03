@@ -394,6 +394,42 @@ body {
   pointer-events: none;
 }
 
+/* Card Action Buttons */
+.card-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.card-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.card-action-btn:hover {
+  opacity: 0.85;
+}
+
+.card-action-btn:active {
+  transform: scale(0.95);
+}
+
+.card-action-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
 /* Info Modal */
 .info-modal-overlay {
   position: fixed;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useLaunchParams, backButton } from '@telegram-apps/sdk-react'
+import { useLaunchParams, backButton, shareStory } from '@telegram-apps/sdk-react'
 
 import { apiClient, CardImageWithUrl } from './api/client'
 import { WeekSelector } from './components/WeekSelector'
@@ -21,6 +21,7 @@ function App() {
   const [isInfoOpen, setIsInfoOpen] = useState(false)
   const [swipeOffset, setSwipeOffset] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
 
   // Derive selected card from index
   const selectedCard = selectedCardIndex !== null ? cards[selectedCardIndex] : null
@@ -68,6 +69,7 @@ function App() {
         }
 
         const auth = await apiClient.authenticate(initDataRaw)
+        setCurrentUserId(auth.user_id)
 
         if (!auth.chat_id) {
           setError('Please open this app from a group chat using the /deck command')
@@ -136,6 +138,32 @@ function App() {
     if (selectedCardIndex === null || cards.length === 0) return
     setSelectedCardIndex((selectedCardIndex - 1 + cards.length) % cards.length)
   }, [selectedCardIndex, cards.length])
+
+  // Share to story handler (only for own card)
+  const handleShareToStory = useCallback(() => {
+    if (!selectedCard) return
+    shareStory(selectedCard.url, {
+      text: 'Check out my Deck card!',
+    })
+  }, [selectedCard])
+
+  const handleDownload = useCallback(async () => {
+    if (!selectedCard) return
+    try {
+      const response = await fetch(selectedCard.url)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `deck-card-${selectedCard.week_start}.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Download failed:', err)
+    }
+  }, [selectedCard])
 
   // Swipe gesture handlers (horizontal: swipe left = next, swipe right = prev)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -286,6 +314,27 @@ function App() {
                   <span className="card-zoom-username">@{selectedCard.username}</span>
                 )}
               </div>
+              {currentUserId === selectedCard.user_id && (
+                <div className="card-actions">
+                  {shareStory.isAvailable() && (
+                    <button className="card-action-btn" onClick={(e) => { e.stopPropagation(); handleShareToStory(); }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                      Story
+                    </button>
+                  )}
+                  <button className="card-action-btn" onClick={(e) => { e.stopPropagation(); handleDownload(); }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Next card */}

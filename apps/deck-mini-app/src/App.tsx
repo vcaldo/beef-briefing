@@ -191,14 +191,6 @@ function App() {
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          <button
-            className="nav-arrow nav-arrow-left"
-            onClick={(e) => { e.stopPropagation(); goToPrevCard() }}
-            aria-label="Previous card"
-          >
-            ‹
-          </button>
-
           <div className="card-zoom-content" onClick={(e) => e.stopPropagation()}>
             <img src={selectedCard.url} alt={selectedCard.first_name || 'Card'} />
             <div className="card-zoom-info">
@@ -210,14 +202,6 @@ function App() {
               )}
             </div>
           </div>
-
-          <button
-            className="nav-arrow nav-arrow-right"
-            onClick={(e) => { e.stopPropagation(); goToNextCard() }}
-            aria-label="Next card"
-          >
-            ›
-          </button>
         </div>
       </div>
     )

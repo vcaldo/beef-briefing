@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLaunchParams, backButton } from '@telegram-apps/sdk-react'
 
 import { apiClient, CardImageWithUrl } from './api/client'
@@ -17,8 +17,14 @@ function App() {
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null)
   const [cards, setCards] = useState<CardImageWithUrl[]>([])
   const [isLoadingCards, setIsLoadingCards] = useState(false)
-  const [selectedCard, setSelectedCard] = useState<CardImageWithUrl | null>(null)
+  const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null)
   const [isInfoOpen, setIsInfoOpen] = useState(false)
+
+  // Derive selected card from index
+  const selectedCard = selectedCardIndex !== null ? cards[selectedCardIndex] : null
+
+  // Swipe gesture tracking
+  const touchStartX = useRef<number | null>(null)
 
   // Handle back button for card zoom
   useEffect(() => {
@@ -36,7 +42,7 @@ function App() {
 
     const off = backButton.onClick(() => {
       if (selectedCard) {
-        setSelectedCard(null)
+        setSelectedCardIndex(null)
       }
     })
     return () => off()
@@ -109,12 +115,49 @@ function App() {
 
   const handleWeekSelect = useCallback((week: string) => {
     setSelectedWeek(week)
-    setSelectedCard(null)
+    setSelectedCardIndex(null)
   }, [])
 
   const handleCardClick = useCallback((card: CardImageWithUrl) => {
-    setSelectedCard(card)
+    const index = cards.findIndex(c => c.id === card.id)
+    setSelectedCardIndex(index >= 0 ? index : null)
+  }, [cards])
+
+  // Navigation functions with wrap-around
+  const goToNextCard = useCallback(() => {
+    if (selectedCardIndex === null || cards.length === 0) return
+    setSelectedCardIndex((selectedCardIndex + 1) % cards.length)
+  }, [selectedCardIndex, cards.length])
+
+  const goToPrevCard = useCallback(() => {
+    if (selectedCardIndex === null || cards.length === 0) return
+    setSelectedCardIndex((selectedCardIndex - 1 + cards.length) % cards.length)
+  }, [selectedCardIndex, cards.length])
+
+  // Swipe gesture handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
   }, [])
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null) return
+    const diff = e.changedTouches[0].clientX - touchStartX.current
+    const threshold = 50
+    if (diff > threshold) goToPrevCard()
+    else if (diff < -threshold) goToNextCard()
+    touchStartX.current = null
+  }, [goToPrevCard, goToNextCard])
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (selectedCardIndex === null) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') goToPrevCard()
+      if (e.key === 'ArrowRight') goToNextCard()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedCardIndex, goToPrevCard, goToNextCard])
 
   if (state === 'loading') {
     return (
@@ -138,11 +181,24 @@ function App() {
     )
   }
 
-  // Card zoom overlay
+  // Card zoom overlay with navigation
   if (selectedCard) {
     return (
       <div className="app">
-        <div className="card-zoom-overlay" onClick={() => setSelectedCard(null)}>
+        <div
+          className="card-zoom-overlay"
+          onClick={() => setSelectedCardIndex(null)}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <button
+            className="nav-arrow nav-arrow-left"
+            onClick={(e) => { e.stopPropagation(); goToPrevCard() }}
+            aria-label="Previous card"
+          >
+            ‹
+          </button>
+
           <div className="card-zoom-content" onClick={(e) => e.stopPropagation()}>
             <img src={selectedCard.url} alt={selectedCard.first_name || 'Card'} />
             <div className="card-zoom-info">
@@ -154,6 +210,14 @@ function App() {
               )}
             </div>
           </div>
+
+          <button
+            className="nav-arrow nav-arrow-right"
+            onClick={(e) => { e.stopPropagation(); goToNextCard() }}
+            aria-label="Next card"
+          >
+            ›
+          </button>
         </div>
       </div>
     )

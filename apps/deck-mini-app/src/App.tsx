@@ -23,8 +23,8 @@ function App() {
   // Derive selected card from index
   const selectedCard = selectedCardIndex !== null ? cards[selectedCardIndex] : null
 
-  // Swipe gesture tracking (vertical for mobile)
-  const touchStartY = useRef<number | null>(null)
+  // Swipe gesture tracking (horizontal for mobile)
+  const touchStartX = useRef<number | null>(null)
 
   // Handle back button for card zoom
   useEffect(() => {
@@ -134,18 +134,18 @@ function App() {
     setSelectedCardIndex((selectedCardIndex - 1 + cards.length) % cards.length)
   }, [selectedCardIndex, cards.length])
 
-  // Swipe gesture handlers (vertical: swipe up = next, swipe down = prev)
+  // Swipe gesture handlers (horizontal: swipe left = next, swipe right = prev)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY
+    touchStartX.current = e.touches[0].clientX
   }, [])
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (touchStartY.current === null) return
-    const diff = e.changedTouches[0].clientY - touchStartY.current
+    if (touchStartX.current === null) return
+    const diff = e.changedTouches[0].clientX - touchStartX.current
     const threshold = 50
-    if (diff < -threshold) goToNextCard()  // swipe up = next
-    else if (diff > threshold) goToPrevCard()  // swipe down = prev
-    touchStartY.current = null
+    if (diff < -threshold) goToNextCard()  // swipe left = next
+    else if (diff > threshold) goToPrevCard()  // swipe right = prev
+    touchStartX.current = null
   }, [goToPrevCard, goToNextCard])
 
   // Keyboard navigation

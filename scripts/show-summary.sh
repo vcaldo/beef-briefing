@@ -20,7 +20,6 @@ declare -A DEV_SERVICES=(
     ["api-service"]="8080|http://localhost:8080|/health"
     ["telegram-bot"]="-|-|"
     ["leaderboard"]="8050|http://localhost:8050|/health"
-    ["ml-dashboard"]="8501|http://localhost:8501|"
     ["postgres"]="5432|localhost:5432|"
     ["minio"]="9000|http://localhost:9000|"
 )
@@ -40,7 +39,6 @@ DEV_IMAGES=(
     "infrastructure-api-service"
     "infrastructure-telegram-bot"
     "infrastructure-leaderboard"
-    "infrastructure-ml-dashboard"
 )
 
 PROD_IMAGES=(
@@ -199,7 +197,7 @@ show_dev_summary() {
     echo -e "${GREEN}| Service          | Status    | Port  | URL                    |${NC}"
     echo -e "${GREEN}+==================+===========+=======+========================+${NC}"
 
-    for service in api-service telegram-bot leaderboard ml-dashboard postgres minio; do
+    for service in api-service telegram-bot leaderboard postgres minio; do
         local info="${DEV_SERVICES[$service]}"
         IFS='|' read -r port url _ <<< "$info"
 

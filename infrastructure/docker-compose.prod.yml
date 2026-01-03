@@ -184,6 +184,11 @@ services:
       dockerfile: apps/deck-mini-app/Dockerfile
       args:
         VITE_API_URL: https://cards-api.${DOMAIN_NAME}
+        # New Relic Browser monitoring (optional)
+        VITE_NEW_RELIC_BROWSER_ACCOUNT_ID: ${NEW_RELIC_ACCOUNT_ID:-}
+        VITE_NEW_RELIC_BROWSER_APP_ID: ${NEW_RELIC_BROWSER_APP_ID:-}
+        VITE_NEW_RELIC_BROWSER_LICENSE_KEY: ${NEW_RELIC_BROWSER_LICENSE_KEY:-}
+        VITE_ENVIRONMENT: production
     image: beef-briefing/deck-mini-app:${IMAGE_TAG}
     container_name: beef-deck-mini-app-prod
     networks:

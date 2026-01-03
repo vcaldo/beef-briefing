@@ -66,6 +66,7 @@ services:
     container_name: beef-telegram-bot-prod
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
       API_SERVICE_URL: http://api-service:${API_PORT}
       API_KEY_FILE: /app/secrets/api_key
       ADMIN_USER_IDS: ${ADMIN_USER_IDS}

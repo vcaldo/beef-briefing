@@ -23,6 +23,7 @@ IMAGES=(
     "beef-briefing/telegram-bot"
     "beef-briefing/leaderboard"
     "beef-briefing/card-image-generator"
+    "beef-briefing/deck-mini-app"
 )
 
 # Required environment variables for deployment
@@ -35,6 +36,7 @@ REQUIRED_ENV_VARS=(
     "DOMAIN_NAME"
     "LETSENCRYPT_EMAIL"
     "TRAEFIK_DASHBOARD_USERS"
+    "JWT_SECRET_KEY"
 )
 
 # =============================================================================

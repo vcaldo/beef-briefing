@@ -1,14 +1,23 @@
 """FastAPI routes for card image generator."""
 
+import logging
 from datetime import date
 from typing import Annotated
 
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Security
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 
 from ..generator import CardGenerator
+from .mini_app_auth import (
+    InitDataValidation,
+    create_jwt_token,
+    validate_init_data,
+    verify_jwt_token,
+)
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -34,11 +43,28 @@ def get_default_theme(request: Request) -> str:
     return getattr(request.app.state, "default_theme", "gaming")
 
 
-async def verify_api_key(
+def get_jwt_secret(request: Request) -> str:
+    """Get JWT secret from app state."""
+    return getattr(request.app.state, "jwt_secret_key", "")
+
+
+def get_bot_token(request: Request) -> str:
+    """Get Telegram bot token from app state."""
+    return getattr(request.app.state, "telegram_bot_token", "")
+
+
+async def verify_api_key_or_jwt(
     request: Request,
     authorization: str = Security(api_key_header),
-) -> str:
-    """Verify API key from Authorization header."""
+) -> dict:
+    """
+    Verify API key or JWT token from Authorization header.
+
+    Returns:
+        dict with auth info:
+        - For API key: {"type": "api_key", "key": "..."}
+        - For JWT: {"type": "jwt", "user_id": ..., "chat_id": ...}
+    """
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization header")
 
@@ -47,12 +73,41 @@ async def verify_api_key(
     if len(parts) != 2 or parts[0].lower() != "bearer":
         raise HTTPException(status_code=401, detail="Invalid authorization format")
 
-    key = parts[1]
-    api_keys = get_api_keys(request)
-    if key not in api_keys.values():
-        raise HTTPException(status_code=401, detail="Invalid API key")
+    token = parts[1]
 
-    return key
+    # First try API key authentication
+    api_keys = get_api_keys(request)
+    if token in api_keys.values():
+        return {"type": "api_key", "key": token}
+
+    # Then try JWT authentication
+    jwt_secret = get_jwt_secret(request)
+    if jwt_secret:
+        try:
+            payload = verify_jwt_token(token, jwt_secret)
+            if payload.get("type") == "mini_app":
+                return {
+                    "type": "jwt",
+                    "user_id": payload.get("user_id"),
+                    "chat_id": payload.get("chat_id"),
+                }
+        except jwt.InvalidTokenError:
+            pass
+
+    raise HTTPException(status_code=401, detail="Invalid API key or token")
+
+
+# Keep the old function for backward compatibility
+async def verify_api_key(
+    request: Request,
+    authorization: str = Security(api_key_header),
+) -> str:
+    """Verify API key from Authorization header (legacy, API key only)."""
+    auth_info = await verify_api_key_or_jwt(request, authorization)
+    if auth_info["type"] == "api_key":
+        return auth_info["key"]
+    # JWT is also valid for existing endpoints
+    return f"jwt:{auth_info.get('user_id', 'unknown')}"
 
 
 # Request/Response models
@@ -263,6 +318,72 @@ async def get_image_url(
         url=url,
         expires_in=expires,
     )
+
+
+# Mini App Authentication Models
+class MiniAppAuthRequest(BaseModel):
+    """Request to authenticate Mini App user."""
+
+    init_data: str = Field(..., description="Telegram init data string")
+
+
+class MiniAppAuthResponse(BaseModel):
+    """Response with JWT token for Mini App authentication."""
+
+    token: str
+    user_id: int
+    chat_id: int | None
+    first_name: str
+    username: str | None
+
+
+@router.post("/api/v1/mini-app/auth", response_model=MiniAppAuthResponse)
+async def authenticate_mini_app(
+    request: Request,
+    auth_request: MiniAppAuthRequest,
+):
+    """
+    Authenticate Telegram Mini App user via init data validation.
+
+    Validates the init data signature using the bot token and returns
+    a JWT token for subsequent authenticated API calls.
+
+    This endpoint is unauthenticated - it validates the Telegram-signed init data.
+    """
+    bot_token = get_bot_token(request)
+    if not bot_token:
+        logger.error("TELEGRAM_BOT_TOKEN not configured")
+        raise HTTPException(
+            status_code=503,
+            detail="Mini App authentication not configured",
+        )
+
+    jwt_secret = get_jwt_secret(request)
+    if not jwt_secret:
+        logger.error("JWT_SECRET_KEY not configured")
+        raise HTTPException(
+            status_code=503,
+            detail="Mini App authentication not configured",
+        )
+
+    try:
+        validated = validate_init_data(auth_request.init_data, bot_token)
+        token = create_jwt_token(validated, jwt_secret)
+
+        logger.info(
+            f"Mini App auth successful for user {validated.user_id}, chat {validated.chat_id}"
+        )
+
+        return MiniAppAuthResponse(
+            token=token,
+            user_id=validated.user_id,
+            chat_id=validated.chat_id,
+            first_name=validated.first_name,
+            username=validated.username,
+        )
+    except ValueError as e:
+        logger.warning(f"Mini App auth failed: {e}")
+        raise HTTPException(status_code=401, detail=str(e))
 
 
 @router.get("/health")

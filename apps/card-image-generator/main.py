@@ -5,6 +5,7 @@ import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine
 
 from config import load_config
@@ -74,10 +75,20 @@ async def lifespan(app: FastAPI):
     # Initialize generator (starts Playwright)
     await generator.start()
 
-    # Store generator, API keys, and default theme in app state
+    # Store generator, API keys, and config in app state
     app.state.generator = generator
     app.state.api_keys = config.get_app_keys()
     app.state.default_theme = config.default_card_theme
+
+    # Mini App authentication config
+    app.state.jwt_secret_key = config.jwt_secret_key
+    app.state.telegram_bot_token = config.telegram_bot_token
+    if config.jwt_secret_key and config.telegram_bot_token:
+        logger.info("Mini App authentication enabled")
+    else:
+        logger.warning(
+            "Mini App authentication disabled - JWT_SECRET_KEY or TELEGRAM_BOT_TOKEN not configured"
+        )
 
     logger.info(
         f"Service ready on {config.card_generator_host}:{config.card_generator_port}"
@@ -97,6 +108,22 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Add CORS middleware for Mini App
+cors_origins = [
+    origin.strip()
+    for origin in config.cors_origins.split(",")
+    if origin.strip()
+]
+if cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
+    logger.info(f"CORS enabled for origins: {cors_origins}")
 
 # Include router
 app.include_router(router)

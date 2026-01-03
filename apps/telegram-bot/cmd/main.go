@@ -69,6 +69,7 @@ func main() {
 	criteriaHandler := handlers.NewCriteriaHandler(nrApp)
 	technicalHandler := handlers.NewTechnicalHandler(nrApp)
 	deckHandler := handlers.NewDeckHandler(nrApp)
+	rankingHandler := handlers.NewRankingHandler(nrApp)
 
 	// Create bot instance with allowed updates including reactions
 	opts := []bot.Option{
@@ -109,6 +110,7 @@ func main() {
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/criteria", bot.MatchTypePrefix, criteriaHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/technical", bot.MatchTypePrefix, technicalHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/deck", bot.MatchTypePrefix, deckHandler.Handle)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/ranking", bot.MatchTypePrefix, rankingHandler.Handle)
 
 	slog.Info("bot initialized successfully, starting long polling...")
 

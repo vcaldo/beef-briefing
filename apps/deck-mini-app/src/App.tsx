@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useLaunchParams, backButton, shareStory, cloudStorage } from '@telegram-apps/sdk-react'
+import { useLaunchParams, backButton, shareStory, cloudStorage, openLink } from '@telegram-apps/sdk-react'
 
 import { apiClient, CardImageWithUrl } from './api/client'
 import { WeekSelector } from './components/WeekSelector'

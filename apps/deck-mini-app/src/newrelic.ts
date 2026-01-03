@@ -43,8 +43,22 @@ function initNewRelic(): BrowserAgent | null {
       init: {
         distributed_tracing: { enabled: true },
         privacy: { cookies_enabled: true },
-        ajax: { deny_list: [] },
+        ajax: { deny_list: ['bam.eu01.nr-data.net'] },
         spa: { enabled: true },
+        session_replay: {
+          enabled: true,
+          block_selector: '',
+          mask_text_selector: '*',
+          sampling_rate: 10.0,
+          error_sampling_rate: 100.0,
+          mask_all_inputs: true,
+          collect_fonts: true,
+          inline_images: false,
+          preload: false,
+          mask_input_options: {},
+        },
+        performance: { capture_measures: true },
+        browser_consent_mode: { enabled: false },
       },
       info: {
         beacon: 'bam.eu01.nr-data.net',

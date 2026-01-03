@@ -162,7 +162,7 @@ services:
       # Mini App authentication
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      CORS_ORIGINS: https://deck.${DOMAIN_NAME}
+      CORS_ORIGINS: https://deck.${DOMAIN_NAME},https://leaderboard.${DOMAIN_NAME}
     volumes:
       - ./secrets/apps/card-image-generator:/app/secrets:ro
     depends_on:
@@ -198,6 +198,29 @@ services:
       - "traefik.http.routers.deck-mini-app.entrypoints=websecure"
       - "traefik.http.routers.deck-mini-app.tls.certresolver=letsencrypt"
       - "traefik.http.services.deck-mini-app.loadbalancer.server.port=80"
+    restart: unless-stopped
+
+  leaderboard-mini-app:
+    build:
+      context: ..
+      dockerfile: apps/leaderboard-mini-app/Dockerfile
+      args:
+        VITE_API_URL: https://cards-api.${DOMAIN_NAME}
+        # New Relic Browser monitoring (optional)
+        VITE_NEW_RELIC_BROWSER_ACCOUNT_ID: ${NEW_RELIC_ACCOUNT_ID:-}
+        VITE_NEW_RELIC_BROWSER_APP_ID: ${NEW_RELIC_BROWSER_LEADERBOARD_APP_ID:-}
+        VITE_NEW_RELIC_BROWSER_LICENSE_KEY: ${NEW_RELIC_BROWSER_LICENSE_KEY:-}
+        VITE_ENVIRONMENT: production
+    image: beef-briefing/leaderboard-mini-app:${IMAGE_TAG}
+    container_name: beef-leaderboard-mini-app-prod
+    networks:
+      - beef-prod-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.leaderboard-mini-app.rule=Host(`leaderboard.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.leaderboard-mini-app.entrypoints=websecure"
+      - "traefik.http.routers.leaderboard-mini-app.tls.certresolver=letsencrypt"
+      - "traefik.http.services.leaderboard-mini-app.loadbalancer.server.port=80"
     restart: unless-stopped
 
   traefik:

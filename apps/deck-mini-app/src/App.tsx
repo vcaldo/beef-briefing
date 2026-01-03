@@ -4,6 +4,7 @@ import { useLaunchParams, backButton } from '@telegram-apps/sdk-react'
 import { apiClient, CardImageWithUrl } from './api/client'
 import { WeekSelector } from './components/WeekSelector'
 import { CardGallery } from './components/CardGallery'
+import { InfoModal } from './components/InfoModal'
 
 type AppState = 'loading' | 'authenticated' | 'error'
 
@@ -17,6 +18,7 @@ function App() {
   const [cards, setCards] = useState<CardImageWithUrl[]>([])
   const [isLoadingCards, setIsLoadingCards] = useState(false)
   const [selectedCard, setSelectedCard] = useState<CardImageWithUrl | null>(null)
+  const [isInfoOpen, setIsInfoOpen] = useState(false)
 
   // Handle back button for card zoom
   useEffect(() => {
@@ -161,7 +163,16 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>Deck Gallery</h1>
+        <button className="info-btn" onClick={() => setIsInfoOpen(true)} aria-label="Info">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+        </button>
       </header>
+
+      <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
 
       {weeks.length > 0 && (
         <WeekSelector

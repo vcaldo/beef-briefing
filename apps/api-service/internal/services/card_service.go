@@ -395,3 +395,134 @@ func (s *CardService) GetCardImageURL(
 		GeneratedAt: cardImage.GeneratedAt.Format(time.RFC3339),
 	}, nil
 }
+
+// GalleryWeeksResponse is the response for GetGalleryWeeks.
+type GalleryWeeksResponse struct {
+	Weeks []string `json:"weeks"`
+}
+
+// GalleryImage represents a card image for the gallery API.
+type GalleryImage struct {
+	ID          int64   `json:"id"`
+	UserID      int64   `json:"user_id"`
+	ChatID      int64   `json:"chat_id"`
+	WeekStart   string  `json:"week_start"`
+	StoragePath string  `json:"storage_path"`
+	Theme       string  `json:"theme"`
+	GeneratedAt string  `json:"generated_at"`
+	FirstName   *string `json:"first_name,omitempty"`
+	LastName    *string `json:"last_name,omitempty"`
+	Username    *string `json:"username,omitempty"`
+}
+
+// GalleryImagesResponse is the response for GetGalleryImages.
+type GalleryImagesResponse struct {
+	Images []GalleryImage `json:"images"`
+}
+
+// GalleryImageURLResponse is the response for GetGalleryImageURL.
+type GalleryImageURLResponse struct {
+	ImageID   int64  `json:"image_id"`
+	URL       string `json:"url"`
+	ExpiresIn int    `json:"expires_in"`
+}
+
+// GetGalleryWeeks returns weeks with generated card images for a chat.
+func (s *CardService) GetGalleryWeeks(ctx context.Context, chatID int64) (*GalleryWeeksResponse, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:GetGalleryWeeks")
+		defer segment.End()
+	}
+
+	weeks, err := s.cardRepo.GetGalleryWeeks(ctx, chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GalleryWeeksResponse{Weeks: weeks}, nil
+}
+
+// GetGalleryImages returns card images for a chat/week with user info.
+func (s *CardService) GetGalleryImages(
+	ctx context.Context,
+	chatID int64,
+	weekStart *time.Time,
+	userID *int64,
+	theme *string,
+) (*GalleryImagesResponse, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:GetGalleryImages")
+		defer segment.End()
+	}
+
+	images, err := s.cardRepo.GetGalleryImages(ctx, chatID, weekStart, userID, theme)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert repository types to service types
+	result := make([]GalleryImage, len(images))
+	for i, img := range images {
+		result[i] = GalleryImage{
+			ID:          img.ID,
+			UserID:      img.UserID,
+			ChatID:      img.ChatID,
+			WeekStart:   img.WeekStart,
+			StoragePath: img.StoragePath,
+			Theme:       img.Theme,
+			GeneratedAt: img.GeneratedAt.Format(time.RFC3339),
+			FirstName:   img.FirstName,
+			LastName:    img.LastName,
+			Username:    img.Username,
+		}
+	}
+
+	return &GalleryImagesResponse{Images: result}, nil
+}
+
+// GetGalleryImageURL retrieves a presigned URL for a gallery image by ID.
+func (s *CardService) GetGalleryImageURL(
+	ctx context.Context,
+	imageID int64,
+	expirySeconds int,
+) (*GalleryImageURLResponse, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:GetGalleryImageURL")
+		defer segment.End()
+	}
+
+	if expirySeconds <= 0 {
+		expirySeconds = 3600 // Default 1 hour
+	}
+	if expirySeconds > 86400 {
+		expirySeconds = 86400 // Max 24 hours
+	}
+
+	// Get image from repository
+	image, err := s.cardRepo.GetGalleryImageByID(ctx, imageID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrCardImageNotFound
+		}
+		return nil, err
+	}
+
+	// Generate presigned URL
+	if s.minioClient == nil {
+		return nil, errors.New("storage client not configured")
+	}
+
+	url, err := s.minioClient.GetPresignedURLSeconds(image.StoragePath, expirySeconds)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GalleryImageURLResponse{
+		ImageID:   imageID,
+		URL:       url,
+		ExpiresIn: expirySeconds,
+	}, nil
+}

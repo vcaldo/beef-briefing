@@ -41,6 +41,21 @@ A Go-based Telegram bot that listens to group messages and forwards all updates 
 - **Smart Photo Selection**: Only largest photo size downloaded (Telegram sends multiple sizes)
 - **Context Cancellation**: Proper context cleanup prevents resource leaks
 
+## API Endpoints Used
+
+The bot calls the following api-service endpoints. All endpoints require API Key authentication via `Authorization: Bearer <key>` header.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/ingest` | Send Telegram updates with optional media files |
+| GET | `/api/v1/users` | Fetch all user IDs for profile photo sync |
+| GET | `/api/v1/chats` | Fetch all chat IDs for profile photo sync |
+| POST | `/api/v1/profile-photos/user` | Upload user profile photos |
+| POST | `/api/v1/profile-photos/chat` | Upload chat profile photos |
+| GET | `/api/v1/cards/{user_id}/image` | Get presigned URL for card image |
+
+See [api-service README](../api-service/README.md) for full endpoint documentation.
+
 ## Configuration
 
 All configuration via environment variables:

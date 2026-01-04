@@ -6,6 +6,7 @@ Uses Pydantic for environment variable parsing.
 from functools import cached_property
 from typing import Literal, Optional
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 ProviderType = Literal["local", "openai", "anthropic", "perspective"]
@@ -79,9 +80,13 @@ class Config(BaseSettings):
     environment: str = "development"
     log_level: str = "info"
 
-    # Card Image Generator Service (optional)
-    card_image_generator_url: Optional[str] = None
-    card_image_generator_api_key_file: str = ""
+    # Card Renderer Service (optional)
+    card_image_generator_url: Optional[str] = Field(
+        default=None, validation_alias="CARD_RENDERER_URL"
+    )
+    card_image_generator_api_key_file: str = Field(
+        default="", validation_alias="CARD_RENDERER_API_KEY_FILE"
+    )
     card_image_generator_timeout: float = 120.0
     default_card_theme: str = "gaming"
 

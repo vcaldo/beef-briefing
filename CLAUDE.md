@@ -24,6 +24,7 @@ A Go-based Telegram bot system for managing beef briefing subscriptions with RES
    - Handles multipart uploads with JSON metadata + binary files
    - Content-addressable storage using SHA256 hashing
    - Cross-table deduplication for media files
+   - Mini App endpoints for leaderboard-mini-app (JWT authenticated)
 
 2. **telegram-bot**: Telegram bot that listens to group messages and forwards to API
    - Concurrent media downloads (max 5 simultaneous)
@@ -38,10 +39,10 @@ A Go-based Telegram bot system for managing beef briefing subscriptions with RES
 
 **Python Services:**
 
-4. **card-image-generator** (port 8051): Renders gamified user stats cards as PNG images
+4. **card-renderer** (port 8051): Renders gamified user stats cards as PNG images
    - HTML/CSS templates with Jinja2
    - Playwright for headless Chromium rendering
-   - Theme system with JSON configuration (see [card-image-generator README](apps/card-image-generator/README.md))
+   - Theme system with JSON configuration (see [card-renderer README](apps/card-renderer/README.md))
    - MinIO/S3 storage for generated images
 
 5. **ml-processor**: ML pipeline for message analysis
@@ -75,18 +76,23 @@ A Go-based Telegram bot system for managing beef briefing subscriptions with RES
 ```
 Internet (443/80) → Traefik (SSL termination)
                          ├─→ api.{domain} → API Service (8080)
-                         ├─→ cards-api.{domain} → Card Image Generator (8051)
-                         ├─→ {domain}/leaderboard → Leaderboard (8050)
+                         │       ├─→ /api/v1/mini-app/* (public, JWT auth)
+                         │       └─→ /api/v1/* (IP restricted)
+                         ├─→ cards-api.{domain} → Card Renderer (8051)
+                         ├─→ leaderboard.{domain} → Leaderboard Mini App
+                         ├─→ {domain}/leaderboard → Leaderboard Dashboard (8050)
                          └─→ {domain}/dashboard → Traefik Dashboard
 
 Internal Docker Network:
   ├─ API Service (8080) ←→ Telegram Bot
-  ├─ Card Image Generator (8051) ←→ Leaderboard
+  ├─ Card Renderer (8051) ←→ Leaderboard
   └─ PostgreSQL (5432)
 ```
 
 Only Traefik exposes ports externally. All services communicate via `beef-prod-network`.
-- `api.{domain}` and `cards-api.{domain}` are protected by IP allowlist (same `ALLOWED_IP`)
+- `api.{domain}` main API endpoints are protected by IP allowlist
+- `api.{domain}/api/v1/mini-app/*` endpoints are public (JWT protected)
+- `cards-api.{domain}` is protected by IP allowlist
 
 ## Development Commands
 
@@ -242,15 +248,15 @@ Generates a secure random API key for each application. Keys are stored in two l
 - `infrastructure/secrets/apps/api-service/app_keys/{app}` - for api-service to validate incoming requests
 - `infrastructure/secrets/apps/{app}/api_key` - for the app to read when making requests
 
-**Card Image Generator Keys** (for gallery access):
+**Card Renderer Keys** (for gallery access):
 ```bash
-make secrets-card-image-generator APP=leaderboard
-make secrets-card-image-generator APP=ml-processor
+make secrets-card-renderer APP=leaderboard
+make secrets-card-renderer APP=ml-processor
 ```
 
-Generates API keys for services that need to access the card-image-generator. Keys are stored in:
-- `infrastructure/secrets/apps/card-image-generator/app_keys/{app}` - for card-image-generator to validate incoming requests
-- `infrastructure/secrets/apps/{app}/card_image_generator_api_key` - for the app to read when making requests
+Generates API keys for services that need to access the card-renderer. Keys are stored in:
+- `infrastructure/secrets/apps/card-renderer/app_keys/{app}` - for card-renderer to validate incoming requests
+- `infrastructure/secrets/apps/{app}/card_renderer_api_key` - for the app to read when making requests
 
 This structure allows each container to mount its own secrets directory without collisions. All `/api/v1/*` endpoints require authentication via `Authorization: Bearer <key>` header. Only `/health` is unauthenticated (for load balancer health checks).
 
@@ -333,7 +339,7 @@ DEFAULT_CARD_THEME=neon_arcade
 
 **Available themes**: gaming, clean, sticker, meme, vaporwave, blueprint, mythic, noir_luxury, neon_arcade, sticker_retro
 
-Theme files are located in `apps/card-image-generator/templates/themes/`. Each theme has a `theme.json` (colors/typography) and `card.html` (template).
+Theme files are located in `apps/card-renderer/templates/themes/`. Each theme has a `theme.json` (colors/typography) and `card.html` (template).
 
 ## Import CLI Usage
 

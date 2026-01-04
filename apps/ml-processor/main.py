@@ -276,16 +276,16 @@ def run_render_cards(args, config):
     logger.info(f"Rendering card images for chat {args.chat_id}")
 
     # Validate config
-    if not config.card_image_generator_url:
-        logger.error("CARD_IMAGE_GENERATOR_URL not configured")
-        print("\nError: Card image generator service not configured.")
-        print("Set CARD_IMAGE_GENERATOR_URL and CARD_IMAGE_GENERATOR_API_KEY environment variables.")
+    if not config.card_renderer_url:
+        logger.error("CARD_RENDERER_URL not configured")
+        print("\nError: Card renderer service not configured.")
+        print("Set CARD_RENDERER_URL and CARD_RENDERER_API_KEY environment variables.")
         return None
 
-    if not config.card_image_generator_api_key:
-        logger.error("CARD_IMAGE_GENERATOR_API_KEY not configured")
-        print("\nError: Card image generator API key not configured.")
-        print("Set CARD_IMAGE_GENERATOR_API_KEY environment variable.")
+    if not config.card_renderer_api_key:
+        logger.error("CARD_RENDERER_API_KEY not configured")
+        print("\nError: Card renderer API key not configured.")
+        print("Set CARD_RENDERER_API_KEY environment variable.")
         return None
 
     add_custom_attributes(
@@ -301,16 +301,16 @@ def run_render_cards(args, config):
     from src.cards import CardImageClient
 
     client = CardImageClient(
-        base_url=config.card_image_generator_url,
-        api_key=config.card_image_generator_api_key,
-        timeout=config.card_image_generator_timeout,
+        base_url=config.card_renderer_url,
+        api_key=config.card_renderer_api_key,
+        timeout=config.card_renderer_timeout,
     )
 
     # Check health
     if not client.health_check():
-        logger.error("Card image generator service is not healthy")
-        print("\nError: Card image generator service is not responding.")
-        print(f"Check if the service is running at {config.card_image_generator_url}")
+        logger.error("Card renderer service is not healthy")
+        print("\nError: Card renderer service is not responding.")
+        print(f"Check if the service is running at {config.card_renderer_url}")
         return None
 
     # Determine week (use provided or let service figure it out)

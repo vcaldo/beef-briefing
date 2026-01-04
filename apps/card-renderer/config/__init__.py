@@ -1,11 +1,12 @@
 """
-Configuration module for the card image generator service.
+Configuration module for the card renderer service.
 Uses Pydantic for environment variable parsing.
 """
 
 import os
 from functools import cached_property
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -29,8 +30,8 @@ class Config(BaseSettings):
     minio_region: str = ""
 
     # Service Configuration
-    card_generator_port: int = 8051
-    card_generator_host: str = "0.0.0.0"
+    card_renderer_port: int = 8051
+    card_renderer_host: str = "0.0.0.0"
 
     # Template Configuration
     templates_dir: str = "/app/templates"
@@ -48,12 +49,8 @@ class Config(BaseSettings):
     # API Authentication
     app_keys_dir: str = "/app/secrets/app_keys"
 
-    # Mini App JWT Authentication
-    jwt_secret_key: str = ""  # Required for Mini App auth
-    telegram_bot_token: str = ""  # Required for init data validation
-
-    # CORS Configuration
-    cors_origins: str = ""  # Comma-separated list of allowed origins
+    # CORS Configuration (comma-separated origins)
+    cors_origins_str: str = Field(default="", validation_alias="CORS_ORIGINS")
 
     # New Relic APM Configuration (optional)
     new_relic_app_name: str | None = None
@@ -91,7 +88,7 @@ class Config(BaseSettings):
     def new_relic_full_app_name(self) -> str:
         """Return full New Relic app name."""
         if self.new_relic_app_name:
-            return f"{self.new_relic_app_name}-card-image-generator-{self.environment}"
+            return f"{self.new_relic_app_name}-card-renderer-{self.environment}"
         return ""
 
     @cached_property
@@ -125,6 +122,13 @@ class Config(BaseSettings):
                 with open(filepath) as f:
                     keys[filename] = f.read().strip()
         return keys
+
+    @cached_property
+    def cors_origins(self) -> list[str]:
+        """Parse CORS origins from comma-separated string."""
+        if not self.cors_origins_str:
+            return []
+        return [origin.strip() for origin in self.cors_origins_str.split(",") if origin.strip()]
 
 
 def load_config() -> Config:

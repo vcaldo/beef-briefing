@@ -12,9 +12,12 @@ RUN npm ci
 # Copy source code
 COPY apps/deck-mini-app/ .
 
-# Build arguments for API URL and New Relic Browser monitoring
+# Build arguments for API URLs and New Relic Browser monitoring
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
+
+ARG VITE_CARD_API_URL
+ENV VITE_CARD_API_URL=$VITE_CARD_API_URL
 
 ARG VITE_NEW_RELIC_BROWSER_ACCOUNT_ID
 ENV VITE_NEW_RELIC_BROWSER_ACCOUNT_ID=$VITE_NEW_RELIC_BROWSER_ACCOUNT_ID

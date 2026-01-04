@@ -56,6 +56,13 @@ type Config struct {
 
 	// Card Theme Configuration
 	DefaultCardTheme string `envconfig:"DEFAULT_CARD_THEME" default:"neon_arcade"`
+
+	// JWT Configuration (for Mini App authentication)
+	JWTSecretKey     string `envconfig:"JWT_SECRET_KEY"`
+	JWTSecretKeyFile string `envconfig:"JWT_SECRET_KEY_FILE"`
+
+	// CORS Configuration
+	CORSOrigins string `envconfig:"CORS_ORIGINS"`
 }
 
 // DSN returns PostgreSQL connection string
@@ -93,6 +100,23 @@ func (c *Config) IsAdmin(userID int64) bool {
 	return false
 }
 
+// GetCORSOrigins returns CORS origins as a slice
+func (c *Config) GetCORSOrigins() []string {
+	if c.CORSOrigins == "" {
+		return nil
+	}
+	origins := strings.Split(c.CORSOrigins, ",")
+	for i := range origins {
+		origins[i] = strings.TrimSpace(origins[i])
+	}
+	return origins
+}
+
+// MiniAppEnabled returns true if Mini App authentication is configured
+func (c *Config) MiniAppEnabled() bool {
+	return c.JWTSecretKey != "" && c.TelegramBotToken != ""
+}
+
 // LoadConfig loads configuration from environment variables
 func LoadConfig() (*Config, error) {
 	// Load .env file (ignore error if not found)
@@ -119,6 +143,15 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("failed to read app keys dir from file: %w", err)
 		}
 		cfg.AppKeysDir = appKeysDir
+	}
+
+	// Load JWT secret key from file if specified
+	if cfg.JWTSecretKeyFile != "" {
+		jwtSecret, err := readSecretFromFile(cfg.JWTSecretKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read JWT secret key from file: %w", err)
+		}
+		cfg.JWTSecretKey = jwtSecret
 	}
 
 	return &cfg, nil

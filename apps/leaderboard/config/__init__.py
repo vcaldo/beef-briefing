@@ -6,6 +6,7 @@ Mirrors the Go pkg/config pattern using Pydantic for environment parsing.
 import os
 from functools import cached_property
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -39,9 +40,11 @@ class Config(BaseSettings):
     api_service_url: str = ""
     api_key_file: str = ""
 
-    # Card Image Generator Configuration (for gallery)
-    card_image_generator_url: str = ""
-    card_image_generator_api_key_file: str = ""
+    # Card Renderer Configuration (for gallery)
+    card_renderer_url: str = Field(default="", validation_alias="CARD_RENDERER_URL")
+    card_renderer_api_key_file: str = Field(
+        default="", validation_alias="CARD_RENDERER_API_KEY_FILE"
+    )
 
     # New Relic APM Configuration (optional)
     new_relic_app_name: str | None = None
@@ -101,12 +104,12 @@ class Config(BaseSettings):
             return ""
 
     @cached_property
-    def card_image_generator_api_key(self) -> str:
-        """Load card-image-generator API key from file."""
-        if not self.card_image_generator_api_key_file:
+    def card_renderer_api_key(self) -> str:
+        """Load card-renderer API key from file."""
+        if not self.card_renderer_api_key_file:
             return ""
         try:
-            with open(self.card_image_generator_api_key_file) as f:
+            with open(self.card_renderer_api_key_file) as f:
                 return f.read().strip()
         except FileNotFoundError:
             return ""

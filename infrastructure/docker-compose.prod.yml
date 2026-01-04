@@ -44,7 +44,7 @@ services:
       LOG_LEVEL: info
       # Mini App authentication
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      CORS_ORIGINS: https://leaderboard.${DOMAIN_NAME}
+      CORS_ORIGINS: https://leaderboard.${DOMAIN_NAME},https://deck.${DOMAIN_NAME}
     volumes:
       - ./secrets/apps/api-service:/app/secrets:ro
     depends_on:
@@ -191,7 +191,8 @@ services:
       context: ..
       dockerfile: apps/deck-mini-app/Dockerfile
       args:
-        VITE_API_URL: https://cards-api.${DOMAIN_NAME}
+        VITE_API_URL: https://api.${DOMAIN_NAME}
+        VITE_CARD_API_URL: https://cards-api.${DOMAIN_NAME}
         # New Relic Browser monitoring (optional)
         VITE_NEW_RELIC_BROWSER_ACCOUNT_ID: ${NEW_RELIC_ACCOUNT_ID:-}
         VITE_NEW_RELIC_BROWSER_APP_ID: ${NEW_RELIC_BROWSER_APP_ID:-}

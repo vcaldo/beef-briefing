@@ -130,12 +130,12 @@ class WeekListResponse(BaseModel):
 async def get_available_weeks(
     chat_id: Annotated[int, Query(description="Chat ID")],
     generator: CardGenerator = Depends(get_generator),
-    api_key: str = Depends(verify_api_key),
 ):
     """
     Get list of weeks with generated card images for a chat.
 
     Returns list of week_start dates (YYYY-MM-DD) in descending order.
+    Public endpoint for Mini App gallery.
     """
     weeks = generator.queries.get_available_weeks(chat_id)
     return WeekListResponse(weeks=[w.isoformat() for w in weeks])
@@ -198,12 +198,12 @@ async def get_images(
     user_id: Annotated[int | None, Query(description="Filter by user ID")] = None,
     theme: Annotated[str | None, Query(description="Filter by theme")] = None,
     generator: CardGenerator = Depends(get_generator),
-    api_key: str = Depends(verify_api_key),
 ):
     """
     Get card images for a chat/week.
 
     Returns list of image references with metadata.
+    Public endpoint for Mini App gallery.
     """
     # Get latest week if not specified
     if week_start is None:
@@ -251,12 +251,12 @@ async def get_image_url(
     image_id: int,
     expires: Annotated[int, Query(ge=60, le=86400)] = 3600,
     generator: CardGenerator = Depends(get_generator),
-    api_key: str = Depends(verify_api_key),
 ):
     """
     Get presigned URL for a specific card image.
 
     The URL expires after the specified duration (default 1 hour).
+    Public endpoint for Mini App gallery.
     """
     url = generator.get_image_url(image_id, expires_seconds=expires)
     if url is None:

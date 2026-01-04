@@ -284,7 +284,8 @@ services:
       - "5173:5173"
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     environment:
-      VITE_API_URL: http://localhost:8051
+      VITE_API_URL: http://localhost:8080
+      VITE_CARD_API_URL: http://localhost:8051
       # New Relic Browser monitoring (optional)
       VITE_NEW_RELIC_BROWSER_ACCOUNT_ID: ${NEW_RELIC_ACCOUNT_ID:-}
       VITE_NEW_RELIC_BROWSER_APP_ID: ${NEW_RELIC_BROWSER_APP_ID:-}

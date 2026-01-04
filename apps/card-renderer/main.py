@@ -5,6 +5,7 @@ import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine
 
 from config import load_config
@@ -92,11 +93,23 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="Card Image Generator",
+    title="Card Renderer",
     description="Generates static card images from user stats",
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Add CORS middleware if origins are configured
+cors_origins = config.cors_origins
+if cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+    )
+    logger.info(f"CORS enabled for origins: {cors_origins}")
 
 # Include router
 app.include_router(router)

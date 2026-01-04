@@ -6,6 +6,7 @@ Uses Pydantic for environment variable parsing.
 import os
 from functools import cached_property
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -47,6 +48,9 @@ class Config(BaseSettings):
 
     # API Authentication
     app_keys_dir: str = "/app/secrets/app_keys"
+
+    # CORS Configuration (comma-separated origins)
+    cors_origins_str: str = Field(default="", validation_alias="CORS_ORIGINS")
 
     # New Relic APM Configuration (optional)
     new_relic_app_name: str | None = None
@@ -118,6 +122,13 @@ class Config(BaseSettings):
                 with open(filepath) as f:
                     keys[filename] = f.read().strip()
         return keys
+
+    @cached_property
+    def cors_origins(self) -> list[str]:
+        """Parse CORS origins from comma-separated string."""
+        if not self.cors_origins_str:
+            return []
+        return [origin.strip() for origin in self.cors_origins_str.split(",") if origin.strip()]
 
 
 def load_config() -> Config:

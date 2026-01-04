@@ -111,7 +111,7 @@ main() {
         shift
         ENV_OVERRIDES="-e DB_HOST=$PROD_DB_HOST -e DB_PORT=$PROD_DB_PORT -e CARD_RENDERER_URL=$PROD_CARD_RENDERER_URL"
         log_info "Targeting PRODUCTION database (via SSH tunnel on port $PROD_DB_PORT)"
-        log_info "Card image generator: $PROD_CARD_RENDERER_URL"
+        log_info "Card renderer: $PROD_CARD_RENDERER_URL"
     fi
 
     if [[ $# -lt 1 ]]; then

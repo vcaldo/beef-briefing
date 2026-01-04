@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
     app.state.default_theme = config.default_card_theme
 
     logger.info(
-        f"Service ready on {config.card_generator_host}:{config.card_generator_port}"
+        f"Service ready on {config.card_renderer_host}:{config.card_renderer_port}"
     )
 
     yield
@@ -107,7 +107,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "main:app",
-        host=config.card_generator_host,
-        port=config.card_generator_port,
+        host=config.card_renderer_host,
+        port=config.card_renderer_port,
         reload=not config.is_production(),
     )

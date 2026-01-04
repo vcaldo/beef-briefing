@@ -1,5 +1,5 @@
 """
-Configuration module for the card image generator service.
+Configuration module for the card renderer service.
 Uses Pydantic for environment variable parsing.
 """
 
@@ -29,8 +29,8 @@ class Config(BaseSettings):
     minio_region: str = ""
 
     # Service Configuration
-    card_generator_port: int = 8051
-    card_generator_host: str = "0.0.0.0"
+    card_renderer_port: int = 8051
+    card_renderer_host: str = "0.0.0.0"
 
     # Template Configuration
     templates_dir: str = "/app/templates"
@@ -84,7 +84,7 @@ class Config(BaseSettings):
     def new_relic_full_app_name(self) -> str:
         """Return full New Relic app name."""
         if self.new_relic_app_name:
-            return f"{self.new_relic_app_name}-card-image-generator-{self.environment}"
+            return f"{self.new_relic_app_name}-card-renderer-{self.environment}"
         return ""
 
     @cached_property

@@ -113,7 +113,7 @@ services:
       API_SERVICE_URL: http://api-service:${API_PORT}
       API_KEY_FILE: /app/secrets/api_key
       CARD_RENDERER_URL: http://card-renderer:8051
-      CARD_RENDERER_API_KEY_FILE: /app/secrets/card_image_generator_api_key
+      CARD_RENDERER_API_KEY_FILE: /app/secrets/card_renderer_api_key
       NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: production
@@ -155,7 +155,7 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET}
       MINIO_USE_SSL: ${MINIO_USE_SSL}
       MINIO_REGION: ${MINIO_REGION}
-      CARD_GENERATOR_PORT: 8051
+      CARD_RENDERER_PORT: 8051
       TEMPLATES_DIR: /app/templates
       APP_KEYS_DIR: /app/secrets/app_keys
       NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}

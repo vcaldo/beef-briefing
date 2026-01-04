@@ -19,12 +19,12 @@ mkdir -p "$CARD_GEN_DIR"
 echo -n "$KEY" > "$CARD_GEN_DIR/$APP_NAME"
 chmod 600 "$CARD_GEN_DIR/$APP_NAME"
 
-# Save to {app}/card_image_generator_api_key (for the app to use when making requests)
+# Save to {app}/card_renderer_api_key (for the app to use when making requests)
 APP_DIR="$SECRETS_DIR/apps/$APP_NAME"
 mkdir -p "$APP_DIR"
-echo -n "$KEY" > "$APP_DIR/card_image_generator_api_key"
-chmod 600 "$APP_DIR/card_image_generator_api_key"
+echo -n "$KEY" > "$APP_DIR/card_renderer_api_key"
+chmod 600 "$APP_DIR/card_renderer_api_key"
 
 echo "API key generated for: $APP_NAME"
 echo "  card-renderer reads from: $CARD_GEN_DIR/$APP_NAME"
-echo "  $APP_NAME reads from:            $APP_DIR/card_image_generator_api_key"
+echo "  $APP_NAME reads from:            $APP_DIR/card_renderer_api_key"

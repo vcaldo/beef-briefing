@@ -81,13 +81,13 @@ class Config(BaseSettings):
     log_level: str = "info"
 
     # Card Renderer Service (optional)
-    card_image_generator_url: Optional[str] = Field(
+    card_renderer_url: Optional[str] = Field(
         default=None, validation_alias="CARD_RENDERER_URL"
     )
-    card_image_generator_api_key_file: str = Field(
+    card_renderer_api_key_file: str = Field(
         default="", validation_alias="CARD_RENDERER_API_KEY_FILE"
     )
-    card_image_generator_timeout: float = 120.0
+    card_renderer_timeout: float = 120.0
     default_card_theme: str = "gaming"
 
     # Tier Configuration (format: "Name:MinScore")
@@ -142,12 +142,12 @@ class Config(BaseSettings):
         return sorted(result, key=lambda x: x[1], reverse=True)
 
     @cached_property
-    def card_image_generator_api_key(self) -> str:
-        """Load card-image-generator API key from file."""
-        if not self.card_image_generator_api_key_file:
+    def card_renderer_api_key(self) -> str:
+        """Load card-renderer API key from file."""
+        if not self.card_renderer_api_key_file:
             return ""
         try:
-            with open(self.card_image_generator_api_key_file) as f:
+            with open(self.card_renderer_api_key_file) as f:
                 return f.read().strip()
         except FileNotFoundError:
             return ""

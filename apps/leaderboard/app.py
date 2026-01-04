@@ -233,16 +233,16 @@ def get_gallery_client() -> GalleryClient:
     """Get or create GalleryClient instance."""
     global _gallery_client
     if _gallery_client is None:
-        if cfg.card_image_generator_url and cfg.card_image_generator_api_key:
+        if cfg.card_renderer_url and cfg.card_renderer_api_key:
             _gallery_client = GalleryClient(
-                cfg.card_image_generator_url, cfg.card_image_generator_api_key
+                cfg.card_renderer_url, cfg.card_renderer_api_key
             )
             logger.info("GalleryClient initialized")
         else:
             # Return a stub client that always returns None
             _gallery_client = GalleryClient("", "")
             logger.warning(
-                "GalleryClient not configured (missing CARD_IMAGE_GENERATOR_URL or API key)"
+                "GalleryClient not configured (missing CARD_RENDERER_URL or API key)"
             )
     return _gallery_client
 

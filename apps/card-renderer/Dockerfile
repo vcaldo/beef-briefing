@@ -1,4 +1,4 @@
-# Card Image Generator Service
+# Card Renderer Service
 # Multi-stage build for minimal image size
 
 # Build stage
@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY apps/card-image-generator/requirements.txt .
+COPY apps/card-renderer/requirements.txt .
 # Install to /usr/local (global) instead of --user for multi-stage compatibility
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -64,10 +64,10 @@ RUN playwright install chromium
 USER root
 
 # Copy application code
-COPY --chown=appuser:appuser apps/card-image-generator/config ./config
-COPY --chown=appuser:appuser apps/card-image-generator/src ./src
-COPY --chown=appuser:appuser apps/card-image-generator/templates ./templates
-COPY --chown=appuser:appuser apps/card-image-generator/main.py .
+COPY --chown=appuser:appuser apps/card-renderer/config ./config
+COPY --chown=appuser:appuser apps/card-renderer/src ./src
+COPY --chown=appuser:appuser apps/card-renderer/templates ./templates
+COPY --chown=appuser:appuser apps/card-renderer/main.py .
 
 USER appuser
 

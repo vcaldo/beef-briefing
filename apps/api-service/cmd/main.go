@@ -227,6 +227,25 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	cardService := services.NewCardService(db, minioClient, nrApp)
 	cardHandler := handlers.NewCardHandler(cardService, cfg)
 
+	// Mini App service and handler (optional - only if configured)
+	var miniAppHandler *handlers.MiniAppHandler
+	var jwtAuth *middleware.JWTAuth
+	if cfg.MiniAppEnabled() {
+		miniAppService := services.NewMiniAppService(db, cfg.JWTSecretKey, cfg.TelegramBotToken, nrApp)
+		miniAppHandler = handlers.NewMiniAppHandler(miniAppService, cfg)
+		jwtAuth = middleware.NewJWTAuth(cfg.JWTSecretKey)
+		slog.Info("Mini App endpoints enabled")
+	} else {
+		slog.Info("Mini App endpoints disabled (JWT_SECRET_KEY not configured)")
+	}
+
+	// CORS middleware for Mini App (if configured)
+	var corsMiddleware *middleware.CORS
+	if origins := cfg.GetCORSOrigins(); len(origins) > 0 {
+		corsMiddleware = middleware.NewCORS(origins)
+		slog.Info("CORS enabled", "origins", origins)
+	}
+
 	// API v1 routes - ALL AUTHENTICATED
 	api := router.PathPrefix("/api/v1").Subrouter()
 	api.Use(multiKeyAuth.Authenticate)
@@ -255,6 +274,28 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	api.HandleFunc("/cards/{user_id}/image", cardHandler.HandleGetCardImage).Methods("GET")
 
 	slog.Info("all API endpoints require authentication", "path_prefix", "/api/v1")
+
+	// Mini App routes (JWT authenticated, CORS enabled)
+	if miniAppHandler != nil {
+		miniApp := router.PathPrefix("/api/v1/mini-app").Subrouter()
+
+		// Apply CORS middleware if configured
+		if corsMiddleware != nil {
+			miniApp.Use(corsMiddleware.Handler)
+		}
+
+		// Auth endpoint - unauthenticated (validates Telegram init data)
+		miniApp.HandleFunc("/auth", miniAppHandler.HandleAuth).Methods("POST", "OPTIONS")
+
+		// Protected endpoints - require JWT
+		protected := miniApp.PathPrefix("").Subrouter()
+		protected.Use(jwtAuth.Authenticate)
+		protected.HandleFunc("/stats", miniAppHandler.HandleStats).Methods("GET", "OPTIONS")
+		protected.HandleFunc("/activity", miniAppHandler.HandleActivity).Methods("GET", "OPTIONS")
+		protected.HandleFunc("/leaderboard", miniAppHandler.HandleLeaderboard).Methods("GET", "OPTIONS")
+
+		slog.Info("Mini App endpoints registered", "path_prefix", "/api/v1/mini-app")
+	}
 
 	return router
 }

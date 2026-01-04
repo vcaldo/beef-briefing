@@ -92,7 +92,7 @@ main() {
     update_env_file "$jwt_secret"
 
     echo ""
-    log_info "This key is used by card-image-generator to sign Mini App JWT tokens."
+    log_info "This key is used by card-renderer to sign Mini App JWT tokens."
     log_info "Make sure to redeploy after updating: make deploy"
 }
 

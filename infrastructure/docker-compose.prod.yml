@@ -42,6 +42,9 @@ services:
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: production
       LOG_LEVEL: info
+      # Mini App authentication
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CORS_ORIGINS: https://leaderboard.${DOMAIN_NAME},https://deck.${DOMAIN_NAME}
     volumes:
       - ./secrets/apps/api-service:/app/secrets:ro
     depends_on:
@@ -50,12 +53,18 @@ services:
       - beef-prod-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api-service.rule=Host(`api.${DOMAIN_NAME}`)"
+      # Main API router - IP restricted
+      - "traefik.http.routers.api-service.rule=Host(`api.${DOMAIN_NAME}`) && !PathPrefix(`/api/v1/mini-app`)"
       - "traefik.http.routers.api-service.entrypoints=websecure"
       - "traefik.http.routers.api-service.tls.certresolver=letsencrypt"
-      - "traefik.http.services.api-service.loadbalancer.server.port=${API_PORT}"
-      - "traefik.http.middlewares.api-ipallow.ipallowlist.sourcerange=${ALLOWED_IP}"
       - "traefik.http.routers.api-service.middlewares=api-ipallow"
+      - "traefik.http.middlewares.api-ipallow.ipallowlist.sourcerange=${ALLOWED_IP}"
+      # Mini App router - publicly accessible (JWT protected instead)
+      - "traefik.http.routers.api-mini-app.rule=Host(`api.${DOMAIN_NAME}`) && PathPrefix(`/api/v1/mini-app`)"
+      - "traefik.http.routers.api-mini-app.entrypoints=websecure"
+      - "traefik.http.routers.api-mini-app.tls.certresolver=letsencrypt"
+      # Shared service
+      - "traefik.http.services.api-service.loadbalancer.server.port=${API_PORT}"
     restart: unless-stopped
 
   telegram-bot:
@@ -103,8 +112,8 @@ services:
       ADMIN_USER_IDS: ${ADMIN_USER_IDS}
       API_SERVICE_URL: http://api-service:${API_PORT}
       API_KEY_FILE: /app/secrets/api_key
-      CARD_IMAGE_GENERATOR_URL: http://card-image-generator:8051
-      CARD_IMAGE_GENERATOR_API_KEY_FILE: /app/secrets/card_image_generator_api_key
+      CARD_RENDERER_URL: http://card-renderer:8051
+      CARD_RENDERER_API_KEY_FILE: /app/secrets/card_renderer_api_key
       NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: production
@@ -114,7 +123,7 @@ services:
     depends_on:
       - postgres
       - api-service
-      - card-image-generator
+      - card-renderer
     networks:
       - beef-prod-network
     labels:
@@ -127,12 +136,12 @@ services:
       - "traefik.http.routers.leaderboard.middlewares=leaderboard-strip"
     restart: unless-stopped
 
-  card-image-generator:
+  card-renderer:
     build:
       context: ..
-      dockerfile: apps/card-image-generator/Dockerfile
-    image: beef-briefing/card-image-generator:${IMAGE_TAG}
-    container_name: beef-card-image-generator-prod
+      dockerfile: apps/card-renderer/Dockerfile
+    image: beef-briefing/card-renderer:${IMAGE_TAG}
+    container_name: beef-card-renderer-prod
     environment:
       DB_HOST: postgres
       DB_USER: ${DB_USER}
@@ -146,7 +155,7 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET}
       MINIO_USE_SSL: ${MINIO_USE_SSL}
       MINIO_REGION: ${MINIO_REGION}
-      CARD_GENERATOR_PORT: 8051
+      CARD_RENDERER_PORT: 8051
       TEMPLATES_DIR: /app/templates
       APP_KEYS_DIR: /app/secrets/app_keys
       NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME}
@@ -164,17 +173,17 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       CORS_ORIGINS: https://deck.${DOMAIN_NAME},https://leaderboard.${DOMAIN_NAME}
     volumes:
-      - ./secrets/apps/card-image-generator:/app/secrets:ro
+      - ./secrets/apps/card-renderer:/app/secrets:ro
     depends_on:
       - postgres
     networks:
       - beef-prod-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.card-image-generator.rule=Host(`cards-api.${DOMAIN_NAME}`)"
-      - "traefik.http.routers.card-image-generator.entrypoints=websecure"
-      - "traefik.http.routers.card-image-generator.tls.certresolver=letsencrypt"
-      - "traefik.http.services.card-image-generator.loadbalancer.server.port=8051"
+      - "traefik.http.routers.card-renderer.rule=Host(`cards-api.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.card-renderer.entrypoints=websecure"
+      - "traefik.http.routers.card-renderer.tls.certresolver=letsencrypt"
+      - "traefik.http.services.card-renderer.loadbalancer.server.port=8051"
     restart: unless-stopped
 
   deck-mini-app:
@@ -182,7 +191,8 @@ services:
       context: ..
       dockerfile: apps/deck-mini-app/Dockerfile
       args:
-        VITE_API_URL: https://cards-api.${DOMAIN_NAME}
+        VITE_API_URL: https://api.${DOMAIN_NAME}
+        VITE_CARD_API_URL: https://cards-api.${DOMAIN_NAME}
         # New Relic Browser monitoring (optional)
         VITE_NEW_RELIC_BROWSER_ACCOUNT_ID: ${NEW_RELIC_ACCOUNT_ID:-}
         VITE_NEW_RELIC_BROWSER_APP_ID: ${NEW_RELIC_BROWSER_APP_ID:-}
@@ -205,7 +215,7 @@ services:
       context: ..
       dockerfile: apps/leaderboard-mini-app/Dockerfile
       args:
-        VITE_API_URL: https://cards-api.${DOMAIN_NAME}
+        VITE_API_URL: https://api.${DOMAIN_NAME}
         # New Relic Browser monitoring (optional)
         VITE_NEW_RELIC_BROWSER_ACCOUNT_ID: ${NEW_RELIC_ACCOUNT_ID:-}
         VITE_NEW_RELIC_BROWSER_APP_ID: ${NEW_RELIC_BROWSER_LEADERBOARD_APP_ID:-}

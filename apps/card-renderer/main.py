@@ -1,4 +1,4 @@
-"""Card Image Generator Service - FastAPI Application."""
+"""Card Renderer Service - FastAPI Application."""
 
 import logging
 import sys
@@ -10,7 +10,6 @@ from sqlalchemy import create_engine
 
 from config import load_config
 from src.api import router
-from src.database.mini_app_queries import MiniAppQueries
 from src.generator import CardGenerator
 from src.storage import CardStorageClient
 
@@ -46,7 +45,7 @@ logging.basicConfig(level=log_level, handlers=[handler])
 logger = logging.getLogger(__name__)
 
 # Initialize components
-engine = create_engine(config.dsn())
+engine = create_engine(config.dsn(), pool_pre_ping=True)
 
 storage = CardStorageClient(
     endpoint=config.minio_endpoint,
@@ -81,22 +80,8 @@ async def lifespan(app: FastAPI):
     app.state.api_keys = config.get_app_keys()
     app.state.default_theme = config.default_card_theme
 
-    # Mini App authentication config
-    app.state.jwt_secret_key = config.jwt_secret_key
-    app.state.telegram_bot_token = config.telegram_bot_token
-    if config.jwt_secret_key and config.telegram_bot_token:
-        logger.info("Mini App authentication enabled")
-    else:
-        logger.warning(
-            "Mini App authentication disabled - JWT_SECRET_KEY or TELEGRAM_BOT_TOKEN not configured"
-        )
-
-    # Mini App queries for leaderboard
-    app.state.mini_app_queries = MiniAppQueries(engine)
-    logger.info("Mini App queries initialized")
-
     logger.info(
-        f"Service ready on {config.card_generator_host}:{config.card_generator_port}"
+        f"Service ready on {config.card_renderer_host}:{config.card_renderer_port}"
     )
 
     yield
@@ -108,25 +93,21 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="Card Image Generator",
+    title="Card Renderer",
     description="Generates static card images from user stats",
     version="1.0.0",
     lifespan=lifespan,
 )
 
-# Add CORS middleware for Mini App
-cors_origins = [
-    origin.strip()
-    for origin in config.cors_origins.split(",")
-    if origin.strip()
-]
+# Add CORS middleware if origins are configured
+cors_origins = config.cors_origins
 if cors_origins:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["*"],
     )
     logger.info(f"CORS enabled for origins: {cors_origins}")
 
@@ -139,7 +120,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "main:app",
-        host=config.card_generator_host,
-        port=config.card_generator_port,
+        host=config.card_renderer_host,
+        port=config.card_renderer_port,
         reload=not config.is_production(),
     )

@@ -1,4 +1,4 @@
-# Card Image Generator
+# Card Renderer
 
 A Python service that renders gamified user stats cards as PNG images using HTML/CSS templates and Playwright.
 
@@ -18,7 +18,7 @@ ml_user_cards (PostgreSQL)
         │
         ▼
 ┌───────────────────────────────────────────────────────┐
-│           Card Image Generator Service                │
+│              Card Renderer Service                    │
 │                                                       │
 │  ┌─────────────┐    ┌────────────────────────────┐   │
 │  │   Queries   │───▶│  TemplateLoader            │   │
@@ -299,7 +299,7 @@ CREATE TABLE ml_user_card_images (
 make up-build
 
 # Generate API key
-make secrets-service-api APP=card-image-generator
+make secrets-service-api APP=card-renderer
 
 # The service runs automatically via docker-compose
 ```
@@ -352,7 +352,7 @@ templates/themes/
 **1. Create theme directory:**
 
 ```bash
-mkdir -p apps/card-image-generator/templates/themes/mytheme
+mkdir -p apps/card-renderer/templates/themes/mytheme
 ```
 
 **2. Create `theme.json`:**

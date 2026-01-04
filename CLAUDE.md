@@ -20,11 +20,13 @@ A Go-based Telegram bot system for managing beef briefing subscriptions with RES
 
 **Go Services:**
 
-1. **api-service** (port 8080): REST API for ingesting Telegram updates with media uploads
-   - Handles multipart uploads with JSON metadata + binary files
-   - Content-addressable storage using SHA256 hashing
-   - Cross-table deduplication for media files
-   - Mini App endpoints for leaderboard-mini-app (JWT authenticated)
+1. **api-service** (port 8080): Central REST API with 26 endpoints across 6 categories
+   - **Ingest**: Multipart uploads with JSON metadata + binary files, SHA256 deduplication
+   - **Profile Photos**: Upload/retrieve user and chat profile photos
+   - **ML Analytics**: Batch message processing for ML pipeline
+   - **Cards**: Weekly user stats cards with presigned image URLs
+   - **Mini App**: JWT-authenticated endpoints for deck-mini-app and leaderboard-mini-app
+   - **Auth**: API Key (internal services) and JWT (Mini Apps) authentication
 
 2. **telegram-bot**: Telegram bot that listens to group messages and forwards to API
    - Concurrent media downloads (max 5 simultaneous)

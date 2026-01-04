@@ -41,14 +41,14 @@ type GetMessagesResponse struct {
 
 // MLResultRequest represents a single message's ML analysis results.
 type MLResultRequest struct {
-	MessageID int64            `json:"message_id"`
-	ChatID    int64            `json:"chat_id"`
-	Sentiment *SentimentInput  `json:"sentiment,omitempty"`
-	Toxicity  *ToxicityInput   `json:"toxicity,omitempty"`
-	Humor     *HumorInput      `json:"humor,omitempty"`
-	Question  *QuestionInput   `json:"question,omitempty"`
-	Entities  []NEREntity      `json:"entities,omitempty"`
-	Topic     *TopicInput      `json:"topic,omitempty"`
+	MessageID int64           `json:"message_id"`
+	ChatID    int64           `json:"chat_id"`
+	Sentiment *SentimentInput `json:"sentiment,omitempty"`
+	Toxicity  *ToxicityInput  `json:"toxicity,omitempty"`
+	Humor     *HumorInput     `json:"humor,omitempty"`
+	Question  *QuestionInput  `json:"question,omitempty"`
+	Entities  []NEREntity     `json:"entities,omitempty"`
+	Topic     *TopicInput     `json:"topic,omitempty"`
 }
 
 // SentimentInput represents sentiment analysis input.
@@ -108,16 +108,16 @@ type SaveResultsRequest struct {
 
 // ProcessingStats contains ML processing statistics.
 type ProcessingStats struct {
-	TotalWithText    int64 `json:"total_with_text"`
-	Processed        int64 `json:"processed"`
-	Unprocessed      int64 `json:"unprocessed"`
-	SentimentCount   int64 `json:"sentiment_analyzed"`
-	ToxicityCount    int64 `json:"toxicity_analyzed"`
-	ToxicMessages    int64 `json:"toxic_messages"`
-	HumorCount       int64 `json:"humor_analyzed"`
-	QuestionCount    int64 `json:"questions_analyzed"`
-	NERCount         int64 `json:"entities_extracted"`
-	TopicCount       int64 `json:"topics_assigned"`
+	TotalWithText  int64 `json:"total_with_text"`
+	Processed      int64 `json:"processed"`
+	Unprocessed    int64 `json:"unprocessed"`
+	SentimentCount int64 `json:"sentiment_analyzed"`
+	ToxicityCount  int64 `json:"toxicity_analyzed"`
+	ToxicMessages  int64 `json:"toxic_messages"`
+	HumorCount     int64 `json:"humor_analyzed"`
+	QuestionCount  int64 `json:"questions_analyzed"`
+	NERCount       int64 `json:"entities_extracted"`
+	TopicCount     int64 `json:"topics_assigned"`
 }
 
 // GetUnprocessedMessages fetches messages that haven't been processed by ML.

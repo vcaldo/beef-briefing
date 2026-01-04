@@ -232,7 +232,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	var jwtAuth *middleware.JWTAuth
 	if cfg.MiniAppEnabled() {
 		miniAppService := services.NewMiniAppService(db, cfg.JWTSecretKey, cfg.TelegramBotToken, nrApp)
-		miniAppHandler = handlers.NewMiniAppHandler(miniAppService, cfg)
+		miniAppHandler = handlers.NewMiniAppHandler(miniAppService, cardService, cfg)
 		jwtAuth = middleware.NewJWTAuth(cfg.JWTSecretKey)
 		slog.Info("Mini App endpoints enabled")
 	} else {
@@ -293,6 +293,11 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		protected.HandleFunc("/stats", miniAppHandler.HandleStats).Methods("GET", "OPTIONS")
 		protected.HandleFunc("/activity", miniAppHandler.HandleActivity).Methods("GET", "OPTIONS")
 		protected.HandleFunc("/leaderboard", miniAppHandler.HandleLeaderboard).Methods("GET", "OPTIONS")
+
+		// Gallery endpoints - card images for deck-mini-app
+		protected.HandleFunc("/gallery/weeks", miniAppHandler.HandleGalleryWeeks).Methods("GET", "OPTIONS")
+		protected.HandleFunc("/gallery/images", miniAppHandler.HandleGalleryImages).Methods("GET", "OPTIONS")
+		protected.HandleFunc("/gallery/image/{id:[0-9]+}", miniAppHandler.HandleGalleryImageURL).Methods("GET", "OPTIONS")
 
 		slog.Info("Mini App endpoints registered", "path_prefix", "/api/v1/mini-app")
 	}

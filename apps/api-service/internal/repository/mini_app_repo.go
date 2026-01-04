@@ -21,11 +21,11 @@ func NewMiniAppRepository(db *sql.DB, nrApp *newrelic.Application) *MiniAppRepos
 
 // OverviewStats represents overview statistics for a chat.
 type OverviewStats struct {
-	TotalMessages   int64   `json:"total_messages"`
-	TotalUsers      int64   `json:"total_users"`
-	TotalReactions  int64   `json:"total_reactions"`
-	TotalMedia      int64   `json:"total_media"`
-	MessagesPerDay  float64 `json:"messages_per_day"`
+	TotalMessages  int64   `json:"total_messages"`
+	TotalUsers     int64   `json:"total_users"`
+	TotalReactions int64   `json:"total_reactions"`
+	TotalMedia     int64   `json:"total_media"`
+	MessagesPerDay float64 `json:"messages_per_day"`
 }
 
 // DailyActivity represents a single day's activity.

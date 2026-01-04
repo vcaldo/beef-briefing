@@ -1,10 +1,9 @@
 /**
  * API client for deck-mini-app.
- * Auth endpoints go to api-service, gallery endpoints go to card-renderer.
+ * All endpoints go through api-service with JWT authentication.
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
-const CARD_API_URL = import.meta.env.VITE_CARD_API_URL || API_BASE_URL
 
 export interface AuthResponse {
   token: string
@@ -67,7 +66,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${CARD_API_URL}/api/v1/weeks?chat_id=${targetChatId}`,
+      `${API_BASE_URL}/api/v1/mini-app/gallery/weeks?chat_id=${targetChatId}`,
       { headers: this.getHeaders() }
     )
 
@@ -89,7 +88,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${CARD_API_URL}/api/v1/images?chat_id=${targetChatId}&week_start=${weekStart}`,
+      `${API_BASE_URL}/api/v1/mini-app/gallery/images?chat_id=${targetChatId}&week_start=${weekStart}`,
       { headers: this.getHeaders() }
     )
 
@@ -106,7 +105,7 @@ class ApiClient {
    */
   async getImageUrl(imageId: number, expiresIn: number = 3600): Promise<string> {
     const response = await fetch(
-      `${CARD_API_URL}/api/v1/image/${imageId}?expires=${expiresIn}`,
+      `${API_BASE_URL}/api/v1/mini-app/gallery/image/${imageId}?expires=${expiresIn}`,
       { headers: this.getHeaders() }
     )
 

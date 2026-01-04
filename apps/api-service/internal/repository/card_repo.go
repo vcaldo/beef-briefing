@@ -445,3 +445,141 @@ func (r *CardRepository) GetCardImage(
 
 	return &img, nil
 }
+
+// GalleryImage represents a card image for the gallery with user info.
+type GalleryImage struct {
+	ID          int64     `json:"id"`
+	UserID      int64     `json:"user_id"`
+	ChatID      int64     `json:"chat_id"`
+	WeekStart   string    `json:"week_start"`
+	StoragePath string    `json:"storage_path"`
+	Theme       string    `json:"theme"`
+	GeneratedAt time.Time `json:"generated_at"`
+	FirstName   *string   `json:"first_name,omitempty"`
+	LastName    *string   `json:"last_name,omitempty"`
+	Username    *string   `json:"username,omitempty"`
+}
+
+// GetGalleryWeeks returns weeks with generated card images for a chat.
+func (r *CardRepository) GetGalleryWeeks(ctx context.Context, chatID int64) ([]string, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:gallery-get-weeks")
+		defer segment.End()
+	}
+
+	query := `
+		SELECT DISTINCT week_start
+		FROM ml_user_card_images
+		WHERE chat_id = $1
+		ORDER BY week_start DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, chatID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query gallery weeks: %w", err)
+	}
+	defer rows.Close()
+
+	var weeks []string
+	for rows.Next() {
+		var week time.Time
+		if err := rows.Scan(&week); err != nil {
+			return nil, fmt.Errorf("failed to scan week: %w", err)
+		}
+		weeks = append(weeks, week.Format("2006-01-02"))
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %w", err)
+	}
+
+	return weeks, nil
+}
+
+// GetGalleryImages returns card images for a chat/week with user info.
+func (r *CardRepository) GetGalleryImages(
+	ctx context.Context,
+	chatID int64,
+	weekStart *time.Time,
+	userID *int64,
+	theme *string,
+) ([]GalleryImage, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:gallery-get-images")
+		defer segment.End()
+	}
+
+	// Build query with optional filters
+	query := `
+		SELECT
+			i.id, i.user_id, i.chat_id, i.week_start,
+			i.storage_path, i.theme, i.generated_at,
+			u.first_name, u.last_name, u.username
+		FROM ml_user_card_images i
+		JOIN users u ON i.user_id = u.id
+		JOIN ml_user_cards c ON i.card_id = c.id
+		WHERE i.chat_id = $1
+		  AND i.week_start = COALESCE($2, (SELECT MAX(week_start) FROM ml_user_card_images WHERE chat_id = $1))
+		  AND ($3::bigint IS NULL OR i.user_id = $3)
+		  AND ($4::text IS NULL OR i.theme = $4)
+		ORDER BY (c.stats->'overall'->>'score')::float DESC NULLS LAST
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, chatID, weekStart, userID, theme)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query gallery images: %w", err)
+	}
+	defer rows.Close()
+
+	var images []GalleryImage
+	for rows.Next() {
+		var img GalleryImage
+		var weekTime time.Time
+		err := rows.Scan(
+			&img.ID, &img.UserID, &img.ChatID, &weekTime,
+			&img.StoragePath, &img.Theme, &img.GeneratedAt,
+			&img.FirstName, &img.LastName, &img.Username,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan gallery image: %w", err)
+		}
+		img.WeekStart = weekTime.Format("2006-01-02")
+		images = append(images, img)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %w", err)
+	}
+
+	return images, nil
+}
+
+// GetGalleryImageByID returns a single gallery image by ID.
+func (r *CardRepository) GetGalleryImageByID(ctx context.Context, imageID int64) (*GalleryImage, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:gallery-get-image-by-id")
+		defer segment.End()
+	}
+
+	query := `
+		SELECT id, user_id, chat_id, week_start, storage_path, theme, generated_at
+		FROM ml_user_card_images
+		WHERE id = $1
+	`
+
+	var img GalleryImage
+	var weekTime time.Time
+	err := r.db.QueryRowContext(ctx, query, imageID).Scan(
+		&img.ID, &img.UserID, &img.ChatID, &weekTime,
+		&img.StoragePath, &img.Theme, &img.GeneratedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	img.WeekStart = weekTime.Format("2006-01-02")
+
+	return &img, nil
+}

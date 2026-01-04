@@ -1,4 +1,4 @@
-"""Card Image Generator Service - FastAPI Application."""
+"""Card Renderer Service - FastAPI Application."""
 
 import logging
 import sys
@@ -44,7 +44,7 @@ logging.basicConfig(level=log_level, handlers=[handler])
 logger = logging.getLogger(__name__)
 
 # Initialize components
-engine = create_engine(config.dsn())
+engine = create_engine(config.dsn(), pool_pre_ping=True)
 
 storage = CardStorageClient(
     endpoint=config.minio_endpoint,

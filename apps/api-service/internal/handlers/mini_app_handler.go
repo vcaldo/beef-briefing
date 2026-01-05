@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"beef-briefing/apps/api-service/internal/middleware"
+	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
 
@@ -183,6 +184,11 @@ func (h *MiniAppHandler) HandleActivity(w http.ResponseWriter, r *http.Request) 
 		}
 		writeError(w, "internal server error", http.StatusInternalServerError)
 		return
+	}
+
+	// Ensure non-nil slice for JSON serialization
+	if activity == nil {
+		activity = []repository.DailyActivity{}
 	}
 
 	response := map[string]interface{}{

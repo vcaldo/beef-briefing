@@ -53,7 +53,7 @@ export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
     setActivityError(null)
     try {
       const activityData = await apiClient.getActivity(period)
-      setActivity(activityData.data)
+      setActivity(activityData.data || [])
     } catch (err) {
       console.error('Failed to fetch activity:', err)
       setActivityError('Failed to load activity')

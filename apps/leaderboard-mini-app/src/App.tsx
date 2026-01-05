@@ -1,19 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 
 import { apiClient } from './api/client'
-import { PeriodSelector } from './components/PeriodSelector'
-import { OverviewStats } from './components/OverviewStats'
-import { ActivityChart } from './components/ActivityChart'
-import { LeaderboardTable } from './components/LeaderboardTable'
+import { TabBar } from './components/common/TabBar'
+import { HomePage } from './components/home/HomePage'
+import { ReactionsPage } from './components/reactions/ReactionsPage'
+import { ProfilePage } from './components/profile/ProfilePage'
+import { ActivityPage } from './components/activity/ActivityPage'
 
-import type {
-  Period,
-  LeaderboardMetric,
-  StatsResponse,
-  ActivityDataPoint,
-  LeaderboardUser,
-} from './types'
+import type { TabId, Period } from './types'
 
 type AppState = 'loading' | 'authenticated' | 'error'
 
@@ -22,19 +17,13 @@ function App() {
   const [appState, setAppState] = useState<AppState>('loading')
   const [error, setError] = useState<string | null>(null)
 
-  // Data state
-  const [period, setPeriod] = useState<Period>('30d')
-  const [stats, setStats] = useState<StatsResponse | null>(null)
-  const [activity, setActivity] = useState<ActivityDataPoint[]>([])
-  const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([])
-  const [leaderboardTotal, setLeaderboardTotal] = useState(0)
-  const [leaderboardPage, setLeaderboardPage] = useState(1)
-  const [leaderboardMetric, setLeaderboardMetric] = useState<LeaderboardMetric>('message_count')
+  // User info (from auth response)
+  const [firstName, setFirstName] = useState<string>('')
+  const [username, setUsername] = useState<string | null>(null)
 
-  // Loading states
-  const [loadingStats, setLoadingStats] = useState(false)
-  const [loadingActivity, setLoadingActivity] = useState(false)
-  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false)
+  // Navigation state
+  const [activeTab, setActiveTab] = useState<TabId>('home')
+  const [period, setPeriod] = useState<Period>('30d')
 
   // Get launch params from Telegram
   let launchParams: ReturnType<typeof useLaunchParams> | null = null
@@ -62,6 +51,10 @@ function App() {
           return
         }
 
+        // Store user info
+        setFirstName(auth.first_name)
+        setUsername(auth.username)
+
         setAppState('authenticated')
       } catch (err) {
         console.error('Authentication failed:', err)
@@ -73,85 +66,37 @@ function App() {
     authenticate()
   }, [launchParams?.initDataRaw])
 
-  // Fetch all data when period changes
-  const fetchData = useCallback(async () => {
-    if (!apiClient.isAuthenticated()) return
-
-    // Fetch stats
-    setLoadingStats(true)
-    try {
-      const statsData = await apiClient.getStats(period)
-      setStats(statsData)
-    } catch (err) {
-      console.error('Failed to fetch stats:', err)
-    } finally {
-      setLoadingStats(false)
-    }
-
-    // Fetch activity
-    setLoadingActivity(true)
-    try {
-      const activityData = await apiClient.getActivity(period)
-      setActivity(activityData.data)
-    } catch (err) {
-      console.error('Failed to fetch activity:', err)
-    } finally {
-      setLoadingActivity(false)
-    }
-
-    // Fetch leaderboard (reset to page 1 when period changes)
-    setLeaderboardPage(1)
-    fetchLeaderboard(1)
-  }, [period])
-
-  // Fetch leaderboard (separate function for pagination)
-  const fetchLeaderboard = useCallback(
-    async (page: number) => {
-      if (!apiClient.isAuthenticated()) return
-
-      setLoadingLeaderboard(true)
-      try {
-        const data = await apiClient.getLeaderboard(period, leaderboardMetric, page, 20)
-        setLeaderboard(data.users)
-        setLeaderboardTotal(data.total)
-        setLeaderboardPage(page)
-      } catch (err) {
-        console.error('Failed to fetch leaderboard:', err)
-      } finally {
-        setLoadingLeaderboard(false)
-      }
-    },
-    [period, leaderboardMetric]
-  )
-
-  // Fetch data when authenticated
-  useEffect(() => {
-    if (appState === 'authenticated') {
-      fetchData()
-    }
-  }, [appState, fetchData])
-
-  // Refetch leaderboard when metric changes
-  useEffect(() => {
-    if (appState === 'authenticated') {
-      setLeaderboardPage(1)
-      fetchLeaderboard(1)
-    }
-  }, [leaderboardMetric, appState])
-
   // Handle period change
   const handlePeriodChange = (newPeriod: Period) => {
     setPeriod(newPeriod)
   }
 
-  // Handle metric change
-  const handleMetricChange = (newMetric: LeaderboardMetric) => {
-    setLeaderboardMetric(newMetric)
+  // Handle tab change
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab)
   }
 
-  // Handle page change
-  const handlePageChange = (newPage: number) => {
-    fetchLeaderboard(newPage)
+  // Render page based on active tab
+  const renderPage = () => {
+    switch (activeTab) {
+      case 'home':
+        return <HomePage period={period} onPeriodChange={handlePeriodChange} />
+      case 'reactions':
+        return <ReactionsPage period={period} onPeriodChange={handlePeriodChange} />
+      case 'profile':
+        return (
+          <ProfilePage
+            period={period}
+            onPeriodChange={handlePeriodChange}
+            firstName={firstName}
+            username={username}
+          />
+        )
+      case 'activity':
+        return <ActivityPage period={period} onPeriodChange={handlePeriodChange} />
+      default:
+        return <HomePage period={period} onPeriodChange={handlePeriodChange} />
+    }
   }
 
   // Loading state
@@ -180,29 +125,11 @@ function App() {
     )
   }
 
-  // Main app
+  // Main app with tab navigation
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>Leaderboard</h1>
-      </header>
-
-      <PeriodSelector selectedPeriod={period} onPeriodChange={handlePeriodChange} />
-
-      <OverviewStats stats={stats} loading={loadingStats} />
-
-      <ActivityChart data={activity} loading={loadingActivity} />
-
-      <LeaderboardTable
-        users={leaderboard}
-        total={leaderboardTotal}
-        page={leaderboardPage}
-        limit={20}
-        metric={leaderboardMetric}
-        loading={loadingLeaderboard}
-        onMetricChange={handleMetricChange}
-        onPageChange={handlePageChange}
-      />
+      {renderPage()}
+      <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
   )
 }

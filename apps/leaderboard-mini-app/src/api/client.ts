@@ -8,6 +8,9 @@ import type {
   StatsResponse,
   ActivityResponse,
   LeaderboardResponse,
+  ReactionsOverviewResponse,
+  ProfileResponse,
+  HeatmapResponse,
   Period,
   LeaderboardMetric,
 } from '../types'
@@ -104,6 +107,77 @@ class ApiClient {
 
     if (!response.ok) {
       throw new Error('Failed to fetch leaderboard')
+    }
+
+    return response.json()
+  }
+
+  /**
+   * Get reactions overview (top reactions, givers, receivers).
+   */
+  async getReactionsOverview(
+    period: Period = '30d',
+    limit: number = 10,
+    chatId?: number
+  ): Promise<ReactionsOverviewResponse> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/reactions-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}`,
+      { headers: this.getHeaders() }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch reactions overview')
+    }
+
+    return response.json()
+  }
+
+  /**
+   * Get user profile data (stats, top interactors, personal heatmap).
+   */
+  async getProfile(period: Period = '30d', chatId?: number): Promise<ProfileResponse> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/profile?chat_id=${targetChatId}&period=${period}`,
+      { headers: this.getHeaders() }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch profile')
+    }
+
+    return response.json()
+  }
+
+  /**
+   * Get activity heatmap data (group and optionally user).
+   */
+  async getHeatmap(
+    period: Period = 'max',
+    includeUser: boolean = true,
+    chatId?: number
+  ): Promise<HeatmapResponse> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/heatmap?chat_id=${targetChatId}&period=${period}&include_user=${includeUser}`,
+      { headers: this.getHeaders() }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch heatmap')
     }
 
     return response.json()

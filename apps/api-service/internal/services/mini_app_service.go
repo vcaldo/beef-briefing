@@ -273,3 +273,126 @@ func getPeriodDates(period string) (*time.Time, *time.Time) {
 		return &startDate, &endDate
 	}
 }
+
+// ReactionsOverviewResponse represents reactions overview data
+type ReactionsOverviewResponse struct {
+	TopReactions []repository.TopReaction  `json:"top_reactions"`
+	TopGivers    []repository.ReactionUser `json:"top_givers"`
+	TopReceivers []repository.ReactionUser `json:"top_receivers"`
+}
+
+// GetReactionsOverview returns top reactions, givers, and receivers for a chat
+func (s *MiniAppService) GetReactionsOverview(ctx context.Context, chatID int64, period string, limit int) (*ReactionsOverviewResponse, error) {
+	startDate, endDate := getPeriodDates(period)
+
+	topReactions, err := s.repo.GetTopReactions(ctx, chatID, limit, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get top reactions: %w", err)
+	}
+
+	topGivers, err := s.repo.GetTopReactionGivers(ctx, chatID, limit, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get top givers: %w", err)
+	}
+
+	topReceivers, err := s.repo.GetTopReactionReceivers(ctx, chatID, limit, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get top receivers: %w", err)
+	}
+
+	// Ensure non-nil slices for JSON
+	if topReactions == nil {
+		topReactions = []repository.TopReaction{}
+	}
+	if topGivers == nil {
+		topGivers = []repository.ReactionUser{}
+	}
+	if topReceivers == nil {
+		topReceivers = []repository.ReactionUser{}
+	}
+
+	return &ReactionsOverviewResponse{
+		TopReactions: topReactions,
+		TopGivers:    topGivers,
+		TopReceivers: topReceivers,
+	}, nil
+}
+
+// ProfileResponse represents user profile data
+type ProfileResponse struct {
+	Stats       *repository.ProfileStats    `json:"stats"`
+	TopReactors []repository.TopInteractor  `json:"top_reactors"`
+	TopRepliers []repository.TopInteractor  `json:"top_repliers"`
+	Heatmap     *repository.HeatmapData     `json:"heatmap"`
+}
+
+// GetUserProfile returns personal stats and top interactors for a user
+func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int64, period string) (*ProfileResponse, error) {
+	startDate, endDate := getPeriodDates(period)
+
+	stats, err := s.repo.GetUserProfileStats(ctx, chatID, userID, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get profile stats: %w", err)
+	}
+
+	topReactors, err := s.repo.GetTopReactorsToUser(ctx, chatID, userID, 5, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get top reactors: %w", err)
+	}
+
+	topRepliers, err := s.repo.GetTopRepliersToUser(ctx, chatID, userID, 5, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get top repliers: %w", err)
+	}
+
+	heatmap, err := s.repo.GetUserHeatmap(ctx, chatID, userID, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user heatmap: %w", err)
+	}
+
+	// Ensure non-nil slices for JSON
+	if topReactors == nil {
+		topReactors = []repository.TopInteractor{}
+	}
+	if topRepliers == nil {
+		topRepliers = []repository.TopInteractor{}
+	}
+
+	return &ProfileResponse{
+		Stats:       stats,
+		TopReactors: topReactors,
+		TopRepliers: topRepliers,
+		Heatmap:     heatmap,
+	}, nil
+}
+
+// HeatmapResponse represents heatmap data
+type HeatmapResponse struct {
+	Group *repository.HeatmapData `json:"group"`
+	User  *repository.HeatmapData `json:"user,omitempty"`
+}
+
+// GetHeatmapData returns group and optionally user heatmap data
+func (s *MiniAppService) GetHeatmapData(ctx context.Context, chatID int64, userID *int64, period string) (*HeatmapResponse, error) {
+	// Group heatmap always uses all-time data from MV
+	groupHeatmap, err := s.repo.GetGroupHeatmap(ctx, chatID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group heatmap: %w", err)
+	}
+
+	response := &HeatmapResponse{
+		Group: groupHeatmap,
+	}
+
+	// User heatmap if requested
+	if userID != nil {
+		startDate, endDate := getPeriodDates(period)
+		userHeatmap, err := s.repo.GetUserHeatmap(ctx, chatID, *userID, startDate, endDate)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user heatmap: %w", err)
+		}
+		response.User = userHeatmap
+	}
+
+	return response, nil
+}

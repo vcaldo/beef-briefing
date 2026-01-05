@@ -9,6 +9,7 @@ import type {
   ActivityResponse,
   LeaderboardResponse,
   ReactionsOverviewResponse,
+  RepliesOverviewResponse,
   ProfileResponse,
   HeatmapResponse,
   Period,
@@ -132,6 +133,31 @@ class ApiClient {
 
     if (!response.ok) {
       throw new Error('Failed to fetch reactions overview')
+    }
+
+    return response.json()
+  }
+
+  /**
+   * Get replies overview (top senders, receivers).
+   */
+  async getRepliesOverview(
+    period: Period = '30d',
+    limit: number = 10,
+    chatId?: number
+  ): Promise<RepliesOverviewResponse> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/replies-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}`,
+      { headers: this.getHeaders() }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch replies overview')
     }
 
     return response.json()

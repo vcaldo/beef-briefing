@@ -542,6 +542,69 @@ func (h *MiniAppHandler) HandleReactionsOverview(w http.ResponseWriter, r *http.
 	json.NewEncoder(w).Encode(response)
 }
 
+// HandleRepliesOverview handles replies overview statistics.
+// GET /api/v1/mini-app/replies-overview?chat_id=...&period=30d&limit=10
+func (h *MiniAppHandler) HandleRepliesOverview(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+
+	// Get JWT claims from context
+	claims := middleware.GetClaimsFromContext(ctx)
+	if claims == nil {
+		writeError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse chat_id
+	chatIDStr := r.URL.Query().Get("chat_id")
+	if chatIDStr == "" {
+		writeError(w, "chat_id is required", http.StatusBadRequest)
+		return
+	}
+	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+	if err != nil {
+		writeError(w, "invalid chat_id", http.StatusBadRequest)
+		return
+	}
+
+	// Verify chat access
+	if claims.ChatID != nil && *claims.ChatID != chatID {
+		writeError(w, "access denied to this chat", http.StatusForbidden)
+		return
+	}
+
+	period := r.URL.Query().Get("period")
+	if period == "" {
+		period = "30d"
+	}
+
+	limit := 10
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 50 {
+			limit = l
+		}
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("period", period)
+		txn.AddAttribute("limit", limit)
+	}
+
+	response, err := h.service.GetRepliesOverview(ctx, chatID, period, limit)
+	if err != nil {
+		slog.Error("failed to get replies overview", "error", err, "chat_id", chatID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		writeError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
 // HandleProfile handles user profile data.
 // GET /api/v1/mini-app/profile?chat_id=...&period=30d
 func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {

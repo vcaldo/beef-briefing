@@ -1062,6 +1062,156 @@ func (r *MiniAppRepository) GetTopRepliedToByUser(ctx context.Context, chatID, u
 	return interactors, rows.Err()
 }
 
+// GetTopReplySenders returns users who send the most replies in a chat.
+func (r *MiniAppRepository) GetTopReplySenders(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]ReactionUser, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-top-reply-senders")
+		defer segment.End()
+	}
+
+	var rows *sql.Rows
+	var err error
+
+	if startDate == nil && endDate == nil {
+		// All-time: live query (no MV for reply stats)
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				m.user_id,
+				u.first_name,
+				u.last_name,
+				u.username,
+				COUNT(*) as score,
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
+			FROM messages m
+			JOIN users u ON u.id = m.user_id
+			WHERE m.chat_id = $1
+				AND m.reply_to_message_id IS NOT NULL
+				AND u.is_bot = false
+			GROUP BY m.user_id, u.first_name, u.last_name, u.username
+			ORDER BY score DESC
+			LIMIT $2
+		`, chatID, limit)
+	} else {
+		// Date-filtered
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				m.user_id,
+				u.first_name,
+				u.last_name,
+				u.username,
+				COUNT(*) as score,
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
+			FROM messages m
+			JOIN users u ON u.id = m.user_id
+			WHERE m.chat_id = $1
+				AND m.reply_to_message_id IS NOT NULL
+				AND m.date >= $2
+				AND m.date < $3
+				AND u.is_bot = false
+			GROUP BY m.user_id, u.first_name, u.last_name, u.username
+			ORDER BY score DESC
+			LIMIT $4
+		`, chatID, startDate, endDate, limit)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []ReactionUser
+	for rows.Next() {
+		var rank int64
+		var u ReactionUser
+		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.Score, &rank, &u.PhotoObjectKey); err != nil {
+			return nil, err
+		}
+		u.Rank = int(rank)
+		users = append(users, u)
+	}
+
+	return users, rows.Err()
+}
+
+// GetTopReplyReceivers returns users whose messages receive the most replies in a chat.
+func (r *MiniAppRepository) GetTopReplyReceivers(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]ReactionUser, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-top-reply-receivers")
+		defer segment.End()
+	}
+
+	var rows *sql.Rows
+	var err error
+
+	if startDate == nil && endDate == nil {
+		// All-time: live query (no MV for reply stats)
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				orig.user_id,
+				u.first_name,
+				u.last_name,
+				u.username,
+				COUNT(*) as score,
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = orig.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
+			FROM messages m
+			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
+			JOIN users u ON u.id = orig.user_id
+			WHERE m.chat_id = $1
+				AND m.reply_to_message_id IS NOT NULL
+				AND u.is_bot = false
+			GROUP BY orig.user_id, u.first_name, u.last_name, u.username
+			ORDER BY score DESC
+			LIMIT $2
+		`, chatID, limit)
+	} else {
+		// Date-filtered
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				orig.user_id,
+				u.first_name,
+				u.last_name,
+				u.username,
+				COUNT(*) as score,
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = orig.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
+			FROM messages m
+			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
+			JOIN users u ON u.id = orig.user_id
+			WHERE m.chat_id = $1
+				AND m.reply_to_message_id IS NOT NULL
+				AND m.date >= $2
+				AND m.date < $3
+				AND u.is_bot = false
+			GROUP BY orig.user_id, u.first_name, u.last_name, u.username
+			ORDER BY score DESC
+			LIMIT $4
+		`, chatID, startDate, endDate, limit)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []ReactionUser
+	for rows.Next() {
+		var rank int64
+		var u ReactionUser
+		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.Score, &rank, &u.PhotoObjectKey); err != nil {
+			return nil, err
+		}
+		u.Rank = int(rank)
+		users = append(users, u)
+	}
+
+	return users, rows.Err()
+}
+
 // GetGroupHeatmap returns the activity heatmap for a chat from the materialized view.
 func (r *MiniAppRepository) GetGroupHeatmap(ctx context.Context, chatID int64) (*HeatmapData, error) {
 	txn := newrelic.FromContext(ctx)

@@ -404,6 +404,60 @@ func (s *MiniAppService) GetReactionsOverview(ctx context.Context, chatID int64,
 	}, nil
 }
 
+// RepliesOverviewResponse represents replies overview data
+type RepliesOverviewResponse struct {
+	TopSenders   []ReactionUserWithPhoto `json:"top_senders"`
+	TopReceivers []ReactionUserWithPhoto `json:"top_receivers"`
+}
+
+// GetRepliesOverview returns top reply senders and receivers for a chat
+func (s *MiniAppService) GetRepliesOverview(ctx context.Context, chatID int64, period string, limit int) (*RepliesOverviewResponse, error) {
+	startDate, endDate := getPeriodDates(period)
+
+	topSenders, err := s.repo.GetTopReplySenders(ctx, chatID, limit, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get top reply senders: %w", err)
+	}
+
+	topReceivers, err := s.repo.GetTopReplyReceivers(ctx, chatID, limit, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get top reply receivers: %w", err)
+	}
+
+	// Transform senders to response type with photo URLs
+	sendersWithPhoto := make([]ReactionUserWithPhoto, len(topSenders))
+	for i, sender := range topSenders {
+		sendersWithPhoto[i] = ReactionUserWithPhoto{
+			Rank:      sender.Rank,
+			UserID:    sender.UserID,
+			FirstName: sender.FirstName,
+			LastName:  sender.LastName,
+			Username:  sender.Username,
+			Score:     sender.Score,
+			PhotoURL:  s.generatePhotoURL(ctx, sender.PhotoObjectKey),
+		}
+	}
+
+	// Transform receivers to response type with photo URLs
+	receiversWithPhoto := make([]ReactionUserWithPhoto, len(topReceivers))
+	for i, r := range topReceivers {
+		receiversWithPhoto[i] = ReactionUserWithPhoto{
+			Rank:      r.Rank,
+			UserID:    r.UserID,
+			FirstName: r.FirstName,
+			LastName:  r.LastName,
+			Username:  r.Username,
+			Score:     r.Score,
+			PhotoURL:  s.generatePhotoURL(ctx, r.PhotoObjectKey),
+		}
+	}
+
+	return &RepliesOverviewResponse{
+		TopSenders:   sendersWithPhoto,
+		TopReceivers: receiversWithPhoto,
+	}, nil
+}
+
 // ProfileResponse represents user profile data
 type ProfileResponse struct {
 	PhotoURL     *string                  `json:"photo_url,omitempty"`

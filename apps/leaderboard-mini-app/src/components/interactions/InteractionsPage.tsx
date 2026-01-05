@@ -7,6 +7,7 @@ import { Avatar } from '../common'
 import type {
   Period,
   ReactionsOverviewResponse,
+  RepliesOverviewResponse,
   TopReaction,
   ReactionUser,
 } from '../../types'
@@ -43,6 +44,7 @@ interface InteractionsPageProps {
 
 export function InteractionsPage({ period, onPeriodChange }: InteractionsPageProps) {
   const [reactionsData, setReactionsData] = useState<ReactionsOverviewResponse | null>(null)
+  const [repliesData, setRepliesData] = useState<RepliesOverviewResponse | null>(null)
   const [loading, setLoading] = useState(false)
 
   const fetchData = useCallback(async () => {
@@ -50,10 +52,14 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
 
     setLoading(true)
     try {
-      const response = await apiClient.getReactionsOverview(period, 10)
-      setReactionsData(response)
+      const [reactionsResponse, repliesResponse] = await Promise.all([
+        apiClient.getReactionsOverview(period, 10),
+        apiClient.getRepliesOverview(period, 10),
+      ])
+      setReactionsData(reactionsResponse)
+      setRepliesData(repliesResponse)
     } catch (err) {
-      console.error('Failed to fetch reactions overview:', err)
+      console.error('Failed to fetch interactions data:', err)
     } finally {
       setLoading(false)
     }
@@ -123,6 +129,38 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
           </div>
         ) : reactionsData?.top_receivers.length ? (
           <UserList users={reactionsData.top_receivers} />
+        ) : (
+          <div className="empty-list">No data</div>
+        )}
+      </section>
+
+      {/* Top Replies Sent */}
+      <section className="reactions-section">
+        <h2 className="section-title">Top Replies Sent</h2>
+        {loading ? (
+          <div className="leaderboard-list">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="skeleton skeleton-row" />
+            ))}
+          </div>
+        ) : repliesData?.top_senders.length ? (
+          <UserList users={repliesData.top_senders} />
+        ) : (
+          <div className="empty-list">No data</div>
+        )}
+      </section>
+
+      {/* Top Replies Received */}
+      <section className="reactions-section">
+        <h2 className="section-title">Top Replies Received</h2>
+        {loading ? (
+          <div className="leaderboard-list">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="skeleton skeleton-row" />
+            ))}
+          </div>
+        ) : repliesData?.top_receivers.length ? (
+          <UserList users={repliesData.top_receivers} />
         ) : (
           <div className="empty-list">No data</div>
         )}

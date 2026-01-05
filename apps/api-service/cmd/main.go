@@ -294,6 +294,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		protected.HandleFunc("/activity", miniAppHandler.HandleActivity).Methods("GET", "OPTIONS")
 		protected.HandleFunc("/leaderboard", miniAppHandler.HandleLeaderboard).Methods("GET", "OPTIONS")
 		protected.HandleFunc("/reactions-overview", miniAppHandler.HandleReactionsOverview).Methods("GET", "OPTIONS")
+		protected.HandleFunc("/replies-overview", miniAppHandler.HandleRepliesOverview).Methods("GET", "OPTIONS")
 		protected.HandleFunc("/profile", miniAppHandler.HandleProfile).Methods("GET", "OPTIONS")
 		protected.HandleFunc("/heatmap", miniAppHandler.HandleHeatmap).Methods("GET", "OPTIONS")
 

@@ -80,6 +80,12 @@ export interface ReactionsOverviewResponse {
   top_receivers: ReactionUser[]
 }
 
+// Replies Overview Types
+export interface RepliesOverviewResponse {
+  top_senders: ReactionUser[]
+  top_receivers: ReactionUser[]
+}
+
 // Profile Types
 export interface ProfileStats {
   message_count: number

@@ -92,6 +92,8 @@ export interface ProfileStats {
   reactions_sent: number
   reactions_received: number
   active_days: number
+  current_streak: number
+  avg_messages_per_day: number
   rank_by_messages: number
   rank_by_reactions_received: number
 }

@@ -66,12 +66,14 @@ type ReactionUser struct {
 
 // ProfileStats represents personal stats for a user.
 type ProfileStats struct {
-	MessageCount            int64 `json:"message_count"`
-	ReactionsSent           int64 `json:"reactions_sent"`
-	ReactionsReceived       int64 `json:"reactions_received"`
-	ActiveDays              int64 `json:"active_days"`
-	RankByMessages          int   `json:"rank_by_messages"`
-	RankByReactionsReceived int   `json:"rank_by_reactions_received"`
+	MessageCount            int64   `json:"message_count"`
+	ReactionsSent           int64   `json:"reactions_sent"`
+	ReactionsReceived       int64   `json:"reactions_received"`
+	ActiveDays              int64   `json:"active_days"`
+	CurrentStreak           int64   `json:"current_streak"`
+	AvgMessagesPerDay       float64 `json:"avg_messages_per_day"`
+	RankByMessages          int     `json:"rank_by_messages"`
+	RankByReactionsReceived int     `json:"rank_by_reactions_received"`
 }
 
 // TopInteractor represents a user who interacts with another user.
@@ -817,7 +819,75 @@ func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, use
 		}
 	}
 
+	// Calculate avg messages per day
+	if stats.ActiveDays > 0 {
+		stats.AvgMessagesPerDay = float64(stats.MessageCount) / float64(stats.ActiveDays)
+	}
+
+	// Calculate current streak
+	streak, err := r.getUserCurrentStreak(ctx, chatID, userID, startDate, endDate)
+	if err != nil {
+		// Log but don't fail - streak is not critical
+		stats.CurrentStreak = 0
+	} else {
+		stats.CurrentStreak = streak
+	}
+
 	return stats, nil
+}
+
+// getUserCurrentStreak calculates the current consecutive days streak for a user.
+func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time) (int64, error) {
+	var query string
+	var args []interface{}
+
+	if startDate == nil && endDate == nil {
+		// All-time streak: consecutive days ending at most recent activity
+		query = `
+			WITH user_dates AS (
+				SELECT DISTINCT DATE(date) as activity_date
+				FROM messages
+				WHERE chat_id = $1 AND user_id = $2
+			),
+			numbered AS (
+				SELECT
+					activity_date,
+					activity_date - (ROW_NUMBER() OVER (ORDER BY activity_date DESC))::int as grp
+				FROM user_dates
+			)
+			SELECT COUNT(*)
+			FROM numbered
+			WHERE grp = (SELECT grp FROM numbered ORDER BY activity_date DESC LIMIT 1)
+		`
+		args = []interface{}{chatID, userID}
+	} else {
+		// Period-filtered streak
+		query = `
+			WITH user_dates AS (
+				SELECT DISTINCT DATE(date) as activity_date
+				FROM messages
+				WHERE chat_id = $1 AND user_id = $2
+					AND date >= $3 AND date < $4
+			),
+			numbered AS (
+				SELECT
+					activity_date,
+					activity_date - (ROW_NUMBER() OVER (ORDER BY activity_date DESC))::int as grp
+				FROM user_dates
+			)
+			SELECT COUNT(*)
+			FROM numbered
+			WHERE grp = (SELECT grp FROM numbered ORDER BY activity_date DESC LIMIT 1)
+		`
+		args = []interface{}{chatID, userID, startDate, endDate}
+	}
+
+	var streak int64
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&streak)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return streak, err
 }
 
 // GetTopReactorsToUser returns users who react most to a specific user's messages.

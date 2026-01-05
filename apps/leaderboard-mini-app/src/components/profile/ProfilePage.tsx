@@ -62,7 +62,7 @@ export function ProfilePage({ period, onPeriodChange, firstName, username }: Pro
       <div className="profile-stats-grid">
         {loading ? (
           <>
-            {[...Array(4)].map((_, i) => (
+            {[...Array(6)].map((_, i) => (
               <div key={i} className="skeleton skeleton-stat" />
             ))}
           </>
@@ -89,6 +89,14 @@ export function ProfilePage({ period, onPeriodChange, firstName, username }: Pro
             <div className="profile-stat-card">
               <div className="profile-stat-value">{data?.stats.active_days || 0}</div>
               <div className="profile-stat-label">Active Days</div>
+            </div>
+            <div className="profile-stat-card">
+              <div className="profile-stat-value">{data?.stats.current_streak || 0}</div>
+              <div className="profile-stat-label">Days Streak</div>
+            </div>
+            <div className="profile-stat-card">
+              <div className="profile-stat-value">{data?.stats.avg_messages_per_day?.toFixed(1) || '0'}</div>
+              <div className="profile-stat-label">Avg/Day</div>
             </div>
           </>
         )}

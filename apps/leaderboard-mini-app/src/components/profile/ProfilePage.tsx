@@ -106,10 +106,27 @@ export function ProfilePage({ period, onPeriodChange, firstName, username }: Pro
         )}
       </section>
 
-      {/* Top Repliers */}
+      {/* Who You Reply To */}
       <section className="interactors-section">
-        <h2 className="section-title">Top Repliers</h2>
-        <p className="section-subtitle">Users who reply most to your messages</p>
+        <h2 className="section-title">Who You Reply To</h2>
+        <p className="section-subtitle">Users you reply to most</p>
+        {loading ? (
+          <div className="interactor-list">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="skeleton skeleton-row" />
+            ))}
+          </div>
+        ) : data?.top_replied_to.length ? (
+          <InteractorList interactors={data.top_replied_to} />
+        ) : (
+          <div className="empty-list">No replies yet</div>
+        )}
+      </section>
+
+      {/* Who Replies to You */}
+      <section className="interactors-section">
+        <h2 className="section-title">Who Replies to You</h2>
+        <p className="section-subtitle">Users who reply to your messages</p>
         {loading ? (
           <div className="interactor-list">
             {[...Array(3)].map((_, i) => (

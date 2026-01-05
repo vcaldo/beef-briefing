@@ -134,7 +134,7 @@ prod-logs-traefik: ## Tail logs from traefik (production)
 	@SSH_HOST=$$($(MAKE) -s tf-ssh-user-host); \
 	ssh $$SSH_HOST 'cd ~/beef-briefing && docker compose logs -f traefik'
 
-prod-update-ip: ## Update API IP allowlist and restart api-service
+prod-update-ip: ## Update IP allowlist for api-service and card-renderer
 	@echo "Fetching current IP address..."
 	@ALLOWED_IP=$$(curl -s whatismyip.akamai.com); \
 	if [ -z "$$ALLOWED_IP" ]; then \
@@ -148,9 +148,9 @@ prod-update-ip: ## Update API IP allowlist and restart api-service
 		echo "ALLOWED_IP=$$ALLOWED_IP" >> $(PROD_ENV_FILE); \
 	fi; \
 	echo "Updated $(PROD_ENV_FILE)"; \
-	echo "Updating remote .env and restarting api-service..."; \
+	echo "Syncing to remote and recreating containers with IP allowlist..."; \
 	scp $(PROD_ENV_FILE) $$($(MAKE) -s tf-ssh-user-host):~/beef-briefing/.env; \
-	ssh $$($(MAKE) -s tf-ssh-user-host) 'cd ~/beef-briefing && docker compose up -d --no-deps api-service'
+	ssh $$($(MAKE) -s tf-ssh-user-host) 'cd ~/beef-briefing && docker compose up -d --force-recreate --no-deps api-service card-renderer'
 
 pg-tunnel: ## Open SSH tunnel to production PostgreSQL (localhost:5433 -> prod postgres)
 	@echo "Opening SSH tunnel to production PostgreSQL..."

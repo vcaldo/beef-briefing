@@ -8,8 +8,10 @@ interface LeaderboardTableProps {
   limit: number
   metric: LeaderboardMetric
   loading: boolean
+  error?: string | null
   onMetricChange: (metric: LeaderboardMetric) => void
   onPageChange: (page: number) => void
+  onRetry?: () => void
 }
 
 const METRICS: { value: LeaderboardMetric; label: string }[] = [
@@ -56,8 +58,10 @@ export function LeaderboardTable({
   limit,
   metric,
   loading,
+  error,
   onMetricChange,
   onPageChange,
+  onRetry,
 }: LeaderboardTableProps) {
   const totalPages = Math.ceil(total / limit)
 
@@ -84,6 +88,15 @@ export function LeaderboardTable({
               <div className="skeleton skeleton-row" style={{ width: '100%' }} />
             </div>
           ))}
+        </div>
+      ) : error ? (
+        <div className="section-error">
+          <p className="section-error-message">{error}</p>
+          {onRetry && (
+            <button className="section-error-btn" onClick={onRetry}>
+              Retry
+            </button>
+          )}
         </div>
       ) : users.length === 0 ? (
         <div className="empty-state">No users found for this period</div>

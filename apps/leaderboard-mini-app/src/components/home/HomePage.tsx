@@ -24,43 +24,65 @@ export function HomePage({ period, onPeriodChange }: HomePageProps) {
   const [loadingActivity, setLoadingActivity] = useState(false)
   const [loadingHeatmap, setLoadingHeatmap] = useState(false)
 
-  // Fetch all data when period changes
-  const fetchData = useCallback(async () => {
-    if (!apiClient.isAuthenticated()) return
+  // Error states
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const [activityError, setActivityError] = useState<string | null>(null)
+  const [heatmapError, setHeatmapError] = useState<string | null>(null)
 
-    // Fetch stats
+  // Fetch stats
+  const fetchStats = useCallback(async () => {
+    if (!apiClient.isAuthenticated()) return
     setLoadingStats(true)
+    setStatsError(null)
     try {
       const statsData = await apiClient.getStats(period)
       setStats(statsData)
     } catch (err) {
       console.error('Failed to fetch stats:', err)
+      setStatsError('Failed to load stats')
     } finally {
       setLoadingStats(false)
     }
+  }, [period])
 
-    // Fetch activity
+  // Fetch activity
+  const fetchActivity = useCallback(async () => {
+    if (!apiClient.isAuthenticated()) return
     setLoadingActivity(true)
+    setActivityError(null)
     try {
       const activityData = await apiClient.getActivity(period)
       setActivity(activityData.data)
     } catch (err) {
       console.error('Failed to fetch activity:', err)
+      setActivityError('Failed to load activity')
     } finally {
       setLoadingActivity(false)
     }
+  }, [period])
 
-    // Fetch group heatmap (always use max period for group heatmap)
+  // Fetch heatmap
+  const fetchHeatmap = useCallback(async () => {
+    if (!apiClient.isAuthenticated()) return
     setLoadingHeatmap(true)
+    setHeatmapError(null)
     try {
       const heatmapData = await apiClient.getHeatmap('max', false)
       setHeatmap(heatmapData.group)
     } catch (err) {
       console.error('Failed to fetch heatmap:', err)
+      setHeatmapError('Failed to load heatmap')
     } finally {
       setLoadingHeatmap(false)
     }
-  }, [period])
+  }, [])
+
+  // Fetch all data when period changes
+  const fetchData = useCallback(async () => {
+    fetchStats()
+    fetchActivity()
+    fetchHeatmap()
+  }, [fetchStats, fetchActivity, fetchHeatmap])
 
   // Fetch data on mount and when period changes
   useEffect(() => {
@@ -75,15 +97,22 @@ export function HomePage({ period, onPeriodChange }: HomePageProps) {
 
       <PeriodSelector selectedPeriod={period} onPeriodChange={onPeriodChange} />
 
-      <OverviewStats stats={stats} loading={loadingStats} />
+      <OverviewStats stats={stats} loading={loadingStats} error={statsError} onRetry={fetchStats} />
 
-      <ActivityChart data={activity} loading={loadingActivity} />
+      <ActivityChart data={activity} loading={loadingActivity} error={activityError} onRetry={fetchActivity} />
 
       <section className="heatmap-section">
         <h2 className="section-title">Group Activity</h2>
         <p className="section-subtitle">When the group is most active</p>
         {loadingHeatmap ? (
           <HeatmapSkeleton />
+        ) : heatmapError ? (
+          <div className="section-error">
+            <p className="section-error-message">{heatmapError}</p>
+            <button className="section-error-btn" onClick={fetchHeatmap}>
+              Retry
+            </button>
+          </div>
         ) : heatmap ? (
           <HeatmapGrid data={heatmap} />
         ) : (

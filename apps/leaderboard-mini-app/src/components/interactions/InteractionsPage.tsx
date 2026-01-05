@@ -46,11 +46,13 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
   const [reactionsData, setReactionsData] = useState<ReactionsOverviewResponse | null>(null)
   const [repliesData, setRepliesData] = useState<RepliesOverviewResponse | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!apiClient.isAuthenticated()) return
 
     setLoading(true)
+    setError(null)
     try {
       const [reactionsResponse, repliesResponse] = await Promise.all([
         apiClient.getReactionsOverview(period, 10),
@@ -60,6 +62,7 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
       setRepliesData(repliesResponse)
     } catch (err) {
       console.error('Failed to fetch interactions data:', err)
+      setError('Failed to load interactions')
     } finally {
       setLoading(false)
     }
@@ -90,6 +93,13 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
             {[...Array(10)].map((_, i) => (
               <div key={i} className="reaction-item skeleton" style={{ height: 72 }} />
             ))}
+          </div>
+        ) : error ? (
+          <div className="section-error">
+            <p className="section-error-message">{error}</p>
+            <button className="section-error-btn" onClick={fetchData}>
+              Retry
+            </button>
           </div>
         ) : processedReactions.length ? (
           <div className="reactions-grid">

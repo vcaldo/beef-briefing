@@ -20,16 +20,19 @@ interface ProfilePageProps {
 export function ProfilePage({ period, onPeriodChange, firstName, username }: ProfilePageProps) {
   const [data, setData] = useState<ProfileResponse | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!apiClient.isAuthenticated()) return
 
     setLoading(true)
+    setError(null)
     try {
       const response = await apiClient.getProfile(period)
       setData(response)
     } catch (err) {
       console.error('Failed to fetch profile:', err)
+      setError('Failed to load profile')
     } finally {
       setLoading(false)
     }
@@ -66,6 +69,13 @@ export function ProfilePage({ period, onPeriodChange, firstName, username }: Pro
               <div key={i} className="skeleton skeleton-stat" />
             ))}
           </>
+        ) : error ? (
+          <div className="profile-stat-card section-error" style={{ gridColumn: '1 / -1' }}>
+            <p className="section-error-message">{error}</p>
+            <button className="section-error-btn" onClick={fetchData}>
+              Retry
+            </button>
+          </div>
         ) : (
           <>
             <div className="profile-stat-card">

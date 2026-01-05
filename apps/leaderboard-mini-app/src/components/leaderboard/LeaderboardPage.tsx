@@ -17,12 +17,14 @@ export function LeaderboardPage({ period, onPeriodChange }: LeaderboardPageProps
   const [leaderboardPage, setLeaderboardPage] = useState(1)
   const [leaderboardMetric, setLeaderboardMetric] = useState<LeaderboardMetric>('message_count')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchLeaderboard = useCallback(
     async (page: number) => {
       if (!apiClient.isAuthenticated()) return
 
       setLoading(true)
+      setError(null)
       try {
         const data = await apiClient.getLeaderboard(period, leaderboardMetric, page, 20)
         setLeaderboard(data.users)
@@ -30,6 +32,7 @@ export function LeaderboardPage({ period, onPeriodChange }: LeaderboardPageProps
         setLeaderboardPage(page)
       } catch (err) {
         console.error('Failed to fetch leaderboard:', err)
+        setError('Failed to load leaderboard')
       } finally {
         setLoading(false)
       }
@@ -72,8 +75,10 @@ export function LeaderboardPage({ period, onPeriodChange }: LeaderboardPageProps
         limit={20}
         metric={leaderboardMetric}
         loading={loading}
+        error={error}
         onMetricChange={handleMetricChange}
         onPageChange={handlePageChange}
+        onRetry={() => fetchLeaderboard(leaderboardPage)}
       />
     </div>
   )

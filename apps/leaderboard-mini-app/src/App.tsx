@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 
 import { apiClient } from './api/client'
-import { TabBar } from './components/common/TabBar'
+import { TabBar, ErrorBoundary } from './components/common'
 import { HomePage } from './components/home/HomePage'
 import { LeaderboardPage } from './components/leaderboard/LeaderboardPage'
 import { InteractionsPage } from './components/interactions/InteractionsPage'
@@ -81,6 +81,11 @@ function App() {
     setActiveTab(tab)
   }
 
+  // Reset error boundary on tab change
+  const handleErrorReset = useCallback(() => {
+    // Re-render will happen automatically due to key change
+  }, [])
+
   // Render page based on active tab
   const renderPage = () => {
     switch (activeTab) {
@@ -133,7 +138,9 @@ function App() {
   // Main app with tab navigation
   return (
     <div className="app">
-      {renderPage()}
+      <ErrorBoundary key={activeTab} onReset={handleErrorReset}>
+        {renderPage()}
+      </ErrorBoundary>
       <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
   )

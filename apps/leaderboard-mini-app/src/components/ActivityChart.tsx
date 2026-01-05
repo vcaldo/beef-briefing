@@ -12,6 +12,8 @@ import type { ActivityDataPoint } from '../types'
 interface ActivityChartProps {
   data: ActivityDataPoint[]
   loading: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
 function formatDate(dateStr: string): string {
@@ -19,7 +21,7 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-export function ActivityChart({ data, loading }: ActivityChartProps) {
+export function ActivityChart({ data, loading, error, onRetry }: ActivityChartProps) {
   const chartData = useMemo(() => {
     return data.map((point) => ({
       ...point,
@@ -33,6 +35,22 @@ export function ActivityChart({ data, loading }: ActivityChartProps) {
         <h2 className="section-title">Activity</h2>
         <div className="chart-container">
           <div className="skeleton skeleton-chart" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="activity-section">
+        <h2 className="section-title">Activity</h2>
+        <div className="section-error">
+          <p className="section-error-message">{error}</p>
+          {onRetry && (
+            <button className="section-error-btn" onClick={onRetry}>
+              Retry
+            </button>
+          )}
         </div>
       </div>
     )

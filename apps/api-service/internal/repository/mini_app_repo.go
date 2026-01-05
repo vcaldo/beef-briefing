@@ -260,23 +260,59 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 	var err error
 
 	if startDate == nil && endDate == nil {
-		// All-time: use materialized view
-		// Note: We use a safe column name by validating metric
-		query := `
-			SELECT
-				user_id,
-				first_name,
-				last_name,
-				username,
-				` + sanitizeMetricColumn(metric) + ` as score,
-				ROW_NUMBER() OVER (ORDER BY ` + sanitizeMetricColumn(metric) + ` DESC) as rank
-			FROM mv_user_statistics
-			WHERE chat_id = $1
-				AND is_bot = false
-			ORDER BY ` + sanitizeMetricColumn(metric) + ` DESC
-			LIMIT $2 OFFSET $3
-		`
-		rows, err = r.db.QueryContext(ctx, query, chatID, limit, offset)
+		// All-time: use materialized view for standard metrics, live query for reply metrics
+		if metric == "replies_sent" || metric == "replies_received" {
+			// Reply metrics need live computation
+			query := `
+				WITH replies_sent AS (
+					SELECT m.user_id, COUNT(*) as replies_sent
+					FROM messages m
+					WHERE m.chat_id = $1
+						AND m.reply_to_message_id IS NOT NULL
+					GROUP BY m.user_id
+				),
+				replies_received AS (
+					SELECT orig.user_id, COUNT(*) as replies_received
+					FROM messages m
+					JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
+					WHERE m.chat_id = $1
+						AND m.reply_to_message_id IS NOT NULL
+					GROUP BY orig.user_id
+				)
+				SELECT
+					mv.user_id,
+					mv.first_name,
+					mv.last_name,
+					mv.username,
+					COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) as score,
+					ROW_NUMBER() OVER (ORDER BY COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) DESC) as rank
+				FROM mv_user_statistics mv
+				LEFT JOIN replies_sent rps ON rps.user_id = mv.user_id
+				LEFT JOIN replies_received rpr ON rpr.user_id = mv.user_id
+				WHERE mv.chat_id = $1
+					AND mv.is_bot = false
+				ORDER BY COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) DESC
+				LIMIT $2 OFFSET $3
+			`
+			rows, err = r.db.QueryContext(ctx, query, chatID, limit, offset)
+		} else {
+			// Standard metrics from MV
+			query := `
+				SELECT
+					user_id,
+					first_name,
+					last_name,
+					username,
+					` + sanitizeMetricColumn(metric) + ` as score,
+					ROW_NUMBER() OVER (ORDER BY ` + sanitizeMetricColumn(metric) + ` DESC) as rank
+				FROM mv_user_statistics
+				WHERE chat_id = $1
+					AND is_bot = false
+				ORDER BY ` + sanitizeMetricColumn(metric) + ` DESC
+				LIMIT $2 OFFSET $3
+			`
+			rows, err = r.db.QueryContext(ctx, query, chatID, limit, offset)
+		}
 	} else {
 		// Date-filtered: use live query
 		query := `
@@ -314,6 +350,25 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 					AND mr.date < $3
 					AND mr.is_removed = false
 				GROUP BY m.user_id
+			),
+			replies_sent AS (
+				SELECT m.user_id, COUNT(*) as replies_sent
+				FROM messages m
+				WHERE m.chat_id = $1
+					AND m.date >= $2
+					AND m.date < $3
+					AND m.reply_to_message_id IS NOT NULL
+				GROUP BY m.user_id
+			),
+			replies_received AS (
+				SELECT orig.user_id, COUNT(*) as replies_received
+				FROM messages m
+				JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
+				WHERE m.chat_id = $1
+					AND m.date >= $2
+					AND m.date < $3
+					AND m.reply_to_message_id IS NOT NULL
+				GROUP BY orig.user_id
 			)
 			SELECT
 				us.user_id,
@@ -325,6 +380,8 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 			FROM user_stats us
 			LEFT JOIN reactions_sent rs ON rs.user_id = us.user_id
 			LEFT JOIN reactions_received rr ON rr.user_id = us.user_id
+			LEFT JOIN replies_sent rps ON rps.user_id = us.user_id
+			LEFT JOIN replies_received rpr ON rpr.user_id = us.user_id
 			WHERE us.is_bot = false
 			ORDER BY COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) DESC
 			LIMIT $4 OFFSET $5
@@ -399,6 +456,10 @@ func sanitizeMetricColumn(metric string) string {
 		return "reactions_sent"
 	case "reactions_received":
 		return "reactions_received"
+	case "replies_sent":
+		return "replies_sent"
+	case "replies_received":
+		return "replies_received"
 	case "active_days":
 		return "active_days"
 	default:
@@ -415,6 +476,10 @@ func sanitizeMetricColumnCTE(metric string) string {
 		return "rs.reactions_sent"
 	case "reactions_received":
 		return "rr.reactions_received"
+	case "replies_sent":
+		return "rps.replies_sent"
+	case "replies_received":
+		return "rpr.replies_received"
 	case "active_days":
 		return "us.active_days"
 	default:

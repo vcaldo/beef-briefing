@@ -13,9 +13,11 @@ interface LeaderboardTableProps {
 
 const METRICS: { value: LeaderboardMetric; label: string }[] = [
   { value: 'message_count', label: 'Messages' },
-  { value: 'reactions_sent', label: 'Sent' },
-  { value: 'reactions_received', label: 'Received' },
-  { value: 'active_days', label: 'Days' },
+  { value: 'reactions_sent', label: 'Reactions Sent' },
+  { value: 'reactions_received', label: 'Reactions Received' },
+  { value: 'replies_sent', label: 'Replies Sent' },
+  { value: 'replies_received', label: 'Replies Received' },
+  { value: 'active_days', label: 'Days Streak' },
 ]
 
 function getRankClass(rank: number): string {

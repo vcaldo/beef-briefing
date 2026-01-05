@@ -46,7 +46,13 @@ export interface LeaderboardResponse {
 
 export type Period = '24h' | '7d' | '30d' | '90d' | '180d' | '365d' | 'ytd' | 'max'
 
-export type LeaderboardMetric = 'message_count' | 'reactions_sent' | 'reactions_received' | 'active_days'
+export type LeaderboardMetric =
+  | 'message_count'
+  | 'reactions_sent'
+  | 'reactions_received'
+  | 'replies_sent'
+  | 'replies_received'
+  | 'active_days'
 
 export type TabId = 'home' | 'leaderboard' | 'interactions' | 'profile'
 

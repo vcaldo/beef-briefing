@@ -240,10 +240,12 @@ func (h *MiniAppHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Reques
 		"message_count":      true,
 		"reactions_sent":     true,
 		"reactions_received": true,
+		"replies_sent":       true,
+		"replies_received":   true,
 		"active_days":        true,
 	}
 	if !validMetrics[metric] {
-		writeError(w, "invalid metric. Must be one of: message_count, reactions_sent, reactions_received, active_days", http.StatusBadRequest)
+		writeError(w, "invalid metric. Must be one of: message_count, reactions_sent, reactions_received, replies_sent, replies_received, active_days", http.StatusBadRequest)
 		return
 	}
 

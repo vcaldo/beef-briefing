@@ -594,6 +594,9 @@ body {
    Profile Page
    ===================================================== */
 .profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   padding: 20px 16px;
 }
@@ -753,4 +756,51 @@ body {
   font-size: 14px;
   background: var(--tg-theme-secondary-bg-color);
   border-radius: 12px;
+}
+
+/* =====================================================
+   Avatar Component
+   ===================================================== */
+.avatar {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--tg-theme-button-color), var(--tg-theme-link-color));
+}
+
+.avatar-small {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+}
+
+.avatar-medium {
+  width: 40px;
+  height: 40px;
+  font-size: 14px;
+}
+
+.avatar-large {
+  width: 64px;
+  height: 64px;
+  font-size: 24px;
+}
+
+.profile-header .avatar {
+  margin-bottom: 12px;
+}
+
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-initials {
+  color: var(--tg-theme-button-text-color);
+  font-weight: 700;
+  text-transform: uppercase;
 }

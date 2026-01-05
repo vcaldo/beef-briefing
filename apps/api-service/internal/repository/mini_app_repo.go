@@ -37,12 +37,13 @@ type DailyActivity struct {
 
 // UserRanking represents a user's ranking in the leaderboard.
 type UserRanking struct {
-	Rank      int     `json:"rank"`
-	UserID    int64   `json:"user_id"`
-	FirstName string  `json:"first_name"`
-	LastName  *string `json:"last_name,omitempty"`
-	Username  *string `json:"username,omitempty"`
-	Score     int64   `json:"score"`
+	Rank           int     `json:"rank"`
+	UserID         int64   `json:"user_id"`
+	FirstName      string  `json:"first_name"`
+	LastName       *string `json:"last_name,omitempty"`
+	Username       *string `json:"username,omitempty"`
+	Score          int64   `json:"score"`
+	PhotoObjectKey *string `json:"-"` // Internal use, not serialized
 }
 
 // TopReaction represents a reaction emoji and its count.
@@ -54,12 +55,13 @@ type TopReaction struct {
 
 // ReactionUser represents a user in reaction rankings.
 type ReactionUser struct {
-	Rank      int     `json:"rank"`
-	UserID    int64   `json:"user_id"`
-	FirstName string  `json:"first_name"`
-	LastName  *string `json:"last_name,omitempty"`
-	Username  *string `json:"username,omitempty"`
-	Score     int64   `json:"score"`
+	Rank           int     `json:"rank"`
+	UserID         int64   `json:"user_id"`
+	FirstName      string  `json:"first_name"`
+	LastName       *string `json:"last_name,omitempty"`
+	Username       *string `json:"username,omitempty"`
+	Score          int64   `json:"score"`
+	PhotoObjectKey *string `json:"-"` // Internal use, not serialized
 }
 
 // ProfileStats represents personal stats for a user.
@@ -74,13 +76,14 @@ type ProfileStats struct {
 
 // TopInteractor represents a user who interacts with another user.
 type TopInteractor struct {
-	Rank      int     `json:"rank"`
-	UserID    int64   `json:"user_id"`
-	FirstName string  `json:"first_name"`
-	LastName  *string `json:"last_name,omitempty"`
-	Username  *string `json:"username,omitempty"`
-	Score     int64   `json:"score"`
-	TopEmoji  *string `json:"top_emoji,omitempty"`
+	Rank           int     `json:"rank"`
+	UserID         int64   `json:"user_id"`
+	FirstName      string  `json:"first_name"`
+	LastName       *string `json:"last_name,omitempty"`
+	Username       *string `json:"username,omitempty"`
+	Score          int64   `json:"score"`
+	TopEmoji       *string `json:"top_emoji,omitempty"`
+	PhotoObjectKey *string `json:"-"` // Internal use, not serialized
 }
 
 // HeatmapCell represents a single cell in the heatmap grid.
@@ -285,7 +288,8 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 					mv.last_name,
 					mv.username,
 					COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) as score,
-					ROW_NUMBER() OVER (ORDER BY COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) DESC) as rank
+					ROW_NUMBER() OVER (ORDER BY COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) DESC) as rank,
+					(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mv.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 				FROM mv_user_statistics mv
 				LEFT JOIN replies_sent rps ON rps.user_id = mv.user_id
 				LEFT JOIN replies_received rpr ON rpr.user_id = mv.user_id
@@ -304,7 +308,8 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 					last_name,
 					username,
 					` + sanitizeMetricColumn(metric) + ` as score,
-					ROW_NUMBER() OVER (ORDER BY ` + sanitizeMetricColumn(metric) + ` DESC) as rank
+					ROW_NUMBER() OVER (ORDER BY ` + sanitizeMetricColumn(metric) + ` DESC) as rank,
+					(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mv_user_statistics.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 				FROM mv_user_statistics
 				WHERE chat_id = $1
 					AND is_bot = false
@@ -376,7 +381,8 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 				us.last_name,
 				us.username,
 				COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) as score,
-				ROW_NUMBER() OVER (ORDER BY COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) DESC) as rank
+				ROW_NUMBER() OVER (ORDER BY COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = us.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 			FROM user_stats us
 			LEFT JOIN reactions_sent rs ON rs.user_id = us.user_id
 			LEFT JOIN reactions_received rr ON rr.user_id = us.user_id
@@ -398,7 +404,7 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 	for rows.Next() {
 		var rank int64
 		var r UserRanking
-		if err := rows.Scan(&r.UserID, &r.FirstName, &r.LastName, &r.Username, &r.Score, &rank); err != nil {
+		if err := rows.Scan(&r.UserID, &r.FirstName, &r.LastName, &r.Username, &r.Score, &rank, &r.PhotoObjectKey); err != nil {
 			return nil, err
 		}
 		// Adjust rank for offset
@@ -562,7 +568,8 @@ func (r *MiniAppRepository) GetTopReactionGivers(ctx context.Context, chatID int
 				last_name,
 				username,
 				reactions_sent as score,
-				ROW_NUMBER() OVER (ORDER BY reactions_sent DESC) as rank
+				ROW_NUMBER() OVER (ORDER BY reactions_sent DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mv_user_statistics.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 			FROM mv_user_statistics
 			WHERE chat_id = $1
 				AND is_bot = false
@@ -579,7 +586,8 @@ func (r *MiniAppRepository) GetTopReactionGivers(ctx context.Context, chatID int
 				u.last_name,
 				u.username,
 				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mr.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 			FROM message_reactions mr
 			JOIN users u ON u.id = mr.user_id
 			WHERE mr.chat_id = $1
@@ -603,7 +611,7 @@ func (r *MiniAppRepository) GetTopReactionGivers(ctx context.Context, chatID int
 	for rows.Next() {
 		var rank int64
 		var u ReactionUser
-		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.Score, &rank); err != nil {
+		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.Score, &rank, &u.PhotoObjectKey); err != nil {
 			return nil, err
 		}
 		u.Rank = int(rank)
@@ -633,7 +641,8 @@ func (r *MiniAppRepository) GetTopReactionReceivers(ctx context.Context, chatID 
 				last_name,
 				username,
 				reactions_received as score,
-				ROW_NUMBER() OVER (ORDER BY reactions_received DESC) as rank
+				ROW_NUMBER() OVER (ORDER BY reactions_received DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mv_user_statistics.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 			FROM mv_user_statistics
 			WHERE chat_id = $1
 				AND is_bot = false
@@ -650,7 +659,8 @@ func (r *MiniAppRepository) GetTopReactionReceivers(ctx context.Context, chatID 
 				u.last_name,
 				u.username,
 				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 			FROM message_reactions mr
 			JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
 			JOIN users u ON u.id = m.user_id
@@ -675,7 +685,7 @@ func (r *MiniAppRepository) GetTopReactionReceivers(ctx context.Context, chatID 
 	for rows.Next() {
 		var rank int64
 		var u ReactionUser
-		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.Score, &rank); err != nil {
+		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.Score, &rank, &u.PhotoObjectKey); err != nil {
 			return nil, err
 		}
 		u.Rank = int(rank)
@@ -831,7 +841,8 @@ func (r *MiniAppRepository) GetTopReactorsToUser(ctx context.Context, chatID, us
 				u.username,
 				COUNT(*) as score,
 				MODE() WITHIN GROUP (ORDER BY COALESCE(mr.emoji_value, mr.custom_emoji_id, 'paid')) as top_emoji,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mr.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 			FROM message_reactions mr
 			JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
 			JOIN users u ON u.id = mr.user_id
@@ -854,7 +865,8 @@ func (r *MiniAppRepository) GetTopReactorsToUser(ctx context.Context, chatID, us
 				u.username,
 				COUNT(*) as score,
 				MODE() WITHIN GROUP (ORDER BY COALESCE(mr.emoji_value, mr.custom_emoji_id, 'paid')) as top_emoji,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mr.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 			FROM message_reactions mr
 			JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
 			JOIN users u ON u.id = mr.user_id
@@ -880,7 +892,7 @@ func (r *MiniAppRepository) GetTopReactorsToUser(ctx context.Context, chatID, us
 	for rows.Next() {
 		var rank int64
 		var i TopInteractor
-		if err := rows.Scan(&i.UserID, &i.FirstName, &i.LastName, &i.Username, &i.Score, &i.TopEmoji, &rank); err != nil {
+		if err := rows.Scan(&i.UserID, &i.FirstName, &i.LastName, &i.Username, &i.Score, &i.TopEmoji, &rank, &i.PhotoObjectKey); err != nil {
 			return nil, err
 		}
 		i.Rank = int(rank)
@@ -910,7 +922,8 @@ func (r *MiniAppRepository) GetTopRepliersToUser(ctx context.Context, chatID, us
 				u.last_name,
 				u.username,
 				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 			FROM messages m
 			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
 			JOIN users u ON u.id = m.user_id
@@ -932,7 +945,8 @@ func (r *MiniAppRepository) GetTopRepliersToUser(ctx context.Context, chatID, us
 				u.last_name,
 				u.username,
 				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 			FROM messages m
 			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
 			JOIN users u ON u.id = m.user_id
@@ -958,7 +972,7 @@ func (r *MiniAppRepository) GetTopRepliersToUser(ctx context.Context, chatID, us
 	for rows.Next() {
 		var rank int64
 		var i TopInteractor
-		if err := rows.Scan(&i.UserID, &i.FirstName, &i.LastName, &i.Username, &i.Score, &rank); err != nil {
+		if err := rows.Scan(&i.UserID, &i.FirstName, &i.LastName, &i.Username, &i.Score, &rank, &i.PhotoObjectKey); err != nil {
 			return nil, err
 		}
 		i.Rank = int(rank)
@@ -988,7 +1002,8 @@ func (r *MiniAppRepository) GetTopRepliedToByUser(ctx context.Context, chatID, u
 				u.last_name,
 				u.username,
 				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = orig.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 			FROM messages m
 			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
 			JOIN users u ON u.id = orig.user_id
@@ -1010,7 +1025,8 @@ func (r *MiniAppRepository) GetTopRepliedToByUser(ctx context.Context, chatID, u
 				u.last_name,
 				u.username,
 				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = orig.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
 			FROM messages m
 			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
 			JOIN users u ON u.id = orig.user_id
@@ -1036,7 +1052,7 @@ func (r *MiniAppRepository) GetTopRepliedToByUser(ctx context.Context, chatID, u
 	for rows.Next() {
 		var rank int64
 		var i TopInteractor
-		if err := rows.Scan(&i.UserID, &i.FirstName, &i.LastName, &i.Username, &i.Score, &rank); err != nil {
+		if err := rows.Scan(&i.UserID, &i.FirstName, &i.LastName, &i.Username, &i.Score, &rank, &i.PhotoObjectKey); err != nil {
 			return nil, err
 		}
 		i.Rank = int(rank)
@@ -1146,4 +1162,31 @@ func (r *MiniAppRepository) GetUserHeatmap(ctx context.Context, chatID, userID i
 	}
 
 	return heatmap, rows.Err()
+}
+
+// GetUserPhotoObjectKey returns the largest profile photo object key for a user.
+func (r *MiniAppRepository) GetUserPhotoObjectKey(ctx context.Context, userID int64) (*string, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-user-photo-key")
+		defer segment.End()
+	}
+
+	var objectKey sql.NullString
+	err := r.db.QueryRowContext(ctx, `
+		SELECT minio_object_key
+		FROM user_profile_photos
+		WHERE user_id = $1
+		ORDER BY width DESC
+		LIMIT 1
+	`, userID).Scan(&objectKey)
+
+	if err == sql.ErrNoRows || !objectKey.Valid {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &objectKey.String, nil
 }

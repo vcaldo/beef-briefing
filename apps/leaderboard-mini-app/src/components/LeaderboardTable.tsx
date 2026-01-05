@@ -1,4 +1,5 @@
 import type { LeaderboardUser, LeaderboardMetric } from '../types'
+import { Avatar } from './common'
 
 interface LeaderboardTableProps {
   users: LeaderboardUser[]
@@ -92,6 +93,12 @@ export function LeaderboardTable({
             {users.map((user) => (
               <div key={user.user_id} className="leaderboard-item">
                 <div className={`rank ${getRankClass(user.rank)}`}>{user.rank}</div>
+                <Avatar
+                  photoUrl={user.photo_url}
+                  firstName={user.first_name}
+                  lastName={user.last_name}
+                  size="small"
+                />
                 <div className="user-info">
                   <div className="user-name">{getUserDisplayName(user)}</div>
                   {user.username && (

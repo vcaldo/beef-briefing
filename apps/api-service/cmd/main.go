@@ -231,7 +231,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	var miniAppHandler *handlers.MiniAppHandler
 	var jwtAuth *middleware.JWTAuth
 	if cfg.MiniAppEnabled() {
-		miniAppService := services.NewMiniAppService(db, cfg.JWTSecretKey, cfg.TelegramBotToken, nrApp)
+		miniAppService := services.NewMiniAppService(db, cfg.JWTSecretKey, cfg.TelegramBotToken, nrApp, minioClient)
 		miniAppHandler = handlers.NewMiniAppHandler(miniAppService, cardService, cfg)
 		jwtAuth = middleware.NewJWTAuth(cfg.JWTSecretKey)
 		slog.Info("Mini App endpoints enabled")

@@ -18,6 +18,7 @@ import (
 
 	"beef-briefing/apps/api-service/internal/middleware"
 	"beef-briefing/apps/api-service/internal/repository"
+	"beef-briefing/apps/api-service/internal/storage"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
@@ -60,20 +61,35 @@ type AuthResponse struct {
 
 // MiniAppService handles Mini App authentication and analytics
 type MiniAppService struct {
-	repo     *repository.MiniAppRepository
-	jwtAuth  *middleware.JWTAuth
-	botToken string
-	nrApp    *newrelic.Application
+	repo          *repository.MiniAppRepository
+	jwtAuth       *middleware.JWTAuth
+	botToken      string
+	nrApp         *newrelic.Application
+	storageClient *storage.MinIOClient
 }
 
 // NewMiniAppService creates a new MiniAppService
-func NewMiniAppService(db *sql.DB, jwtSecretKey, botToken string, nrApp *newrelic.Application) *MiniAppService {
+func NewMiniAppService(db *sql.DB, jwtSecretKey, botToken string, nrApp *newrelic.Application, storageClient *storage.MinIOClient) *MiniAppService {
 	return &MiniAppService{
-		repo:     repository.NewMiniAppRepository(db, nrApp),
-		jwtAuth:  middleware.NewJWTAuth(jwtSecretKey),
-		botToken: botToken,
-		nrApp:    nrApp,
+		repo:          repository.NewMiniAppRepository(db, nrApp),
+		jwtAuth:       middleware.NewJWTAuth(jwtSecretKey),
+		botToken:      botToken,
+		nrApp:         nrApp,
+		storageClient: storageClient,
 	}
+}
+
+// generatePhotoURL creates a presigned URL for a photo object key
+func (s *MiniAppService) generatePhotoURL(ctx context.Context, objectKey *string) *string {
+	if objectKey == nil || *objectKey == "" || s.storageClient == nil {
+		return nil
+	}
+	url, err := s.storageClient.GetPresignedURL(ctx, *objectKey, time.Hour)
+	if err != nil {
+		slog.Warn("failed to generate photo URL", "object_key", *objectKey, "error", err)
+		return nil
+	}
+	return &url
 }
 
 // ValidateInitData validates Telegram Mini App init data
@@ -219,8 +235,19 @@ func (s *MiniAppService) GetDailyActivity(ctx context.Context, chatID int64, per
 	return s.repo.GetDailyActivity(ctx, chatID, startDate, endDate)
 }
 
+// UserRankingWithPhoto is a user ranking with photo URL
+type UserRankingWithPhoto struct {
+	Rank      int     `json:"rank"`
+	UserID    int64   `json:"user_id"`
+	FirstName string  `json:"first_name"`
+	LastName  *string `json:"last_name,omitempty"`
+	Username  *string `json:"username,omitempty"`
+	Score     int64   `json:"score"`
+	PhotoURL  *string `json:"photo_url,omitempty"`
+}
+
 // GetUserRankings returns user rankings for a chat
-func (s *MiniAppService) GetUserRankings(ctx context.Context, chatID int64, metric, period string, page, limit int) ([]repository.UserRanking, int, error) {
+func (s *MiniAppService) GetUserRankings(ctx context.Context, chatID int64, metric, period string, page, limit int) ([]UserRankingWithPhoto, int, error) {
 	startDate, endDate := getPeriodDates(period)
 	offset := (page - 1) * limit
 
@@ -234,7 +261,21 @@ func (s *MiniAppService) GetUserRankings(ctx context.Context, chatID int64, metr
 		return nil, 0, err
 	}
 
-	return rankings, total, nil
+	// Transform to response type with photo URLs
+	result := make([]UserRankingWithPhoto, len(rankings))
+	for i, r := range rankings {
+		result[i] = UserRankingWithPhoto{
+			Rank:      r.Rank,
+			UserID:    r.UserID,
+			FirstName: r.FirstName,
+			LastName:  r.LastName,
+			Username:  r.Username,
+			Score:     r.Score,
+			PhotoURL:  s.generatePhotoURL(ctx, r.PhotoObjectKey),
+		}
+	}
+
+	return result, total, nil
 }
 
 // getPeriodDates returns start and end dates for a period
@@ -274,11 +315,34 @@ func getPeriodDates(period string) (*time.Time, *time.Time) {
 	}
 }
 
+// ReactionUserWithPhoto is a reaction user with photo URL
+type ReactionUserWithPhoto struct {
+	Rank      int     `json:"rank"`
+	UserID    int64   `json:"user_id"`
+	FirstName string  `json:"first_name"`
+	LastName  *string `json:"last_name,omitempty"`
+	Username  *string `json:"username,omitempty"`
+	Score     int64   `json:"score"`
+	PhotoURL  *string `json:"photo_url,omitempty"`
+}
+
+// TopInteractorWithPhoto is a top interactor with photo URL
+type TopInteractorWithPhoto struct {
+	Rank      int     `json:"rank"`
+	UserID    int64   `json:"user_id"`
+	FirstName string  `json:"first_name"`
+	LastName  *string `json:"last_name,omitempty"`
+	Username  *string `json:"username,omitempty"`
+	Score     int64   `json:"score"`
+	TopEmoji  *string `json:"top_emoji,omitempty"`
+	PhotoURL  *string `json:"photo_url,omitempty"`
+}
+
 // ReactionsOverviewResponse represents reactions overview data
 type ReactionsOverviewResponse struct {
-	TopReactions []repository.TopReaction  `json:"top_reactions"`
-	TopGivers    []repository.ReactionUser `json:"top_givers"`
-	TopReceivers []repository.ReactionUser `json:"top_receivers"`
+	TopReactions []repository.TopReaction `json:"top_reactions"`
+	TopGivers    []ReactionUserWithPhoto  `json:"top_givers"`
+	TopReceivers []ReactionUserWithPhoto  `json:"top_receivers"`
 }
 
 // GetReactionsOverview returns top reactions, givers, and receivers for a chat
@@ -304,27 +368,50 @@ func (s *MiniAppService) GetReactionsOverview(ctx context.Context, chatID int64,
 	if topReactions == nil {
 		topReactions = []repository.TopReaction{}
 	}
-	if topGivers == nil {
-		topGivers = []repository.ReactionUser{}
+
+	// Transform givers to response type with photo URLs
+	giversWithPhoto := make([]ReactionUserWithPhoto, len(topGivers))
+	for i, g := range topGivers {
+		giversWithPhoto[i] = ReactionUserWithPhoto{
+			Rank:      g.Rank,
+			UserID:    g.UserID,
+			FirstName: g.FirstName,
+			LastName:  g.LastName,
+			Username:  g.Username,
+			Score:     g.Score,
+			PhotoURL:  s.generatePhotoURL(ctx, g.PhotoObjectKey),
+		}
 	}
-	if topReceivers == nil {
-		topReceivers = []repository.ReactionUser{}
+
+	// Transform receivers to response type with photo URLs
+	receiversWithPhoto := make([]ReactionUserWithPhoto, len(topReceivers))
+	for i, r := range topReceivers {
+		receiversWithPhoto[i] = ReactionUserWithPhoto{
+			Rank:      r.Rank,
+			UserID:    r.UserID,
+			FirstName: r.FirstName,
+			LastName:  r.LastName,
+			Username:  r.Username,
+			Score:     r.Score,
+			PhotoURL:  s.generatePhotoURL(ctx, r.PhotoObjectKey),
+		}
 	}
 
 	return &ReactionsOverviewResponse{
 		TopReactions: topReactions,
-		TopGivers:    topGivers,
-		TopReceivers: topReceivers,
+		TopGivers:    giversWithPhoto,
+		TopReceivers: receiversWithPhoto,
 	}, nil
 }
 
 // ProfileResponse represents user profile data
 type ProfileResponse struct {
-	Stats        *repository.ProfileStats   `json:"stats"`
-	TopReactors  []repository.TopInteractor `json:"top_reactors"`
-	TopRepliers  []repository.TopInteractor `json:"top_repliers"`
-	TopRepliedTo []repository.TopInteractor `json:"top_replied_to"`
-	Heatmap      *repository.HeatmapData    `json:"heatmap"`
+	PhotoURL     *string                  `json:"photo_url,omitempty"`
+	Stats        *repository.ProfileStats `json:"stats"`
+	TopReactors  []TopInteractorWithPhoto `json:"top_reactors"`
+	TopRepliers  []TopInteractorWithPhoto `json:"top_repliers"`
+	TopRepliedTo []TopInteractorWithPhoto `json:"top_replied_to"`
+	Heatmap      *repository.HeatmapData  `json:"heatmap"`
 }
 
 // GetUserProfile returns personal stats and top interactors for a user
@@ -356,22 +443,62 @@ func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int6
 		return nil, fmt.Errorf("failed to get user heatmap: %w", err)
 	}
 
-	// Ensure non-nil slices for JSON
-	if topReactors == nil {
-		topReactors = []repository.TopInteractor{}
+	// Get current user's photo
+	userPhotoKey, err := s.repo.GetUserPhotoObjectKey(ctx, userID)
+	if err != nil {
+		slog.Warn("failed to get user photo key", "user_id", userID, "error", err)
 	}
-	if topRepliers == nil {
-		topRepliers = []repository.TopInteractor{}
+	userPhotoURL := s.generatePhotoURL(ctx, userPhotoKey)
+
+	// Transform top reactors to response type with photo URLs
+	reactorsWithPhoto := make([]TopInteractorWithPhoto, len(topReactors))
+	for i, r := range topReactors {
+		reactorsWithPhoto[i] = TopInteractorWithPhoto{
+			Rank:      r.Rank,
+			UserID:    r.UserID,
+			FirstName: r.FirstName,
+			LastName:  r.LastName,
+			Username:  r.Username,
+			Score:     r.Score,
+			TopEmoji:  r.TopEmoji,
+			PhotoURL:  s.generatePhotoURL(ctx, r.PhotoObjectKey),
+		}
 	}
-	if topRepliedTo == nil {
-		topRepliedTo = []repository.TopInteractor{}
+
+	// Transform top repliers to response type with photo URLs
+	repliersWithPhoto := make([]TopInteractorWithPhoto, len(topRepliers))
+	for i, r := range topRepliers {
+		repliersWithPhoto[i] = TopInteractorWithPhoto{
+			Rank:      r.Rank,
+			UserID:    r.UserID,
+			FirstName: r.FirstName,
+			LastName:  r.LastName,
+			Username:  r.Username,
+			Score:     r.Score,
+			PhotoURL:  s.generatePhotoURL(ctx, r.PhotoObjectKey),
+		}
+	}
+
+	// Transform top replied to to response type with photo URLs
+	repliedToWithPhoto := make([]TopInteractorWithPhoto, len(topRepliedTo))
+	for i, r := range topRepliedTo {
+		repliedToWithPhoto[i] = TopInteractorWithPhoto{
+			Rank:      r.Rank,
+			UserID:    r.UserID,
+			FirstName: r.FirstName,
+			LastName:  r.LastName,
+			Username:  r.Username,
+			Score:     r.Score,
+			PhotoURL:  s.generatePhotoURL(ctx, r.PhotoObjectKey),
+		}
 	}
 
 	return &ProfileResponse{
+		PhotoURL:     userPhotoURL,
 		Stats:        stats,
-		TopReactors:  topReactors,
-		TopRepliers:  topRepliers,
-		TopRepliedTo: topRepliedTo,
+		TopReactors:  reactorsWithPhoto,
+		TopRepliers:  repliersWithPhoto,
+		TopRepliedTo: repliedToWithPhoto,
 		Heatmap:      heatmap,
 	}, nil
 }

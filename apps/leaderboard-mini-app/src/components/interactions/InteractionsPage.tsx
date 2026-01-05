@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 
 import { apiClient } from '../../api/client'
 import { PeriodSelector } from '../PeriodSelector'
+import { Avatar } from '../common'
 
 import type {
   Period,
@@ -154,6 +155,12 @@ function UserList({ users }: { users: ReactionUser[] }) {
       {users.map((user) => (
         <div key={user.user_id} className="leaderboard-item">
           <div className={`rank ${getRankClass(user.rank)}`}>{user.rank}</div>
+          <Avatar
+            photoUrl={user.photo_url}
+            firstName={user.first_name}
+            lastName={user.last_name}
+            size="small"
+          />
           <div className="user-info">
             <div className="user-name">{user.first_name} {user.last_name || ''}</div>
             {user.username && <div className="user-username">@{user.username}</div>}

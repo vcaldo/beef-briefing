@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 
 import { apiClient } from '../../api/client'
 import { PeriodSelector } from '../PeriodSelector'
-import { HeatmapGrid, HeatmapSkeleton } from '../common/HeatmapGrid'
+import { Avatar, HeatmapGrid, HeatmapSkeleton } from '../common'
 
 import type {
   Period,
@@ -49,6 +49,11 @@ export function ProfilePage({ period, onPeriodChange, firstName, username }: Pro
 
       {/* Profile Header */}
       <div className="profile-header">
+        <Avatar
+          photoUrl={data?.photo_url}
+          firstName={firstName}
+          size="large"
+        />
         <h2 className="profile-name">{firstName}</h2>
         {username && <div className="profile-username">@{username}</div>}
       </div>
@@ -166,6 +171,12 @@ function InteractorList({ interactors, showEmoji = false }: { interactors: TopIn
       {interactors.map((interactor) => (
         <div key={interactor.user_id} className="interactor-item">
           <div className="interactor-rank">{interactor.rank}</div>
+          <Avatar
+            photoUrl={interactor.photo_url}
+            firstName={interactor.first_name}
+            lastName={interactor.last_name}
+            size="small"
+          />
           <div className="interactor-info">
             <div className="interactor-name">
               {interactor.first_name} {interactor.last_name || ''}

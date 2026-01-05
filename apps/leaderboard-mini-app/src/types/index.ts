@@ -35,6 +35,7 @@ export interface LeaderboardUser {
   last_name: string | null
   username: string | null
   score: number
+  photo_url?: string | null
 }
 
 export interface LeaderboardResponse {
@@ -70,6 +71,7 @@ export interface ReactionUser {
   last_name: string | null
   username: string | null
   score: number
+  photo_url?: string | null
 }
 
 export interface ReactionsOverviewResponse {
@@ -96,9 +98,11 @@ export interface TopInteractor {
   username: string | null
   score: number
   top_emoji?: string
+  photo_url?: string | null
 }
 
 export interface ProfileResponse {
+  photo_url?: string | null
   stats: ProfileStats
   top_reactors: TopInteractor[]
   top_repliers: TopInteractor[]

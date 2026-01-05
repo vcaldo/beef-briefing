@@ -577,24 +577,17 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  gap: 0;
   margin-bottom: 4px;
 }
 
-.paid-label {
-  font-size: 10px;
+.paid-label-line {
+  font-size: 12px;
   font-weight: 700;
   color: var(--tg-theme-button-color);
-  letter-spacing: 0.5px;
-}
-
-.paid-id {
-  font-size: 9px;
-  color: var(--tg-theme-hint-color);
-  font-family: monospace;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  letter-spacing: 1px;
+  line-height: 1.2;
 }
 
 /* =====================================================
@@ -717,7 +710,7 @@ body {
   flex-shrink: 0;
 }
 
-.interactor-emoji-paid .paid-label {
+.paid-label-small {
   font-size: 8px;
   font-weight: 700;
   color: var(--tg-theme-button-color);

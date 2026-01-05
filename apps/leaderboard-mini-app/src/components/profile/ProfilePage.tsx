@@ -157,7 +157,7 @@ function InteractorList({ interactors, showEmoji = false }: { interactors: TopIn
           {showEmoji && interactor.top_emoji && (
             isPaidEmoji(interactor.top_emoji) ? (
               <div className="interactor-emoji-paid">
-                <span className="paid-label">PAID</span>
+                <span className="paid-label-small">PAID</span>
               </div>
             ) : (
               <div className="interactor-emoji">{interactor.top_emoji}</div>

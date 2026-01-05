@@ -11,6 +11,31 @@ import type {
   TopInteractor,
 } from '../../types'
 
+// Group all paid/custom emoji reactions into a single combined item
+function groupPaidReactions(reactions: TopReaction[]): TopReaction[] {
+  const regularReactions: TopReaction[] = []
+  let paidTotal = 0
+
+  for (const reaction of reactions) {
+    if (reaction.reaction_type === 'custom_emoji' || reaction.reaction_type === 'paid') {
+      paidTotal += reaction.count
+    } else {
+      regularReactions.push(reaction)
+    }
+  }
+
+  // Add combined paid reactions at the end if there are any
+  if (paidTotal > 0) {
+    regularReactions.push({
+      emoji: 'paid',
+      reaction_type: 'paid',
+      count: paidTotal,
+    })
+  }
+
+  return regularReactions
+}
+
 interface InteractionsPageProps {
   period: Period
   onPeriodChange: (period: Period) => void
@@ -54,6 +79,11 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
     fetchData()
   }, [fetchData])
 
+  // Process reactions: group all paid/custom emojis into one combined item
+  const processedReactions = reactionsData?.top_reactions
+    ? groupPaidReactions(reactionsData.top_reactions)
+    : []
+
   return (
     <div className="page-container">
       <header className="app-header">
@@ -71,9 +101,9 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
               <div key={i} className="reaction-item skeleton" style={{ height: 72 }} />
             ))}
           </div>
-        ) : reactionsData?.top_reactions.length ? (
+        ) : processedReactions.length ? (
           <div className="reactions-grid">
-            {reactionsData.top_reactions.map((reaction) => (
+            {processedReactions.map((reaction) => (
               <ReactionItem key={reaction.emoji} reaction={reaction} />
             ))}
           </div>
@@ -158,8 +188,8 @@ function ReactionItem({ reaction }: { reaction: TopReaction }) {
     <div className="reaction-item">
       {isPaid ? (
         <div className="reaction-emoji-paid">
-          <span className="paid-label">PAID</span>
-          <span className="paid-id">{reaction.emoji}</span>
+          <span className="paid-label-line">PAID</span>
+          <span className="paid-label-line">EMOJI</span>
         </div>
       ) : (
         <div className="reaction-emoji">{reaction.emoji}</div>

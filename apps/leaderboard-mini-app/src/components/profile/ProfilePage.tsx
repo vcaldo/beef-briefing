@@ -15,9 +15,10 @@ interface ProfilePageProps {
   onPeriodChange: (period: Period) => void
   firstName: string
   username: string | null
+  chatTitle: string | null
 }
 
-export function ProfilePage({ period, onPeriodChange, firstName, username }: ProfilePageProps) {
+export function ProfilePage({ period, onPeriodChange, firstName, username, chatTitle }: ProfilePageProps) {
   const [data, setData] = useState<ProfileResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -46,6 +47,7 @@ export function ProfilePage({ period, onPeriodChange, firstName, username }: Pro
     <div className="page-container">
       <header className="app-header">
         <h1>Profile</h1>
+        {chatTitle && <p className="app-header-subtitle">{chatTitle}</p>}
       </header>
 
       <PeriodSelector selectedPeriod={period} onPeriodChange={onPeriodChange} />

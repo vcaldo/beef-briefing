@@ -47,6 +47,13 @@ body {
   margin: 0;
 }
 
+.app-header-subtitle {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color);
+  font-weight: 400;
+  margin: 2px 0 0 0;
+}
+
 /* Period Selector */
 .period-selector {
   margin-bottom: 16px;
@@ -476,16 +483,13 @@ body {
 
 .heatmap-grid {
   display: grid;
-  grid-template-columns: 32px repeat(24, 1fr);
-  gap: 2px;
-  min-width: 360px;
+  grid-template-columns: 28px repeat(24, 1fr);
+  gap: 1px;
 }
 
 .heatmap-cell {
   aspect-ratio: 1;
   border-radius: 2px;
-  min-width: 10px;
-  min-height: 10px;
 }
 
 .heatmap-label {

@@ -9,9 +9,10 @@ import type { Period, LeaderboardMetric, LeaderboardUser } from '../../types'
 interface LeaderboardPageProps {
   period: Period
   onPeriodChange: (period: Period) => void
+  chatTitle: string | null
 }
 
-export function LeaderboardPage({ period, onPeriodChange }: LeaderboardPageProps) {
+export function LeaderboardPage({ period, onPeriodChange, chatTitle }: LeaderboardPageProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([])
   const [leaderboardTotal, setLeaderboardTotal] = useState(0)
   const [leaderboardPage, setLeaderboardPage] = useState(1)
@@ -64,6 +65,7 @@ export function LeaderboardPage({ period, onPeriodChange }: LeaderboardPageProps
     <div className="page-container">
       <header className="app-header">
         <h1>Leaderboard</h1>
+        {chatTitle && <p className="app-header-subtitle">{chatTitle}</p>}
       </header>
 
       <PeriodSelector selectedPeriod={period} onPeriodChange={onPeriodChange} />

@@ -40,9 +40,10 @@ function groupPaidReactions(reactions: TopReaction[]): TopReaction[] {
 interface InteractionsPageProps {
   period: Period
   onPeriodChange: (period: Period) => void
+  chatTitle: string | null
 }
 
-export function InteractionsPage({ period, onPeriodChange }: InteractionsPageProps) {
+export function InteractionsPage({ period, onPeriodChange, chatTitle }: InteractionsPageProps) {
   const [reactionsData, setReactionsData] = useState<ReactionsOverviewResponse | null>(null)
   const [repliesData, setRepliesData] = useState<RepliesOverviewResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -81,6 +82,7 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
     <div className="page-container">
       <header className="app-header">
         <h1>Interactions</h1>
+        {chatTitle && <p className="app-header-subtitle">{chatTitle}</p>}
       </header>
 
       <PeriodSelector selectedPeriod={period} onPeriodChange={onPeriodChange} />

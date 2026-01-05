@@ -20,6 +20,7 @@ function App() {
   // User info (from auth response)
   const [firstName, setFirstName] = useState<string>('')
   const [username, setUsername] = useState<string | null>(null)
+  const [chatTitle, setChatTitle] = useState<string | null>(null)
 
   // Navigation state
   const [activeTab, setActiveTab] = useState<TabId>('home')
@@ -54,6 +55,7 @@ function App() {
         // Store user info
         setFirstName(auth.first_name)
         setUsername(auth.username)
+        setChatTitle(auth.chat_title)
 
         // Update document title to group name (shown in Telegram header)
         if (auth.chat_title) {
@@ -90,11 +92,11 @@ function App() {
   const renderPage = () => {
     switch (activeTab) {
       case 'home':
-        return <HomePage period={period} onPeriodChange={handlePeriodChange} />
+        return <HomePage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
       case 'leaderboard':
-        return <LeaderboardPage period={period} onPeriodChange={handlePeriodChange} />
+        return <LeaderboardPage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
       case 'interactions':
-        return <InteractionsPage period={period} onPeriodChange={handlePeriodChange} />
+        return <InteractionsPage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
       case 'profile':
         return (
           <ProfilePage
@@ -102,10 +104,11 @@ function App() {
             onPeriodChange={handlePeriodChange}
             firstName={firstName}
             username={username}
+            chatTitle={chatTitle}
           />
         )
       default:
-        return <HomePage period={period} onPeriodChange={handlePeriodChange} />
+        return <HomePage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
     }
   }
 

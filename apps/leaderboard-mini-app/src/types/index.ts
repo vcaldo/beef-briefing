@@ -6,6 +6,7 @@ export interface AuthResponse {
   token: string
   user_id: number
   chat_id: number | null
+  chat_title: string | null
   first_name: string
   username: string | null
 }
@@ -113,6 +114,7 @@ export interface ProfileResponse {
   photo_url?: string | null
   stats: ProfileStats
   top_reactors: TopInteractor[]
+  top_reacted_to: TopInteractor[]
   top_repliers: TopInteractor[]
   top_replied_to: TopInteractor[]
   heatmap: HeatmapData

@@ -55,6 +55,7 @@ type AuthResponse struct {
 	Token     string  `json:"token"`
 	UserID    int64   `json:"user_id"`
 	ChatID    *int64  `json:"chat_id,omitempty"`
+	ChatTitle *string `json:"chat_title,omitempty"`
 	FirstName string  `json:"first_name"`
 	Username  *string `json:"username,omitempty"`
 }
@@ -193,7 +194,7 @@ func (s *MiniAppService) ValidateInitData(initData string, maxAgeSeconds int64) 
 }
 
 // Authenticate validates init data and returns a JWT token
-func (s *MiniAppService) Authenticate(initData string) (*AuthResponse, error) {
+func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*AuthResponse, error) {
 	validated, err := s.ValidateInitData(initData, 86400) // 24 hours max age
 	if err != nil {
 		return nil, err
@@ -209,6 +210,15 @@ func (s *MiniAppService) Authenticate(initData string) (*AuthResponse, error) {
 		return nil, fmt.Errorf("failed to create JWT token: %w", err)
 	}
 
+	// Fetch chat title if chat ID is available
+	var chatTitle *string
+	if validated.ChatID != nil {
+		chatTitle, err = s.repo.GetChatTitle(ctx, *validated.ChatID)
+		if err != nil {
+			slog.Warn("failed to get chat title", "chat_id", *validated.ChatID, "error", err)
+		}
+	}
+
 	slog.Info("Mini App auth successful",
 		"user_id", validated.UserID,
 		"chat_id", validated.ChatID,
@@ -218,6 +228,7 @@ func (s *MiniAppService) Authenticate(initData string) (*AuthResponse, error) {
 		Token:     token,
 		UserID:    validated.UserID,
 		ChatID:    validated.ChatID,
+		ChatTitle: chatTitle,
 		FirstName: validated.FirstName,
 		Username:  validated.Username,
 	}, nil
@@ -460,12 +471,13 @@ func (s *MiniAppService) GetRepliesOverview(ctx context.Context, chatID int64, p
 
 // ProfileResponse represents user profile data
 type ProfileResponse struct {
-	PhotoURL     *string                  `json:"photo_url,omitempty"`
-	Stats        *repository.ProfileStats `json:"stats"`
-	TopReactors  []TopInteractorWithPhoto `json:"top_reactors"`
-	TopRepliers  []TopInteractorWithPhoto `json:"top_repliers"`
-	TopRepliedTo []TopInteractorWithPhoto `json:"top_replied_to"`
-	Heatmap      *repository.HeatmapData  `json:"heatmap"`
+	PhotoURL      *string                  `json:"photo_url,omitempty"`
+	Stats         *repository.ProfileStats `json:"stats"`
+	TopReactors   []TopInteractorWithPhoto `json:"top_reactors"`
+	TopReactedTo  []TopInteractorWithPhoto `json:"top_reacted_to"`
+	TopRepliers   []TopInteractorWithPhoto `json:"top_repliers"`
+	TopRepliedTo  []TopInteractorWithPhoto `json:"top_replied_to"`
+	Heatmap       *repository.HeatmapData  `json:"heatmap"`
 }
 
 // GetUserProfile returns personal stats and top interactors for a user
@@ -480,6 +492,11 @@ func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int6
 	topReactors, err := s.repo.GetTopReactorsToUser(ctx, chatID, userID, 5, startDate, endDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get top reactors: %w", err)
+	}
+
+	topReactedTo, err := s.repo.GetTopReactedToByUser(ctx, chatID, userID, 5, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get top reacted to: %w", err)
 	}
 
 	topRepliers, err := s.repo.GetTopRepliersToUser(ctx, chatID, userID, 5, startDate, endDate)
@@ -508,6 +525,21 @@ func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int6
 	reactorsWithPhoto := make([]TopInteractorWithPhoto, len(topReactors))
 	for i, r := range topReactors {
 		reactorsWithPhoto[i] = TopInteractorWithPhoto{
+			Rank:      r.Rank,
+			UserID:    r.UserID,
+			FirstName: r.FirstName,
+			LastName:  r.LastName,
+			Username:  r.Username,
+			Score:     r.Score,
+			TopEmoji:  r.TopEmoji,
+			PhotoURL:  s.generatePhotoURL(ctx, r.PhotoObjectKey),
+		}
+	}
+
+	// Transform top reacted to to response type with photo URLs
+	reactedToWithPhoto := make([]TopInteractorWithPhoto, len(topReactedTo))
+	for i, r := range topReactedTo {
+		reactedToWithPhoto[i] = TopInteractorWithPhoto{
 			Rank:      r.Rank,
 			UserID:    r.UserID,
 			FirstName: r.FirstName,
@@ -551,6 +583,7 @@ func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int6
 		PhotoURL:     userPhotoURL,
 		Stats:        stats,
 		TopReactors:  reactorsWithPhoto,
+		TopReactedTo: reactedToWithPhoto,
 		TopRepliers:  repliersWithPhoto,
 		TopRepliedTo: repliedToWithPhoto,
 		Heatmap:      heatmap,

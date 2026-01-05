@@ -842,12 +842,15 @@ func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, us
 	var args []interface{}
 
 	if startDate == nil && endDate == nil {
-		// All-time streak: consecutive days ending at most recent activity
+		// All-time streak: consecutive days ending today or yesterday (active streak only)
 		query = `
 			WITH user_dates AS (
 				SELECT DISTINCT DATE(date) as activity_date
 				FROM messages
 				WHERE chat_id = $1 AND user_id = $2
+			),
+			most_recent AS (
+				SELECT MAX(activity_date) as last_active FROM user_dates
 			),
 			numbered AS (
 				SELECT
@@ -855,13 +858,20 @@ func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, us
 					activity_date - (ROW_NUMBER() OVER (ORDER BY activity_date DESC))::int as grp
 				FROM user_dates
 			)
-			SELECT COUNT(*)
-			FROM numbered
-			WHERE grp = (SELECT grp FROM numbered ORDER BY activity_date DESC LIMIT 1)
+			SELECT CASE
+				-- Only count streak if last activity was today or yesterday
+				WHEN (SELECT last_active FROM most_recent) >= CURRENT_DATE - INTERVAL '1 day'
+				THEN (
+					SELECT COUNT(*)
+					FROM numbered
+					WHERE grp = (SELECT grp FROM numbered ORDER BY activity_date DESC LIMIT 1)
+				)
+				ELSE 0
+			END
 		`
 		args = []interface{}{chatID, userID}
 	} else {
-		// Period-filtered streak
+		// Period-filtered streak: consecutive days ending at period end or yesterday
 		query = `
 			WITH user_dates AS (
 				SELECT DISTINCT DATE(date) as activity_date
@@ -869,15 +879,25 @@ func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, us
 				WHERE chat_id = $1 AND user_id = $2
 					AND date >= $3 AND date < $4
 			),
+			most_recent AS (
+				SELECT MAX(activity_date) as last_active FROM user_dates
+			),
 			numbered AS (
 				SELECT
 					activity_date,
 					activity_date - (ROW_NUMBER() OVER (ORDER BY activity_date DESC))::int as grp
 				FROM user_dates
 			)
-			SELECT COUNT(*)
-			FROM numbered
-			WHERE grp = (SELECT grp FROM numbered ORDER BY activity_date DESC LIMIT 1)
+			SELECT CASE
+				-- Only count streak if last activity was within the period's end or yesterday
+				WHEN (SELECT last_active FROM most_recent) >= LEAST($4::date, CURRENT_DATE) - INTERVAL '1 day'
+				THEN (
+					SELECT COUNT(*)
+					FROM numbered
+					WHERE grp = (SELECT grp FROM numbered ORDER BY activity_date DESC LIMIT 1)
+				)
+				ELSE 0
+			END
 		`
 		args = []interface{}{chatID, userID, startDate, endDate}
 	}
@@ -948,6 +968,88 @@ func (r *MiniAppRepository) GetTopReactorsToUser(ctx context.Context, chatID, us
 				AND mr.date < $4
 				AND u.is_bot = false
 			GROUP BY mr.user_id, u.first_name, u.last_name, u.username
+			ORDER BY score DESC
+			LIMIT $5
+		`, chatID, userID, startDate, endDate, limit)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var interactors []TopInteractor
+	for rows.Next() {
+		var rank int64
+		var i TopInteractor
+		if err := rows.Scan(&i.UserID, &i.FirstName, &i.LastName, &i.Username, &i.Score, &i.TopEmoji, &rank, &i.PhotoObjectKey); err != nil {
+			return nil, err
+		}
+		i.Rank = int(rank)
+		interactors = append(interactors, i)
+	}
+
+	return interactors, rows.Err()
+}
+
+// GetTopReactedToByUser returns users whose messages a specific user reacts to most.
+func (r *MiniAppRepository) GetTopReactedToByUser(ctx context.Context, chatID, userID int64, limit int, startDate, endDate *time.Time) ([]TopInteractor, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-top-reacted-to-by-user")
+		defer segment.End()
+	}
+
+	var rows *sql.Rows
+	var err error
+
+	if startDate == nil && endDate == nil {
+		// All-time: live query (no MV for this specific data)
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				m.user_id,
+				u.first_name,
+				u.last_name,
+				u.username,
+				COUNT(*) as score,
+				MODE() WITHIN GROUP (ORDER BY COALESCE(mr.emoji_value, mr.custom_emoji_id, 'paid')) as top_emoji,
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
+			FROM message_reactions mr
+			JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
+			JOIN users u ON u.id = m.user_id
+			WHERE mr.chat_id = $1
+				AND mr.user_id = $2
+				AND m.user_id != $2
+				AND mr.is_removed = false
+				AND u.is_bot = false
+			GROUP BY m.user_id, u.first_name, u.last_name, u.username
+			ORDER BY score DESC
+			LIMIT $3
+		`, chatID, userID, limit)
+	} else {
+		// Date-filtered
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				m.user_id,
+				u.first_name,
+				u.last_name,
+				u.username,
+				COUNT(*) as score,
+				MODE() WITHIN GROUP (ORDER BY COALESCE(mr.emoji_value, mr.custom_emoji_id, 'paid')) as top_emoji,
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
+			FROM message_reactions mr
+			JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
+			JOIN users u ON u.id = m.user_id
+			WHERE mr.chat_id = $1
+				AND mr.user_id = $2
+				AND m.user_id != $2
+				AND mr.is_removed = false
+				AND mr.date >= $3
+				AND mr.date < $4
+				AND u.is_bot = false
+			GROUP BY m.user_id, u.first_name, u.last_name, u.username
 			ORDER BY score DESC
 			LIMIT $5
 		`, chatID, userID, startDate, endDate, limit)
@@ -1409,4 +1511,29 @@ func (r *MiniAppRepository) GetUserPhotoObjectKey(ctx context.Context, userID in
 	}
 
 	return &objectKey.String, nil
+}
+
+// GetChatTitle returns the title of a chat.
+func (r *MiniAppRepository) GetChatTitle(ctx context.Context, chatID int64) (*string, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-chat-title")
+		defer segment.End()
+	}
+
+	var title sql.NullString
+	err := r.db.QueryRowContext(ctx, `
+		SELECT title
+		FROM chats
+		WHERE id = $1
+	`, chatID).Scan(&title)
+
+	if err == sql.ErrNoRows || !title.Valid {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &title.String, nil
 }

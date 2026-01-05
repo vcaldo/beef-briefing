@@ -20,6 +20,7 @@ function App() {
   // User info (from auth response)
   const [firstName, setFirstName] = useState<string>('')
   const [username, setUsername] = useState<string | null>(null)
+  const [chatTitle, setChatTitle] = useState<string | null>(null)
 
   // Navigation state
   const [activeTab, setActiveTab] = useState<TabId>('home')
@@ -54,6 +55,7 @@ function App() {
         // Store user info
         setFirstName(auth.first_name)
         setUsername(auth.username)
+        setChatTitle(auth.chat_title)
 
         setAppState('authenticated')
       } catch (err) {
@@ -80,7 +82,7 @@ function App() {
   const renderPage = () => {
     switch (activeTab) {
       case 'home':
-        return <HomePage period={period} onPeriodChange={handlePeriodChange} />
+        return <HomePage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
       case 'leaderboard':
         return <LeaderboardPage period={period} onPeriodChange={handlePeriodChange} />
       case 'interactions':
@@ -95,7 +97,7 @@ function App() {
           />
         )
       default:
-        return <HomePage period={period} onPeriodChange={handlePeriodChange} />
+        return <HomePage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
     }
   }
 

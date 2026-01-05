@@ -58,7 +58,7 @@ func (h *MiniAppHandler) HandleAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := h.service.Authenticate(req.InitData)
+	response, err := h.service.Authenticate(ctx, req.InitData)
 	if err != nil {
 		slog.Warn("Mini App auth failed", "error", err)
 		if txn != nil {

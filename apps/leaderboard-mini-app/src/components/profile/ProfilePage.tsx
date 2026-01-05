@@ -102,9 +102,9 @@ export function ProfilePage({ period, onPeriodChange, firstName, username }: Pro
         )}
       </div>
 
-      {/* Top Reactors */}
+      {/* Who Reacts to You */}
       <section className="interactors-section">
-        <h2 className="section-title">Top Fans</h2>
+        <h2 className="section-title">Who Reacts to You</h2>
         <p className="section-subtitle">Users who react most to your messages</p>
         {loading ? (
           <div className="interactor-list">
@@ -114,6 +114,23 @@ export function ProfilePage({ period, onPeriodChange, firstName, username }: Pro
           </div>
         ) : data?.top_reactors.length ? (
           <InteractorList interactors={data.top_reactors} />
+        ) : (
+          <div className="empty-list">No reactions yet</div>
+        )}
+      </section>
+
+      {/* Who You React To */}
+      <section className="interactors-section">
+        <h2 className="section-title">Who You React To</h2>
+        <p className="section-subtitle">Users whose messages you react to most</p>
+        {loading ? (
+          <div className="interactor-list">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="skeleton skeleton-row" />
+            ))}
+          </div>
+        ) : data?.top_reacted_to.length ? (
+          <InteractorList interactors={data.top_reacted_to} />
         ) : (
           <div className="empty-list">No reactions yet</div>
         )}

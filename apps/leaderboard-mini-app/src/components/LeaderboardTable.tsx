@@ -1,4 +1,5 @@
 import type { LeaderboardUser, LeaderboardMetric } from '../types'
+import { Avatar } from './common'
 
 interface LeaderboardTableProps {
   users: LeaderboardUser[]
@@ -13,9 +14,11 @@ interface LeaderboardTableProps {
 
 const METRICS: { value: LeaderboardMetric; label: string }[] = [
   { value: 'message_count', label: 'Messages' },
-  { value: 'reactions_sent', label: 'Sent' },
-  { value: 'reactions_received', label: 'Received' },
-  { value: 'active_days', label: 'Days' },
+  { value: 'reactions_sent', label: 'Reactions Sent' },
+  { value: 'reactions_received', label: 'Reactions Received' },
+  { value: 'replies_sent', label: 'Replies Sent' },
+  { value: 'replies_received', label: 'Replies Received' },
+  { value: 'active_days', label: 'Active Days' },
 ]
 
 function getRankClass(rank: number): string {
@@ -90,6 +93,12 @@ export function LeaderboardTable({
             {users.map((user) => (
               <div key={user.user_id} className="leaderboard-item">
                 <div className={`rank ${getRankClass(user.rank)}`}>{user.rank}</div>
+                <Avatar
+                  photoUrl={user.photo_url}
+                  firstName={user.first_name}
+                  lastName={user.last_name}
+                  size="small"
+                />
                 <div className="user-info">
                   <div className="user-name">{getUserDisplayName(user)}</div>
                   {user.username && (

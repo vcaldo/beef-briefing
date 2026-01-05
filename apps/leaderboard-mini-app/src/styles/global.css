@@ -573,6 +573,30 @@ body {
   color: var(--tg-theme-text-color);
 }
 
+.reaction-emoji-paid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.paid-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--tg-theme-button-color);
+  letter-spacing: 0.5px;
+}
+
+.paid-id {
+  font-size: 9px;
+  color: var(--tg-theme-hint-color);
+  font-family: monospace;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* =====================================================
    Profile Page
    ===================================================== */
@@ -684,6 +708,20 @@ body {
 .interactor-emoji {
   font-size: 16px;
   flex-shrink: 0;
+}
+
+.interactor-emoji-paid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.interactor-emoji-paid .paid-label {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--tg-theme-button-color);
+  letter-spacing: 0.3px;
 }
 
 /* =====================================================

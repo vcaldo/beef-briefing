@@ -138,6 +138,11 @@ export function ProfilePage({ period, onPeriodChange, firstName, username }: Pro
   )
 }
 
+// Check if emoji is a paid emoji (numeric ID)
+function isPaidEmoji(emoji: string): boolean {
+  return /^\d+$/.test(emoji)
+}
+
 function InteractorList({ interactors, showEmoji = false }: { interactors: TopInteractor[]; showEmoji?: boolean }) {
   return (
     <div className="interactor-list">
@@ -150,7 +155,13 @@ function InteractorList({ interactors, showEmoji = false }: { interactors: TopIn
             </div>
           </div>
           {showEmoji && interactor.top_emoji && (
-            <div className="interactor-emoji">{interactor.top_emoji}</div>
+            isPaidEmoji(interactor.top_emoji) ? (
+              <div className="interactor-emoji-paid">
+                <span className="paid-label">PAID</span>
+              </div>
+            ) : (
+              <div className="interactor-emoji">{interactor.top_emoji}</div>
+            )
           )}
           <div className="interactor-score">{interactor.score}</div>
         </div>

@@ -101,9 +101,18 @@ export function ReactionsPage({ period, onPeriodChange }: ReactionsPageProps) {
 }
 
 function ReactionItem({ reaction }: { reaction: TopReaction }) {
+  const isPaid = reaction.reaction_type === 'custom_emoji' || reaction.reaction_type === 'paid'
+
   return (
     <div className="reaction-item">
-      <div className="reaction-emoji">{reaction.emoji}</div>
+      {isPaid ? (
+        <div className="reaction-emoji-paid">
+          <span className="paid-label">PAID</span>
+          <span className="paid-id">{reaction.emoji}</span>
+        </div>
+      ) : (
+        <div className="reaction-emoji">{reaction.emoji}</div>
+      )}
       <div className="reaction-count">{reaction.count.toLocaleString()}</div>
     </div>
   )

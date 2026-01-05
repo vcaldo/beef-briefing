@@ -105,7 +105,6 @@ export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
 
       <section className="heatmap-section">
         <h2 className="section-title">Group Activity</h2>
-        <p className="section-subtitle">When the group is most active</p>
         {loadingHeatmap ? (
           <HeatmapSkeleton />
         ) : heatmapError ? (

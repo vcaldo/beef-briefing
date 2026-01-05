@@ -291,7 +291,7 @@ func (s *MiniAppService) GetUserRankings(ctx context.Context, chatID int64, metr
 
 // getPeriodDates returns start and end dates for a period
 func getPeriodDates(period string) (*time.Time, *time.Time) {
-	now := time.Now()
+	now := time.Now().UTC()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	endDate := today.Add(24 * time.Hour) // Include today
 

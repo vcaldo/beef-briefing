@@ -69,6 +69,8 @@ type ProfileStats struct {
 	MessageCount            int64   `json:"message_count"`
 	ReactionsSent           int64   `json:"reactions_sent"`
 	ReactionsReceived       int64   `json:"reactions_received"`
+	RepliesSent             int64   `json:"replies_sent"`
+	RepliesReceived         int64   `json:"replies_received"`
 	ActiveDays              int64   `json:"active_days"`
 	CurrentStreak           int64   `json:"current_streak"`
 	AvgMessagesPerDay       float64 `json:"avg_messages_per_day"`
@@ -710,22 +712,43 @@ func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, use
 	if startDate == nil && endDate == nil {
 		// All-time: use materialized view with window functions for ranking
 		err := r.db.QueryRowContext(ctx, `
-			WITH ranked AS (
+			WITH replies_sent AS (
+				SELECT m.user_id, COUNT(*) as replies_sent
+				FROM messages m
+				WHERE m.chat_id = $1
+					AND m.reply_to_message_id IS NOT NULL
+				GROUP BY m.user_id
+			),
+			replies_received AS (
+				SELECT orig.user_id, COUNT(*) as replies_received
+				FROM messages m
+				JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
+				WHERE m.chat_id = $1
+					AND m.reply_to_message_id IS NOT NULL
+				GROUP BY orig.user_id
+			),
+			ranked AS (
 				SELECT
-					user_id,
-					message_count,
-					reactions_sent,
-					reactions_received,
-					active_days,
-					ROW_NUMBER() OVER (ORDER BY message_count DESC) as rank_by_messages,
-					ROW_NUMBER() OVER (ORDER BY reactions_received DESC) as rank_by_reactions
-				FROM mv_user_statistics
-				WHERE chat_id = $1 AND is_bot = false
+					mv.user_id,
+					mv.message_count,
+					mv.reactions_sent,
+					mv.reactions_received,
+					mv.active_days,
+					COALESCE(rps.replies_sent, 0) as replies_sent,
+					COALESCE(rpr.replies_received, 0) as replies_received,
+					ROW_NUMBER() OVER (ORDER BY mv.message_count DESC) as rank_by_messages,
+					ROW_NUMBER() OVER (ORDER BY mv.reactions_received DESC) as rank_by_reactions
+				FROM mv_user_statistics mv
+				LEFT JOIN replies_sent rps ON rps.user_id = mv.user_id
+				LEFT JOIN replies_received rpr ON rpr.user_id = mv.user_id
+				WHERE mv.chat_id = $1 AND mv.is_bot = false
 			)
 			SELECT
 				message_count,
 				reactions_sent,
 				reactions_received,
+				replies_sent,
+				replies_received,
 				active_days,
 				rank_by_messages,
 				rank_by_reactions
@@ -735,6 +758,8 @@ func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, use
 			&stats.MessageCount,
 			&stats.ReactionsSent,
 			&stats.ReactionsReceived,
+			&stats.RepliesSent,
+			&stats.RepliesReceived,
 			&stats.ActiveDays,
 			&stats.RankByMessages,
 			&stats.RankByReactionsReceived,
@@ -781,6 +806,25 @@ func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, use
 					AND mr.is_removed = false
 				GROUP BY m.user_id
 			),
+			replies_sent AS (
+				SELECT m.user_id, COUNT(*) as replies_sent
+				FROM messages m
+				WHERE m.chat_id = $1
+					AND m.date >= $2
+					AND m.date < $3
+					AND m.reply_to_message_id IS NOT NULL
+				GROUP BY m.user_id
+			),
+			replies_received AS (
+				SELECT orig.user_id, COUNT(*) as replies_received
+				FROM messages m
+				JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
+				WHERE m.chat_id = $1
+					AND m.date >= $2
+					AND m.date < $3
+					AND m.reply_to_message_id IS NOT NULL
+				GROUP BY orig.user_id
+			),
 			combined AS (
 				SELECT
 					us.user_id,
@@ -788,16 +832,22 @@ func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, use
 					us.active_days,
 					COALESCE(rs.reactions_sent, 0) as reactions_sent,
 					COALESCE(rr.reactions_received, 0) as reactions_received,
+					COALESCE(rps.replies_sent, 0) as replies_sent,
+					COALESCE(rpr.replies_received, 0) as replies_received,
 					ROW_NUMBER() OVER (ORDER BY us.message_count DESC) as rank_by_messages,
 					ROW_NUMBER() OVER (ORDER BY COALESCE(rr.reactions_received, 0) DESC) as rank_by_reactions
 				FROM user_stats us
 				LEFT JOIN reactions_sent rs ON rs.user_id = us.user_id
 				LEFT JOIN reactions_received rr ON rr.user_id = us.user_id
+				LEFT JOIN replies_sent rps ON rps.user_id = us.user_id
+				LEFT JOIN replies_received rpr ON rpr.user_id = us.user_id
 			)
 			SELECT
 				message_count,
 				reactions_sent,
 				reactions_received,
+				replies_sent,
+				replies_received,
 				active_days,
 				rank_by_messages,
 				rank_by_reactions
@@ -807,6 +857,8 @@ func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, use
 			&stats.MessageCount,
 			&stats.ReactionsSent,
 			&stats.ReactionsReceived,
+			&stats.RepliesSent,
+			&stats.RepliesReceived,
 			&stats.ActiveDays,
 			&stats.RankByMessages,
 			&stats.RankByReactionsReceived,

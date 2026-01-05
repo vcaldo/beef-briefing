@@ -11,10 +11,9 @@ import type { Period, StatsResponse, ActivityDataPoint, HeatmapData } from '../.
 interface HomePageProps {
   period: Period
   onPeriodChange: (period: Period) => void
-  chatTitle: string | null
 }
 
-export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
+export function HomePage({ period, onPeriodChange }: HomePageProps) {
   // Data state
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [activity, setActivity] = useState<ActivityDataPoint[]>([])
@@ -71,7 +70,7 @@ export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
   return (
     <div className="page-container">
       <header className="app-header">
-        <h1>{chatTitle || 'Overview'}</h1>
+        <h1>Overview</h1>
       </header>
 
       <PeriodSelector selectedPeriod={period} onPeriodChange={onPeriodChange} />

@@ -20,7 +20,6 @@ function App() {
   // User info (from auth response)
   const [firstName, setFirstName] = useState<string>('')
   const [username, setUsername] = useState<string | null>(null)
-  const [chatTitle, setChatTitle] = useState<string | null>(null)
 
   // Navigation state
   const [activeTab, setActiveTab] = useState<TabId>('home')
@@ -55,7 +54,11 @@ function App() {
         // Store user info
         setFirstName(auth.first_name)
         setUsername(auth.username)
-        setChatTitle(auth.chat_title)
+
+        // Update document title to group name (shown in Telegram header)
+        if (auth.chat_title) {
+          document.title = auth.chat_title
+        }
 
         setAppState('authenticated')
       } catch (err) {
@@ -82,7 +85,7 @@ function App() {
   const renderPage = () => {
     switch (activeTab) {
       case 'home':
-        return <HomePage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
+        return <HomePage period={period} onPeriodChange={handlePeriodChange} />
       case 'leaderboard':
         return <LeaderboardPage period={period} onPeriodChange={handlePeriodChange} />
       case 'interactions':
@@ -97,7 +100,7 @@ function App() {
           />
         )
       default:
-        return <HomePage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
+        return <HomePage period={period} onPeriodChange={handlePeriodChange} />
     }
   }
 

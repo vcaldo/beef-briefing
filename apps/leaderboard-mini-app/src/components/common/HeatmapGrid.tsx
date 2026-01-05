@@ -12,16 +12,20 @@ interface HeatmapGridProps {
 export function HeatmapGrid({ data, title, showLabels = true }: HeatmapGridProps) {
   // Create a lookup map for quick cell access
   const cellMap = new Map<string, number>()
-  data.data.forEach((cell) => {
-    cellMap.set(`${cell.day_of_week}-${cell.hour}`, cell.message_count)
-  })
+  // Defensive check for malformed data
+  if (data?.data && Array.isArray(data.data)) {
+    data.data.forEach((cell) => {
+      cellMap.set(`${cell.day_of_week}-${cell.hour}`, cell.message_count)
+    })
+  }
 
   // Calculate color intensity based on count relative to max
+  const maxCount = data?.max_count ?? 0
   const getColor = (count: number): string => {
-    if (count === 0 || data.max_count === 0) {
+    if (count === 0 || maxCount === 0) {
       return 'var(--tg-theme-secondary-bg-color)'
     }
-    const intensity = count / data.max_count
+    const intensity = count / maxCount
     // Use CSS variable for button color with varying opacity
     if (intensity > 0.75) return 'var(--heatmap-high)'
     if (intensity > 0.5) return 'var(--heatmap-medium-high)'
@@ -83,7 +87,7 @@ export function HeatmapGrid({ data, title, showLabels = true }: HeatmapGridProps
       </div>
 
       <div className="heatmap-stats">
-        Total: {data.total_messages.toLocaleString()} messages
+        Total: {(data?.total_messages ?? 0).toLocaleString()} messages
       </div>
     </div>
   )

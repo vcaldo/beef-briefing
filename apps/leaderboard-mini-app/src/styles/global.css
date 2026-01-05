@@ -47,6 +47,13 @@ body {
   margin: 0;
 }
 
+.app-header-subtitle {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color);
+  font-weight: 400;
+  margin: 2px 0 0 0;
+}
+
 /* Period Selector */
 .period-selector {
   margin-bottom: 16px;
@@ -476,16 +483,13 @@ body {
 
 .heatmap-grid {
   display: grid;
-  grid-template-columns: 32px repeat(24, 1fr);
-  gap: 2px;
-  min-width: 360px;
+  grid-template-columns: 28px repeat(24, 1fr);
+  gap: 1px;
 }
 
 .heatmap-cell {
   aspect-ratio: 1;
   border-radius: 2px;
-  min-width: 10px;
-  min-height: 10px;
 }
 
 .heatmap-label {
@@ -803,4 +807,97 @@ body {
   color: var(--tg-theme-button-text-color);
   font-weight: 700;
   text-transform: uppercase;
+}
+
+/* =====================================================
+   Error Boundary
+   ===================================================== */
+.error-boundary {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  padding: 20px;
+}
+
+.error-boundary-content {
+  text-align: center;
+  max-width: 280px;
+}
+
+.error-boundary-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--tg-theme-secondary-bg-color);
+  color: var(--tg-theme-hint-color);
+  font-size: 24px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+}
+
+.error-boundary-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--tg-theme-text-color);
+}
+
+.error-boundary-message {
+  font-size: 13px;
+  color: var(--tg-theme-hint-color);
+  line-height: 1.4;
+  margin-bottom: 16px;
+}
+
+.error-boundary-btn {
+  padding: 10px 24px;
+  border-radius: 20px;
+  border: none;
+  background: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.error-boundary-btn:hover {
+  opacity: 0.9;
+}
+
+/* =====================================================
+   Inline Error State (for sections within pages)
+   ===================================================== */
+.section-error {
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.section-error-message {
+  font-size: 13px;
+  color: var(--tg-theme-hint-color);
+  margin-bottom: 12px;
+}
+
+.section-error-btn {
+  padding: 8px 16px;
+  border-radius: 16px;
+  border: 1.5px solid var(--tg-theme-button-color);
+  background: transparent;
+  color: var(--tg-theme-button-color);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.section-error-btn:hover {
+  background: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
 }

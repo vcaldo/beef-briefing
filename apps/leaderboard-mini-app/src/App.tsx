@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 
 import { apiClient } from './api/client'
-import { TabBar } from './components/common/TabBar'
+import { TabBar, ErrorBoundary } from './components/common'
 import { HomePage } from './components/home/HomePage'
 import { LeaderboardPage } from './components/leaderboard/LeaderboardPage'
 import { InteractionsPage } from './components/interactions/InteractionsPage'
@@ -20,6 +20,7 @@ function App() {
   // User info (from auth response)
   const [firstName, setFirstName] = useState<string>('')
   const [username, setUsername] = useState<string | null>(null)
+  const [chatTitle, setChatTitle] = useState<string | null>(null)
 
   // Navigation state
   const [activeTab, setActiveTab] = useState<TabId>('home')
@@ -54,6 +55,7 @@ function App() {
         // Store user info
         setFirstName(auth.first_name)
         setUsername(auth.username)
+        setChatTitle(auth.chat_title)
 
         // Update document title to group name (shown in Telegram header)
         if (auth.chat_title) {
@@ -81,15 +83,20 @@ function App() {
     setActiveTab(tab)
   }
 
+  // Reset error boundary on tab change
+  const handleErrorReset = useCallback(() => {
+    // Re-render will happen automatically due to key change
+  }, [])
+
   // Render page based on active tab
   const renderPage = () => {
     switch (activeTab) {
       case 'home':
-        return <HomePage period={period} onPeriodChange={handlePeriodChange} />
+        return <HomePage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
       case 'leaderboard':
-        return <LeaderboardPage period={period} onPeriodChange={handlePeriodChange} />
+        return <LeaderboardPage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
       case 'interactions':
-        return <InteractionsPage period={period} onPeriodChange={handlePeriodChange} />
+        return <InteractionsPage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
       case 'profile':
         return (
           <ProfilePage
@@ -97,10 +104,11 @@ function App() {
             onPeriodChange={handlePeriodChange}
             firstName={firstName}
             username={username}
+            chatTitle={chatTitle}
           />
         )
       default:
-        return <HomePage period={period} onPeriodChange={handlePeriodChange} />
+        return <HomePage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
     }
   }
 
@@ -133,7 +141,9 @@ function App() {
   // Main app with tab navigation
   return (
     <div className="app">
-      {renderPage()}
+      <ErrorBoundary key={activeTab} onReset={handleErrorReset}>
+        {renderPage()}
+      </ErrorBoundary>
       <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
   )

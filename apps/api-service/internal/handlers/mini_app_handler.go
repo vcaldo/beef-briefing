@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"beef-briefing/apps/api-service/internal/middleware"
+	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
 
@@ -185,6 +186,11 @@ func (h *MiniAppHandler) HandleActivity(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Ensure non-nil slice for JSON serialization
+	if activity == nil {
+		activity = []repository.DailyActivity{}
+	}
+
 	response := map[string]interface{}{
 		"data": activity,
 	}
@@ -240,10 +246,12 @@ func (h *MiniAppHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Reques
 		"message_count":      true,
 		"reactions_sent":     true,
 		"reactions_received": true,
+		"replies_sent":       true,
+		"replies_received":   true,
 		"active_days":        true,
 	}
 	if !validMetrics[metric] {
-		writeError(w, "invalid metric. Must be one of: message_count, reactions_sent, reactions_received, active_days", http.StatusBadRequest)
+		writeError(w, "invalid metric. Must be one of: message_count, reactions_sent, reactions_received, replies_sent, replies_received, active_days", http.StatusBadRequest)
 		return
 	}
 

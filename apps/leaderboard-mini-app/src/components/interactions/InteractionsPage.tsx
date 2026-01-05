@@ -40,17 +40,20 @@ function groupPaidReactions(reactions: TopReaction[]): TopReaction[] {
 interface InteractionsPageProps {
   period: Period
   onPeriodChange: (period: Period) => void
+  chatTitle: string | null
 }
 
-export function InteractionsPage({ period, onPeriodChange }: InteractionsPageProps) {
+export function InteractionsPage({ period, onPeriodChange, chatTitle }: InteractionsPageProps) {
   const [reactionsData, setReactionsData] = useState<ReactionsOverviewResponse | null>(null)
   const [repliesData, setRepliesData] = useState<RepliesOverviewResponse | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!apiClient.isAuthenticated()) return
 
     setLoading(true)
+    setError(null)
     try {
       const [reactionsResponse, repliesResponse] = await Promise.all([
         apiClient.getReactionsOverview(period, 10),
@@ -60,6 +63,7 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
       setRepliesData(repliesResponse)
     } catch (err) {
       console.error('Failed to fetch interactions data:', err)
+      setError('Failed to load interactions')
     } finally {
       setLoading(false)
     }
@@ -78,6 +82,7 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
     <div className="page-container">
       <header className="app-header">
         <h1>Interactions</h1>
+        {chatTitle && <p className="app-header-subtitle">{chatTitle}</p>}
       </header>
 
       <PeriodSelector selectedPeriod={period} onPeriodChange={onPeriodChange} />
@@ -85,11 +90,19 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
       {/* Top Reactions */}
       <section className="reactions-section">
         <h2 className="section-title">Top Reactions</h2>
+        <p className="section-subtitle">Most used reactions in the group</p>
         {loading ? (
           <div className="reactions-grid">
             {[...Array(10)].map((_, i) => (
               <div key={i} className="reaction-item skeleton" style={{ height: 72 }} />
             ))}
+          </div>
+        ) : error ? (
+          <div className="section-error">
+            <p className="section-error-message">{error}</p>
+            <button className="section-error-btn" onClick={fetchData}>
+              Retry
+            </button>
           </div>
         ) : processedReactions.length ? (
           <div className="reactions-grid">
@@ -102,9 +115,10 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
         )}
       </section>
 
-      {/* Top Givers */}
+      {/* Top Reaction Givers */}
       <section className="reactions-section">
-        <h2 className="section-title">Top Givers</h2>
+        <h2 className="section-title">Top Reaction Givers</h2>
+        <p className="section-subtitle">Users who give the most reactions</p>
         {loading ? (
           <div className="leaderboard-list">
             {[...Array(5)].map((_, i) => (
@@ -118,9 +132,10 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
         )}
       </section>
 
-      {/* Top Receivers */}
+      {/* Top Reaction Receivers */}
       <section className="reactions-section">
-        <h2 className="section-title">Top Receivers</h2>
+        <h2 className="section-title">Top Reaction Receivers</h2>
+        <p className="section-subtitle">Users who receive the most reactions</p>
         {loading ? (
           <div className="leaderboard-list">
             {[...Array(5)].map((_, i) => (
@@ -137,6 +152,7 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
       {/* Top Replies Sent */}
       <section className="reactions-section">
         <h2 className="section-title">Top Replies Sent</h2>
+        <p className="section-subtitle">Users who reply the most to others</p>
         {loading ? (
           <div className="leaderboard-list">
             {[...Array(5)].map((_, i) => (
@@ -153,6 +169,7 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
       {/* Top Replies Received */}
       <section className="reactions-section">
         <h2 className="section-title">Top Replies Received</h2>
+        <p className="section-subtitle">Users whose messages get the most replies</p>
         {loading ? (
           <div className="leaderboard-list">
             {[...Array(5)].map((_, i) => (

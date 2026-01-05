@@ -15,21 +15,25 @@ interface ProfilePageProps {
   onPeriodChange: (period: Period) => void
   firstName: string
   username: string | null
+  chatTitle: string | null
 }
 
-export function ProfilePage({ period, onPeriodChange, firstName, username }: ProfilePageProps) {
+export function ProfilePage({ period, onPeriodChange, firstName, username, chatTitle }: ProfilePageProps) {
   const [data, setData] = useState<ProfileResponse | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!apiClient.isAuthenticated()) return
 
     setLoading(true)
+    setError(null)
     try {
       const response = await apiClient.getProfile(period)
       setData(response)
     } catch (err) {
       console.error('Failed to fetch profile:', err)
+      setError('Failed to load profile')
     } finally {
       setLoading(false)
     }
@@ -43,6 +47,7 @@ export function ProfilePage({ period, onPeriodChange, firstName, username }: Pro
     <div className="page-container">
       <header className="app-header">
         <h1>Profile</h1>
+        {chatTitle && <p className="app-header-subtitle">{chatTitle}</p>}
       </header>
 
       <PeriodSelector selectedPeriod={period} onPeriodChange={onPeriodChange} />
@@ -66,6 +71,13 @@ export function ProfilePage({ period, onPeriodChange, firstName, username }: Pro
               <div key={i} className="skeleton skeleton-stat" />
             ))}
           </>
+        ) : error ? (
+          <div className="profile-stat-card section-error" style={{ gridColumn: '1 / -1' }}>
+            <p className="section-error-message">{error}</p>
+            <button className="section-error-btn" onClick={fetchData}>
+              Retry
+            </button>
+          </div>
         ) : (
           <>
             <div className="profile-stat-card">

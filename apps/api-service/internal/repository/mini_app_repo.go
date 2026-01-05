@@ -855,7 +855,7 @@ func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, us
 			numbered AS (
 				SELECT
 					activity_date,
-					activity_date - (ROW_NUMBER() OVER (ORDER BY activity_date DESC))::int as grp
+					activity_date - (ROW_NUMBER() OVER (ORDER BY activity_date ASC))::int as grp
 				FROM user_dates
 			)
 			SELECT CASE
@@ -885,7 +885,7 @@ func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, us
 			numbered AS (
 				SELECT
 					activity_date,
-					activity_date - (ROW_NUMBER() OVER (ORDER BY activity_date DESC))::int as grp
+					activity_date - (ROW_NUMBER() OVER (ORDER BY activity_date ASC))::int as grp
 				FROM user_dates
 			)
 			SELECT CASE

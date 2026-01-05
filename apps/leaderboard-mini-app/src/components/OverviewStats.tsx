@@ -3,6 +3,8 @@ import type { StatsResponse } from '../types'
 interface OverviewStatsProps {
   stats: StatsResponse | null
   loading: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
 function formatNumber(num: number): string {
@@ -15,7 +17,7 @@ function formatNumber(num: number): string {
   return num.toLocaleString()
 }
 
-export function OverviewStats({ stats, loading }: OverviewStatsProps) {
+export function OverviewStats({ stats, loading, error, onRetry }: OverviewStatsProps) {
   if (loading) {
     return (
       <div className="stats-grid">
@@ -24,6 +26,21 @@ export function OverviewStats({ stats, loading }: OverviewStatsProps) {
             <div className="skeleton skeleton-stat" />
           </div>
         ))}
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="stats-grid">
+        <div className="stat-card full-width section-error">
+          <p className="section-error-message">{error}</p>
+          {onRetry && (
+            <button className="section-error-btn" onClick={onRetry}>
+              Retry
+            </button>
+          )}
+        </div>
       </div>
     )
   }

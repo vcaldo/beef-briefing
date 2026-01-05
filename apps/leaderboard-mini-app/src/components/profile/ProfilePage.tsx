@@ -80,6 +80,7 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
           </div>
         ) : (
           <>
+            {/* Row 1: Messages | Avg */}
             <div className="profile-stat-card">
               <div className="profile-stat-value">{data?.stats.message_count.toLocaleString() || 0}</div>
               <div className="profile-stat-label">Messages</div>
@@ -88,27 +89,38 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
               )}
             </div>
             <div className="profile-stat-card">
+              <div className="profile-stat-value">{data?.stats.avg_messages_per_day?.toFixed(1) || '0'}</div>
+              <div className="profile-stat-label">Avg</div>
+            </div>
+            {/* Row 2: Reactions Received | Reactions Given */}
+            <div className="profile-stat-card">
               <div className="profile-stat-value">{data?.stats.reactions_received.toLocaleString() || 0}</div>
-              <div className="profile-stat-label">Reactions</div>
+              <div className="profile-stat-label">Reactions Received</div>
               {data?.stats.rank_by_reactions_received && (
                 <div className="profile-rank-badge">#{data.stats.rank_by_reactions_received}</div>
               )}
             </div>
             <div className="profile-stat-card">
               <div className="profile-stat-value">{data?.stats.reactions_sent.toLocaleString() || 0}</div>
-              <div className="profile-stat-label">Given</div>
+              <div className="profile-stat-label">Reactions Given</div>
+            </div>
+            {/* Row 3: Replies Received | Replies Sent */}
+            <div className="profile-stat-card">
+              <div className="profile-stat-value">{data?.stats.replies_received?.toLocaleString() || 0}</div>
+              <div className="profile-stat-label">Replies Received</div>
             </div>
             <div className="profile-stat-card">
-              <div className="profile-stat-value">{data?.stats.active_days || 0}</div>
-              <div className="profile-stat-label">Active Days</div>
+              <div className="profile-stat-value">{data?.stats.replies_sent?.toLocaleString() || 0}</div>
+              <div className="profile-stat-label">Replies Sent</div>
             </div>
+            {/* Row 4: Days Streak | Active Days */}
             <div className="profile-stat-card">
               <div className="profile-stat-value">{data?.stats.current_streak || 0}</div>
               <div className="profile-stat-label">Days Streak</div>
             </div>
             <div className="profile-stat-card">
-              <div className="profile-stat-value">{data?.stats.avg_messages_per_day?.toFixed(1) || '0'}</div>
-              <div className="profile-stat-label">Avg/Day</div>
+              <div className="profile-stat-value">{data?.stats.active_days || 0}</div>
+              <div className="profile-stat-label">Active Days</div>
             </div>
           </>
         )}

@@ -88,6 +88,7 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
       {/* Top Reactions */}
       <section className="reactions-section">
         <h2 className="section-title">Top Reactions</h2>
+        <p className="section-subtitle">Most used reactions in the group</p>
         {loading ? (
           <div className="reactions-grid">
             {[...Array(10)].map((_, i) => (
@@ -112,9 +113,10 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
         )}
       </section>
 
-      {/* Top Givers */}
+      {/* Top Reaction Givers */}
       <section className="reactions-section">
-        <h2 className="section-title">Top Givers</h2>
+        <h2 className="section-title">Top Reaction Givers</h2>
+        <p className="section-subtitle">Users who give the most reactions</p>
         {loading ? (
           <div className="leaderboard-list">
             {[...Array(5)].map((_, i) => (
@@ -128,9 +130,10 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
         )}
       </section>
 
-      {/* Top Receivers */}
+      {/* Top Reaction Receivers */}
       <section className="reactions-section">
-        <h2 className="section-title">Top Receivers</h2>
+        <h2 className="section-title">Top Reaction Receivers</h2>
+        <p className="section-subtitle">Users who receive the most reactions</p>
         {loading ? (
           <div className="leaderboard-list">
             {[...Array(5)].map((_, i) => (
@@ -147,6 +150,7 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
       {/* Top Replies Sent */}
       <section className="reactions-section">
         <h2 className="section-title">Top Replies Sent</h2>
+        <p className="section-subtitle">Users who reply the most to others</p>
         {loading ? (
           <div className="leaderboard-list">
             {[...Array(5)].map((_, i) => (
@@ -163,6 +167,7 @@ export function InteractionsPage({ period, onPeriodChange }: InteractionsPagePro
       {/* Top Replies Received */}
       <section className="reactions-section">
         <h2 className="section-title">Top Replies Received</h2>
+        <p className="section-subtitle">Users whose messages get the most replies</p>
         {loading ? (
           <div className="leaderboard-list">
             {[...Array(5)].map((_, i) => (

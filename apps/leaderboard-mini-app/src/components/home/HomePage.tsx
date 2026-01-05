@@ -4,15 +4,9 @@ import { apiClient } from '../../api/client'
 import { PeriodSelector } from '../PeriodSelector'
 import { OverviewStats } from '../OverviewStats'
 import { ActivityChart } from '../ActivityChart'
-import { LeaderboardTable } from '../LeaderboardTable'
+import { HeatmapGrid, HeatmapSkeleton } from '../common/HeatmapGrid'
 
-import type {
-  Period,
-  LeaderboardMetric,
-  StatsResponse,
-  ActivityDataPoint,
-  LeaderboardUser,
-} from '../../types'
+import type { Period, StatsResponse, ActivityDataPoint, HeatmapData } from '../../types'
 
 interface HomePageProps {
   period: Period
@@ -23,35 +17,12 @@ export function HomePage({ period, onPeriodChange }: HomePageProps) {
   // Data state
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [activity, setActivity] = useState<ActivityDataPoint[]>([])
-  const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([])
-  const [leaderboardTotal, setLeaderboardTotal] = useState(0)
-  const [leaderboardPage, setLeaderboardPage] = useState(1)
-  const [leaderboardMetric, setLeaderboardMetric] = useState<LeaderboardMetric>('message_count')
+  const [heatmap, setHeatmap] = useState<HeatmapData | null>(null)
 
   // Loading states
   const [loadingStats, setLoadingStats] = useState(false)
   const [loadingActivity, setLoadingActivity] = useState(false)
-  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false)
-
-  // Fetch leaderboard (separate function for pagination)
-  const fetchLeaderboard = useCallback(
-    async (page: number) => {
-      if (!apiClient.isAuthenticated()) return
-
-      setLoadingLeaderboard(true)
-      try {
-        const data = await apiClient.getLeaderboard(period, leaderboardMetric, page, 20)
-        setLeaderboard(data.users)
-        setLeaderboardTotal(data.total)
-        setLeaderboardPage(page)
-      } catch (err) {
-        console.error('Failed to fetch leaderboard:', err)
-      } finally {
-        setLoadingLeaderboard(false)
-      }
-    },
-    [period, leaderboardMetric]
-  )
+  const [loadingHeatmap, setLoadingHeatmap] = useState(false)
 
   // Fetch all data when period changes
   const fetchData = useCallback(async () => {
@@ -79,36 +50,27 @@ export function HomePage({ period, onPeriodChange }: HomePageProps) {
       setLoadingActivity(false)
     }
 
-    // Fetch leaderboard (reset to page 1 when period changes)
-    setLeaderboardPage(1)
-    fetchLeaderboard(1)
-  }, [period, fetchLeaderboard])
+    // Fetch group heatmap (always use max period for group heatmap)
+    setLoadingHeatmap(true)
+    try {
+      const heatmapData = await apiClient.getHeatmap('max', false)
+      setHeatmap(heatmapData.group)
+    } catch (err) {
+      console.error('Failed to fetch heatmap:', err)
+    } finally {
+      setLoadingHeatmap(false)
+    }
+  }, [period])
 
   // Fetch data on mount and when period changes
   useEffect(() => {
     fetchData()
   }, [fetchData])
 
-  // Refetch leaderboard when metric changes
-  useEffect(() => {
-    setLeaderboardPage(1)
-    fetchLeaderboard(1)
-  }, [leaderboardMetric, fetchLeaderboard])
-
-  // Handle metric change
-  const handleMetricChange = (newMetric: LeaderboardMetric) => {
-    setLeaderboardMetric(newMetric)
-  }
-
-  // Handle page change
-  const handlePageChange = (newPage: number) => {
-    fetchLeaderboard(newPage)
-  }
-
   return (
     <div className="page-container">
       <header className="app-header">
-        <h1>Leaderboard</h1>
+        <h1>Overview</h1>
       </header>
 
       <PeriodSelector selectedPeriod={period} onPeriodChange={onPeriodChange} />
@@ -117,16 +79,17 @@ export function HomePage({ period, onPeriodChange }: HomePageProps) {
 
       <ActivityChart data={activity} loading={loadingActivity} />
 
-      <LeaderboardTable
-        users={leaderboard}
-        total={leaderboardTotal}
-        page={leaderboardPage}
-        limit={20}
-        metric={leaderboardMetric}
-        loading={loadingLeaderboard}
-        onMetricChange={handleMetricChange}
-        onPageChange={handlePageChange}
-      />
+      <section className="heatmap-section">
+        <h2 className="section-title">Group Activity</h2>
+        <p className="section-subtitle">When the group is most active</p>
+        {loadingHeatmap ? (
+          <HeatmapSkeleton />
+        ) : heatmap ? (
+          <HeatmapGrid data={heatmap} />
+        ) : (
+          <div className="empty-list">No activity data</div>
+        )}
+      </section>
     </div>
   )
 }

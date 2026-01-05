@@ -4,9 +4,9 @@ import { useLaunchParams } from '@telegram-apps/sdk-react'
 import { apiClient } from './api/client'
 import { TabBar } from './components/common/TabBar'
 import { HomePage } from './components/home/HomePage'
-import { ReactionsPage } from './components/reactions/ReactionsPage'
+import { LeaderboardPage } from './components/leaderboard/LeaderboardPage'
+import { InteractionsPage } from './components/interactions/InteractionsPage'
 import { ProfilePage } from './components/profile/ProfilePage'
-import { ActivityPage } from './components/activity/ActivityPage'
 
 import type { TabId, Period } from './types'
 
@@ -81,8 +81,10 @@ function App() {
     switch (activeTab) {
       case 'home':
         return <HomePage period={period} onPeriodChange={handlePeriodChange} />
-      case 'reactions':
-        return <ReactionsPage period={period} onPeriodChange={handlePeriodChange} />
+      case 'leaderboard':
+        return <LeaderboardPage period={period} onPeriodChange={handlePeriodChange} />
+      case 'interactions':
+        return <InteractionsPage period={period} onPeriodChange={handlePeriodChange} />
       case 'profile':
         return (
           <ProfilePage
@@ -92,8 +94,6 @@ function App() {
             username={username}
           />
         )
-      case 'activity':
-        return <ActivityPage period={period} onPeriodChange={handlePeriodChange} />
       default:
         return <HomePage period={period} onPeriodChange={handlePeriodChange} />
     }

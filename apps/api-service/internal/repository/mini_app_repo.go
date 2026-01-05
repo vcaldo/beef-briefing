@@ -903,6 +903,84 @@ func (r *MiniAppRepository) GetTopRepliersToUser(ctx context.Context, chatID, us
 	return interactors, rows.Err()
 }
 
+// GetTopRepliedToByUser returns users that a specific user replies to most.
+func (r *MiniAppRepository) GetTopRepliedToByUser(ctx context.Context, chatID, userID int64, limit int, startDate, endDate *time.Time) ([]TopInteractor, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-top-replied-to-by-user")
+		defer segment.End()
+	}
+
+	var rows *sql.Rows
+	var err error
+
+	if startDate == nil && endDate == nil {
+		// All-time
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				orig.user_id,
+				u.first_name,
+				u.last_name,
+				u.username,
+				COUNT(*) as score,
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank
+			FROM messages m
+			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
+			JOIN users u ON u.id = orig.user_id
+			WHERE m.chat_id = $1
+				AND m.user_id = $2
+				AND orig.user_id != $2
+				AND m.reply_to_message_id IS NOT NULL
+				AND u.is_bot = false
+			GROUP BY orig.user_id, u.first_name, u.last_name, u.username
+			ORDER BY score DESC
+			LIMIT $3
+		`, chatID, userID, limit)
+	} else {
+		// Date-filtered
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				orig.user_id,
+				u.first_name,
+				u.last_name,
+				u.username,
+				COUNT(*) as score,
+				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank
+			FROM messages m
+			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
+			JOIN users u ON u.id = orig.user_id
+			WHERE m.chat_id = $1
+				AND m.user_id = $2
+				AND orig.user_id != $2
+				AND m.reply_to_message_id IS NOT NULL
+				AND m.date >= $3
+				AND m.date < $4
+				AND u.is_bot = false
+			GROUP BY orig.user_id, u.first_name, u.last_name, u.username
+			ORDER BY score DESC
+			LIMIT $5
+		`, chatID, userID, startDate, endDate, limit)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var interactors []TopInteractor
+	for rows.Next() {
+		var rank int64
+		var i TopInteractor
+		if err := rows.Scan(&i.UserID, &i.FirstName, &i.LastName, &i.Username, &i.Score, &rank); err != nil {
+			return nil, err
+		}
+		i.Rank = int(rank)
+		interactors = append(interactors, i)
+	}
+
+	return interactors, rows.Err()
+}
+
 // GetGroupHeatmap returns the activity heatmap for a chat from the materialized view.
 func (r *MiniAppRepository) GetGroupHeatmap(ctx context.Context, chatID int64) (*HeatmapData, error) {
 	txn := newrelic.FromContext(ctx)

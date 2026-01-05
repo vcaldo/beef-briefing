@@ -48,7 +48,7 @@ export type Period = '24h' | '7d' | '30d' | '90d' | '180d' | '365d' | 'ytd' | 'm
 
 export type LeaderboardMetric = 'message_count' | 'reactions_sent' | 'reactions_received' | 'active_days'
 
-export type TabId = 'home' | 'reactions' | 'profile' | 'activity'
+export type TabId = 'home' | 'leaderboard' | 'interactions' | 'profile'
 
 // Reactions Overview Types
 export interface TopReaction {
@@ -96,6 +96,7 @@ export interface ProfileResponse {
   stats: ProfileStats
   top_reactors: TopInteractor[]
   top_repliers: TopInteractor[]
+  top_replied_to: TopInteractor[]
   heatmap: HeatmapData
 }
 

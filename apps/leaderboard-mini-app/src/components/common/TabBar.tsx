@@ -6,6 +6,13 @@ interface Tab {
   icon: React.ReactNode
 }
 
+const HomeIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <polyline points="9 22 9 12 15 12 15 22" />
+  </svg>
+)
+
 const TrophyIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
@@ -30,21 +37,11 @@ const UserIcon = () => (
   </svg>
 )
 
-const ChartIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" />
-    <path d="M3 9h18" />
-    <path d="M3 15h18" />
-    <path d="M9 3v18" />
-    <path d="M15 3v18" />
-  </svg>
-)
-
 const TABS: Tab[] = [
-  { id: 'home', label: 'Home', icon: <TrophyIcon /> },
-  { id: 'reactions', label: 'Reactions', icon: <HeartIcon /> },
+  { id: 'home', label: 'Home', icon: <HomeIcon /> },
+  { id: 'leaderboard', label: 'Leaderboard', icon: <TrophyIcon /> },
+  { id: 'interactions', label: 'Interactions', icon: <HeartIcon /> },
   { id: 'profile', label: 'Profile', icon: <UserIcon /> },
-  { id: 'activity', label: 'Activity', icon: <ChartIcon /> },
 ]
 
 interface TabBarProps {

@@ -320,10 +320,11 @@ func (s *MiniAppService) GetReactionsOverview(ctx context.Context, chatID int64,
 
 // ProfileResponse represents user profile data
 type ProfileResponse struct {
-	Stats       *repository.ProfileStats    `json:"stats"`
-	TopReactors []repository.TopInteractor  `json:"top_reactors"`
-	TopRepliers []repository.TopInteractor  `json:"top_repliers"`
-	Heatmap     *repository.HeatmapData     `json:"heatmap"`
+	Stats        *repository.ProfileStats   `json:"stats"`
+	TopReactors  []repository.TopInteractor `json:"top_reactors"`
+	TopRepliers  []repository.TopInteractor `json:"top_repliers"`
+	TopRepliedTo []repository.TopInteractor `json:"top_replied_to"`
+	Heatmap      *repository.HeatmapData    `json:"heatmap"`
 }
 
 // GetUserProfile returns personal stats and top interactors for a user
@@ -345,6 +346,11 @@ func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int6
 		return nil, fmt.Errorf("failed to get top repliers: %w", err)
 	}
 
+	topRepliedTo, err := s.repo.GetTopRepliedToByUser(ctx, chatID, userID, 5, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get top replied to: %w", err)
+	}
+
 	heatmap, err := s.repo.GetUserHeatmap(ctx, chatID, userID, startDate, endDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user heatmap: %w", err)
@@ -357,12 +363,16 @@ func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int6
 	if topRepliers == nil {
 		topRepliers = []repository.TopInteractor{}
 	}
+	if topRepliedTo == nil {
+		topRepliedTo = []repository.TopInteractor{}
+	}
 
 	return &ProfileResponse{
-		Stats:       stats,
-		TopReactors: topReactors,
-		TopRepliers: topRepliers,
-		Heatmap:     heatmap,
+		Stats:        stats,
+		TopReactors:  topReactors,
+		TopRepliers:  topRepliers,
+		TopRepliedTo: topRepliedTo,
+		Heatmap:      heatmap,
 	}, nil
 }
 

@@ -113,7 +113,7 @@ export function ProfilePage({ period, onPeriodChange, firstName, username }: Pro
             ))}
           </div>
         ) : data?.top_reactors.length ? (
-          <InteractorList interactors={data.top_reactors} showEmoji />
+          <InteractorList interactors={data.top_reactors} />
         ) : (
           <div className="empty-list">No reactions yet</div>
         )}

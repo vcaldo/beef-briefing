@@ -727,7 +727,8 @@ body {
 /* =====================================================
    Activity Page
    ===================================================== */
-.activity-heatmap-section {
+.activity-heatmap-section,
+.heatmap-section {
   padding: 0 16px 16px;
 }
 

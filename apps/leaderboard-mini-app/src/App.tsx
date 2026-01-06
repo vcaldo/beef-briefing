@@ -7,6 +7,7 @@ import { HomePage } from './components/home/HomePage'
 import { LeaderboardPage } from './components/leaderboard/LeaderboardPage'
 import { InteractionsPage } from './components/interactions/InteractionsPage'
 import { ProfilePage } from './components/profile/ProfilePage'
+import { CardPage } from './components/card'
 
 import type { TabId, Period } from './types'
 
@@ -18,6 +19,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
 
   // User info (from auth response)
+  const [userId, setUserId] = useState<number>(0)
   const [firstName, setFirstName] = useState<string>('')
   const [username, setUsername] = useState<string | null>(null)
   const [chatTitle, setChatTitle] = useState<string | null>(null)
@@ -54,6 +56,7 @@ function App() {
         }
 
         // Store user info
+        setUserId(auth.user_id)
         setFirstName(auth.first_name)
         setUsername(auth.username)
         setChatTitle(auth.chat_title)
@@ -99,6 +102,8 @@ function App() {
         return <LeaderboardPage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
       case 'interactions':
         return <InteractionsPage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
+      case 'card':
+        return <CardPage userId={userId} chatTitle={chatTitle} />
       case 'profile':
         return (
           <ProfilePage

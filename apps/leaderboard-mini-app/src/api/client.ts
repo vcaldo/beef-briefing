@@ -15,6 +15,8 @@ import type {
   ChatUsersResponse,
   Period,
   LeaderboardMetric,
+  CardImage,
+  CardImageWithUrl,
 } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
@@ -234,6 +236,95 @@ class ApiClient {
     }
 
     return response.json()
+  }
+
+  /**
+   * Get list of available weeks with card images.
+   */
+  async getWeeks(chatId?: number): Promise<string[]> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/gallery/weeks?chat_id=${targetChatId}`,
+      { headers: this.getHeaders() }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch weeks')
+    }
+
+    const data = await response.json()
+    return data.weeks
+  }
+
+  /**
+   * Get card images for a specific week.
+   */
+  async getCards(weekStart: string, chatId?: number): Promise<CardImage[]> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/gallery/images?chat_id=${targetChatId}&week_start=${weekStart}`,
+      { headers: this.getHeaders() }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch cards')
+    }
+
+    const data = await response.json()
+    return data.images
+  }
+
+  /**
+   * Get presigned URL for a specific card image.
+   */
+  async getImageUrl(imageId: number, expiresIn: number = 3600): Promise<string> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/gallery/image/${imageId}?expires=${expiresIn}`,
+      { headers: this.getHeaders() }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch image URL')
+    }
+
+    const data = await response.json()
+    return data.url
+  }
+
+  /**
+   * Get the current user's latest card with presigned URL.
+   */
+  async getUserLatestCard(userId: number, chatId?: number): Promise<CardImageWithUrl | null> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    // Get latest week
+    const weeks = await this.getWeeks(targetChatId)
+    if (weeks.length === 0) {
+      return null
+    }
+
+    // Get cards for the latest week
+    const cards = await this.getCards(weeks[0], targetChatId)
+    const userCard = cards.find((card) => card.user_id === userId)
+
+    if (!userCard) {
+      return null
+    }
+
+    // Get presigned URL
+    const url = await this.getImageUrl(userCard.id)
+    return { ...userCard, url }
   }
 
   private getHeaders(): HeadersInit {

@@ -57,7 +57,25 @@ export type LeaderboardMetric =
   | 'replies_received'
   | 'active_days'
 
-export type TabId = 'home' | 'leaderboard' | 'interactions' | 'profile'
+export type TabId = 'home' | 'leaderboard' | 'interactions' | 'profile' | 'card'
+
+// Card Gallery Types
+export interface CardImage {
+  id: number
+  user_id: number
+  chat_id: number
+  week_start: string
+  storage_path: string
+  theme: string
+  generated_at: string
+  first_name: string | null
+  last_name: string | null
+  username: string | null
+}
+
+export interface CardImageWithUrl extends CardImage {
+  url: string
+}
 
 // Reactions Overview Types
 export interface TopReaction {

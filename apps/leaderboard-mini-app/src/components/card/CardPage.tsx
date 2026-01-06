@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
-import { shareStory, openLink } from '@telegram-apps/sdk-react'
+import { useState, useEffect } from 'react'
 
 import { apiClient } from '../../api/client'
 import type { CardImageWithUrl } from '../../types'
@@ -31,22 +30,6 @@ export function CardPage({ userId, chatTitle }: CardPageProps) {
 
     fetchCard()
   }, [userId])
-
-  const handleShareToStory = useCallback(() => {
-    if (!card) return
-    shareStory(card.url, {
-      text: 'Check out my Deck card!',
-    })
-  }, [card])
-
-  const handleDownload = useCallback(() => {
-    if (!card) return
-    if (openLink.isAvailable()) {
-      openLink(card.url)
-    } else {
-      window.open(card.url, '_blank')
-    }
-  }, [card])
 
   if (isLoading) {
     return (
@@ -114,26 +97,6 @@ export function CardPage({ userId, chatTitle }: CardPageProps) {
             alt="Your weekly card"
             className="card-image"
           />
-        </div>
-
-        <div className="card-actions">
-          {shareStory.isAvailable() && (
-            <button className="card-action-btn card-action-primary" onClick={handleShareToStory}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              Story
-            </button>
-          )}
-          <button className="card-action-btn" onClick={handleDownload}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Download
-          </button>
         </div>
       </div>
     </div>

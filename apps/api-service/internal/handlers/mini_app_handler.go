@@ -116,12 +116,15 @@ func (h *MiniAppHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
 		period = "30d"
 	}
 
+	tz := parseTimezone(r)
+
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
 		txn.AddAttribute("period", period)
+		txn.AddAttribute("timezone", tz.String())
 	}
 
-	stats, err := h.service.GetOverviewStats(ctx, chatID, period)
+	stats, err := h.service.GetOverviewStats(ctx, chatID, period, tz)
 	if err != nil {
 		slog.Error("failed to get stats", "error", err, "chat_id", chatID)
 		if txn != nil {
@@ -171,12 +174,15 @@ func (h *MiniAppHandler) HandleActivity(w http.ResponseWriter, r *http.Request) 
 		period = "30d"
 	}
 
+	tz := parseTimezone(r)
+
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
 		txn.AddAttribute("period", period)
+		txn.AddAttribute("timezone", tz.String())
 	}
 
-	activity, err := h.service.GetDailyActivity(ctx, chatID, period)
+	activity, err := h.service.GetDailyActivity(ctx, chatID, period, tz)
 	if err != nil {
 		slog.Error("failed to get activity", "error", err, "chat_id", chatID)
 		if txn != nil {
@@ -269,15 +275,18 @@ func (h *MiniAppHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
+	tz := parseTimezone(r)
+
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
 		txn.AddAttribute("period", period)
 		txn.AddAttribute("metric", metric)
 		txn.AddAttribute("page", page)
 		txn.AddAttribute("limit", limit)
+		txn.AddAttribute("timezone", tz.String())
 	}
 
-	users, total, err := h.service.GetUserRankings(ctx, chatID, metric, period, page, limit)
+	users, total, err := h.service.GetUserRankings(ctx, chatID, metric, period, page, limit, tz)
 	if err != nil {
 		slog.Error("failed to get leaderboard", "error", err, "chat_id", chatID)
 		if txn != nil {
@@ -302,6 +311,21 @@ func writeError(w http.ResponseWriter, message string, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+// parseTimezone parses the timezone from query parameter and returns a *time.Location.
+// Falls back to UTC if not provided or invalid.
+func parseTimezone(r *http.Request) *time.Location {
+	tzStr := r.URL.Query().Get("tz")
+	if tzStr == "" {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(tzStr)
+	if err != nil {
+		slog.Warn("invalid timezone, using UTC", "timezone", tzStr, "error", err)
+		return time.UTC
+	}
+	return loc
 }
 
 // HandleGalleryWeeks handles GET /api/v1/mini-app/gallery/weeks?chat_id=...
@@ -530,13 +554,16 @@ func (h *MiniAppHandler) HandleReactionsOverview(w http.ResponseWriter, r *http.
 		}
 	}
 
+	tz := parseTimezone(r)
+
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
 		txn.AddAttribute("period", period)
 		txn.AddAttribute("limit", limit)
+		txn.AddAttribute("timezone", tz.String())
 	}
 
-	response, err := h.service.GetReactionsOverview(ctx, chatID, period, limit)
+	response, err := h.service.GetReactionsOverview(ctx, chatID, period, limit, tz)
 	if err != nil {
 		slog.Error("failed to get reactions overview", "error", err, "chat_id", chatID)
 		if txn != nil {
@@ -593,13 +620,16 @@ func (h *MiniAppHandler) HandleRepliesOverview(w http.ResponseWriter, r *http.Re
 		}
 	}
 
+	tz := parseTimezone(r)
+
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
 		txn.AddAttribute("period", period)
 		txn.AddAttribute("limit", limit)
+		txn.AddAttribute("timezone", tz.String())
 	}
 
-	response, err := h.service.GetRepliesOverview(ctx, chatID, period, limit)
+	response, err := h.service.GetRepliesOverview(ctx, chatID, period, limit, tz)
 	if err != nil {
 		slog.Error("failed to get replies overview", "error", err, "chat_id", chatID)
 		if txn != nil {
@@ -685,14 +715,17 @@ func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	tz := parseTimezone(r)
+
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
 		txn.AddAttribute("user_id", userID)
 		txn.AddAttribute("period", period)
 		txn.AddAttribute("is_impersonation", targetUserInfo != nil)
+		txn.AddAttribute("timezone", tz.String())
 	}
 
-	profile, err := h.service.GetUserProfile(ctx, chatID, userID, period)
+	profile, err := h.service.GetUserProfile(ctx, chatID, userID, period, tz)
 	if err != nil {
 		slog.Error("failed to get user profile", "error", err, "chat_id", chatID, "user_id", userID)
 		if txn != nil {
@@ -765,13 +798,16 @@ func (h *MiniAppHandler) HandleHeatmap(w http.ResponseWriter, r *http.Request) {
 		userID = &claims.UserID
 	}
 
+	tz := parseTimezone(r)
+
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
 		txn.AddAttribute("period", period)
 		txn.AddAttribute("include_user", includeUser)
+		txn.AddAttribute("timezone", tz.String())
 	}
 
-	response, err := h.service.GetHeatmapData(ctx, chatID, userID, period)
+	response, err := h.service.GetHeatmapData(ctx, chatID, userID, period, tz)
 	if err != nil {
 		slog.Error("failed to get heatmap data", "error", err, "chat_id", chatID)
 		if txn != nil {

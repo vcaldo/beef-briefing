@@ -240,15 +240,15 @@ func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*Au
 }
 
 // GetOverviewStats returns overview statistics for a chat
-func (s *MiniAppService) GetOverviewStats(ctx context.Context, chatID int64, period string) (*repository.OverviewStats, error) {
-	startDate, endDate := getPeriodDates(period)
+func (s *MiniAppService) GetOverviewStats(ctx context.Context, chatID int64, period string, tz *time.Location) (*repository.OverviewStats, error) {
+	startDate, endDate := getPeriodDates(period, tz)
 	return s.repo.GetOverviewStats(ctx, chatID, startDate, endDate)
 }
 
 // GetDailyActivity returns daily activity for a chat
-func (s *MiniAppService) GetDailyActivity(ctx context.Context, chatID int64, period string) ([]repository.DailyActivity, error) {
-	startDate, endDate := getPeriodDates(period)
-	return s.repo.GetDailyActivity(ctx, chatID, startDate, endDate)
+func (s *MiniAppService) GetDailyActivity(ctx context.Context, chatID int64, period string, tz *time.Location) ([]repository.DailyActivity, error) {
+	startDate, endDate := getPeriodDates(period, tz)
+	return s.repo.GetDailyActivity(ctx, chatID, startDate, endDate, tz)
 }
 
 // UserRankingWithPhoto is a user ranking with photo URL
@@ -263,8 +263,8 @@ type UserRankingWithPhoto struct {
 }
 
 // GetUserRankings returns user rankings for a chat
-func (s *MiniAppService) GetUserRankings(ctx context.Context, chatID int64, metric, period string, page, limit int) ([]UserRankingWithPhoto, int, error) {
-	startDate, endDate := getPeriodDates(period)
+func (s *MiniAppService) GetUserRankings(ctx context.Context, chatID int64, metric, period string, page, limit int, tz *time.Location) ([]UserRankingWithPhoto, int, error) {
+	startDate, endDate := getPeriodDates(period, tz)
 	offset := (page - 1) * limit
 
 	rankings, err := s.repo.GetUserRankings(ctx, chatID, metric, limit, offset, startDate, endDate)
@@ -294,17 +294,20 @@ func (s *MiniAppService) GetUserRankings(ctx context.Context, chatID int64, metr
 	return result, total, nil
 }
 
-// getPeriodDates returns start and end dates for a period
-func getPeriodDates(period string) (*time.Time, *time.Time) {
-	now := time.Now().UTC()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+// getPeriodDates returns start and end dates for a period in the specified timezone
+func getPeriodDates(period string, tz *time.Location) (*time.Time, *time.Time) {
+	if tz == nil {
+		tz = time.UTC
+	}
+	now := time.Now().In(tz)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, tz)
 	endDate := today.Add(24 * time.Hour) // Include today
 
 	switch period {
 	case "max":
 		return nil, nil
 	case "ytd":
-		startDate := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
+		startDate := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, tz)
 		return &startDate, &endDate
 	case "24h":
 		startDate := today.Add(-1 * 24 * time.Hour)
@@ -362,8 +365,8 @@ type ReactionsOverviewResponse struct {
 }
 
 // GetReactionsOverview returns top reactions, givers, and receivers for a chat
-func (s *MiniAppService) GetReactionsOverview(ctx context.Context, chatID int64, period string, limit int) (*ReactionsOverviewResponse, error) {
-	startDate, endDate := getPeriodDates(period)
+func (s *MiniAppService) GetReactionsOverview(ctx context.Context, chatID int64, period string, limit int, tz *time.Location) (*ReactionsOverviewResponse, error) {
+	startDate, endDate := getPeriodDates(period, tz)
 
 	topReactions, err := s.repo.GetTopReactions(ctx, chatID, limit, startDate, endDate)
 	if err != nil {
@@ -427,8 +430,8 @@ type RepliesOverviewResponse struct {
 }
 
 // GetRepliesOverview returns top reply senders and receivers for a chat
-func (s *MiniAppService) GetRepliesOverview(ctx context.Context, chatID int64, period string, limit int) (*RepliesOverviewResponse, error) {
-	startDate, endDate := getPeriodDates(period)
+func (s *MiniAppService) GetRepliesOverview(ctx context.Context, chatID int64, period string, limit int, tz *time.Location) (*RepliesOverviewResponse, error) {
+	startDate, endDate := getPeriodDates(period, tz)
 
 	topSenders, err := s.repo.GetTopReplySenders(ctx, chatID, limit, startDate, endDate)
 	if err != nil {
@@ -486,8 +489,8 @@ type ProfileResponse struct {
 }
 
 // GetUserProfile returns personal stats and top interactors for a user
-func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int64, period string) (*ProfileResponse, error) {
-	startDate, endDate := getPeriodDates(period)
+func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int64, period string, tz *time.Location) (*ProfileResponse, error) {
+	startDate, endDate := getPeriodDates(period, tz)
 
 	stats, err := s.repo.GetUserProfileStats(ctx, chatID, userID, startDate, endDate)
 	if err != nil {
@@ -514,7 +517,7 @@ func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int6
 		return nil, fmt.Errorf("failed to get top replied to: %w", err)
 	}
 
-	heatmap, err := s.repo.GetUserHeatmap(ctx, chatID, userID, startDate, endDate)
+	heatmap, err := s.repo.GetUserHeatmap(ctx, chatID, userID, startDate, endDate, tz)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user heatmap: %w", err)
 	}
@@ -602,9 +605,9 @@ type HeatmapResponse struct {
 }
 
 // GetHeatmapData returns group and optionally user heatmap data
-func (s *MiniAppService) GetHeatmapData(ctx context.Context, chatID int64, userID *int64, period string) (*HeatmapResponse, error) {
-	// Group heatmap always uses all-time data from MV
-	groupHeatmap, err := s.repo.GetGroupHeatmap(ctx, chatID)
+func (s *MiniAppService) GetHeatmapData(ctx context.Context, chatID int64, userID *int64, period string, tz *time.Location) (*HeatmapResponse, error) {
+	// Group heatmap with timezone
+	groupHeatmap, err := s.repo.GetGroupHeatmap(ctx, chatID, tz)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get group heatmap: %w", err)
 	}
@@ -615,8 +618,8 @@ func (s *MiniAppService) GetHeatmapData(ctx context.Context, chatID int64, userI
 
 	// User heatmap if requested
 	if userID != nil {
-		startDate, endDate := getPeriodDates(period)
-		userHeatmap, err := s.repo.GetUserHeatmap(ctx, chatID, *userID, startDate, endDate)
+		startDate, endDate := getPeriodDates(period, tz)
+		userHeatmap, err := s.repo.GetUserHeatmap(ctx, chatID, *userID, startDate, endDate, tz)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get user heatmap: %w", err)
 		}

@@ -3,6 +3,7 @@
  * Handles JWT authentication via Mini App init data.
  */
 
+import { getBrowserTimezone } from '../utils/timezone'
 import type {
   AuthResponse,
   StatsResponse,
@@ -25,6 +26,7 @@ class ApiClient {
   private token: string | null = null
   private chatId: number | null = null
   private isAdmin: boolean = false
+  private timezone: string = getBrowserTimezone()
 
   /**
    * Authenticate with Mini App init data.
@@ -59,7 +61,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/stats?chat_id=${targetChatId}&period=${period}`,
+      `${API_BASE_URL}/api/v1/mini-app/stats?chat_id=${targetChatId}&period=${period}&tz=${encodeURIComponent(this.timezone)}`,
       { headers: this.getHeaders() }
     )
 
@@ -80,7 +82,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/activity?chat_id=${targetChatId}&period=${period}`,
+      `${API_BASE_URL}/api/v1/mini-app/activity?chat_id=${targetChatId}&period=${period}&tz=${encodeURIComponent(this.timezone)}`,
       { headers: this.getHeaders() }
     )
 
@@ -107,7 +109,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/leaderboard?chat_id=${targetChatId}&period=${period}&metric=${metric}&page=${page}&limit=${limit}`,
+      `${API_BASE_URL}/api/v1/mini-app/leaderboard?chat_id=${targetChatId}&period=${period}&metric=${metric}&page=${page}&limit=${limit}&tz=${encodeURIComponent(this.timezone)}`,
       { headers: this.getHeaders() }
     )
 
@@ -132,7 +134,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/reactions-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}`,
+      `${API_BASE_URL}/api/v1/mini-app/reactions-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}&tz=${encodeURIComponent(this.timezone)}`,
       { headers: this.getHeaders() }
     )
 
@@ -157,7 +159,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/replies-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}`,
+      `${API_BASE_URL}/api/v1/mini-app/replies-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}&tz=${encodeURIComponent(this.timezone)}`,
       { headers: this.getHeaders() }
     )
 
@@ -178,7 +180,7 @@ class ApiClient {
       throw new Error('No chat ID available')
     }
 
-    let url = `${API_BASE_URL}/api/v1/mini-app/profile?chat_id=${targetChatId}&period=${period}`
+    let url = `${API_BASE_URL}/api/v1/mini-app/profile?chat_id=${targetChatId}&period=${period}&tz=${encodeURIComponent(this.timezone)}`
     if (targetUserId) {
       url += `&target_user_id=${targetUserId}`
     }
@@ -227,7 +229,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/heatmap?chat_id=${targetChatId}&period=${period}&include_user=${includeUser}`,
+      `${API_BASE_URL}/api/v1/mini-app/heatmap?chat_id=${targetChatId}&period=${period}&include_user=${includeUser}&tz=${encodeURIComponent(this.timezone)}`,
       { headers: this.getHeaders() }
     )
 
@@ -347,6 +349,10 @@ class ApiClient {
 
   isAuthenticated(): boolean {
     return this.token !== null
+  }
+
+  getTimezone(): string {
+    return this.timezone
   }
 }
 

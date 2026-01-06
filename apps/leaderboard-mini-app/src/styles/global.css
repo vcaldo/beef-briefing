@@ -968,9 +968,10 @@ body {
 
 .card-image-container {
   width: 100%;
-  max-width: 320px;
+  max-width: min(360px, calc(100vw - 32px));
   overflow: hidden;
   background: var(--tg-theme-secondary-bg-color);
+  border-radius: 12px;
 }
 
 .card-image {
@@ -978,46 +979,6 @@ body {
   height: 100%;
   object-fit: cover;
   display: block;
-}
-
-.card-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-  width: 100%;
-  max-width: 320px;
-}
-
-.card-action-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: 1.5px solid var(--tg-theme-button-color);
-  background: transparent;
-  color: var(--tg-theme-button-color);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.card-action-btn:hover {
-  background: var(--tg-theme-button-color);
-  color: var(--tg-theme-button-text-color);
-}
-
-.card-action-btn.card-action-primary {
-  background: var(--tg-theme-button-color);
-  color: var(--tg-theme-button-text-color);
-  border-color: var(--tg-theme-button-color);
-}
-
-.card-action-btn.card-action-primary:hover {
-  opacity: 0.9;
 }
 
 .card-empty-state {

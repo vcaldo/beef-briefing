@@ -1589,3 +1589,78 @@ func (r *MiniAppRepository) GetChatTitle(ctx context.Context, chatID int64) (*st
 
 	return &title.String, nil
 }
+
+// ChatUser represents a user in a chat for admin selection.
+type ChatUser struct {
+	UserID         int64   `json:"user_id"`
+	FirstName      string  `json:"first_name"`
+	LastName       *string `json:"last_name,omitempty"`
+	Username       *string `json:"username,omitempty"`
+	PhotoObjectKey *string `json:"-"` // Internal use, not serialized
+}
+
+// GetChatUsers returns all non-bot users who have sent messages in a chat.
+func (r *MiniAppRepository) GetChatUsers(ctx context.Context, chatID int64) ([]ChatUser, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-chat-users")
+		defer segment.End()
+	}
+
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT
+			user_id,
+			first_name,
+			last_name,
+			username,
+			(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mv_user_statistics.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
+		FROM mv_user_statistics
+		WHERE chat_id = $1 AND is_bot = false
+		ORDER BY first_name, last_name
+	`, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []ChatUser
+	for rows.Next() {
+		var u ChatUser
+		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.PhotoObjectKey); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+
+	return users, rows.Err()
+}
+
+// GetUserInfo returns basic info for a specific user.
+func (r *MiniAppRepository) GetUserInfo(ctx context.Context, userID int64) (*ChatUser, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-user-info")
+		defer segment.End()
+	}
+
+	var u ChatUser
+	err := r.db.QueryRowContext(ctx, `
+		SELECT
+			id,
+			first_name,
+			last_name,
+			username,
+			(SELECT minio_object_key FROM user_profile_photos WHERE user_id = users.id ORDER BY width DESC LIMIT 1) as photo_object_key
+		FROM users
+		WHERE id = $1
+	`, userID).Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.PhotoObjectKey)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &u, nil
+}

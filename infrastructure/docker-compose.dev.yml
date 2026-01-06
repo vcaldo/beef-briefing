@@ -46,6 +46,7 @@ services:
       # Mini App authentication
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       CORS_ORIGINS: http://localhost:5174
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS}
     ports:
       - "${API_PORT}:${API_PORT}"
     volumes:

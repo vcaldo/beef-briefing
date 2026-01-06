@@ -205,35 +205,48 @@ func (r *MiniAppRepository) GetOverviewStats(ctx context.Context, chatID int64, 
 	return stats, nil
 }
 
-// GetDailyActivity returns daily message activity for a chat.
-func (r *MiniAppRepository) GetDailyActivity(ctx context.Context, chatID int64, startDate, endDate *time.Time) ([]DailyActivity, error) {
+// GetDailyActivity returns daily message activity for a chat in the specified timezone.
+func (r *MiniAppRepository) GetDailyActivity(ctx context.Context, chatID int64, startDate, endDate *time.Time, tz *time.Location) ([]DailyActivity, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("db:mini-app-daily-activity")
 		defer segment.End()
 	}
 
+	tzName := "UTC"
+	if tz != nil {
+		tzName = tz.String()
+	}
+
 	var rows *sql.Rows
 	var err error
 
 	if startDate == nil && endDate == nil {
-		// All-time from MV
+		// All-time: query live data with timezone conversion
 		rows, err = r.db.QueryContext(ctx, `
-			SELECT date, message_count, unique_users
-			FROM mv_daily_message_stats
-			WHERE chat_id = $1
-			ORDER BY date
-		`, chatID)
+			SELECT
+				DATE(m.date AT TIME ZONE $2) as activity_date,
+				COUNT(*) as message_count,
+				COUNT(DISTINCT m.user_id) as unique_users
+			FROM messages m
+			WHERE m.chat_id = $1
+			GROUP BY DATE(m.date AT TIME ZONE $2)
+			ORDER BY activity_date
+		`, chatID, tzName)
 	} else {
-		// Date-filtered from MV
+		// Date-filtered: query live data with timezone conversion
 		rows, err = r.db.QueryContext(ctx, `
-			SELECT date, message_count, unique_users
-			FROM mv_daily_message_stats
-			WHERE chat_id = $1
-				AND date >= $2
-				AND date < $3
-			ORDER BY date
-		`, chatID, startDate, endDate)
+			SELECT
+				DATE(m.date AT TIME ZONE $4) as activity_date,
+				COUNT(*) as message_count,
+				COUNT(DISTINCT m.user_id) as unique_users
+			FROM messages m
+			WHERE m.chat_id = $1
+				AND m.date >= $2
+				AND m.date < $3
+			GROUP BY DATE(m.date AT TIME ZONE $4)
+			ORDER BY activity_date
+		`, chatID, startDate, endDate, tzName)
 	}
 
 	if err != nil {
@@ -1436,20 +1449,33 @@ func (r *MiniAppRepository) GetTopReplyReceivers(ctx context.Context, chatID int
 	return users, rows.Err()
 }
 
-// GetGroupHeatmap returns the activity heatmap for a chat from the materialized view.
-func (r *MiniAppRepository) GetGroupHeatmap(ctx context.Context, chatID int64) (*HeatmapData, error) {
+// GetGroupHeatmap returns the activity heatmap for a chat in the specified timezone.
+func (r *MiniAppRepository) GetGroupHeatmap(ctx context.Context, chatID int64, tz *time.Location) (*HeatmapData, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("db:mini-app-group-heatmap")
 		defer segment.End()
 	}
 
+	tzName := "UTC"
+	if tz != nil {
+		tzName = tz.String()
+	}
+
+	// Query live data with timezone conversion for accurate local time display
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT day_of_week, hour, message_count, unique_users
-		FROM mv_hourly_activity
-		WHERE chat_id = $1
+		SELECT
+			EXTRACT(DOW FROM m.date AT TIME ZONE $2)::int as day_of_week,
+			EXTRACT(HOUR FROM m.date AT TIME ZONE $2)::int as hour,
+			COUNT(*) as message_count,
+			COUNT(DISTINCT m.user_id) as unique_users
+		FROM messages m
+		WHERE m.chat_id = $1
+		GROUP BY
+			EXTRACT(DOW FROM m.date AT TIME ZONE $2),
+			EXTRACT(HOUR FROM m.date AT TIME ZONE $2)
 		ORDER BY day_of_week, hour
-	`, chatID)
+	`, chatID, tzName)
 	if err != nil {
 		return nil, err
 	}
@@ -1474,44 +1500,53 @@ func (r *MiniAppRepository) GetGroupHeatmap(ctx context.Context, chatID int64) (
 	return heatmap, rows.Err()
 }
 
-// GetUserHeatmap returns the activity heatmap for a specific user.
-func (r *MiniAppRepository) GetUserHeatmap(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time) (*HeatmapData, error) {
+// GetUserHeatmap returns the activity heatmap for a specific user in the specified timezone.
+func (r *MiniAppRepository) GetUserHeatmap(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time, tz *time.Location) (*HeatmapData, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("db:mini-app-user-heatmap")
 		defer segment.End()
 	}
 
+	tzName := "UTC"
+	if tz != nil {
+		tzName = tz.String()
+	}
+
 	var rows *sql.Rows
 	var err error
 
 	if startDate == nil && endDate == nil {
-		// All-time
+		// All-time with timezone
 		rows, err = r.db.QueryContext(ctx, `
 			SELECT
-				EXTRACT(DOW FROM m.date)::int as day_of_week,
-				EXTRACT(HOUR FROM m.date)::int as hour,
+				EXTRACT(DOW FROM m.date AT TIME ZONE $3)::int as day_of_week,
+				EXTRACT(HOUR FROM m.date AT TIME ZONE $3)::int as hour,
 				COUNT(*) as message_count
 			FROM messages m
 			WHERE m.chat_id = $1 AND m.user_id = $2
-			GROUP BY EXTRACT(DOW FROM m.date), EXTRACT(HOUR FROM m.date)
+			GROUP BY
+				EXTRACT(DOW FROM m.date AT TIME ZONE $3),
+				EXTRACT(HOUR FROM m.date AT TIME ZONE $3)
 			ORDER BY day_of_week, hour
-		`, chatID, userID)
+		`, chatID, userID, tzName)
 	} else {
-		// Date-filtered
+		// Date-filtered with timezone
 		rows, err = r.db.QueryContext(ctx, `
 			SELECT
-				EXTRACT(DOW FROM m.date)::int as day_of_week,
-				EXTRACT(HOUR FROM m.date)::int as hour,
+				EXTRACT(DOW FROM m.date AT TIME ZONE $5)::int as day_of_week,
+				EXTRACT(HOUR FROM m.date AT TIME ZONE $5)::int as hour,
 				COUNT(*) as message_count
 			FROM messages m
 			WHERE m.chat_id = $1
 				AND m.user_id = $2
 				AND m.date >= $3
 				AND m.date < $4
-			GROUP BY EXTRACT(DOW FROM m.date), EXTRACT(HOUR FROM m.date)
+			GROUP BY
+				EXTRACT(DOW FROM m.date AT TIME ZONE $5),
+				EXTRACT(HOUR FROM m.date AT TIME ZONE $5)
 			ORDER BY day_of_week, hour
-		`, chatID, userID, startDate, endDate)
+		`, chatID, userID, startDate, endDate, tzName)
 	}
 
 	if err != nil {

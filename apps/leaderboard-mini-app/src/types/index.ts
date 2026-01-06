@@ -9,6 +9,7 @@ export interface AuthResponse {
   chat_title: string | null
   first_name: string
   username: string | null
+  is_admin: boolean
 }
 
 export interface StatsResponse {
@@ -120,6 +121,24 @@ export interface ProfileResponse {
   top_repliers: TopInteractor[]
   top_replied_to: TopInteractor[]
   heatmap: HeatmapData
+  // Fields populated when admin is impersonating another user
+  user_id?: number
+  first_name?: string
+  last_name?: string | null
+  username?: string | null
+}
+
+// Admin user list types
+export interface ChatUser {
+  user_id: number
+  first_name: string
+  last_name: string | null
+  username: string | null
+  photo_url?: string | null
+}
+
+export interface ChatUsersResponse {
+  users: ChatUser[]
 }
 
 // Heatmap Types

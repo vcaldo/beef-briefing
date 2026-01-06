@@ -19,6 +19,7 @@ import (
 	"beef-briefing/apps/api-service/internal/middleware"
 	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/storage"
+	"beef-briefing/pkg/config"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
@@ -58,6 +59,7 @@ type AuthResponse struct {
 	ChatTitle *string `json:"chat_title,omitempty"`
 	FirstName string  `json:"first_name"`
 	Username  *string `json:"username,omitempty"`
+	IsAdmin   bool    `json:"is_admin"`
 }
 
 // MiniAppService handles Mini App authentication and analytics
@@ -67,16 +69,18 @@ type MiniAppService struct {
 	botToken      string
 	nrApp         *newrelic.Application
 	storageClient *storage.MinIOClient
+	config        *config.Config
 }
 
 // NewMiniAppService creates a new MiniAppService
-func NewMiniAppService(db *sql.DB, jwtSecretKey, botToken string, nrApp *newrelic.Application, storageClient *storage.MinIOClient) *MiniAppService {
+func NewMiniAppService(db *sql.DB, jwtSecretKey, botToken string, nrApp *newrelic.Application, storageClient *storage.MinIOClient, cfg *config.Config) *MiniAppService {
 	return &MiniAppService{
 		repo:          repository.NewMiniAppRepository(db, nrApp),
 		jwtAuth:       middleware.NewJWTAuth(jwtSecretKey),
 		botToken:      botToken,
 		nrApp:         nrApp,
 		storageClient: storageClient,
+		config:        cfg,
 	}
 }
 
@@ -231,6 +235,7 @@ func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*Au
 		ChatTitle: chatTitle,
 		FirstName: validated.FirstName,
 		Username:  validated.Username,
+		IsAdmin:   s.config.IsAdmin(validated.UserID),
 	}, nil
 }
 
@@ -619,4 +624,55 @@ func (s *MiniAppService) GetHeatmapData(ctx context.Context, chatID int64, userI
 	}
 
 	return response, nil
+}
+
+// IsAdmin checks if a user ID is an admin
+func (s *MiniAppService) IsAdmin(userID int64) bool {
+	return s.config.IsAdmin(userID)
+}
+
+// ChatUserWithPhoto represents a chat user with photo URL for admin dropdown
+type ChatUserWithPhoto struct {
+	UserID    int64   `json:"user_id"`
+	FirstName string  `json:"first_name"`
+	LastName  *string `json:"last_name,omitempty"`
+	Username  *string `json:"username,omitempty"`
+	PhotoURL  *string `json:"photo_url,omitempty"`
+}
+
+// GetChatUsers returns all non-bot users in a chat for admin user selection
+func (s *MiniAppService) GetChatUsers(ctx context.Context, chatID int64) ([]ChatUserWithPhoto, error) {
+	users, err := s.repo.GetChatUsers(ctx, chatID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chat users: %w", err)
+	}
+
+	result := make([]ChatUserWithPhoto, len(users))
+	for i, u := range users {
+		result[i] = ChatUserWithPhoto{
+			UserID:    u.UserID,
+			FirstName: u.FirstName,
+			LastName:  u.LastName,
+			Username:  u.Username,
+			PhotoURL:  s.generatePhotoURL(ctx, u.PhotoObjectKey),
+		}
+	}
+
+	return result, nil
+}
+
+// GetUserInfo returns basic user info for displaying impersonated user
+func (s *MiniAppService) GetUserInfo(ctx context.Context, userID int64) (*ChatUserWithPhoto, error) {
+	user, err := s.repo.GetUserInfo(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user info: %w", err)
+	}
+
+	return &ChatUserWithPhoto{
+		UserID:    user.UserID,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		Username:  user.Username,
+		PhotoURL:  s.generatePhotoURL(ctx, user.PhotoObjectKey),
+	}, nil
 }

@@ -8,7 +8,8 @@ A Go-based Telegram bot system for managing beef briefing subscriptions with RES
 
 **Technology Stack:**
 - **Backend**: Go 1.25+
-- **Dashboard/Analytics**: Python 3.14, Dash, DMC, DBC
+- **ML/Card Rendering**: Python 3.14, Playwright, OpenAI
+- **Frontend**: React, TypeScript, Vite (Mini Apps)
 - **Database**: PostgreSQL 17 with PostGIS 3.4
 - **Storage**: MinIO (dev) / Linode Object Storage (prod)
 - **Reverse Proxy**: Traefik v3 with Let's Encrypt SSL
@@ -52,11 +53,6 @@ A Go-based Telegram bot system for managing beef briefing subscriptions with RES
    - Weekly stats aggregation for user cards
    - Rate-limited API calls with token bucket algorithm
 
-6. **leaderboard** (port 8050): Analytics dashboard for chat statistics
-   - Built with Dash + Dash Mantine Components (DMC)
-   - Responsive layout with Dash Bootstrap Components (DBC)
-   - Real-time data from PostgreSQL via SQLAlchemy
-
 ### Database Architecture
 
 **22 tables modeling complete Telegram data structure:**
@@ -82,12 +78,12 @@ Internet (443/80) → Traefik (SSL termination)
                          │       └─→ /api/v1/* (IP restricted)
                          ├─→ cards-api.{domain} → Card Renderer (8051)
                          ├─→ leaderboard.{domain} → Leaderboard Mini App
-                         ├─→ {domain}/leaderboard → Leaderboard Dashboard (8050)
+                         ├─→ deck.{domain} → Deck Mini App
                          └─→ {domain}/dashboard → Traefik Dashboard
 
 Internal Docker Network:
   ├─ API Service (8080) ←→ Telegram Bot
-  ├─ Card Renderer (8051) ←→ Leaderboard
+  ├─ Card Renderer (8051)
   └─ PostgreSQL (5432)
 ```
 
@@ -132,23 +128,6 @@ make fmt              # Format all Go code with gofmt
 make fmt-check        # Check if code is formatted
 ```
 
-### Python/Dash Development
-
-For Dash-based apps (leaderboard), follow these guidelines:
-
-```bash
-# Format Python code
-black apps/leaderboard/
-ruff check apps/leaderboard/
-```
-
-**Component Libraries:**
-- Use **Dash Mantine Components (DMC)** for all UI elements
-- Use **Dash Bootstrap Components (DBC)** for layout grid only
-- **Never use custom CSS** - style through component props
-
-See `agents.md` for comprehensive Python/Dash component guidelines.
-
 ## Production Deployment
 
 ### Initial Setup
@@ -170,7 +149,6 @@ make tf-ip            # Point domain A record to this IP
 # 4. Generate secrets
 make secrets-traefik-password
 make secrets-service-api APP=telegram-bot
-make secrets-service-api APP=leaderboard
 
 # 5. Deploy
 make deploy           # Full deployment
@@ -243,7 +221,6 @@ Updates `TRAEFIK_DASHBOARD_USERS` in `.env.prod` with bcrypt hash ($$2y$$ escapi
 **API Service Keys** (per-application authentication):
 ```bash
 make secrets-service-api APP=telegram-bot
-make secrets-service-api APP=leaderboard
 ```
 
 Generates a secure random API key for each application. Keys are stored in two locations:
@@ -252,7 +229,6 @@ Generates a secure random API key for each application. Keys are stored in two l
 
 **Card Renderer Keys** (for gallery access):
 ```bash
-make secrets-card-renderer APP=leaderboard
 make secrets-card-renderer APP=ml-processor
 ```
 
@@ -400,7 +376,6 @@ cd ~/beef-briefing/apps/import-cli
 ```bash
 # Generate API keys first (required before starting services)
 make secrets-service-api APP=telegram-bot
-make secrets-service-api APP=leaderboard
 
 # Start all services
 make up-build
@@ -433,7 +408,10 @@ beef-briefing/
 ├── apps/
 │   ├── api-service/       # REST API for Telegram data ingestion (includes embedded migrations)
 │   ├── telegram-bot/      # Telegram bot client
-│   ├── leaderboard/       # Analytics dashboard (Dash/Python)
+│   ├── card-renderer/     # Card image renderer (Python/Playwright)
+│   ├── ml-processor/      # ML pipeline for message analysis
+│   ├── leaderboard-mini-app/  # Telegram Mini App for leaderboard
+│   ├── deck-mini-app/     # Telegram Mini App for deck
 │   └── import-cli/        # CLI for importing Telegram exports
 ├── infrastructure/
 │   ├── docker-compose.dev.yml     # Development environment
@@ -442,8 +420,7 @@ beef-briefing/
 │   ├── secrets/                   # Secrets directory (gitignored)
 │   │   └── apps/
 │   │       ├── api-service/app_keys/  # API keys for validation
-│   │       ├── telegram-bot/          # telegram-bot's API key
-│   │       └── leaderboard/           # leaderboard's API key
+│   │       └── telegram-bot/          # telegram-bot's API key
 │   └── letsencrypt/               # SSL certificates (gitignored)
 ├── pkg/config/            # Shared configuration package
 ├── scripts/               # Deployment and utility scripts

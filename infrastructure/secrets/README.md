@@ -9,12 +9,9 @@ secrets/
 └── apps/
     ├── api-service/
     │   └── app_keys/
-    │       ├── telegram-bot    # API key for telegram-bot
-    │       └── leaderboard     # API key for leaderboard
+    │       └── telegram-bot    # API key for telegram-bot
     ├── telegram-bot/
     │   └── api_key             # Same key, for telegram-bot to read
-    ├── leaderboard/
-    │   └── api_key             # Same key, for leaderboard to read
     └── new-relic/
         └── (New Relic configuration files)
 ```
@@ -26,7 +23,6 @@ From the repository root:
 ```bash
 # Generate API keys for each application
 make secrets-service-api APP=telegram-bot
-make secrets-service-api APP=leaderboard
 
 # For production, also generate Traefik password
 make secrets-traefik-password
@@ -38,7 +34,6 @@ Each application that calls the api-service needs an API key:
 
 1. **api-service** reads all keys from `app_keys/` directory to validate incoming requests
 2. **telegram-bot** reads its own key from `telegram-bot/api_key` to authenticate requests
-3. **leaderboard** reads its own key from `leaderboard/api_key` to authenticate requests
 
 The `make secrets-service-api` command generates the same key in both locations:
 - `api-service/app_keys/{app}` - for api-service to validate
@@ -55,7 +50,6 @@ API keys for authenticating requests to all `/api/v1/*` endpoints.
 **Generate:**
 ```bash
 make secrets-service-api APP=telegram-bot
-make secrets-service-api APP=leaderboard
 ```
 
 **Format:** Base64-encoded 32 bytes
@@ -73,7 +67,6 @@ Services read secrets from files using environment variables:
 |---------|---------------------|----------------|
 | api-service | `APP_KEYS_DIR` | `/app/secrets/app_keys` |
 | telegram-bot | `API_KEY_FILE` | `/app/secrets/api_key` |
-| leaderboard | `API_KEY_FILE` | `/app/secrets/api_key` |
 
 ## Docker Volume Mounts
 
@@ -88,10 +81,6 @@ api-service:
 telegram-bot:
   volumes:
     - ./secrets/apps/telegram-bot:/app/secrets:ro
-
-leaderboard:
-  volumes:
-    - ./secrets/apps/leaderboard:/app/secrets:ro
 ```
 
 ## Manual Generation
@@ -120,7 +109,6 @@ All secret files should have `600` permissions (owner read/write only):
 ```bash
 chmod 600 secrets/apps/api-service/app_keys/*
 chmod 600 secrets/apps/telegram-bot/*
-chmod 600 secrets/apps/leaderboard/*
 ```
 
 The Make targets automatically set correct permissions.

@@ -21,7 +21,6 @@ REMOTE_PREVIOUS_TAG_FILE="$REMOTE_APP_DIR/.previous_tag"
 IMAGES=(
     "beef-briefing/api-service"
     "beef-briefing/telegram-bot"
-    "beef-briefing/leaderboard"
     "beef-briefing/card-renderer"
     "beef-briefing/deck-mini-app"
     "beef-briefing/leaderboard-mini-app"

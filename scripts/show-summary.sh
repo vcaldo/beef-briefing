@@ -19,7 +19,6 @@ shift || true
 declare -A DEV_SERVICES=(
     ["api-service"]="8080|http://localhost:8080|/health"
     ["telegram-bot"]="-|-|"
-    ["leaderboard"]="8050|http://localhost:8050|/health"
     ["postgres"]="5432|localhost:5432|"
     ["minio"]="9000|http://localhost:9000|"
 )
@@ -27,7 +26,6 @@ declare -A DEV_SERVICES=(
 declare -A PROD_SERVICES=(
     ["api-service"]="-|https://api.\${DOMAIN}|"
     ["telegram-bot"]="-|-|"
-    ["leaderboard"]="-|https://\${DOMAIN}\${LEADERBOARD_PATH}|"
     ["traefik"]="-|https://\${DOMAIN}/dashboard|"
 )
 
@@ -38,14 +36,12 @@ declare -A PROD_SERVICES=(
 DEV_IMAGES=(
     "infrastructure-api-service"
     "infrastructure-telegram-bot"
-    "infrastructure-leaderboard"
     "infrastructure-leaderboard-mini-app-dev"
 )
 
 PROD_IMAGES=(
     "beef-briefing/api-service"
     "beef-briefing/telegram-bot"
-    "beef-briefing/leaderboard"
     "beef-briefing/card-renderer"
     "beef-briefing/deck-mini-app"
     "beef-briefing/leaderboard-mini-app"
@@ -199,7 +195,7 @@ show_dev_summary() {
     echo -e "${GREEN}| Service          | Status    | Port  | URL                    |${NC}"
     echo -e "${GREEN}+==================+===========+=======+========================+${NC}"
 
-    for service in api-service telegram-bot leaderboard postgres minio; do
+    for service in api-service telegram-bot postgres minio; do
         local info="${DEV_SERVICES[$service]}"
         IFS='|' read -r port url _ <<< "$info"
 
@@ -235,8 +231,6 @@ show_prod_summary() {
         "api-service" "deployed" "https://api.${domain}"
     printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
         "telegram-bot" "deployed" "-"
-    printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
-        "leaderboard" "deployed" "https://${domain}${LEADERBOARD_PATH:-/leaderboard}"
     printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
         "traefik" "deployed" "https://${domain}/dashboard"
 

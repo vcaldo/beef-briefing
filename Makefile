@@ -20,7 +20,6 @@ DC_PROD := docker compose -f $(PROD_COMPOSE_FILE) --env-file $(PROD_ENV_FILE)
 # Service names
 API_SERVICE := api-service
 TELEGRAM_BOT := telegram-bot
-LEADERBOARD := leaderboard
 POSTGRES_SERVICE := postgres
 MINIO_SERVICE := minio
 NEWRELIC_INFRA := newrelic-infra
@@ -33,7 +32,6 @@ IMPORT_CLI_DIR := apps/import-cli
 PKG_DIR := pkg/config
 
 # Python directories
-LEADERBOARD_DIR := apps/leaderboard
 ML_PROCESSOR_DIR := apps/ml-processor
 
 # Git
@@ -173,9 +171,6 @@ docker-build-api: ## Rebuild api-service image
 docker-build-bot: ## Rebuild telegram-bot image
 	$(DC) build $(TELEGRAM_BOT)
 
-docker-build-leaderboard: ## Rebuild leaderboard image
-	$(DC) build $(LEADERBOARD)
-
 # =============================================================================
 # DOCKER LOGS (docker-logs-*)
 # =============================================================================
@@ -197,9 +192,6 @@ docker-logs-minio: ## Tail logs from minio
 docker-logs-newrelic: ## Tail logs from newrelic-infra
 	$(DC) logs -f $(NEWRELIC_INFRA)
 
-docker-logs-leaderboard: ## Tail logs from leaderboard
-	$(DC) logs -f $(LEADERBOARD)
-
 # =============================================================================
 # DOCKER SHELL (docker-shell-*)
 # =============================================================================
@@ -217,9 +209,6 @@ docker-shell-minio: ## Open shell in minio container
 
 docker-shell-newrelic: ## Open shell in newrelic-infra container
 	$(DC) exec $(NEWRELIC_INFRA) /bin/sh
-
-docker-shell-leaderboard: ## Open shell in leaderboard container
-	$(DC) exec $(LEADERBOARD) /bin/sh
 
 # =============================================================================
 # GO BUILD (go-build-*)
@@ -291,9 +280,9 @@ secrets-service-api: ## Generate API key for an app (APP=telegram-bot required)
 	@chmod +x $(SCRIPTS_DIR)/generate-api-service-key.sh
 	@$(SCRIPTS_DIR)/generate-api-service-key.sh "$(APP)" "$(SECRETS_DIR)"
 
-secrets-card-renderer: ## Generate card-renderer API key for an app (APP=leaderboard required)
+secrets-card-renderer: ## Generate card-renderer API key for an app (APP=ml-processor required)
 	@if [ -z "$(APP)" ]; then \
-		echo "Error: APP variable is required. Usage: make secrets-card-renderer APP=leaderboard"; \
+		echo "Error: APP variable is required. Usage: make secrets-card-renderer APP=ml-processor"; \
 		exit 1; \
 	fi
 	@chmod +x $(SCRIPTS_DIR)/generate-card-renderer-key.sh
@@ -513,11 +502,11 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	dev-up dev-up-build dev-up-logs dev-down dev-restart dev-ps dev-clean dev-prune \
 	prod-deploy prod-deploy-skip-build prod-deploy-skip-cleanup prod-deploy-regenerate-certs \
 	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik prod-update-ip pg-tunnel \
-	docker-build docker-build-api docker-build-bot docker-build-leaderboard \
+	docker-build docker-build-api docker-build-bot \
 	docker-logs docker-logs-api docker-logs-bot docker-logs-postgres docker-logs-minio \
-	docker-logs-newrelic docker-logs-leaderboard \
+	docker-logs-newrelic \
 	docker-shell-api docker-shell-bot docker-shell-postgres docker-shell-minio \
-	docker-shell-newrelic docker-shell-leaderboard \
+	docker-shell-newrelic \
 	go-build go-build-api go-build-bot go-build-import-cli go-build-import-cli-prod go-clean \
 	go-fmt go-fmt-check \
 	secrets-traefik-password secrets-service-api secrets-card-renderer secrets-jwt \

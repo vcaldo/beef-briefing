@@ -3,6 +3,7 @@
  * Handles JWT authentication via Mini App init data.
  */
 
+import { getBrowserTimezone } from '../utils/timezone'
 import type {
   AuthResponse,
   StatsResponse,
@@ -15,6 +16,8 @@ import type {
   ChatUsersResponse,
   Period,
   LeaderboardMetric,
+  CardImage,
+  CardImageWithUrl,
 } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
@@ -23,6 +26,7 @@ class ApiClient {
   private token: string | null = null
   private chatId: number | null = null
   private isAdmin: boolean = false
+  private timezone: string = getBrowserTimezone()
 
   /**
    * Authenticate with Mini App init data.
@@ -57,7 +61,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/stats?chat_id=${targetChatId}&period=${period}`,
+      `${API_BASE_URL}/api/v1/mini-app/stats?chat_id=${targetChatId}&period=${period}&tz=${encodeURIComponent(this.timezone)}`,
       { headers: this.getHeaders() }
     )
 
@@ -78,7 +82,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/activity?chat_id=${targetChatId}&period=${period}`,
+      `${API_BASE_URL}/api/v1/mini-app/activity?chat_id=${targetChatId}&period=${period}&tz=${encodeURIComponent(this.timezone)}`,
       { headers: this.getHeaders() }
     )
 
@@ -105,7 +109,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/leaderboard?chat_id=${targetChatId}&period=${period}&metric=${metric}&page=${page}&limit=${limit}`,
+      `${API_BASE_URL}/api/v1/mini-app/leaderboard?chat_id=${targetChatId}&period=${period}&metric=${metric}&page=${page}&limit=${limit}&tz=${encodeURIComponent(this.timezone)}`,
       { headers: this.getHeaders() }
     )
 
@@ -130,7 +134,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/reactions-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}`,
+      `${API_BASE_URL}/api/v1/mini-app/reactions-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}&tz=${encodeURIComponent(this.timezone)}`,
       { headers: this.getHeaders() }
     )
 
@@ -155,7 +159,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/replies-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}`,
+      `${API_BASE_URL}/api/v1/mini-app/replies-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}&tz=${encodeURIComponent(this.timezone)}`,
       { headers: this.getHeaders() }
     )
 
@@ -176,7 +180,7 @@ class ApiClient {
       throw new Error('No chat ID available')
     }
 
-    let url = `${API_BASE_URL}/api/v1/mini-app/profile?chat_id=${targetChatId}&period=${period}`
+    let url = `${API_BASE_URL}/api/v1/mini-app/profile?chat_id=${targetChatId}&period=${period}&tz=${encodeURIComponent(this.timezone)}`
     if (targetUserId) {
       url += `&target_user_id=${targetUserId}`
     }
@@ -225,7 +229,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/heatmap?chat_id=${targetChatId}&period=${period}&include_user=${includeUser}`,
+      `${API_BASE_URL}/api/v1/mini-app/heatmap?chat_id=${targetChatId}&period=${period}&include_user=${includeUser}&tz=${encodeURIComponent(this.timezone)}`,
       { headers: this.getHeaders() }
     )
 
@@ -234,6 +238,95 @@ class ApiClient {
     }
 
     return response.json()
+  }
+
+  /**
+   * Get list of available weeks with card images.
+   */
+  async getWeeks(chatId?: number): Promise<string[]> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/gallery/weeks?chat_id=${targetChatId}`,
+      { headers: this.getHeaders() }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch weeks')
+    }
+
+    const data = await response.json()
+    return data.weeks
+  }
+
+  /**
+   * Get card images for a specific week.
+   */
+  async getCards(weekStart: string, chatId?: number): Promise<CardImage[]> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/gallery/images?chat_id=${targetChatId}&week_start=${weekStart}`,
+      { headers: this.getHeaders() }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch cards')
+    }
+
+    const data = await response.json()
+    return data.images
+  }
+
+  /**
+   * Get presigned URL for a specific card image.
+   */
+  async getImageUrl(imageId: number, expiresIn: number = 3600): Promise<string> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/gallery/image/${imageId}?expires=${expiresIn}`,
+      { headers: this.getHeaders() }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch image URL')
+    }
+
+    const data = await response.json()
+    return data.url
+  }
+
+  /**
+   * Get the current user's latest card with presigned URL.
+   */
+  async getUserLatestCard(userId: number, chatId?: number): Promise<CardImageWithUrl | null> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    // Get latest week
+    const weeks = await this.getWeeks(targetChatId)
+    if (weeks.length === 0) {
+      return null
+    }
+
+    // Get cards for the latest week
+    const cards = await this.getCards(weeks[0], targetChatId)
+    const userCard = cards.find((card) => card.user_id === userId)
+
+    if (!userCard) {
+      return null
+    }
+
+    // Get presigned URL
+    const url = await this.getImageUrl(userCard.id)
+    return { ...userCard, url }
   }
 
   private getHeaders(): HeadersInit {
@@ -256,6 +349,10 @@ class ApiClient {
 
   isAuthenticated(): boolean {
     return this.token !== null
+  }
+
+  getTimezone(): string {
+    return this.timezone
   }
 }
 

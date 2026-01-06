@@ -48,16 +48,6 @@ export function CardPage({ userId, chatTitle }: CardPageProps) {
     }
   }, [card])
 
-  // Format week date for display
-  const formatWeekDate = (weekStart: string) => {
-    const date = new Date(weekStart)
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  }
-
   if (isLoading) {
     return (
       <div className="page-container">
@@ -129,15 +119,15 @@ export function CardPage({ userId, chatTitle }: CardPageProps) {
         <div className="card-actions">
           {shareStory.isAvailable() && (
             <button className="card-action-btn card-action-primary" onClick={handleShareToStory}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
                 <circle cx="12" cy="12" r="3" />
               </svg>
-              Share to Story
+              Story
             </button>
           )}
           <button className="card-action-btn" onClick={handleDownload}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />

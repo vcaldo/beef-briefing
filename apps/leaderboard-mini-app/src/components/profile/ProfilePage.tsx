@@ -8,6 +8,7 @@ import type {
   Period,
   ProfileResponse,
   TopInteractor,
+  ChatUser,
 } from '../../types'
 
 interface ProfilePageProps {
@@ -16,12 +17,40 @@ interface ProfilePageProps {
   firstName: string
   username: string | null
   chatTitle: string | null
+  isAdmin: boolean
 }
 
-export function ProfilePage({ period, onPeriodChange, firstName, username, chatTitle }: ProfilePageProps) {
+export function ProfilePage({ period, onPeriodChange, firstName, username, chatTitle, isAdmin }: ProfilePageProps) {
   const [data, setData] = useState<ProfileResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Admin impersonation state
+  const [users, setUsers] = useState<ChatUser[]>([])
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
+  const [loadingUsers, setLoadingUsers] = useState(false)
+
+  // Determine displayed user info (impersonated user or self)
+  const displayFirstName = selectedUserId && data?.first_name ? data.first_name : firstName
+  const displayUsername = selectedUserId && data?.username !== undefined ? data.username : username
+
+  // Fetch users list for admin dropdown
+  useEffect(() => {
+    async function fetchUsers() {
+      if (!isAdmin || !apiClient.isAuthenticated()) return
+
+      setLoadingUsers(true)
+      try {
+        const response = await apiClient.getChatUsers()
+        setUsers(response.users)
+      } catch (err) {
+        console.error('Failed to fetch users:', err)
+      } finally {
+        setLoadingUsers(false)
+      }
+    }
+    fetchUsers()
+  }, [isAdmin])
 
   const fetchData = useCallback(async () => {
     if (!apiClient.isAuthenticated()) return
@@ -29,7 +58,7 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
     setLoading(true)
     setError(null)
     try {
-      const response = await apiClient.getProfile(period)
+      const response = await apiClient.getProfile(period, undefined, selectedUserId || undefined)
       setData(response)
     } catch (err) {
       console.error('Failed to fetch profile:', err)
@@ -37,11 +66,16 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
     } finally {
       setLoading(false)
     }
-  }, [period])
+  }, [period, selectedUserId])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  // Handle user selection change
+  const handleUserChange = (userId: number | null) => {
+    setSelectedUserId(userId)
+  }
 
   return (
     <div className="page-container">
@@ -50,17 +84,47 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
         {chatTitle && <p className="app-header-subtitle">{chatTitle}</p>}
       </header>
 
+      {/* Admin User Selector */}
+      {isAdmin && (
+        <div className="admin-selector">
+          <label className="admin-selector-label">View as user:</label>
+          {loadingUsers ? (
+            <div className="skeleton skeleton-row" style={{ height: '44px' }} />
+          ) : (
+            <select
+              className="admin-selector-dropdown"
+              value={selectedUserId || ''}
+              onChange={(e) => handleUserChange(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">-- My Profile --</option>
+              {users.map((user) => (
+                <option key={user.user_id} value={user.user_id}>
+                  {user.first_name} {user.last_name || ''} {user.username ? `(@${user.username})` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
+      {/* Impersonation Banner */}
+      {selectedUserId && (
+        <div className="impersonation-banner">
+          Viewing {displayFirstName}'s profile
+        </div>
+      )}
+
       <PeriodSelector selectedPeriod={period} onPeriodChange={onPeriodChange} />
 
       {/* Profile Header */}
       <div className="profile-header">
         <Avatar
           photoUrl={data?.photo_url}
-          firstName={firstName}
+          firstName={displayFirstName}
           size="large"
         />
-        <h2 className="profile-name">{firstName}</h2>
-        {username && <div className="profile-username">@{username}</div>}
+        <h2 className="profile-name">{displayFirstName}</h2>
+        {displayUsername && <div className="profile-username">@{displayUsername}</div>}
       </div>
 
       {/* Stats Grid */}

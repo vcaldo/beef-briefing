@@ -613,8 +613,17 @@ func (h *MiniAppHandler) HandleRepliesOverview(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(response)
 }
 
+// ProfileResponseWithUser extends ProfileResponse with user info for impersonation
+type ProfileResponseWithUser struct {
+	*services.ProfileResponse
+	UserID    *int64  `json:"user_id,omitempty"`
+	FirstName *string `json:"first_name,omitempty"`
+	LastName  *string `json:"last_name,omitempty"`
+	Username  *string `json:"username,omitempty"`
+}
+
 // HandleProfile handles user profile data.
-// GET /api/v1/mini-app/profile?chat_id=...&period=30d
+// GET /api/v1/mini-app/profile?chat_id=...&period=30d&target_user_id=...
 func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
@@ -649,16 +658,41 @@ func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 		period = "30d"
 	}
 
-	// Use the authenticated user's ID
+	// Use the authenticated user's ID by default
 	userID := claims.UserID
+	var targetUserInfo *services.ChatUserWithPhoto
+
+	// Check for target_user_id (admin impersonation)
+	if targetStr := r.URL.Query().Get("target_user_id"); targetStr != "" {
+		targetUserID, err := strconv.ParseInt(targetStr, 10, 64)
+		if err != nil {
+			writeError(w, "invalid target_user_id", http.StatusBadRequest)
+			return
+		}
+
+		// Only admins can view other users' profiles
+		if !h.service.IsAdmin(claims.UserID) {
+			writeError(w, "only admins can view other users' profiles", http.StatusForbidden)
+			return
+		}
+
+		userID = targetUserID
+
+		// Get target user's info for display
+		targetUserInfo, err = h.service.GetUserInfo(ctx, targetUserID)
+		if err != nil {
+			slog.Error("failed to get target user info", "error", err, "target_user_id", targetUserID)
+		}
+	}
 
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
 		txn.AddAttribute("user_id", userID)
 		txn.AddAttribute("period", period)
+		txn.AddAttribute("is_impersonation", targetUserInfo != nil)
 	}
 
-	response, err := h.service.GetUserProfile(ctx, chatID, userID, period)
+	profile, err := h.service.GetUserProfile(ctx, chatID, userID, period)
 	if err != nil {
 		slog.Error("failed to get user profile", "error", err, "chat_id", chatID, "user_id", userID)
 		if txn != nil {
@@ -666,6 +700,18 @@ func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		writeError(w, "internal server error", http.StatusInternalServerError)
 		return
+	}
+
+	// Build response with optional user info for impersonation
+	response := &ProfileResponseWithUser{
+		ProfileResponse: profile,
+	}
+
+	if targetUserInfo != nil {
+		response.UserID = &targetUserInfo.UserID
+		response.FirstName = &targetUserInfo.FirstName
+		response.LastName = targetUserInfo.LastName
+		response.Username = targetUserInfo.Username
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -737,4 +783,67 @@ func (h *MiniAppHandler) HandleHeatmap(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// HandleUsers handles listing all users in a chat (admin-only).
+// GET /api/v1/mini-app/users?chat_id=...
+func (h *MiniAppHandler) HandleUsers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+
+	// Get JWT claims from context
+	claims := middleware.GetClaimsFromContext(ctx)
+	if claims == nil {
+		writeError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Admin-only endpoint
+	if !h.service.IsAdmin(claims.UserID) {
+		writeError(w, "admin access required", http.StatusForbidden)
+		return
+	}
+
+	// Parse chat_id
+	chatIDStr := r.URL.Query().Get("chat_id")
+	if chatIDStr == "" {
+		writeError(w, "chat_id is required", http.StatusBadRequest)
+		return
+	}
+	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+	if err != nil {
+		writeError(w, "invalid chat_id", http.StatusBadRequest)
+		return
+	}
+
+	// Verify chat access
+	if claims.ChatID != nil && *claims.ChatID != chatID {
+		writeError(w, "access denied to this chat", http.StatusForbidden)
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("admin_user_id", claims.UserID)
+	}
+
+	users, err := h.service.GetChatUsers(ctx, chatID)
+	if err != nil {
+		slog.Error("failed to get chat users", "error", err, "chat_id", chatID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		writeError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Ensure non-nil slice for JSON serialization
+	if users == nil {
+		users = []services.ChatUserWithPhoto{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"users": users,
+	})
 }

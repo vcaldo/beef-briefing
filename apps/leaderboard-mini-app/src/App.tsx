@@ -21,6 +21,7 @@ function App() {
   const [firstName, setFirstName] = useState<string>('')
   const [username, setUsername] = useState<string | null>(null)
   const [chatTitle, setChatTitle] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState<boolean>(false)
 
   // Navigation state
   const [activeTab, setActiveTab] = useState<TabId>('home')
@@ -56,6 +57,7 @@ function App() {
         setFirstName(auth.first_name)
         setUsername(auth.username)
         setChatTitle(auth.chat_title)
+        setIsAdmin(auth.is_admin)
 
         // Update document title to group name (shown in Telegram header)
         if (auth.chat_title) {
@@ -105,6 +107,7 @@ function App() {
             firstName={firstName}
             username={username}
             chatTitle={chatTitle}
+            isAdmin={isAdmin}
           />
         )
       default:

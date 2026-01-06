@@ -12,6 +12,7 @@ import type {
   RepliesOverviewResponse,
   ProfileResponse,
   HeatmapResponse,
+  ChatUsersResponse,
   Period,
   LeaderboardMetric,
 } from '../types'
@@ -21,6 +22,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 class ApiClient {
   private token: string | null = null
   private chatId: number | null = null
+  private isAdmin: boolean = false
 
   /**
    * Authenticate with Mini App init data.
@@ -41,6 +43,7 @@ class ApiClient {
     const data: AuthResponse = await response.json()
     this.token = data.token
     this.chatId = data.chat_id
+    this.isAdmin = data.is_admin
     return data
   }
 
@@ -165,20 +168,44 @@ class ApiClient {
 
   /**
    * Get user profile data (stats, top interactors, personal heatmap).
+   * If targetUserId is provided (admin only), fetches that user's profile.
    */
-  async getProfile(period: Period = '30d', chatId?: number): Promise<ProfileResponse> {
+  async getProfile(period: Period = '30d', chatId?: number, targetUserId?: number): Promise<ProfileResponse> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    let url = `${API_BASE_URL}/api/v1/mini-app/profile?chat_id=${targetChatId}&period=${period}`
+    if (targetUserId) {
+      url += `&target_user_id=${targetUserId}`
+    }
+
+    const response = await fetch(url, { headers: this.getHeaders() })
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch profile')
+    }
+
+    return response.json()
+  }
+
+  /**
+   * Get all users in a chat (admin only).
+   */
+  async getChatUsers(chatId?: number): Promise<ChatUsersResponse> {
     const targetChatId = chatId || this.chatId
     if (!targetChatId) {
       throw new Error('No chat ID available')
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/profile?chat_id=${targetChatId}&period=${period}`,
+      `${API_BASE_URL}/api/v1/mini-app/users?chat_id=${targetChatId}`,
       { headers: this.getHeaders() }
     )
 
     if (!response.ok) {
-      throw new Error('Failed to fetch profile')
+      throw new Error('Failed to fetch users')
     }
 
     return response.json()
@@ -221,6 +248,10 @@ class ApiClient {
 
   getChatId(): number | null {
     return this.chatId
+  }
+
+  getIsAdmin(): boolean {
+    return this.isAdmin
   }
 
   isAuthenticated(): boolean {

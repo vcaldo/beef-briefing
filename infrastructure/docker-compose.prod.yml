@@ -45,6 +45,7 @@ services:
       # Mini App authentication
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       CORS_ORIGINS: https://leaderboard.${DOMAIN_NAME},https://deck.${DOMAIN_NAME}
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS}
     volumes:
       - ./secrets/apps/api-service:/app/secrets:ro
     depends_on:

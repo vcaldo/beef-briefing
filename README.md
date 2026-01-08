@@ -1,16 +1,59 @@
 # Beef Briefing
 
-Go-based Telegram bot system for managing beef briefing subscriptions. Includes REST API, PostgreSQL backend, and Linode deployment with Traefik SSL.
+A Telegram group analytics and gamification platform that transforms chat activity into weekly stats cards, leaderboards, and insights.
 
-## Quick Start (Development)
+## What is Beef Briefing?
+
+Beef Briefing captures and analyzes Telegram group conversations to create a fun, gamified experience for group members. Every week, users receive personalized stats cards showing their communication style, mood, humor level, and social influence within the group.
+
+The platform uses ML models to analyze message sentiment, detect humor patterns, and measure engagement. Results are presented through:
+
+- **Weekly Stats Cards**: Gamified cards with scores for Aura (mood), Activity, Presence, Humor, Toxicity, and Popularity
+- **Leaderboard Mini App**: Rankings and activity trends accessible directly in Telegram
+- **Card Gallery**: Browse and share generated stats cards
+
+## Features
+
+- **Real-time Message Capture**: Automatically ingests messages, reactions, and media from Telegram groups
+- **ML-Powered Analytics**: Sentiment analysis, humor detection, toxicity classification, and entity recognition
+- **Gamified Stats Cards**: Beautiful themed cards with customizable designs (gaming, clean, mythic, vaporwave, and more)
+- **Telegram Mini Apps**: Native Telegram experience for viewing leaderboards and card galleries
+- **Historical Import**: Import existing chat history from Telegram Desktop exports
+- **Privacy-Focused**: Self-hosted solution - your data stays on your infrastructure
+
+## Screenshots
+
+<!-- TODO: Add screenshots of stats cards and Mini Apps -->
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Backend Services | Go 1.25 |
+| ML Processing | Python 3.14, PyTorch, OpenAI |
+| Frontend | React, TypeScript, Vite |
+| Database | PostgreSQL 17 with PostGIS |
+| Storage | MinIO / S3 |
+| Card Rendering | Playwright, HTML/CSS |
+| Infrastructure | Docker, Traefik, Terraform |
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Technical Documentation](apps/README.md) | Architecture, services, and data flow |
+| [Infrastructure](infrastructure/README.md) | Docker Compose, deployment, and secrets |
+| [Terraform](infrastructure/terraform/README.md) | Linode provisioning |
+
+## Quick Start
 
 ```bash
 # 1. Configure environment
 cp infrastructure/.env.dev.example infrastructure/.env.dev
-# Edit .env.dev: set TELEGRAM_BOT_TOKEN (required)
+# Edit .env.dev: set TELEGRAM_BOT_TOKEN
 
 # 2. Generate secrets
-make secrets-analytics-api-key
+make secrets-service-api APP=telegram-bot
 
 # 3. Start services
 make up-build
@@ -19,89 +62,8 @@ make up-build
 make logs
 ```
 
-**Access:**
-- API Service: http://localhost:8080
-- MinIO Console: http://localhost:9001
+See [Technical Documentation](apps/README.md) for detailed setup instructions.
 
-## Mandatory Environment Variables
+## License
 
-| Variable | Description | Source |
-|----------|-------------|--------|
-| `TELEGRAM_BOT_TOKEN` | Telegram Bot API token from @BotFather | `infrastructure/.env.dev` |
-| `DB_PASSWORD` | PostgreSQL password | `infrastructure/.env.dev` |
-| `ANALYTICS_API_KEY_FILE` | API key for analytics endpoints | `infrastructure/secrets/apps/api-service/analytics_api_key` |
-
-**Production-only:**
-
-| Variable | Description | Source |
-|----------|-------------|--------|
-| `DOMAIN_NAME` | Domain for SSL certificates | `infrastructure/.env.prod` |
-| `LETSENCRYPT_EMAIL` | Email for Let's Encrypt notifications | `infrastructure/.env.prod` |
-| `TRAEFIK_DASHBOARD_USERS` | Htpasswd credentials (bcrypt, `$$` escaped) | `infrastructure/.env.prod` |
-| `LINODE_TOKEN` | Linode API token for Terraform | `infrastructure/.env.prod` |
-
-## Secrets Generation
-
-**Recommended workflow:** Use file-based secrets (`*_FILE` env vars).
-
-| Secret | Make Target | Output Path |
-|--------|-------------|-------------|
-| Traefik dashboard password | `make secrets-traefik-password` | Updates `TRAEFIK_DASHBOARD_USERS` in `.env.prod` |
-| Analytics API key | `make secrets-analytics-api-key` | `infrastructure/secrets/apps/api-service/analytics_api_key` |
-
-## Service Documentation
-
-| Service | Description |
-|---------|-------------|
-| [api-service](apps/api-service/README.md) | REST API for ingesting Telegram updates with media uploads |
-| [telegram-bot](apps/telegram-bot/README.md) | Telegram bot client that forwards group messages to the API |
-| [import-cli](apps/import-cli/README.md) | CLI tool to import Telegram Desktop exports |
-| [card-image-generator](apps/card-image-generator/README.md) | Renders gamified user stats cards as PNG images using HTML/CSS templates |
-| [ml-processor](apps/ml-processor/README.md) | ML pipeline for sentiment, humor, toxicity analysis |
-
-## Infrastructure Documentation
-
-| Document | Description |
-|----------|-------------|
-| [infrastructure/](infrastructure/README.md) | Docker Compose environments and deployment overview |
-| [infrastructure/secrets/](infrastructure/secrets/README.md) | Secrets management and file-based storage |
-| [infrastructure/terraform/](infrastructure/terraform/README.md) | Linode provisioning (instance, storage, firewall, DNS) |
-
-## Commands Reference
-
-Run `make help` for all available targets.
-
-### Docker Lifecycle
-
-```bash
-make up              # Start dev services
-make up-build        # Rebuild and start
-make down            # Stop services
-make logs            # Tail all logs
-make clean           # Stop and remove volumes
-```
-
-### Deployment
-
-```bash
-make deploy          # Deploy to production
-make deploy-skip-build   # Deploy without rebuilding
-make rollback        # Rollback production
-```
-
-### Terraform
-
-```bash
-make tf-setup        # Setup terraform.tfvars from .env.prod
-make tf-init         # Initialize Terraform
-make tf-plan         # Preview changes
-make tf-apply        # Apply changes
-make tf-ip           # Get server IP
-```
-
-## Troubleshooting
-
-- **Bot not receiving messages**: Ensure bot is admin in the group and privacy mode is disabled via @BotFather `/setprivacy`
-- **SSL certificate not issued**: Check DNS points to server IP (`make tf-ip`) and port 80 is open
-- **Missing `htpasswd`**: Install `apache2-utils` (Debian/Ubuntu) or `httpd-tools` (RHEL/CentOS)
-- **Analytics API 401**: Generate API key with `make secrets-analytics-api-key`
+MIT

@@ -44,9 +44,9 @@ function App() {
     setCustomAttribute('timezone', apiClient.getTimezone())
   }, [])
 
-  // Minimum splash screen display time (1.5s = one full animation cycle)
+  // Minimum splash screen display time (2s)
   useEffect(() => {
-    const timer = setTimeout(() => setSplashMinTimeElapsed(true), 1500)
+    const timer = setTimeout(() => setSplashMinTimeElapsed(true), 2000)
     return () => clearTimeout(timer)
   }, [])
 

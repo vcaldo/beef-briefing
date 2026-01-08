@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '../../newrelic'
@@ -14,7 +14,6 @@ interface PrefetchedHomeData {
   stats: StatsResponse | null
   activity: ActivityDataPoint[]
   heatmap: HeatmapData | null
-  period: Period
 }
 
 interface HomePageProps {
@@ -117,8 +116,8 @@ export function HomePage({ period, onPeriodChange, chatTitle, prefetchedData, on
 
   // Use prefetched data if available (from splash screen), otherwise fetch
   useEffect(() => {
-    // If prefetched data exists and matches current period, use it
-    if (prefetchedData && prefetchedData.period === period) {
+    // If prefetched data exists (period already validated in App.tsx), use it
+    if (prefetchedData) {
       setStats(prefetchedData.stats)
       setActivity(prefetchedData.activity)
       setHeatmap(prefetchedData.heatmap)

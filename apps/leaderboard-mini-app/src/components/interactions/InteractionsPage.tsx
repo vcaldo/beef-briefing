@@ -38,13 +38,27 @@ function groupPaidReactions(reactions: TopReaction[]): TopReaction[] {
   return regularReactions
 }
 
+// Prefetched data passed from App (loaded during splash screen)
+interface PrefetchedInteractionsData {
+  reactions: ReactionsOverviewResponse | null
+  replies: RepliesOverviewResponse | null
+}
+
 interface InteractionsPageProps {
   period: Period
   onPeriodChange: (period: Period) => void
   chatTitle: string | null
+  prefetchedData?: PrefetchedInteractionsData | null
+  onPrefetchConsumed?: () => void
 }
 
-export function InteractionsPage({ period, onPeriodChange, chatTitle }: InteractionsPageProps) {
+export function InteractionsPage({
+  period,
+  onPeriodChange,
+  chatTitle,
+  prefetchedData,
+  onPrefetchConsumed,
+}: InteractionsPageProps) {
   const [reactionsData, setReactionsData] = useState<ReactionsOverviewResponse | null>(null)
   const [repliesData, setRepliesData] = useState<RepliesOverviewResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -77,9 +91,16 @@ export function InteractionsPage({ period, onPeriodChange, chatTitle }: Interact
     }
   }, [period])
 
+  // Use prefetched data if available, otherwise fetch
   useEffect(() => {
+    if (prefetchedData) {
+      setReactionsData(prefetchedData.reactions)
+      setRepliesData(prefetchedData.replies)
+      onPrefetchConsumed?.()
+      return
+    }
     fetchData()
-  }, [fetchData])
+  }, [period, prefetchedData, onPrefetchConsumed, fetchData])
 
   // Process reactions: group all paid/custom emojis into one combined item
   const processedReactions = reactionsData?.top_reactions

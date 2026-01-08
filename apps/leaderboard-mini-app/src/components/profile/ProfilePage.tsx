@@ -20,9 +20,20 @@ interface ProfilePageProps {
   username: string | null
   chatTitle: string | null
   isAdmin: boolean
+  prefetchedData?: ProfileResponse | null
+  onPrefetchConsumed?: () => void
 }
 
-export function ProfilePage({ period, onPeriodChange, firstName, username, chatTitle, isAdmin }: ProfilePageProps) {
+export function ProfilePage({
+  period,
+  onPeriodChange,
+  firstName,
+  username,
+  chatTitle,
+  isAdmin,
+  prefetchedData,
+  onPrefetchConsumed,
+}: ProfilePageProps) {
   const [data, setData] = useState<ProfileResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -78,9 +89,16 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
     }
   }, [period, selectedUserId])
 
+  // Use prefetched data if available and not impersonating, otherwise fetch
   useEffect(() => {
+    // Only use prefetch for own profile (not impersonating)
+    if (prefetchedData && !selectedUserId) {
+      setData(prefetchedData)
+      onPrefetchConsumed?.()
+      return
+    }
     fetchData()
-  }, [fetchData])
+  }, [period, selectedUserId, prefetchedData, onPrefetchConsumed, fetchData])
 
   // Handle user selection change
   const handleUserChange = (userId: number | null) => {

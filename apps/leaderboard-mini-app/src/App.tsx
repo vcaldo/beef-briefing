@@ -10,13 +10,33 @@ import { InteractionsPage } from './components/interactions/InteractionsPage'
 import { ProfilePage } from './components/profile/ProfilePage'
 import { CardPage } from './components/card'
 
-import type { TabId, Period, StatsResponse, ActivityDataPoint, HeatmapData } from './types'
+import type {
+  TabId,
+  Period,
+  StatsResponse,
+  ActivityDataPoint,
+  HeatmapData,
+  LeaderboardResponse,
+  ReactionsOverviewResponse,
+  RepliesOverviewResponse,
+  ProfileResponse,
+  CardImageWithUrl,
+} from './types'
 
-// Prefetched data for home page (loaded during splash screen)
-interface PrefetchedHomeData {
-  stats: StatsResponse | null
-  activity: ActivityDataPoint[]
-  heatmap: HeatmapData | null
+// Prefetched data for all tabs (loaded during splash screen)
+interface PrefetchedData {
+  home: {
+    stats: StatsResponse | null
+    activity: ActivityDataPoint[]
+    heatmap: HeatmapData | null
+  } | null
+  leaderboard: LeaderboardResponse | null
+  interactions: {
+    reactions: ReactionsOverviewResponse | null
+    replies: RepliesOverviewResponse | null
+  } | null
+  profile: ProfileResponse | null
+  card: CardImageWithUrl | null
   period: Period
 }
 
@@ -39,8 +59,8 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [period, setPeriod] = useState<Period>('7d')
 
-  // Prefetched home page data (loaded during splash screen)
-  const [prefetchedHome, setPrefetchedHome] = useState<PrefetchedHomeData | null>(null)
+  // Prefetched data for all tabs (loaded during splash screen)
+  const [prefetched, setPrefetched] = useState<PrefetchedData | null>(null)
 
   // Get launch params from Telegram
   let launchParams: ReturnType<typeof useLaunchParams> | null = null
@@ -61,25 +81,48 @@ function App() {
     return () => clearTimeout(timer)
   }, [])
 
-  // Prefetch home page data (called after auth, while splash still shows)
-  const prefetchHomeData = useCallback(async () => {
-    try {
-      const [statsData, activityData, heatmapData] = await Promise.all([
-        apiClient.getStats(period),
-        apiClient.getActivity(period),
-        apiClient.getHeatmap(period, false),
-      ])
-      setPrefetchedHome({
-        stats: statsData,
-        activity: activityData.data || [],
-        heatmap: heatmapData.group,
-        period,
-      })
-    } catch (err) {
-      // Prefetch failed silently - HomePage will fetch on mount
-      console.warn('Prefetch failed:', err)
-    }
-  }, [period])
+  // Prefetch all tab data in parallel (called after auth, while splash still shows)
+  const prefetchAllData = useCallback(async (authUserId: number) => {
+    const defaultPeriod: Period = '7d'
+
+    // Fire all requests in parallel using Promise.allSettled (failures don't block others)
+    const [home, leaderboard, interactions, profile, card] = await Promise.allSettled([
+      // Home page data
+      Promise.all([
+        apiClient.getStats(defaultPeriod),
+        apiClient.getActivity(defaultPeriod),
+        apiClient.getHeatmap(defaultPeriod, false),
+      ]).then(([stats, activity, heatmap]) => ({
+        stats,
+        activity: activity.data || [],
+        heatmap: heatmap.group,
+      })),
+
+      // Leaderboard (first page, default metric)
+      apiClient.getLeaderboard(defaultPeriod, 'message_count', 1, 20),
+
+      // Interactions (reactions + replies in parallel)
+      Promise.all([
+        apiClient.getReactionsOverview(defaultPeriod, 10),
+        apiClient.getRepliesOverview(defaultPeriod, 10),
+      ]).then(([reactions, replies]) => ({ reactions, replies })),
+
+      // Profile
+      apiClient.getProfile(defaultPeriod),
+
+      // Card (doesn't depend on period)
+      apiClient.getUserLatestCard(authUserId),
+    ])
+
+    setPrefetched({
+      home: home.status === 'fulfilled' ? home.value : null,
+      leaderboard: leaderboard.status === 'fulfilled' ? leaderboard.value : null,
+      interactions: interactions.status === 'fulfilled' ? interactions.value : null,
+      profile: profile.status === 'fulfilled' ? profile.value : null,
+      card: card.status === 'fulfilled' ? card.value : null,
+      period: defaultPeriod,
+    })
+  }, [])
 
   // Authenticate on mount
   useEffect(() => {
@@ -129,8 +172,8 @@ function App() {
 
         setAppState('authenticated')
 
-        // Start prefetching home page data while splash screen is still showing
-        prefetchHomeData()
+        // Start prefetching all tab data while splash screen is still showing
+        prefetchAllData(auth.user_id)
       } catch (err) {
         console.error('Authentication failed:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
@@ -190,16 +233,39 @@ function App() {
             period={period}
             onPeriodChange={handlePeriodChange}
             chatTitle={chatTitle}
-            prefetchedData={prefetchedHome}
-            onPrefetchConsumed={() => setPrefetchedHome(null)}
+            prefetchedData={prefetched?.period === period ? prefetched.home : null}
+            onPrefetchConsumed={() => setPrefetched(prev => prev ? { ...prev, home: null } : null)}
           />
         )
       case 'leaderboard':
-        return <LeaderboardPage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
+        return (
+          <LeaderboardPage
+            period={period}
+            onPeriodChange={handlePeriodChange}
+            chatTitle={chatTitle}
+            prefetchedData={prefetched?.period === period ? prefetched.leaderboard : null}
+            onPrefetchConsumed={() => setPrefetched(prev => prev ? { ...prev, leaderboard: null } : null)}
+          />
+        )
       case 'interactions':
-        return <InteractionsPage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
+        return (
+          <InteractionsPage
+            period={period}
+            onPeriodChange={handlePeriodChange}
+            chatTitle={chatTitle}
+            prefetchedData={prefetched?.period === period ? prefetched.interactions : null}
+            onPrefetchConsumed={() => setPrefetched(prev => prev ? { ...prev, interactions: null } : null)}
+          />
+        )
       case 'card':
-        return <CardPage userId={userId} chatTitle={chatTitle} />
+        return (
+          <CardPage
+            userId={userId}
+            chatTitle={chatTitle}
+            prefetchedData={prefetched?.card}
+            onPrefetchConsumed={() => setPrefetched(prev => prev ? { ...prev, card: null } : null)}
+          />
+        )
       case 'profile':
         return (
           <ProfilePage
@@ -209,6 +275,8 @@ function App() {
             username={username}
             chatTitle={chatTitle}
             isAdmin={isAdmin}
+            prefetchedData={prefetched?.period === period ? prefetched.profile : null}
+            onPrefetchConsumed={() => setPrefetched(prev => prev ? { ...prev, profile: null } : null)}
           />
         )
       default:
@@ -217,8 +285,8 @@ function App() {
             period={period}
             onPeriodChange={handlePeriodChange}
             chatTitle={chatTitle}
-            prefetchedData={prefetchedHome}
-            onPrefetchConsumed={() => setPrefetchedHome(null)}
+            prefetchedData={prefetched?.period === period ? prefetched.home : null}
+            onPrefetchConsumed={() => setPrefetched(prev => prev ? { ...prev, home: null } : null)}
           />
         )
     }

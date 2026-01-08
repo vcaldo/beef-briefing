@@ -5,15 +5,23 @@ import { setCustomAttribute, addPageAction, noticeError } from '../../newrelic'
 import { PeriodSelector } from '../PeriodSelector'
 import { LeaderboardTable } from '../LeaderboardTable'
 
-import type { Period, LeaderboardMetric, LeaderboardUser } from '../../types'
+import type { Period, LeaderboardMetric, LeaderboardUser, LeaderboardResponse } from '../../types'
 
 interface LeaderboardPageProps {
   period: Period
   onPeriodChange: (period: Period) => void
   chatTitle: string | null
+  prefetchedData?: LeaderboardResponse | null
+  onPrefetchConsumed?: () => void
 }
 
-export function LeaderboardPage({ period, onPeriodChange, chatTitle }: LeaderboardPageProps) {
+export function LeaderboardPage({
+  period,
+  onPeriodChange,
+  chatTitle,
+  prefetchedData,
+  onPrefetchConsumed,
+}: LeaderboardPageProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([])
   const [leaderboardTotal, setLeaderboardTotal] = useState(0)
   const [leaderboardPage, setLeaderboardPage] = useState(1)
@@ -67,17 +75,20 @@ export function LeaderboardPage({ period, onPeriodChange, chatTitle }: Leaderboa
     [period, leaderboardMetric]
   )
 
-  // Fetch data on mount and when period changes
+  // Use prefetched data if available (only for default metric 'message_count'), otherwise fetch
   useEffect(() => {
+    // If prefetched data exists and we're on default metric, use it
+    if (prefetchedData && leaderboardMetric === 'message_count') {
+      setLeaderboard(prefetchedData.users)
+      setLeaderboardTotal(prefetchedData.total)
+      setLeaderboardPage(1)
+      onPrefetchConsumed?.()
+      return
+    }
+    // Otherwise fetch normally
     setLeaderboardPage(1)
     fetchLeaderboard(1)
-  }, [period, fetchLeaderboard])
-
-  // Refetch leaderboard when metric changes
-  useEffect(() => {
-    setLeaderboardPage(1)
-    fetchLeaderboard(1)
-  }, [leaderboardMetric, fetchLeaderboard])
+  }, [period, leaderboardMetric, prefetchedData, onPrefetchConsumed, fetchLeaderboard])
 
   const handleMetricChange = (newMetric: LeaderboardMetric) => {
     addPageAction('metric_change', {

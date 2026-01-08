@@ -27,7 +27,7 @@ function App() {
 
   // Navigation state
   const [activeTab, setActiveTab] = useState<TabId>('home')
-  const [period, setPeriod] = useState<Period>('30d')
+  const [period, setPeriod] = useState<Period>('7d')
 
   // Get launch params from Telegram
   let launchParams: ReturnType<typeof useLaunchParams> | null = null

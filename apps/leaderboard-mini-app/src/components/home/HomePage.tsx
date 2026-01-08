@@ -68,7 +68,7 @@ export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
     setLoadingHeatmap(true)
     setHeatmapError(null)
     try {
-      const heatmapData = await apiClient.getHeatmap('max', false)
+      const heatmapData = await apiClient.getHeatmap(period, false)
       setHeatmap(heatmapData.group)
     } catch (err) {
       console.error('Failed to fetch heatmap:', err)
@@ -76,7 +76,7 @@ export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
     } finally {
       setLoadingHeatmap(false)
     }
-  }, [])
+  }, [period])
 
   // Fetch all data when period changes
   const fetchData = useCallback(async () => {
@@ -101,10 +101,10 @@ export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
 
       <OverviewStats stats={stats} loading={loadingStats} error={statsError} onRetry={fetchStats} />
 
-      <ActivityChart data={activity} loading={loadingActivity} error={activityError} onRetry={fetchActivity} />
+      <ActivityChart data={activity} loading={loadingActivity} error={activityError} onRetry={fetchActivity} title="Group Activity" />
 
       <section className="heatmap-section">
-        <h2 className="section-title">Group Activity</h2>
+        <h2 className="section-title">Group Heatmap</h2>
         {loadingHeatmap ? (
           <HeatmapSkeleton />
         ) : heatmapError ? (

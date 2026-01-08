@@ -40,6 +40,9 @@ export function HomePage({ period, onPeriodChange, chatTitle, prefetchedData, on
   const [activityError, setActivityError] = useState<string | null>(null)
   const [heatmapError, setHeatmapError] = useState<string | null>(null)
 
+  // Track if prefetch data has been consumed (to avoid double-fetching on mount)
+  const prefetchUsedRef = useRef(false)
+
   // Fetch stats
   const fetchStats = useCallback(async () => {
     if (!apiClient.isAuthenticated()) return
@@ -116,16 +119,16 @@ export function HomePage({ period, onPeriodChange, chatTitle, prefetchedData, on
 
   // Use prefetched data if available (from splash screen), otherwise fetch
   useEffect(() => {
-    // If prefetched data exists (period already validated in App.tsx), use it
-    if (prefetchedData) {
+    // Use prefetch only once on initial mount
+    if (prefetchedData && !prefetchUsedRef.current) {
+      prefetchUsedRef.current = true
       setStats(prefetchedData.stats)
       setActivity(prefetchedData.activity)
       setHeatmap(prefetchedData.heatmap)
-      // Clear prefetch so re-navigation fetches fresh data
       onPrefetchConsumed?.()
       return
     }
-    // Otherwise fetch normally
+    // Always fetch on period change (after initial prefetch consumed)
     fetchData()
   }, [period, prefetchedData, onPrefetchConsumed, fetchData])
 

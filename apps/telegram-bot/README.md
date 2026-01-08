@@ -1,341 +1,130 @@
-# Telegram Bot Service
+# Telegram Bot
 
-A Go-based Telegram bot that listens to group messages and forwards all updates (messages, edits, reactions) to the API service for ingestion into the database. The bot automatically downloads media files and sends them as multipart attachments.
+Real-time Telegram bot that listens to group messages and forwards updates to the API Service.
+
+## Overview
+
+The Telegram Bot connects to the Telegram API via long polling and captures all messages, edits, and reactions from groups where it's an admin. It downloads media files concurrently and sends updates to the API Service as multipart form data.
 
 ## Features
 
-- **Real-time Message Processing**: Listens to all updates in Telegram groups where the bot is an admin
-- **Concurrent Media Download**: Downloads up to 5 files simultaneously with connection pooling for optimal performance
-- **Smart Photo Handling**: Downloads only the largest photo size instead of all variants to save bandwidth
-- **File Size Protection**: Enforces 100MB file size limit to prevent memory exhaustion
-- **Automatic Retry**: Exponential backoff retry logic (3 attempts: 1s, 2s, 4s delays) for API failures
-- **Graceful Shutdown**: Handles SIGINT/SIGTERM signals for clean shutdown
-- **Structured Logging**: Environment-based logging (JSON for production, text for development)
-- **Timeout Protection**: 2-minute timeout per file download with context propagation
+- **Real-time Message Processing**: Captures all updates from Telegram groups
+- **Concurrent Media Download**: Up to 5 simultaneous file downloads with connection pooling
+- **Smart Photo Handling**: Downloads only the largest photo size to save bandwidth
+- **Automatic Retry**: Exponential backoff (1s, 2s, 4s) for API failures
+- **File Size Protection**: 100MB limit per file to prevent memory exhaustion
+- **Graceful Shutdown**: Clean handling of SIGINT/SIGTERM signals
 
-## Architecture
+## Quick Start
 
-### Components
+```bash
+# Start with Docker (recommended)
+make up-build
+make logs-bot
 
-- **Update Handler** (`internal/handlers/update_handler.go`): Processes updates, extracts media, and downloads files concurrently
-- **API Client** (`internal/client/api_client.go`): Sends updates to API service with retry logic and shared HTTP client
-- **Constants** (`internal/constants.go`): Centralized timeout values, retry configuration, and file size limits
-- **Main** (`cmd/main.go`): Bot initialization, logger setup, and graceful shutdown
-
-### Update Flow
-
-1. Bot receives update via long polling from Telegram
-2. Single shared handler instance processes the update (not recreated per request)
-3. Handler extracts file IDs from message/edited message (largest photo size only)
-4. Files download concurrently (max 5 simultaneous) with 2-minute timeout per file
-5. File size limited to 100MB via `io.LimitReader` to prevent memory exhaustion
-6. API client creates multipart form with JSON update + file attachments
-7. POST request to `{API_SERVICE_URL}/api/v1/ingest` with 30-second timeout
-8. Retry with exponential backoff on 5xx errors or network failures (no retry on 4xx)
-9. Log success/failure with structured fields
-
-### Performance Optimizations
-
-- **Shared HTTP Client**: Single client with connection pooling for all downloads
-- **Concurrent Downloads**: Up to 5 files downloaded simultaneously using goroutines with semaphore limiting
-- **Smart Photo Selection**: Only largest photo size downloaded (Telegram sends multiple sizes)
-- **Context Cancellation**: Proper context cleanup prevents resource leaks
-
-## API Endpoints Used
-
-The bot calls the following api-service endpoints. All endpoints require API Key authentication via `Authorization: Bearer <key>` header.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/ingest` | Send Telegram updates with optional media files |
-| GET | `/api/v1/users` | Fetch all user IDs for profile photo sync |
-| GET | `/api/v1/chats` | Fetch all chat IDs for profile photo sync |
-| POST | `/api/v1/profile-photos/user` | Upload user profile photos |
-| POST | `/api/v1/profile-photos/chat` | Upload chat profile photos |
-| GET | `/api/v1/cards/{user_id}/image` | Get presigned URL for card image |
-
-See [api-service README](../api-service/README.md) for full endpoint documentation.
+# Or run locally
+export TELEGRAM_BOT_TOKEN="your-token"
+export API_SERVICE_URL="http://localhost:8080"
+cd apps/telegram-bot
+go run ./cmd
+```
 
 ## Configuration
 
-All configuration via environment variables:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TELEGRAM_BOT_TOKEN` | (required) | Bot token from [@BotFather](https://t.me/botfather) |
+| `API_SERVICE_URL` | `http://api-service:8080` | API Service URL |
+| `ENVIRONMENT` | `development` | `development` or `production` |
+| `LOG_LEVEL` | `info` | Log level |
 
-### Required
-
-- `TELEGRAM_BOT_TOKEN` - Telegram Bot API token (from [@BotFather](https://t.me/botfather))
-
-### Optional
-
-- `API_SERVICE_URL` (default: `http://api-service:8080`) - URL of the API service ingest endpoint
-- `ENVIRONMENT` (default: `development`) - Set to `production` for JSON logging
-- `LOG_LEVEL` (default: `info`) - Log level: `debug`, `info`, `warn`, `error`
-
-### Configuration Constants
+### Internal Constants
 
 Defined in `internal/constants.go`:
 
-- **File Download Timeout**: 2 minutes per file
-- **API Request Timeout**: 30 seconds
-- **Max Retry Attempts**: 3 attempts
-- **Retry Delays**: 1s, 2s, 4s (exponential backoff)
-- **Max Concurrent Downloads**: 5 simultaneous file downloads
-- **Max File Size**: 100MB per file
+| Constant | Value | Description |
+|----------|-------|-------------|
+| File Download Timeout | 2 min | Per-file download timeout |
+| API Request Timeout | 30 sec | Per-request timeout |
+| Max Retry Attempts | 3 | API request retries |
+| Max Concurrent Downloads | 5 | Parallel file downloads |
+| Max File Size | 100 MB | File size limit |
 
 ## Bot Setup
 
 ### 1. Create Bot with BotFather
 
 1. Open [@BotFather](https://t.me/botfather) in Telegram
-2. Send `/newbot` and follow instructions
+2. Send `/newbot` and follow the prompts
 3. Save the bot token
-4. Send `/setprivacy` and set to **DISABLED** to receive all group messages
-5. Send `/setjoingroups` and set to **ENABLED** to allow bot to join groups
+4. Send `/setprivacy` → **DISABLED** (to receive all group messages)
+5. Send `/setjoingroups` → **ENABLED**
 
 ### 2. Add Bot to Group
 
 1. Add the bot to your Telegram group
-2. **Promote bot to admin** (required to receive all message types including reactions)
-3. Grant the following admin permissions:
-   - Delete messages (optional, for moderation features)
-   - Read messages (implicit with admin status)
+2. **Promote bot to admin** (required for reactions)
+3. No specific permissions needed beyond admin status
 
 ### 3. Configure Environment
 
-Set `TELEGRAM_BOT_TOKEN` in `infrastructure/.env.dev`:
+Add to `infrastructure/.env.dev`:
 
 ```bash
 TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
 ```
 
-## Development
-
-### Prerequisites
-
-- Go 1.22+
-- Docker & Docker Compose
-- Running `api-service` (see `apps/api-service/README.md`)
-
-### Local Development (with Docker)
-
-1. Ensure `infrastructure/.env.dev` has valid `TELEGRAM_BOT_TOKEN`
-
-2. Start all services:
-
-```bash
-cd infrastructure
-docker-compose -f docker-compose.dev.yml up -d
-```
-
-3. View bot logs:
-
-```bash
-docker logs -f beef-telegram-bot-dev
-```
-
-### Local Development (without Docker)
-
-1. Install dependencies:
-
-```bash
-cd apps/telegram-bot
-go mod download
-```
-
-2. Set environment variables:
-
-```bash
-export TELEGRAM_BOT_TOKEN="your-token-here"
-export API_SERVICE_URL="http://localhost:8080"
-export ENVIRONMENT="development"
-export LOG_LEVEL="debug"
-```
-
-3. Run the bot:
-
-```bash
-cd apps/telegram-bot
-go run ./cmd
-```
-
 ## Supported Update Types
 
-The bot processes the following Telegram update types:
+| Type | Description | Requirements |
+|------|-------------|--------------|
+| `message` | Text, photos, videos, documents, stickers, polls, etc. | Bot in group |
+| `edited_message` | Message edits | Bot in group |
+| `message_reaction` | Individual user reactions | Bot must be admin |
+| `message_reaction_count` | Aggregate reaction counts | Bot must be admin |
 
-### Messages (`update.message`)
-
-- Text messages
-- Photos (largest size only - automatically selects highest quality)
-- Videos
-- Audio files
-- Voice messages
-- Documents
-- Animations (GIFs)
-- Video notes
-- Locations
-- Message entities (mentions, URLs, hashtags, etc.)
-
-### Edited Messages (`update.edited_message`)
-
-- Same as messages above
-- Edit history tracked in database
-
-### Reactions (`update.message_reaction`)
-
-- Individual user reactions
-- Emoji, custom emoji, and paid reactions
-- **⚠️ Requires bot to be admin in the chat** - Telegram only sends reaction updates to admin bots
-- Bot must explicitly request `message_reaction` in `allowed_updates` (configured in `cmd/main.go`)
-
-### Reaction Counts (`update.message_reaction_count`)
-
-- Aggregate reaction counts for anonymous reactions
-- Used when individual user reactions are not available
-- **⚠️ Requires bot to be admin in the chat**
-- Bot must explicitly request `message_reaction_count` in `allowed_updates`
-
-> **Note**: By default, Telegram excludes `message_reaction`, `message_reaction_count`, and `chat_member` from the updates sent to bots. The bot explicitly configures `allowed_updates` to include all update types.
-
-## Error Handling
-
-### Retry Logic
-
-The bot retries failed API requests with exponential backoff:
-- **Attempt 1**: Immediate
-- **Attempt 2**: After 1 second
-- **Attempt 3**: After 2 seconds
-- **Attempt 4**: After 4 seconds
-
-**No retry** on 4xx errors (client errors like invalid JSON or missing fields).
-
-### File Download Failures
-
-If a media file fails to download:
-- Error is logged with `file_id` and error details
-- Other files continue downloading concurrently (partial success)
-- Update is sent to API service with successfully downloaded files
-- API service will skip missing files (see `apps/api-service/README.md`)
-- Files exceeding 100MB are rejected with error logged
-
-### Timeouts
-
-- **File download**: 2 minutes per file (concurrent downloads allowed)
-- **API request**: 30 seconds per attempt
-- **Total retry duration**: Up to ~37 seconds (30s + 1s + 2s + 4s delays between attempts)
-
-## Logging
-
-The bot uses structured logging with `log/slog` following the project guidelines:
-
-### Development Mode (`ENVIRONMENT=development`)
-
-- Human-readable text format
-- Log level: `DEBUG` (configurable via `LOG_LEVEL`)
-- Example:
-  ```
-  time=2025-12-07T10:30:00.000Z level=INFO msg="received update" update_id=123456789
-  time=2025-12-07T10:30:01.000Z level=INFO msg="downloading media files" count=2
-  time=2025-12-07T10:30:05.000Z level=INFO msg="successfully processed update" update_id=123456789 message_id=456 chat_id=-1001234567890
-  ```
-
-### Production Mode (`ENVIRONMENT=production`)
-
-- JSON format for machine parsing
-- Log level: `INFO` (configurable via `LOG_LEVEL`)
-- Example:
-  ```json
-  {"time":"2025-12-07T10:30:00.000Z","level":"INFO","msg":"received update","update_id":123456789}
-  {"time":"2025-12-07T10:30:05.000Z","level":"INFO","msg":"successfully processed update","update_id":123456789,"message_id":456,"chat_id":-1001234567890}
-  ```
-
-### Log Fields
-
-- `update_id` - Telegram update identifier
-- `message_id` - Message identifier (for message/edit/reaction updates)
-- `chat_id` - Chat identifier
-- `type` - Update type: `edit`, `reaction`, `reaction_count` (omitted for regular messages)
-- `file_id` - Telegram file identifier (for media downloads)
-- `size` - File size in bytes
-- `error` - Error message (on failures)
-- `attempt` - Retry attempt number (on retries)
-
-## Project Structure
+## Architecture
 
 ```
 apps/telegram-bot/
-├── cmd/
-│   └── main.go                    # Application entry point
+├── cmd/main.go                 # Entry point, bot initialization
 ├── internal/
-│   ├── client/
-│   │   └── api_client.go          # API client with retry logic
-│   ├── handlers/
-│   │   └── update_handler.go      # Concurrent update processing and file downloads
-│   └── constants.go               # Centralized timeouts, retry config, and limits
-├── go.mod
-├── Dockerfile
-└── README.md
+│   ├── client/api_client.go    # API client with retry logic
+│   ├── handlers/update_handler.go  # Update processing
+│   └── constants.go            # Timeouts and limits
+└── Dockerfile
 ```
 
-## Dependencies
+### Update Flow
 
-- **github.com/go-telegram/bot** - Telegram Bot API library
-- **beef-briefing/pkg/config** - Shared configuration package
-
-## Monitoring
-
-### Health Check
-
-The bot doesn't expose an HTTP endpoint. Monitor health via:
-
-1. **Docker logs**: Check for error messages
-   ```bash
-   docker logs beef-telegram-bot-dev
-   ```
-
-2. **Container status**: Ensure container is running
-   ```bash
-   docker ps | grep telegram-bot
-   ```
-
-3. **Process logs**: Look for successful update processing
-   ```bash
-   docker logs beef-telegram-bot-dev | grep "successfully processed"
-   ```
-
-### Key Metrics to Monitor
-
-- Update processing rate (updates per minute)
-- API request failures (retry attempts)
-- File download failures (missing media)
-- Bot restarts (signal handling)
+```
+Telegram API → Bot (long polling) → Download media (concurrent)
+                                  → Send to API Service (multipart)
+                                  → Retry on failure (exponential backoff)
+```
 
 ## Troubleshooting
 
 ### Bot doesn't receive messages
 
-1. Check bot is admin in the group
-2. Verify `TELEGRAM_BOT_TOKEN` is correct
-3. Ensure privacy mode is disabled (via BotFather `/setprivacy`)
-4. Check bot logs for errors
+1. Verify bot is admin in the group
+2. Check privacy mode is disabled: `/setprivacy` in @BotFather
+3. Confirm `TELEGRAM_BOT_TOKEN` is correct
+4. Check logs: `make logs-bot`
+
+### Reactions not captured
+
+- Bot **must be admin** to receive reaction updates
+- Telegram only sends reactions to admin bots
 
 ### Media files not downloading
 
-1. Verify bot has internet access to `api.telegram.org`
-2. Check file download timeout (2 minutes should be sufficient for most files)
-3. Look for `failed to download file` errors in logs with `file_id`
+1. Check internet connectivity to `api.telegram.org`
+2. Look for `failed to download file` in logs
+3. Verify file isn't larger than 100MB
 
 ### API requests failing
 
-1. Verify `API_SERVICE_URL` is correct and reachable
-2. Check `api-service` is running and healthy
-3. Look for retry attempts in logs
-4. Check `api-service` logs for ingestion errors
-
-### High memory usage
-
-**File size limits are now enforced (100MB per file)**. If you still encounter memory issues:
-- Monitor container memory usage with `docker stats`
-- Check for multiple large files being processed simultaneously (max 5 concurrent downloads)
-- Review logs for files approaching the 100MB limit
-- Consider reducing `MaxConcurrentDownloads` in `internal/constants.go` if needed
-- Consider reducing `MaxFileSize` for stricter limits
-
+1. Check `API_SERVICE_URL` is correct
+2. Verify api-service is running: `docker ps | grep api-service`
+3. Check api-service logs: `make logs-api`

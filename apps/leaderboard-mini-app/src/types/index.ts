@@ -139,6 +139,7 @@ export interface ProfileResponse {
   top_repliers: TopInteractor[]
   top_replied_to: TopInteractor[]
   heatmap: HeatmapData
+  activity?: ActivityDataPoint[]
   // Fields populated when admin is impersonating another user
   user_id?: number
   first_name?: string

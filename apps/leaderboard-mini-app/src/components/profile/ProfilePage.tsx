@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 
 import { apiClient } from '../../api/client'
 import { PeriodSelector } from '../PeriodSelector'
+import { ActivityChart } from '../ActivityChart'
 import { Avatar, HeatmapGrid, HeatmapSkeleton } from '../common'
 
 import type {
@@ -258,9 +259,18 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
         )}
       </section>
 
+      {/* Personal Activity Chart */}
+      <ActivityChart
+        data={data?.activity || []}
+        loading={loading}
+        error={error}
+        onRetry={fetchData}
+        title="Your Activity"
+      />
+
       {/* Personal Heatmap */}
       <section className="activity-heatmap-section">
-        <h2 className="section-title">Your Activity</h2>
+        <h2 className="section-title">Your Heatmap</h2>
         {loading ? (
           <HeatmapSkeleton />
         ) : data?.heatmap ? (

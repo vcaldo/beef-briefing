@@ -1,76 +1,87 @@
 # Leaderboard Mini App
 
-A Telegram Mini App for viewing chat statistics and user leaderboards. Users can see activity trends, message counts, and rankings for their chat group.
+Telegram Mini App for viewing chat statistics and user leaderboards.
+
+## Overview
+
+The Leaderboard Mini App displays activity statistics and user rankings for Telegram groups. Users can view overview stats, activity trends over time, and compare rankings across different metrics like message count, reactions, and active days.
 
 ## Features
 
 - **Overview Stats**: Total messages, reactions, active users
 - **Activity Timeline**: Daily message/reaction trends with charts
-- **User Leaderboard**: Rankings by various metrics (messages, reactions sent/received, active days)
-- **Period Filtering**: View stats for different time periods
-- **Telegram Integration**: Seamless authentication via Telegram Mini App init data
+- **User Rankings**: Leaderboards by various metrics
+- **Period Filtering**: View stats for 7d, 30d, 90d, or all time
+- **Multiple Metrics**: Rank by messages, reactions sent/received, active days
+- **Telegram Integration**: Seamless authentication via Mini App init data
 
-## Architecture
+## Quick Start
 
-### Tech Stack
+```bash
+# Install dependencies
+cd apps/leaderboard-mini-app
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_URL` | `` (same origin) | API Service base URL |
+
+## Tech Stack
 
 - **Framework**: React 18 with TypeScript
 - **Build Tool**: Vite
 - **Charts**: Recharts
 - **Telegram SDK**: @telegram-apps/sdk-react
 
-### API Integration
+## API Integration
 
-All API calls go through the central api-service with JWT authentication.
+All API calls use JWT authentication obtained through Telegram init_data.
 
-**Authentication Flow**:
-1. Telegram provides `init_data` when launching the Mini App
-2. Mini App exchanges `init_data` for JWT token via `/api/v1/mini-app/auth`
-3. All subsequent requests include JWT in `Authorization: Bearer <token>` header
+### Authentication Flow
 
-## API Endpoints Used
+1. Telegram provides `init_data` when launching Mini App
+2. App exchanges `init_data` for JWT via `/api/v1/mini-app/auth`
+3. Subsequent requests include JWT in `Authorization: Bearer <token>` header
+
+### Endpoints Used
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/v1/mini-app/auth` | Exchange Telegram init_data for JWT |
-| GET | `/api/v1/mini-app/stats` | Get chat overview statistics |
-| GET | `/api/v1/mini-app/activity` | Get daily activity timeline |
+| POST | `/api/v1/mini-app/auth` | Exchange init_data for JWT |
+| GET | `/api/v1/mini-app/stats` | Get chat overview |
+| GET | `/api/v1/mini-app/activity` | Get daily activity |
 | GET | `/api/v1/mini-app/leaderboard` | Get user rankings |
 
 ### Query Parameters
 
-**Stats & Activity Endpoints**:
-- `chat_id` (required): Chat to query
-- `period` (optional): Time period - `7d`, `30d`, `90d`, `all` (default: `30d`)
+**Stats & Activity**:
+- `chat_id` (required)
+- `period`: `7d`, `30d`, `90d`, `all` (default: `30d`)
 
-**Leaderboard Endpoint**:
-- `chat_id` (required): Chat to query
-- `period` (optional): Time period (default: `30d`)
-- `metric` (optional): Ranking metric (default: `message_count`)
-  - `message_count` - Total messages sent
-  - `reactions_sent` - Reactions given
-  - `reactions_received` - Reactions received
-  - `active_days` - Days with activity
-- `page` (optional): Page number (default: 1)
-- `limit` (optional): Results per page (default: 20, max: 100)
+**Leaderboard**:
+- `chat_id` (required)
+- `period`: Time period
+- `metric`: `message_count`, `reactions_sent`, `reactions_received`, `active_days`
+- `page`, `limit`: Pagination
 
 See [api-service README](../api-service/README.md) for full endpoint documentation.
 
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_URL` | Base URL for api-service | `` (same origin) |
-
-### Development
+## Development
 
 ```bash
 # Install dependencies
 npm install
 
-# Start development server
+# Start development server (hot reload)
 npm run dev
 
 # Build for production
@@ -81,31 +92,49 @@ npm run preview
 
 # Lint code
 npm run lint
+
+# Type check
+npx tsc --noEmit
 ```
 
-## Project Structure
+## Architecture
 
 ```
 apps/leaderboard-mini-app/
 ├── src/
-│   ├── api/
-│   │   └── client.ts          # API client with JWT auth
-│   ├── types/
-│   │   └── index.ts           # TypeScript interfaces
-│   ├── App.tsx                # Main application component
-│   └── main.tsx               # Entry point
+│   ├── api/client.ts     # API client with JWT auth
+│   ├── types/index.ts    # TypeScript interfaces
+│   ├── App.tsx           # Main application
+│   └── main.tsx          # Entry point
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
-└── README.md
+└── Dockerfile
 ```
 
 ## Deployment
 
 The Mini App is deployed as a static site behind Traefik:
-- **Route**: `leaderboard.{domain}` (serves Mini App static files)
-- **API**: Calls api-service at `api.{domain}` for data
+- **Route**: `leaderboard.{domain}`
+- **API**: Calls `api.{domain}` for data
 
-### Docker Build
+The Docker build process compiles the React app and serves it via nginx.
 
-The app is built during the Docker image build process and served via nginx. See `Dockerfile` for build configuration.
+## Troubleshooting
+
+### Stats not loading
+
+1. Verify API Service is running
+2. Check browser console for errors
+3. Ensure the chat has message data
+
+### Charts not rendering
+
+- Check Recharts is installed: `npm ls recharts`
+- Verify activity data is being returned from API
+
+### Authentication fails
+
+- Check `VITE_API_URL` points to correct API
+- Verify the Mini App is launched from Telegram (not standalone browser)
+- Check API Service logs for init_data validation errors

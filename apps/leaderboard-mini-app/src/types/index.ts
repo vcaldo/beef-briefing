@@ -56,6 +56,7 @@ export type LeaderboardMetric =
   | 'replies_sent'
   | 'replies_received'
   | 'active_days'
+  | 'current_streak'
 
 export type TabId = 'home' | 'leaderboard' | 'interactions' | 'profile' | 'card'
 

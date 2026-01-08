@@ -4,6 +4,7 @@ interface Tab {
   id: TabId
   label: string
   icon: React.ReactNode
+  hideLabel?: boolean
 }
 
 const TrophyIcon = () => (
@@ -39,7 +40,7 @@ const CardIcon = () => (
 )
 
 const TABS: Tab[] = [
-  { id: 'home', label: 'Home', icon: <span className="tab-emoji">🥩</span> },
+  { id: 'home', label: 'Home', icon: <span className="tab-emoji-large">🥩</span>, hideLabel: true },
   { id: 'leaderboard', label: 'Leaderboard', icon: <TrophyIcon /> },
   { id: 'interactions', label: 'Interactions', icon: <HeartIcon /> },
   { id: 'card', label: 'Card', icon: <CardIcon /> },
@@ -62,7 +63,7 @@ export function TabBar({ activeTab, onTabChange }: TabBarProps) {
           aria-current={activeTab === tab.id ? 'page' : undefined}
         >
           <span className="tab-icon">{tab.icon}</span>
-          <span className="tab-label">{tab.label}</span>
+          {!tab.hideLabel && <span className="tab-label">{tab.label}</span>}
         </button>
       ))}
     </nav>

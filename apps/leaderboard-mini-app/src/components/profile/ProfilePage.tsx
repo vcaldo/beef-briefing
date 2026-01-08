@@ -200,6 +200,27 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
         )}
       </div>
 
+      {/* Personal Activity Chart */}
+      <ActivityChart
+        data={data?.activity || []}
+        loading={loading}
+        error={error}
+        onRetry={fetchData}
+        title="Your Activity"
+      />
+
+      {/* Personal Heatmap */}
+      <section className="activity-heatmap-section">
+        <h2 className="section-title">Your Heatmap</h2>
+        {loading ? (
+          <HeatmapSkeleton />
+        ) : data?.heatmap ? (
+          <HeatmapGrid data={data.heatmap} />
+        ) : (
+          <div className="empty-list">No activity data</div>
+        )}
+      </section>
+
       {/* Who Reacts to You */}
       <section className="interactors-section">
         <h2 className="section-title">Who Reacts to You</h2>
@@ -265,27 +286,6 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
           <InteractorList interactors={data.top_repliers} />
         ) : (
           <div className="empty-list">No replies yet</div>
-        )}
-      </section>
-
-      {/* Personal Activity Chart */}
-      <ActivityChart
-        data={data?.activity || []}
-        loading={loading}
-        error={error}
-        onRetry={fetchData}
-        title="Your Activity"
-      />
-
-      {/* Personal Heatmap */}
-      <section className="activity-heatmap-section">
-        <h2 className="section-title">Your Heatmap</h2>
-        {loading ? (
-          <HeatmapSkeleton />
-        ) : data?.heatmap ? (
-          <HeatmapGrid data={data.heatmap} />
-        ) : (
-          <div className="empty-list">No activity data</div>
         )}
       </section>
     </div>

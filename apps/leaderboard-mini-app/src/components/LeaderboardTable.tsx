@@ -21,6 +21,7 @@ const METRICS: { value: LeaderboardMetric; label: string }[] = [
   { value: 'replies_sent', label: 'Replies Sent' },
   { value: 'replies_received', label: 'Replies Received' },
   { value: 'active_days', label: 'Active Days' },
+  { value: 'current_streak', label: 'Streak' },
 ]
 
 function getRankClass(rank: number): string {

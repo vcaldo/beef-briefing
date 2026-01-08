@@ -213,6 +213,9 @@ services:
       APP_KEYS_DIR: /app/secrets/app_keys
       ENVIRONMENT: development
       LOG_LEVEL: debug
+      # New Relic APM (optional)
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME:-}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
       TIER_1: ${TIER_1:-Legendary:85}
       TIER_2: ${TIER_2:-Elite:70}
       TIER_3: ${TIER_3:-Outstanding:55}

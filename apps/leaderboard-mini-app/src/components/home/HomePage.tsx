@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
 import { apiClient } from '../../api/client'
+import { addPageAction, noticeError } from '../../newrelic'
 import { PeriodSelector } from '../PeriodSelector'
 import { OverviewStats } from '../OverviewStats'
 import { ActivityChart } from '../ActivityChart'
@@ -38,9 +39,17 @@ export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
     try {
       const statsData = await apiClient.getStats(period)
       setStats(statsData)
+      addPageAction('stats_loaded', {
+        period,
+        total_messages: statsData.total_messages,
+        total_users: statsData.total_users,
+      })
     } catch (err) {
       console.error('Failed to fetch stats:', err)
       setStatsError('Failed to load stats')
+      if (err instanceof Error) {
+        noticeError(err, { context: 'stats_fetch', period })
+      }
     } finally {
       setLoadingStats(false)
     }
@@ -54,9 +63,16 @@ export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
     try {
       const activityData = await apiClient.getActivity(period)
       setActivity(activityData.data || [])
+      addPageAction('activity_loaded', {
+        period,
+        data_points: activityData.data?.length || 0,
+      })
     } catch (err) {
       console.error('Failed to fetch activity:', err)
       setActivityError('Failed to load activity')
+      if (err instanceof Error) {
+        noticeError(err, { context: 'activity_fetch', period })
+      }
     } finally {
       setLoadingActivity(false)
     }
@@ -70,9 +86,13 @@ export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
     try {
       const heatmapData = await apiClient.getHeatmap(period, false)
       setHeatmap(heatmapData.group)
+      addPageAction('heatmap_loaded', { period })
     } catch (err) {
       console.error('Failed to fetch heatmap:', err)
       setHeatmapError('Failed to load heatmap')
+      if (err instanceof Error) {
+        noticeError(err, { context: 'heatmap_fetch', period })
+      }
     } finally {
       setLoadingHeatmap(false)
     }

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 
 import { apiClient } from './api/client'
+import { setCustomAttribute, addPageAction, noticeError } from './newrelic'
 import { TabBar, ErrorBoundary } from './components/common'
 import { HomePage } from './components/home/HomePage'
 import { LeaderboardPage } from './components/leaderboard/LeaderboardPage'
@@ -37,6 +38,11 @@ function App() {
     // Not in Telegram context
   }
 
+  // Set timezone attribute on mount
+  useEffect(() => {
+    setCustomAttribute('timezone', apiClient.getTimezone())
+  }, [])
+
   // Authenticate on mount
   useEffect(() => {
     async function authenticate() {
@@ -45,6 +51,7 @@ function App() {
         if (!initDataRaw) {
           setError('This app must be opened from Telegram')
           setAppState('error')
+          addPageAction('auth_failed', { reason: 'no_init_data' })
           return
         }
 
@@ -52,6 +59,7 @@ function App() {
         if (!auth.chat_id) {
           setError('Please open this app from a group chat')
           setAppState('error')
+          addPageAction('auth_failed', { reason: 'no_chat_id' })
           return
         }
 
@@ -61,6 +69,20 @@ function App() {
         setUsername(auth.username)
         setChatTitle(auth.chat_title)
         setIsAdmin(auth.is_admin)
+
+        // Set New Relic custom attributes for this session
+        setCustomAttribute('user_id', auth.user_id)
+        setCustomAttribute('chat_id', auth.chat_id)
+        setCustomAttribute('username', auth.username || '')
+        setCustomAttribute('first_name', auth.first_name)
+        setCustomAttribute('is_admin', auth.is_admin)
+        setCustomAttribute('is_authenticated', true)
+
+        addPageAction('auth_success', {
+          user_id: auth.user_id,
+          chat_id: auth.chat_id,
+          is_admin: auth.is_admin,
+        })
 
         // Update document title to group name (shown in Telegram header)
         if (auth.chat_title) {
@@ -72,21 +94,45 @@ function App() {
         console.error('Authentication failed:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
         setAppState('error')
+
+        if (err instanceof Error) {
+          noticeError(err, { context: 'authentication' })
+        }
+        addPageAction('auth_error', {
+          error: err instanceof Error ? err.message : 'unknown',
+        })
       }
     }
 
     authenticate()
   }, [launchParams?.initDataRaw])
 
-  // Handle period change
-  const handlePeriodChange = (newPeriod: Period) => {
-    setPeriod(newPeriod)
-  }
+  // Handle period change with tracking
+  const handlePeriodChange = useCallback(
+    (newPeriod: Period) => {
+      addPageAction('period_change', {
+        period: newPeriod,
+        previous_period: period,
+        tab: activeTab,
+      })
+      setCustomAttribute('selected_period', newPeriod)
+      setPeriod(newPeriod)
+    },
+    [period, activeTab]
+  )
 
-  // Handle tab change
-  const handleTabChange = (tab: TabId) => {
-    setActiveTab(tab)
-  }
+  // Handle tab change with tracking
+  const handleTabChange = useCallback(
+    (tab: TabId) => {
+      addPageAction('tab_change', {
+        tab,
+        previous_tab: activeTab,
+      })
+      setCustomAttribute('active_tab', tab)
+      setActiveTab(tab)
+    },
+    [activeTab]
+  )
 
   // Reset error boundary on tab change
   const handleErrorReset = useCallback(() => {

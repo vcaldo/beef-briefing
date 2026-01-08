@@ -1,20 +1,31 @@
 """Card Renderer Service - FastAPI Application."""
 
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 
+from config import load_config
+
+# Load configuration first (before New Relic import)
+config = load_config()
+
+# Initialize New Relic APM if configured (must be done before other imports)
+if config.new_relic_enabled():
+    os.environ["NEW_RELIC_APP_NAME"] = config.new_relic_full_app_name
+    os.environ["NEW_RELIC_LICENSE_KEY"] = config.new_relic_license_key
+    import newrelic.agent
+
+    newrelic.agent.initialize()
+
+# Now import everything else
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine
 
-from config import load_config
 from src.api import router
 from src.generator import CardGenerator
 from src.storage import CardStorageClient
-
-# Load configuration
-config = load_config()
 
 # Configure logging
 log_level = getattr(logging, config.log_level.upper(), logging.INFO)

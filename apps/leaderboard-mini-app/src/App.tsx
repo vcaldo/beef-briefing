@@ -82,11 +82,12 @@ function App() {
   }, [])
 
   // Prefetch all tab data in parallel (called after auth, while splash still shows)
-  const prefetchAllData = useCallback(async (authUserId: number) => {
+  const prefetchAllData = useCallback(async () => {
     const defaultPeriod: Period = '7d'
 
     // Fire all requests in parallel using Promise.allSettled (failures don't block others)
-    const [home, leaderboard, interactions, profile, card] = await Promise.allSettled([
+    // Note: Card prefetch disabled - it was causing issues
+    const [home, leaderboard, interactions, profile] = await Promise.allSettled([
       // Home page data
       Promise.all([
         apiClient.getStats(defaultPeriod),
@@ -109,9 +110,6 @@ function App() {
 
       // Profile
       apiClient.getProfile(defaultPeriod),
-
-      // Card (doesn't depend on period)
-      apiClient.getUserLatestCard(authUserId),
     ])
 
     setPrefetched({
@@ -119,7 +117,7 @@ function App() {
       leaderboard: leaderboard.status === 'fulfilled' ? leaderboard.value : null,
       interactions: interactions.status === 'fulfilled' ? interactions.value : null,
       profile: profile.status === 'fulfilled' ? profile.value : null,
-      card: card.status === 'fulfilled' ? card.value : null,
+      card: null, // Card prefetch disabled
       period: defaultPeriod,
     })
   }, [])
@@ -173,7 +171,7 @@ function App() {
         setAppState('authenticated')
 
         // Start prefetching all tab data while splash screen is still showing
-        prefetchAllData(auth.user_id)
+        prefetchAllData()
       } catch (err) {
         console.error('Authentication failed:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')

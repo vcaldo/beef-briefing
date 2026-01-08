@@ -11,6 +11,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
 from .database import CardQueries, CardImageRepository
+from .instrumentation import (
+    add_custom_attributes,
+    function_trace_async,
+    record_custom_metrics,
+)
 from .renderer import PlaywrightRenderer, TemplateLoader
 from .storage import CardStorageClient
 
@@ -73,6 +78,7 @@ class CardGenerator:
         """Cleanup resources."""
         await self.renderer.stop()
 
+    @function_trace_async(name="render_cards", group="CardGenerator")
     async def render_cards(
         self,
         chat_id: int,
@@ -181,6 +187,14 @@ class CardGenerator:
                 )
                 failed += 1
 
+        # Record custom metrics
+        record_custom_metrics([
+            ("Custom/Cards/Generated", generated),
+            ("Custom/Cards/Skipped", skipped),
+            ("Custom/Cards/Failed", failed),
+            ("Custom/Cards/Total", len(results)),
+        ])
+
         return BatchRenderResult(
             generated=generated,
             skipped=skipped,
@@ -188,6 +202,7 @@ class CardGenerator:
             results=results,
         )
 
+    @function_trace_async(name="render_single_card", group="CardGenerator")
     async def _render_single_card(
         self,
         card_data: dict[str, Any],
@@ -203,6 +218,13 @@ class CardGenerator:
         user_id = card_data["user_id"]
         card_id = card_data["card_id"]
         card_version = card_data["card_version"]
+
+        # Add per-card attributes for detailed tracing
+        add_custom_attributes({
+            "card.current.user_id": user_id,
+            "card.current.rank": rank,
+            "card.current.card_id": card_id,
+        })
 
         # Convert profile photo path to presigned URL for Playwright
         profile_photo_path = card_data.get("profile_photo_path")

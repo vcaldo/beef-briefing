@@ -21,3 +21,6 @@ python-dotenv>=1.0.0
 
 # JWT Authentication
 PyJWT>=2.8.0
+
+# APM Monitoring (optional)
+newrelic>=9.0.0

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLaunchParams, backButton, shareStory, cloudStorage, openLink } from '@telegram-apps/sdk-react'
 
 import { apiClient, CardImageWithUrl } from './api/client'
+import { setCustomAttribute, addPageAction, noticeError } from './newrelic'
 import { WeekSelector } from './components/WeekSelector'
 import { CardGallery } from './components/CardGallery'
 import { InfoModal } from './components/InfoModal'
@@ -152,6 +153,16 @@ function App() {
     return () => off()
   }, [selectedCard])
 
+  // Set timezone attribute on mount
+  useEffect(() => {
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      setCustomAttribute('timezone', timezone)
+    } catch {
+      setCustomAttribute('timezone', 'unknown')
+    }
+  }, [])
+
   // Authenticate on mount
   useEffect(() => {
     async function init() {
@@ -165,6 +176,7 @@ function App() {
             setError('This app must be opened from Telegram')
           }
           setState('error')
+          addPageAction('auth_failed', { reason: 'no_init_data' })
           return
         }
 
@@ -174,8 +186,19 @@ function App() {
         if (!auth.chat_id) {
           setError('Please open this app from a group chat using the /deck command')
           setState('error')
+          addPageAction('auth_failed', { reason: 'no_chat_id' })
           return
         }
+
+        // Set New Relic custom attributes
+        setCustomAttribute('user_id', auth.user_id)
+        setCustomAttribute('chat_id', auth.chat_id)
+        setCustomAttribute('is_authenticated', true)
+
+        addPageAction('auth_success', {
+          user_id: auth.user_id,
+          chat_id: auth.chat_id,
+        })
 
         // Fetch available weeks
         const availableWeeks = await apiClient.getWeeks(auth.chat_id)
@@ -183,16 +206,25 @@ function App() {
         if (availableWeeks.length === 0) {
           setError('No card data available for this group yet')
           setState('error')
+          addPageAction('no_weeks_available', { chat_id: auth.chat_id })
           return
         }
 
         setWeeks(availableWeeks)
         setSelectedWeek(availableWeeks[0])
+        setCustomAttribute('selected_week', availableWeeks[0])
         setState('authenticated')
       } catch (err) {
         console.error('Authentication error:', err)
         setError(err instanceof Error ? err.message : 'Failed to authenticate')
         setState('error')
+
+        if (err instanceof Error) {
+          noticeError(err, { context: 'authentication' })
+        }
+        addPageAction('auth_error', {
+          error: err instanceof Error ? err.message : 'unknown',
+        })
       }
     }
 
@@ -256,19 +288,30 @@ function App() {
     if (selectedWeek) {
       await markAsSeen(selectedWeek)
     }
+    addPageAction('card_reveal_complete', {
+      week: selectedWeek,
+      card_id: revealCard?.id,
+    })
     setShowReveal(false)
     setRevealCard(null)
-  }, [selectedWeek, markAsSeen])
+  }, [selectedWeek, markAsSeen, revealCard])
 
   const handleWeekSelect = useCallback((week: string) => {
+    addPageAction('week_selected', { week, previous_week: selectedWeek })
+    setCustomAttribute('selected_week', week)
     setSelectedWeek(week)
     setSelectedCardIndex(null)
-  }, [])
+  }, [selectedWeek])
 
   const handleCardClick = useCallback((card: CardImageWithUrl) => {
     const index = cards.findIndex(c => c.id === card.id)
     setSelectedCardIndex(index >= 0 ? index : null)
-  }, [cards])
+    addPageAction('card_viewed', {
+      card_id: card.id,
+      user_id: card.user_id,
+      is_own_card: card.user_id === currentUserId,
+    })
+  }, [cards, currentUserId])
 
   // Navigation functions with wrap-around
   const goToNextCard = useCallback(() => {
@@ -287,7 +330,11 @@ function App() {
     shareStory(selectedCard.url, {
       text: 'Check out my Deck card!',
     })
-  }, [selectedCard])
+    addPageAction('share_to_story', {
+      card_id: selectedCard.id,
+      week: selectedWeek,
+    })
+  }, [selectedCard, selectedWeek])
 
   // Handlers for card reveal
   const handleRevealShareStory = useCallback(() => {
@@ -295,7 +342,12 @@ function App() {
     shareStory(revealCard.url, {
       text: 'Check out my Deck card!',
     })
-  }, [revealCard])
+    addPageAction('share_to_story', {
+      card_id: revealCard.id,
+      week: selectedWeek,
+      from_reveal: true,
+    })
+  }, [revealCard, selectedWeek])
 
   const handleRevealDownload = useCallback(() => {
     if (!revealCard) return
@@ -304,7 +356,12 @@ function App() {
     } else {
       window.open(revealCard.url, '_blank')
     }
-  }, [revealCard])
+    addPageAction('card_download', {
+      card_id: revealCard.id,
+      week: selectedWeek,
+      from_reveal: true,
+    })
+  }, [revealCard, selectedWeek])
 
   const handleDownload = useCallback(async () => {
     if (!selectedCard) return
@@ -313,7 +370,11 @@ function App() {
     } else {
       window.open(selectedCard.url, '_blank')
     }
-  }, [selectedCard])
+    addPageAction('card_download', {
+      card_id: selectedCard.id,
+      week: selectedWeek,
+    })
+  }, [selectedCard, selectedWeek])
 
   // Swipe gesture handlers (horizontal: swipe left = next, swipe right = prev)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {

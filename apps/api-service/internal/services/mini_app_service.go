@@ -479,13 +479,14 @@ func (s *MiniAppService) GetRepliesOverview(ctx context.Context, chatID int64, p
 
 // ProfileResponse represents user profile data
 type ProfileResponse struct {
-	PhotoURL      *string                  `json:"photo_url,omitempty"`
-	Stats         *repository.ProfileStats `json:"stats"`
-	TopReactors   []TopInteractorWithPhoto `json:"top_reactors"`
-	TopReactedTo  []TopInteractorWithPhoto `json:"top_reacted_to"`
-	TopRepliers   []TopInteractorWithPhoto `json:"top_repliers"`
-	TopRepliedTo  []TopInteractorWithPhoto `json:"top_replied_to"`
-	Heatmap       *repository.HeatmapData  `json:"heatmap"`
+	PhotoURL      *string                    `json:"photo_url,omitempty"`
+	Stats         *repository.ProfileStats   `json:"stats"`
+	TopReactors   []TopInteractorWithPhoto   `json:"top_reactors"`
+	TopReactedTo  []TopInteractorWithPhoto   `json:"top_reacted_to"`
+	TopRepliers   []TopInteractorWithPhoto   `json:"top_repliers"`
+	TopRepliedTo  []TopInteractorWithPhoto   `json:"top_replied_to"`
+	Heatmap       *repository.HeatmapData    `json:"heatmap"`
+	Activity      []repository.DailyActivity `json:"activity,omitempty"`
 }
 
 // GetUserProfile returns personal stats and top interactors for a user
@@ -520,6 +521,11 @@ func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int6
 	heatmap, err := s.repo.GetUserHeatmap(ctx, chatID, userID, startDate, endDate, tz)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user heatmap: %w", err)
+	}
+
+	activity, err := s.repo.GetUserDailyActivity(ctx, chatID, userID, startDate, endDate, tz)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user activity: %w", err)
 	}
 
 	// Get current user's photo
@@ -595,6 +601,7 @@ func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int6
 		TopRepliers:  repliersWithPhoto,
 		TopRepliedTo: repliedToWithPhoto,
 		Heatmap:      heatmap,
+		Activity:     activity,
 	}, nil
 }
 

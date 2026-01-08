@@ -268,6 +268,68 @@ func (r *MiniAppRepository) GetDailyActivity(ctx context.Context, chatID int64, 
 	return activity, rows.Err()
 }
 
+// GetUserDailyActivity returns daily message activity for a specific user in a chat.
+func (r *MiniAppRepository) GetUserDailyActivity(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time, tz *time.Location) ([]DailyActivity, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-user-daily-activity")
+		defer segment.End()
+	}
+
+	tzName := "UTC"
+	if tz != nil {
+		tzName = tz.String()
+	}
+
+	var rows *sql.Rows
+	var err error
+
+	if startDate == nil && endDate == nil {
+		// All-time: query live data with timezone conversion
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				DATE(m.date AT TIME ZONE $3) as activity_date,
+				COUNT(*) as message_count
+			FROM messages m
+			WHERE m.chat_id = $1 AND m.user_id = $2
+			GROUP BY DATE(m.date AT TIME ZONE $3)
+			ORDER BY activity_date
+		`, chatID, userID, tzName)
+	} else {
+		// Date-filtered: query live data with timezone conversion
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				DATE(m.date AT TIME ZONE $5) as activity_date,
+				COUNT(*) as message_count
+			FROM messages m
+			WHERE m.chat_id = $1 AND m.user_id = $2
+				AND m.date >= $3
+				AND m.date < $4
+			GROUP BY DATE(m.date AT TIME ZONE $5)
+			ORDER BY activity_date
+		`, chatID, userID, startDate, endDate, tzName)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var activity []DailyActivity
+	for rows.Next() {
+		var date time.Time
+		var a DailyActivity
+		if err := rows.Scan(&date, &a.Messages); err != nil {
+			return nil, err
+		}
+		a.Date = date.Format("2006-01-02")
+		a.Users = 1 // Single user
+		activity = append(activity, a)
+	}
+
+	return activity, rows.Err()
+}
+
 // GetUserRankings returns user rankings for a chat.
 func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, metric string, limit, offset int, startDate, endDate *time.Time) ([]UserRanking, error) {
 	txn := newrelic.FromContext(ctx)

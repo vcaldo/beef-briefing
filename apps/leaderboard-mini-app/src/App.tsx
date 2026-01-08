@@ -18,6 +18,7 @@ function App() {
   // App state
   const [appState, setAppState] = useState<AppState>('loading')
   const [error, setError] = useState<string | null>(null)
+  const [splashMinTimeElapsed, setSplashMinTimeElapsed] = useState(false)
 
   // User info (from auth response)
   const [userId, setUserId] = useState<number>(0)
@@ -41,6 +42,12 @@ function App() {
   // Set timezone attribute on mount
   useEffect(() => {
     setCustomAttribute('timezone', apiClient.getTimezone())
+  }, [])
+
+  // Minimum splash screen display time (1.5s = one full animation cycle)
+  useEffect(() => {
+    const timer = setTimeout(() => setSplashMinTimeElapsed(true), 1500)
+    return () => clearTimeout(timer)
   }, [])
 
   // Authenticate on mount
@@ -166,8 +173,8 @@ function App() {
     }
   }
 
-  // Loading state - Splash Screen
-  if (appState === 'loading') {
+  // Splash Screen - show while loading OR until minimum display time elapsed
+  if (appState === 'loading' || (appState === 'authenticated' && !splashMinTimeElapsed)) {
     return (
       <div className="app">
         <div className="splash-screen">

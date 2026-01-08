@@ -9,13 +9,23 @@ import { HeatmapGrid, HeatmapSkeleton } from '../common/HeatmapGrid'
 
 import type { Period, StatsResponse, ActivityDataPoint, HeatmapData } from '../../types'
 
+// Prefetched data passed from App (loaded during splash screen)
+interface PrefetchedHomeData {
+  stats: StatsResponse | null
+  activity: ActivityDataPoint[]
+  heatmap: HeatmapData | null
+  period: Period
+}
+
 interface HomePageProps {
   period: Period
   onPeriodChange: (period: Period) => void
   chatTitle: string | null
+  prefetchedData?: PrefetchedHomeData | null
+  onPrefetchConsumed?: () => void
 }
 
-export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
+export function HomePage({ period, onPeriodChange, chatTitle, prefetchedData, onPrefetchConsumed }: HomePageProps) {
   // Data state
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [activity, setActivity] = useState<ActivityDataPoint[]>([])
@@ -105,10 +115,20 @@ export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
     fetchHeatmap()
   }, [fetchStats, fetchActivity, fetchHeatmap])
 
-  // Fetch data on mount and when period changes
+  // Use prefetched data if available (from splash screen), otherwise fetch
   useEffect(() => {
+    // If prefetched data exists and matches current period, use it
+    if (prefetchedData && prefetchedData.period === period) {
+      setStats(prefetchedData.stats)
+      setActivity(prefetchedData.activity)
+      setHeatmap(prefetchedData.heatmap)
+      // Clear prefetch so re-navigation fetches fresh data
+      onPrefetchConsumed?.()
+      return
+    }
+    // Otherwise fetch normally
     fetchData()
-  }, [fetchData])
+  }, [period, prefetchedData, onPrefetchConsumed, fetchData])
 
   return (
     <div className="page-container">

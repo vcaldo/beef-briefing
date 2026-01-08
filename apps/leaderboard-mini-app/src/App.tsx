@@ -10,7 +10,15 @@ import { InteractionsPage } from './components/interactions/InteractionsPage'
 import { ProfilePage } from './components/profile/ProfilePage'
 import { CardPage } from './components/card'
 
-import type { TabId, Period } from './types'
+import type { TabId, Period, StatsResponse, ActivityDataPoint, HeatmapData } from './types'
+
+// Prefetched data for home page (loaded during splash screen)
+interface PrefetchedHomeData {
+  stats: StatsResponse | null
+  activity: ActivityDataPoint[]
+  heatmap: HeatmapData | null
+  period: Period
+}
 
 type AppState = 'loading' | 'authenticated' | 'error'
 
@@ -31,6 +39,9 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [period, setPeriod] = useState<Period>('7d')
 
+  // Prefetched home page data (loaded during splash screen)
+  const [prefetchedHome, setPrefetchedHome] = useState<PrefetchedHomeData | null>(null)
+
   // Get launch params from Telegram
   let launchParams: ReturnType<typeof useLaunchParams> | null = null
   try {
@@ -49,6 +60,26 @@ function App() {
     const timer = setTimeout(() => setSplashMinTimeElapsed(true), 2000)
     return () => clearTimeout(timer)
   }, [])
+
+  // Prefetch home page data (called after auth, while splash still shows)
+  const prefetchHomeData = useCallback(async () => {
+    try {
+      const [statsData, activityData, heatmapData] = await Promise.all([
+        apiClient.getStats(period),
+        apiClient.getActivity(period),
+        apiClient.getHeatmap(period, false),
+      ])
+      setPrefetchedHome({
+        stats: statsData,
+        activity: activityData.data || [],
+        heatmap: heatmapData.group,
+        period,
+      })
+    } catch (err) {
+      // Prefetch failed silently - HomePage will fetch on mount
+      console.warn('Prefetch failed:', err)
+    }
+  }, [period])
 
   // Authenticate on mount
   useEffect(() => {
@@ -97,6 +128,9 @@ function App() {
         }
 
         setAppState('authenticated')
+
+        // Start prefetching home page data while splash screen is still showing
+        prefetchHomeData()
       } catch (err) {
         console.error('Authentication failed:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
@@ -112,6 +146,7 @@ function App() {
     }
 
     authenticate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [launchParams?.initDataRaw])
 
   // Handle period change with tracking
@@ -150,7 +185,15 @@ function App() {
   const renderPage = () => {
     switch (activeTab) {
       case 'home':
-        return <HomePage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
+        return (
+          <HomePage
+            period={period}
+            onPeriodChange={handlePeriodChange}
+            chatTitle={chatTitle}
+            prefetchedData={prefetchedHome}
+            onPrefetchConsumed={() => setPrefetchedHome(null)}
+          />
+        )
       case 'leaderboard':
         return <LeaderboardPage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
       case 'interactions':
@@ -169,7 +212,15 @@ function App() {
           />
         )
       default:
-        return <HomePage period={period} onPeriodChange={handlePeriodChange} chatTitle={chatTitle} />
+        return (
+          <HomePage
+            period={period}
+            onPeriodChange={handlePeriodChange}
+            chatTitle={chatTitle}
+            prefetchedData={prefetchedHome}
+            onPrefetchConsumed={() => setPrefetchedHome(null)}
+          />
+        )
     }
   }
 

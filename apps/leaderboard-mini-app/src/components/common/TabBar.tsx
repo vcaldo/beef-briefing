@@ -7,6 +7,15 @@ interface Tab {
   hideLabel?: boolean
 }
 
+const OverviewIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+  </svg>
+)
+
 const TrophyIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
@@ -40,7 +49,7 @@ const CardIcon = () => (
 )
 
 const TABS: Tab[] = [
-  { id: 'home', label: 'Home', icon: <span className="tab-emoji-large">🥩</span>, hideLabel: true },
+  { id: 'home', label: 'Overview', icon: <OverviewIcon /> },
   { id: 'leaderboard', label: 'Leaderboard', icon: <TrophyIcon /> },
   { id: 'interactions', label: 'Interactions', icon: <HeartIcon /> },
   { id: 'card', label: 'Card', icon: <CardIcon /> },

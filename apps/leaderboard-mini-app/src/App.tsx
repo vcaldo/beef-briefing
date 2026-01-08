@@ -120,13 +120,14 @@ function App() {
     }
   }
 
-  // Loading state
+  // Loading state - Splash Screen
   if (appState === 'loading') {
     return (
       <div className="app">
-        <div className="loading-container">
-          <div className="spinner" />
-          <p>Loading...</p>
+        <div className="splash-screen">
+          <div className="splash-emoji">🥩</div>
+          <h1 className="splash-title">Beef Briefing</h1>
+          <p className="splash-subtitle">Leaderboard</p>
         </div>
       </div>
     )

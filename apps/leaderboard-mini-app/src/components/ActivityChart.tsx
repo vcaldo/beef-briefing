@@ -15,6 +15,7 @@ interface ActivityChartProps {
   loading: boolean
   error?: string | null
   onRetry?: () => void
+  title?: string
 }
 
 function formatDate(dateStr: string, timezone: string): string {
@@ -22,7 +23,7 @@ function formatDate(dateStr: string, timezone: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: timezone })
 }
 
-export function ActivityChart({ data, loading, error, onRetry }: ActivityChartProps) {
+export function ActivityChart({ data, loading, error, onRetry, title = 'Activity' }: ActivityChartProps) {
   const timezone = apiClient.getTimezone()
   const chartData = useMemo(() => {
     return data.map((point) => ({
@@ -34,7 +35,7 @@ export function ActivityChart({ data, loading, error, onRetry }: ActivityChartPr
   if (loading) {
     return (
       <div className="activity-section">
-        <h2 className="section-title">Activity</h2>
+        <h2 className="section-title">{title}</h2>
         <div className="chart-container">
           <div className="skeleton skeleton-chart" />
         </div>
@@ -45,7 +46,7 @@ export function ActivityChart({ data, loading, error, onRetry }: ActivityChartPr
   if (error) {
     return (
       <div className="activity-section">
-        <h2 className="section-title">Activity</h2>
+        <h2 className="section-title">{title}</h2>
         <div className="section-error">
           <p className="section-error-message">{error}</p>
           {onRetry && (
@@ -61,7 +62,7 @@ export function ActivityChart({ data, loading, error, onRetry }: ActivityChartPr
   if (data.length === 0) {
     return (
       <div className="activity-section">
-        <h2 className="section-title">Activity</h2>
+        <h2 className="section-title">{title}</h2>
         <div className="chart-container">
           <div className="empty-state">No activity data available</div>
         </div>
@@ -71,7 +72,7 @@ export function ActivityChart({ data, loading, error, onRetry }: ActivityChartPr
 
   return (
     <div className="activity-section">
-      <h2 className="section-title">Activity</h2>
+      <h2 className="section-title">{title}</h2>
       <div className="chart-container">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

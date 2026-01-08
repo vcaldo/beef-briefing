@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
 import { apiClient } from '../../api/client'
+import { addPageAction, noticeError } from '../../newrelic'
 import { PeriodSelector } from '../PeriodSelector'
 import { Avatar } from '../common'
 
@@ -61,9 +62,16 @@ export function InteractionsPage({ period, onPeriodChange, chatTitle }: Interact
       ])
       setReactionsData(reactionsResponse)
       setRepliesData(repliesResponse)
+      addPageAction('interactions_loaded', {
+        period,
+        top_reactions_count: reactionsResponse.top_reactions?.length || 0,
+      })
     } catch (err) {
       console.error('Failed to fetch interactions data:', err)
       setError('Failed to load interactions')
+      if (err instanceof Error) {
+        noticeError(err, { context: 'interactions_fetch', period })
+      }
     } finally {
       setLoading(false)
     }

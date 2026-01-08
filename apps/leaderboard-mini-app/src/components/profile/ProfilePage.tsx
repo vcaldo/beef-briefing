@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 
 import { apiClient } from '../../api/client'
+import { addPageAction, noticeError } from '../../newrelic'
 import { PeriodSelector } from '../PeriodSelector'
+import { ActivityChart } from '../ActivityChart'
 import { Avatar, HeatmapGrid, HeatmapSkeleton } from '../common'
 
 import type {
@@ -60,9 +62,17 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
     try {
       const response = await apiClient.getProfile(period, undefined, selectedUserId || undefined)
       setData(response)
+      addPageAction('profile_loaded', {
+        period,
+        is_impersonating: !!selectedUserId,
+        message_count: response.stats.message_count,
+      })
     } catch (err) {
       console.error('Failed to fetch profile:', err)
       setError('Failed to load profile')
+      if (err instanceof Error) {
+        noticeError(err, { context: 'profile_fetch', period })
+      }
     } finally {
       setLoading(false)
     }
@@ -258,9 +268,18 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
         )}
       </section>
 
+      {/* Personal Activity Chart */}
+      <ActivityChart
+        data={data?.activity || []}
+        loading={loading}
+        error={error}
+        onRetry={fetchData}
+        title="Your Activity"
+      />
+
       {/* Personal Heatmap */}
       <section className="activity-heatmap-section">
-        <h2 className="section-title">Your Activity</h2>
+        <h2 className="section-title">Your Heatmap</h2>
         {loading ? (
           <HeatmapSkeleton />
         ) : data?.heatmap ? (

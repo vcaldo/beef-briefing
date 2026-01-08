@@ -1,5 +1,7 @@
 import { Component, type ReactNode } from 'react'
 
+import { noticeError, addPageAction } from '../../newrelic'
+
 interface Props {
   children: ReactNode
   fallback?: ReactNode
@@ -23,6 +25,16 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo)
+
+    // Report to New Relic
+    noticeError(error, {
+      context: 'error_boundary',
+      componentStack: errorInfo.componentStack,
+    })
+    addPageAction('error_boundary_caught', {
+      error_message: error.message,
+      error_name: error.name,
+    })
   }
 
   handleReset = () => {

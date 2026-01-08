@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 
 import { apiClient } from '../../api/client'
+import { addPageAction, noticeError } from '../../newrelic'
 import type { CardImageWithUrl } from '../../types'
 
 interface CardPageProps {
@@ -17,12 +18,27 @@ export function CardPage({ userId, chatTitle }: CardPageProps) {
     async function fetchCard() {
       setIsLoading(true)
       setError(null)
+      addPageAction('card_fetch_start', { user_id: userId })
       try {
         const userCard = await apiClient.getUserLatestCard(userId)
         setCard(userCard)
+        if (userCard) {
+          addPageAction('card_loaded', {
+            user_id: userId,
+            card_id: userCard.id,
+            week_start: userCard.week_start,
+            theme: userCard.theme,
+          })
+        } else {
+          addPageAction('card_not_found', { user_id: userId })
+        }
       } catch (err) {
         console.error('Failed to fetch card:', err)
         setError(err instanceof Error ? err.message : 'Failed to load card')
+        if (err instanceof Error) {
+          noticeError(err, { context: 'card_fetch', user_id: userId })
+        }
+        addPageAction('card_fetch_error', { user_id: userId })
       } finally {
         setIsLoading(false)
       }

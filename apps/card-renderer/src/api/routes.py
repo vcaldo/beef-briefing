@@ -9,6 +9,7 @@ from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 
 from ..generator import CardGenerator
+from ..instrumentation import add_custom_attributes, notice_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -166,29 +167,49 @@ async def render_cards(
     # Use default theme from config if not specified
     theme = render_request.theme or get_default_theme(request)
 
-    result = await generator.render_cards(
-        chat_id=render_request.chat_id,
-        week_start=week_start,
-        user_ids=render_request.user_ids,
-        theme=theme,
-        force_regenerate=render_request.force_regenerate,
-    )
+    # Add custom attributes for observability
+    add_custom_attributes({
+        "card.chat_id": render_request.chat_id,
+        "card.week_start": render_request.week_start,
+        "card.theme": theme,
+        "card.user_count": len(render_request.user_ids) if render_request.user_ids else 0,
+        "card.force_regenerate": render_request.force_regenerate,
+    })
 
-    return RenderResponse(
-        generated=result.generated,
-        skipped=result.skipped,
-        failed=result.failed,
-        results=[
-            RenderResultItem(
-                user_id=r.user_id,
-                status=r.status,
-                image_id=r.image_id,
-                storage_path=r.storage_path,
-                error=r.error,
-            )
-            for r in result.results
-        ],
-    )
+    try:
+        result = await generator.render_cards(
+            chat_id=render_request.chat_id,
+            week_start=week_start,
+            user_ids=render_request.user_ids,
+            theme=theme,
+            force_regenerate=render_request.force_regenerate,
+        )
+
+        # Add result metrics as attributes
+        add_custom_attributes({
+            "card.result.generated": result.generated,
+            "card.result.skipped": result.skipped,
+            "card.result.failed": result.failed,
+        })
+
+        return RenderResponse(
+            generated=result.generated,
+            skipped=result.skipped,
+            failed=result.failed,
+            results=[
+                RenderResultItem(
+                    user_id=r.user_id,
+                    status=r.status,
+                    image_id=r.image_id,
+                    storage_path=r.storage_path,
+                    error=r.error,
+                )
+                for r in result.results
+            ],
+        )
+    except Exception as e:
+        notice_error(e)
+        raise
 
 
 @router.get("/api/v1/images", response_model=ImageListResponse)

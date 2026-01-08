@@ -7,36 +7,14 @@ import type { CardImageWithUrl } from '../../types'
 interface CardPageProps {
   userId: number
   chatTitle: string | null
-  prefetchedData?: CardImageWithUrl | null
-  onPrefetchConsumed?: () => void
 }
 
-export function CardPage({ userId, chatTitle, prefetchedData, onPrefetchConsumed }: CardPageProps) {
+export function CardPage({ userId, chatTitle }: CardPageProps) {
   const [card, setCard] = useState<CardImageWithUrl | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Use prefetched data if available
-    if (prefetchedData !== undefined) {
-      setCard(prefetchedData)
-      setIsLoading(false)
-      onPrefetchConsumed?.()
-      if (prefetchedData) {
-        addPageAction('card_loaded', {
-          user_id: userId,
-          card_id: prefetchedData.id,
-          week_start: prefetchedData.week_start,
-          theme: prefetchedData.theme,
-          prefetched: true,
-        })
-      } else {
-        addPageAction('card_not_found', { user_id: userId, prefetched: true })
-      }
-      return
-    }
-
-    // Otherwise fetch normally
     async function fetchCard() {
       setIsLoading(true)
       setError(null)
@@ -67,7 +45,7 @@ export function CardPage({ userId, chatTitle, prefetchedData, onPrefetchConsumed
     }
 
     fetchCard()
-  }, [userId, prefetchedData, onPrefetchConsumed])
+  }, [userId])
 
   if (isLoading) {
     return (

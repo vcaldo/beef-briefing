@@ -256,14 +256,7 @@ function App() {
           />
         )
       case 'card':
-        return (
-          <CardPage
-            userId={userId}
-            chatTitle={chatTitle}
-            prefetchedData={prefetched?.card}
-            onPrefetchConsumed={() => setPrefetched(prev => prev ? { ...prev, card: null } : null)}
-          />
-        )
+        return <CardPage userId={userId} chatTitle={chatTitle} />
       case 'profile':
         return (
           <ProfilePage

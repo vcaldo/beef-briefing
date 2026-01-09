@@ -14,13 +14,14 @@ interface LeaderboardTableProps {
   onRetry?: () => void
 }
 
-const METRICS: { value: LeaderboardMetric; label: string }[] = [
-  { value: 'message_count', label: 'Messages' },
-  { value: 'reactions_sent', label: 'Reactions Sent' },
-  { value: 'reactions_received', label: 'Reactions Received' },
-  { value: 'replies_sent', label: 'Replies Sent' },
-  { value: 'replies_received', label: 'Replies Received' },
-  { value: 'active_days', label: 'Active Days' },
+const METRICS: { value: LeaderboardMetric; label: string; description: string }[] = [
+  { value: 'message_count', label: 'Messages', description: 'Total messages sent' },
+  { value: 'current_streak', label: 'Streak', description: 'Consecutive days with activity' },
+  { value: 'active_days', label: 'Active Days', description: 'Total days with at least one message' },
+  { value: 'reactions_sent', label: 'Reactions Sent', description: 'Reactions given to others' },
+  { value: 'reactions_received', label: 'Reactions Received', description: 'Reactions received from others' },
+  { value: 'replies_sent', label: 'Replies Sent', description: 'Replies sent to others' },
+  { value: 'replies_received', label: 'Replies Received', description: 'Replies received from others' },
 ]
 
 function getRankClass(rank: number): string {
@@ -80,6 +81,9 @@ export function LeaderboardTable({
           </button>
         ))}
       </div>
+      <p className="section-subtitle">
+        {METRICS.find((m) => m.value === metric)?.description}
+      </p>
 
       {loading ? (
         <div className="leaderboard-list">

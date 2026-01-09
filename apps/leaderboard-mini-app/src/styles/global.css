@@ -487,6 +487,16 @@ body {
   justify-content: center;
 }
 
+.tab-emoji {
+  font-size: 22px;
+  line-height: 24px;
+}
+
+.tab-emoji-large {
+  font-size: 32px;
+  line-height: 1;
+}
+
 .tab-label {
   font-size: 10px;
   font-weight: 500;

@@ -20,9 +20,20 @@ interface ProfilePageProps {
   username: string | null
   chatTitle: string | null
   isAdmin: boolean
+  prefetchedData?: ProfileResponse | null
+  onPrefetchConsumed?: () => void
 }
 
-export function ProfilePage({ period, onPeriodChange, firstName, username, chatTitle, isAdmin }: ProfilePageProps) {
+export function ProfilePage({
+  period,
+  onPeriodChange,
+  firstName,
+  username,
+  chatTitle,
+  isAdmin,
+  prefetchedData,
+  onPrefetchConsumed,
+}: ProfilePageProps) {
   const [data, setData] = useState<ProfileResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -78,9 +89,16 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
     }
   }, [period, selectedUserId])
 
+  // Use prefetched data if available and not impersonating, otherwise fetch
   useEffect(() => {
+    // Only use prefetch for own profile (not impersonating)
+    if (prefetchedData && !selectedUserId) {
+      setData(prefetchedData)
+      onPrefetchConsumed?.()
+      return
+    }
     fetchData()
-  }, [fetchData])
+  }, [period, selectedUserId, prefetchedData, onPrefetchConsumed, fetchData])
 
   // Handle user selection change
   const handleUserChange = (userId: number | null) => {
@@ -164,7 +182,7 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
             </div>
             <div className="profile-stat-card">
               <div className="profile-stat-value">{data?.stats.avg_messages_per_day?.toFixed(1) || '0'}</div>
-              <div className="profile-stat-label">Avg</div>
+              <div className="profile-stat-label">Avg/Day</div>
             </div>
             {/* Row 2: Reactions Received | Reactions Given */}
             <div className="profile-stat-card">
@@ -199,6 +217,27 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
           </>
         )}
       </div>
+
+      {/* Personal Activity Chart */}
+      <ActivityChart
+        data={data?.activity || []}
+        loading={loading}
+        error={error}
+        onRetry={fetchData}
+        title="Your Activity"
+      />
+
+      {/* Personal Heatmap */}
+      <section className="activity-heatmap-section">
+        <h2 className="section-title">Your Heatmap</h2>
+        {loading ? (
+          <HeatmapSkeleton />
+        ) : data?.heatmap ? (
+          <HeatmapGrid data={data.heatmap} />
+        ) : (
+          <div className="empty-list">No activity data</div>
+        )}
+      </section>
 
       {/* Who Reacts to You */}
       <section className="interactors-section">
@@ -265,27 +304,6 @@ export function ProfilePage({ period, onPeriodChange, firstName, username, chatT
           <InteractorList interactors={data.top_repliers} />
         ) : (
           <div className="empty-list">No replies yet</div>
-        )}
-      </section>
-
-      {/* Personal Activity Chart */}
-      <ActivityChart
-        data={data?.activity || []}
-        loading={loading}
-        error={error}
-        onRetry={fetchData}
-        title="Your Activity"
-      />
-
-      {/* Personal Heatmap */}
-      <section className="activity-heatmap-section">
-        <h2 className="section-title">Your Heatmap</h2>
-        {loading ? (
-          <HeatmapSkeleton />
-        ) : data?.heatmap ? (
-          <HeatmapGrid data={data.heatmap} />
-        ) : (
-          <div className="empty-list">No activity data</div>
         )}
       </section>
     </div>

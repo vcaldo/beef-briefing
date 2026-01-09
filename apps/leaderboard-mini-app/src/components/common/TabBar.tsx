@@ -4,12 +4,15 @@ interface Tab {
   id: TabId
   label: string
   icon: React.ReactNode
+  hideLabel?: boolean
 }
 
-const HomeIcon = () => (
+const OverviewIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-    <polyline points="9 22 9 12 15 12 15 22" />
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
   </svg>
 )
 
@@ -46,7 +49,7 @@ const CardIcon = () => (
 )
 
 const TABS: Tab[] = [
-  { id: 'home', label: 'Home', icon: <HomeIcon /> },
+  { id: 'home', label: 'Overview', icon: <OverviewIcon /> },
   { id: 'leaderboard', label: 'Leaderboard', icon: <TrophyIcon /> },
   { id: 'interactions', label: 'Interactions', icon: <HeartIcon /> },
   { id: 'card', label: 'Card', icon: <CardIcon /> },
@@ -69,7 +72,7 @@ export function TabBar({ activeTab, onTabChange }: TabBarProps) {
           aria-current={activeTab === tab.id ? 'page' : undefined}
         >
           <span className="tab-icon">{tab.icon}</span>
-          <span className="tab-label">{tab.label}</span>
+          {!tab.hideLabel && <span className="tab-label">{tab.label}</span>}
         </button>
       ))}
     </nav>

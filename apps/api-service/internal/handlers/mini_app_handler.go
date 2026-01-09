@@ -885,3 +885,71 @@ func (h *MiniAppHandler) HandleUsers(w http.ResponseWriter, r *http.Request) {
 		"users": users,
 	}, http.StatusOK)
 }
+
+// HandleMediaOverview handles media statistics overview.
+// GET /api/v1/mini-app/media-overview?chat_id=...&period=30d&limit=10
+func (h *MiniAppHandler) HandleMediaOverview(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:media-overview")
+	}
+
+	// Get JWT claims from context
+	claims := middleware.GetClaimsFromContext(ctx)
+	if claims == nil {
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse chat_id
+	chatIDStr := r.URL.Query().Get("chat_id")
+	if chatIDStr == "" {
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
+		return
+	}
+	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+	if err != nil {
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
+		return
+	}
+
+	// Verify chat access
+	if claims.ChatID != nil && *claims.ChatID != chatID {
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
+		return
+	}
+
+	period := r.URL.Query().Get("period")
+	if period == "" {
+		period = "30d"
+	}
+
+	limit := 10
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 50 {
+			limit = l
+		}
+	}
+
+	tz := httputil.ParseTimezone(r)
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("period", period)
+		txn.AddAttribute("limit", limit)
+		txn.AddAttribute("timezone", tz.String())
+	}
+
+	response, err := h.service.GetMediaOverview(ctx, chatID, period, limit, tz)
+	if err != nil {
+		slog.Error("failed to get media overview", "error", err, "chat_id", chatID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	httputil.RespondJSON(w, response, http.StatusOK)
+}

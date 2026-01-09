@@ -64,7 +64,7 @@ export type LeaderboardMetric =
   | 'active_days'
   | 'current_streak'
 
-export type TabId = 'home' | 'leaderboard' | 'interactions' | 'profile' | 'card'
+export type TabId = 'home' | 'leaderboard' | 'interactions' | 'media' | 'profile' | 'card'
 
 // Card Gallery Types
 export interface CardImage {
@@ -192,4 +192,44 @@ export interface HeatmapData {
 export interface HeatmapResponse {
   group: HeatmapData
   user?: HeatmapData
+}
+
+// Media Overview Types
+export interface MediaTypeDistribution {
+  media_type: string
+  count: number
+  total_size: number
+}
+
+export interface MediaActivity {
+  date: string
+  count: number
+}
+
+export interface MediaUser {
+  rank: number
+  user_id: number
+  first_name: string
+  last_name: string | null
+  username: string | null
+  media_count: number
+  photo_url?: string | null
+}
+
+export interface MediaOverviewStats {
+  total_media: number
+  total_photos: number
+  total_videos: number
+  total_other: number
+  total_size: number
+  media_per_day: number
+  total_media_trend?: number | null
+  media_per_day_trend?: number | null
+}
+
+export interface MediaOverviewResponse {
+  stats: MediaOverviewStats
+  distribution: MediaTypeDistribution[]
+  activity: MediaActivity[]
+  top_senders: MediaUser[]
 }

@@ -847,3 +847,95 @@ func (s *MiniAppService) GetUserInfo(ctx context.Context, userID int64) (*ChatUs
 		PhotoURL:  s.generatePhotoURL(ctx, user.PhotoObjectKey),
 	}, nil
 }
+
+// MediaUserWithPhoto represents a media user with photo URL
+type MediaUserWithPhoto struct {
+	Rank       int     `json:"rank"`
+	UserID     int64   `json:"user_id"`
+	FirstName  string  `json:"first_name"`
+	LastName   *string `json:"last_name,omitempty"`
+	Username   *string `json:"username,omitempty"`
+	MediaCount int64   `json:"media_count"`
+	PhotoURL   *string `json:"photo_url,omitempty"`
+}
+
+// MediaOverviewResponse represents media statistics response
+type MediaOverviewResponse struct {
+	Stats        *repository.MediaOverviewStats        `json:"stats"`
+	Distribution []repository.MediaTypeDistribution    `json:"distribution"`
+	Activity     []repository.MediaActivity            `json:"activity"`
+	TopSenders   []MediaUserWithPhoto                  `json:"top_senders"`
+}
+
+// GetMediaOverview returns comprehensive media statistics for a chat
+func (s *MiniAppService) GetMediaOverview(ctx context.Context, chatID int64, period string, limit int, tz *time.Location) (*MediaOverviewResponse, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:media-overview")
+		defer segment.End()
+	}
+
+	startDate, endDate := getPeriodDates(period, tz)
+
+	// Get stats
+	stats, err := s.repo.GetMediaOverviewStats(ctx, chatID, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get media stats: %w", err)
+	}
+
+	// Get previous period stats for trend calculation
+	prevStart, prevEnd := getPreviousPeriodDates(period, tz)
+	if prevStart != nil && prevEnd != nil {
+		prevStats, err := s.repo.GetMediaOverviewStats(ctx, chatID, prevStart, prevEnd)
+		if err != nil {
+			slog.Warn("failed to get previous period media stats for trends", "chat_id", chatID, "error", err)
+		} else if prevStats != nil {
+			stats.TotalMediaTrend = calculateTrend(stats.TotalMedia, prevStats.TotalMedia)
+			stats.MediaPerDayTrend = calculateTrendFloat64(stats.MediaPerDay, prevStats.MediaPerDay)
+		}
+	}
+
+	// Get distribution
+	distribution, err := s.repo.GetMediaTypeDistribution(ctx, chatID, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get media distribution: %w", err)
+	}
+	if distribution == nil {
+		distribution = []repository.MediaTypeDistribution{}
+	}
+
+	// Get activity timeline
+	activity, err := s.repo.GetMediaActivity(ctx, chatID, startDate, endDate, tz)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get media activity: %w", err)
+	}
+	if activity == nil {
+		activity = []repository.MediaActivity{}
+	}
+
+	// Get top senders
+	topSenders, err := s.repo.GetTopMediaSenders(ctx, chatID, limit, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get top media senders: %w", err)
+	}
+
+	// Transform to response type with photo URLs
+	sendersWithPhoto := make([]MediaUserWithPhoto, len(topSenders))
+	for i, sender := range topSenders {
+		sendersWithPhoto[i] = MediaUserWithPhoto{
+			Rank:       sender.Rank,
+			UserID:     sender.UserID,
+			FirstName:  sender.FirstName,
+			LastName:   sender.LastName,
+			Username:   sender.Username,
+			MediaCount: sender.MediaCount,
+			PhotoURL:   s.generatePhotoURL(ctx, sender.PhotoObjectKey),
+		}
+	}
+
+	return &MediaOverviewResponse{
+		Stats:        stats,
+		Distribution: distribution,
+		Activity:     activity,
+		TopSenders:   sendersWithPhoto,
+	}, nil
+}

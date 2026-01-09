@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"beef-briefing/apps/api-service/internal/httputil"
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
@@ -33,20 +34,23 @@ func NewIngestHandler(ingestService *services.IngestService, cfg *config.Config)
 func (h *IngestHandler) HandleIngest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:ingest")
+	}
 
 	if err := r.ParseMultipartForm(h.config.MaxUploadSizeBytes()); err != nil {
 		slog.Error("failed to parse multipart form", "error", err)
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		http.Error(w, "invalid multipart request", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid multipart request", http.StatusBadRequest)
 		return
 	}
 
 	updateJSON := r.FormValue("update")
 	if updateJSON == "" {
 		slog.Error("missing update field in request")
-		http.Error(w, "missing update field", http.StatusBadRequest)
+		httputil.RespondError(w, "missing update field", http.StatusBadRequest)
 		return
 	}
 
@@ -56,7 +60,7 @@ func (h *IngestHandler) HandleIngest(w http.ResponseWriter, r *http.Request) {
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		http.Error(w, "invalid update JSON", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid update JSON", http.StatusBadRequest)
 		return
 	}
 
@@ -96,12 +100,11 @@ func (h *IngestHandler) HandleIngest(w http.ResponseWriter, r *http.Request) {
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	httputil.RespondOK(w)
 }
 
 // extractFiles reads all uploaded files from the multipart form.

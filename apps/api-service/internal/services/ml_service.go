@@ -122,6 +122,11 @@ type ProcessingStats struct {
 
 // GetUnprocessedMessages fetches messages that haven't been processed by ML.
 func (s *MLService) GetUnprocessedMessages(ctx context.Context, limit int) (*GetMessagesResponse, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:ml:get-unprocessed")
+		defer segment.End()
+	}
+
 	if limit <= 0 {
 		limit = 500
 	}
@@ -160,6 +165,11 @@ func (s *MLService) GetUnprocessedMessages(ctx context.Context, limit int) (*Get
 
 // SaveResults saves ML analysis results.
 func (s *MLService) SaveResults(ctx context.Context, req *SaveResultsRequest) error {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:ml:save-results")
+		defer segment.End()
+	}
+
 	if len(req.Results) == 0 {
 		return nil
 	}
@@ -333,6 +343,11 @@ func (s *MLService) SaveResults(ctx context.Context, req *SaveResultsRequest) er
 
 // GetProcessingStats returns ML processing statistics.
 func (s *MLService) GetProcessingStats(ctx context.Context) (*ProcessingStats, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:ml:get-stats")
+		defer segment.End()
+	}
+
 	stats, err := s.mlRepo.GetProcessingStats(ctx)
 	if err != nil {
 		slog.Error("failed to get processing stats", "error", err)

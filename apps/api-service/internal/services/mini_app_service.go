@@ -199,6 +199,11 @@ func (s *MiniAppService) ValidateInitData(initData string, maxAgeSeconds int64) 
 
 // Authenticate validates init data and returns a JWT token
 func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*AuthResponse, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:authenticate")
+		defer segment.End()
+	}
+
 	validated, err := s.ValidateInitData(initData, 86400) // 24 hours max age
 	if err != nil {
 		return nil, err
@@ -241,6 +246,11 @@ func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*Au
 
 // GetOverviewStats returns overview statistics for a chat with trend indicators
 func (s *MiniAppService) GetOverviewStats(ctx context.Context, chatID int64, period string, tz *time.Location) (*repository.OverviewStats, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:overview-stats")
+		defer segment.End()
+	}
+
 	startDate, endDate := getPeriodDates(period, tz)
 	stats, err := s.repo.GetOverviewStats(ctx, chatID, startDate, endDate)
 	if err != nil {
@@ -269,6 +279,11 @@ func (s *MiniAppService) GetOverviewStats(ctx context.Context, chatID int64, per
 
 // GetDailyActivity returns daily activity for a chat
 func (s *MiniAppService) GetDailyActivity(ctx context.Context, chatID int64, period string, tz *time.Location) ([]repository.DailyActivity, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:daily-activity")
+		defer segment.End()
+	}
+
 	startDate, endDate := getPeriodDates(period, tz)
 	return s.repo.GetDailyActivity(ctx, chatID, startDate, endDate, tz)
 }
@@ -286,6 +301,11 @@ type UserRankingWithPhoto struct {
 
 // GetUserRankings returns user rankings for a chat
 func (s *MiniAppService) GetUserRankings(ctx context.Context, chatID int64, metric, period string, page, limit int, tz *time.Location) ([]UserRankingWithPhoto, int, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:user-rankings")
+		defer segment.End()
+	}
+
 	startDate, endDate := getPeriodDates(period, tz)
 	offset := (page - 1) * limit
 
@@ -456,6 +476,11 @@ type ReactionsOverviewResponse struct {
 
 // GetReactionsOverview returns top reactions, givers, and receivers for a chat
 func (s *MiniAppService) GetReactionsOverview(ctx context.Context, chatID int64, period string, limit int, tz *time.Location) (*ReactionsOverviewResponse, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:reactions-overview")
+		defer segment.End()
+	}
+
 	startDate, endDate := getPeriodDates(period, tz)
 
 	topReactions, err := s.repo.GetTopReactions(ctx, chatID, limit, startDate, endDate)
@@ -521,6 +546,11 @@ type RepliesOverviewResponse struct {
 
 // GetRepliesOverview returns top reply senders and receivers for a chat
 func (s *MiniAppService) GetRepliesOverview(ctx context.Context, chatID int64, period string, limit int, tz *time.Location) (*RepliesOverviewResponse, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:replies-overview")
+		defer segment.End()
+	}
+
 	startDate, endDate := getPeriodDates(period, tz)
 
 	topSenders, err := s.repo.GetTopReplySenders(ctx, chatID, limit, startDate, endDate)
@@ -569,18 +599,23 @@ func (s *MiniAppService) GetRepliesOverview(ctx context.Context, chatID int64, p
 
 // ProfileResponse represents user profile data
 type ProfileResponse struct {
-	PhotoURL      *string                    `json:"photo_url,omitempty"`
-	Stats         *repository.ProfileStats   `json:"stats"`
-	TopReactors   []TopInteractorWithPhoto   `json:"top_reactors"`
-	TopReactedTo  []TopInteractorWithPhoto   `json:"top_reacted_to"`
-	TopRepliers   []TopInteractorWithPhoto   `json:"top_repliers"`
-	TopRepliedTo  []TopInteractorWithPhoto   `json:"top_replied_to"`
-	Heatmap       *repository.HeatmapData    `json:"heatmap"`
-	Activity      []repository.DailyActivity `json:"activity,omitempty"`
+	PhotoURL     *string                    `json:"photo_url,omitempty"`
+	Stats        *repository.ProfileStats   `json:"stats"`
+	TopReactors  []TopInteractorWithPhoto   `json:"top_reactors"`
+	TopReactedTo []TopInteractorWithPhoto   `json:"top_reacted_to"`
+	TopRepliers  []TopInteractorWithPhoto   `json:"top_repliers"`
+	TopRepliedTo []TopInteractorWithPhoto   `json:"top_replied_to"`
+	Heatmap      *repository.HeatmapData    `json:"heatmap"`
+	Activity     []repository.DailyActivity `json:"activity,omitempty"`
 }
 
 // GetUserProfile returns personal stats and top interactors for a user
 func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int64, period string, tz *time.Location) (*ProfileResponse, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:user-profile")
+		defer segment.End()
+	}
+
 	startDate, endDate := getPeriodDates(period, tz)
 
 	stats, err := s.repo.GetUserProfileStats(ctx, chatID, userID, startDate, endDate)
@@ -722,6 +757,11 @@ type HeatmapResponse struct {
 
 // GetHeatmapData returns group and optionally user heatmap data
 func (s *MiniAppService) GetHeatmapData(ctx context.Context, chatID int64, userID *int64, period string, tz *time.Location) (*HeatmapResponse, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:heatmap")
+		defer segment.End()
+	}
+
 	// Convert period to date range for both group and user heatmaps
 	startDate, endDate := getPeriodDates(period, tz)
 
@@ -763,6 +803,11 @@ type ChatUserWithPhoto struct {
 
 // GetChatUsers returns all non-bot users in a chat for admin user selection
 func (s *MiniAppService) GetChatUsers(ctx context.Context, chatID int64) ([]ChatUserWithPhoto, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:chat-users")
+		defer segment.End()
+	}
+
 	users, err := s.repo.GetChatUsers(ctx, chatID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chat users: %w", err)
@@ -784,6 +829,11 @@ func (s *MiniAppService) GetChatUsers(ctx context.Context, chatID int64) ([]Chat
 
 // GetUserInfo returns basic user info for displaying impersonated user
 func (s *MiniAppService) GetUserInfo(ctx context.Context, userID int64) (*ChatUserWithPhoto, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:user-info")
+		defer segment.End()
+	}
+
 	user, err := s.repo.GetUserInfo(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user info: %w", err)

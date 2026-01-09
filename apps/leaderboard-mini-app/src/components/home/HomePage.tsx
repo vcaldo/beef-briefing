@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '../../newrelic'
@@ -9,13 +9,22 @@ import { HeatmapGrid, HeatmapSkeleton } from '../common/HeatmapGrid'
 
 import type { Period, StatsResponse, ActivityDataPoint, HeatmapData } from '../../types'
 
+// Prefetched data passed from App (loaded during splash screen)
+interface PrefetchedHomeData {
+  stats: StatsResponse | null
+  activity: ActivityDataPoint[]
+  heatmap: HeatmapData | null
+}
+
 interface HomePageProps {
   period: Period
   onPeriodChange: (period: Period) => void
   chatTitle: string | null
+  prefetchedData?: PrefetchedHomeData | null
+  onPrefetchConsumed?: () => void
 }
 
-export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
+export function HomePage({ period, onPeriodChange, chatTitle, prefetchedData, onPrefetchConsumed }: HomePageProps) {
   // Data state
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [activity, setActivity] = useState<ActivityDataPoint[]>([])
@@ -30,6 +39,9 @@ export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
   const [statsError, setStatsError] = useState<string | null>(null)
   const [activityError, setActivityError] = useState<string | null>(null)
   const [heatmapError, setHeatmapError] = useState<string | null>(null)
+
+  // Track if prefetch data has been consumed (to avoid double-fetching on mount)
+  const prefetchUsedRef = useRef(false)
 
   // Fetch stats
   const fetchStats = useCallback(async () => {
@@ -105,10 +117,20 @@ export function HomePage({ period, onPeriodChange, chatTitle }: HomePageProps) {
     fetchHeatmap()
   }, [fetchStats, fetchActivity, fetchHeatmap])
 
-  // Fetch data on mount and when period changes
+  // Use prefetched data if available (from splash screen), otherwise fetch
   useEffect(() => {
+    // Use prefetch only once on initial mount
+    if (prefetchedData && !prefetchUsedRef.current) {
+      prefetchUsedRef.current = true
+      setStats(prefetchedData.stats)
+      setActivity(prefetchedData.activity)
+      setHeatmap(prefetchedData.heatmap)
+      onPrefetchConsumed?.()
+      return
+    }
+    // Always fetch on period change (after initial prefetch consumed)
     fetchData()
-  }, [fetchData])
+  }, [period, prefetchedData, onPrefetchConsumed, fetchData])
 
   return (
     <div className="page-container">

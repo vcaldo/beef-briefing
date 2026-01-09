@@ -26,6 +26,12 @@ type OverviewStats struct {
 	TotalReactions int64   `json:"total_reactions"`
 	TotalMedia     int64   `json:"total_media"`
 	MessagesPerDay float64 `json:"messages_per_day"`
+	// Trend fields (percentage change vs previous period, null if unavailable)
+	TotalMessagesTrend  *float64 `json:"total_messages_trend,omitempty"`
+	TotalUsersTrend     *float64 `json:"total_users_trend,omitempty"`
+	TotalReactionsTrend *float64 `json:"total_reactions_trend,omitempty"`
+	TotalMediaTrend     *float64 `json:"total_media_trend,omitempty"`
+	MessagesPerDayTrend *float64 `json:"messages_per_day_trend,omitempty"`
 }
 
 // DailyActivity represents a single day's activity.
@@ -76,6 +82,14 @@ type ProfileStats struct {
 	AvgMessagesPerDay       float64 `json:"avg_messages_per_day"`
 	RankByMessages          int     `json:"rank_by_messages"`
 	RankByReactionsReceived int     `json:"rank_by_reactions_received"`
+	// Trend fields (percentage change vs previous period, null if unavailable)
+	MessageCountTrend      *float64 `json:"message_count_trend,omitempty"`
+	ReactionsSentTrend     *float64 `json:"reactions_sent_trend,omitempty"`
+	ReactionsReceivedTrend *float64 `json:"reactions_received_trend,omitempty"`
+	RepliesSentTrend       *float64 `json:"replies_sent_trend,omitempty"`
+	RepliesReceivedTrend   *float64 `json:"replies_received_trend,omitempty"`
+	ActiveDaysTrend        *float64 `json:"active_days_trend,omitempty"`
+	AvgMessagesPerDayTrend *float64 `json:"avg_messages_per_day_trend,omitempty"`
 }
 
 // TopInteractor represents a user who interacts with another user.

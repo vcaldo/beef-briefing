@@ -7,6 +7,7 @@ import { TabBar, ErrorBoundary } from './components/common'
 import { HomePage } from './components/home/HomePage'
 import { LeaderboardPage } from './components/leaderboard/LeaderboardPage'
 import { InteractionsPage } from './components/interactions/InteractionsPage'
+import { MediaPage } from './components/media'
 import { ProfilePage } from './components/profile/ProfilePage'
 import { CardPage } from './components/card'
 
@@ -21,6 +22,7 @@ import type {
   RepliesOverviewResponse,
   ProfileResponse,
   CardImageWithUrl,
+  MediaOverviewResponse,
 } from './types'
 
 // Prefetched data for all tabs (loaded during splash screen)
@@ -35,6 +37,7 @@ interface PrefetchedData {
     reactions: ReactionsOverviewResponse | null
     replies: RepliesOverviewResponse | null
   } | null
+  media: MediaOverviewResponse | null
   profile: ProfileResponse | null
   card: CardImageWithUrl | null
   period: Period
@@ -87,7 +90,7 @@ function App() {
 
     // Fire all requests in parallel using Promise.allSettled (failures don't block others)
     // Note: Card prefetch disabled - it was causing issues
-    const [home, leaderboard, interactions, profile] = await Promise.allSettled([
+    const [home, leaderboard, interactions, media, profile] = await Promise.allSettled([
       // Home page data
       Promise.all([
         apiClient.getStats(defaultPeriod),
@@ -108,6 +111,9 @@ function App() {
         apiClient.getRepliesOverview(defaultPeriod, 10),
       ]).then(([reactions, replies]) => ({ reactions, replies })),
 
+      // Media
+      apiClient.getMediaOverview(defaultPeriod, 10),
+
       // Profile
       apiClient.getProfile(defaultPeriod),
     ])
@@ -116,6 +122,7 @@ function App() {
       home: home.status === 'fulfilled' ? home.value : null,
       leaderboard: leaderboard.status === 'fulfilled' ? leaderboard.value : null,
       interactions: interactions.status === 'fulfilled' ? interactions.value : null,
+      media: media.status === 'fulfilled' ? media.value : null,
       profile: profile.status === 'fulfilled' ? profile.value : null,
       card: null, // Card prefetch disabled
       period: defaultPeriod,
@@ -253,6 +260,16 @@ function App() {
             chatTitle={chatTitle}
             prefetchedData={prefetched?.period === period ? prefetched.interactions : null}
             onPrefetchConsumed={() => setPrefetched(prev => prev ? { ...prev, interactions: null } : null)}
+          />
+        )
+      case 'media':
+        return (
+          <MediaPage
+            period={period}
+            onPeriodChange={handlePeriodChange}
+            chatTitle={chatTitle}
+            prefetchedData={prefetched?.period === period ? prefetched.media : null}
+            onPrefetchConsumed={() => setPrefetched(prev => prev ? { ...prev, media: null } : null)}
           />
         )
       case 'card':

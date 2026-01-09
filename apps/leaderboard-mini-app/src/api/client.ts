@@ -14,6 +14,7 @@ import type {
   ProfileResponse,
   HeatmapResponse,
   ChatUsersResponse,
+  MediaOverviewResponse,
   Period,
   LeaderboardMetric,
   CardImage,
@@ -235,6 +236,31 @@ class ApiClient {
 
     if (!response.ok) {
       throw new Error('Failed to fetch heatmap')
+    }
+
+    return response.json()
+  }
+
+  /**
+   * Get media overview (distribution, timeline, top senders).
+   */
+  async getMediaOverview(
+    period: Period = '30d',
+    limit: number = 10,
+    chatId?: number
+  ): Promise<MediaOverviewResponse> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/media-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}&tz=${encodeURIComponent(this.timezone)}`,
+      { headers: this.getHeaders() }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch media overview')
     }
 
     return response.json()

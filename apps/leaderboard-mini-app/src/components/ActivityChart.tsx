@@ -75,7 +75,7 @@ export function ActivityChart({ data, loading, error, onRetry, title = 'Activity
       <h2 className="section-title">{title}</h2>
       <div className="chart-container">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -6, bottom: 0 }}>
             <defs>
               <linearGradient id="colorMessages" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="var(--tg-theme-button-color)" stopOpacity={0.3} />

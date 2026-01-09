@@ -182,7 +182,7 @@ export function ProfilePage({
             </div>
             <div className="profile-stat-card">
               <div className="profile-stat-value">{data?.stats.avg_messages_per_day?.toFixed(1) || '0'}</div>
-              <div className="profile-stat-label">Avg</div>
+              <div className="profile-stat-label">Avg/Day</div>
             </div>
             {/* Row 2: Reactions Received | Reactions Given */}
             <div className="profile-stat-card">

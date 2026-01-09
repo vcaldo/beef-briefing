@@ -264,6 +264,18 @@ Get user rankings.
 - `metric` (optional): `message_count`, `reactions_sent`, `reactions_received`, `active_days`
 - `page`, `limit` (pagination)
 
+#### GET `/api/v1/mini-app/media-overview`
+
+Get media statistics including type distribution, timeline, and top senders.
+
+**Parameters:**
+- `chat_id` (required)
+- `period` (optional): `7d`, `30d`, `90d`, `all` (default: `30d`)
+- `limit` (optional): Top senders count, 1-50 (default: `10`)
+- `tz` (optional): Timezone for date grouping
+
+**Response:** Stats (with trends), distribution by type, daily activity timeline, top media senders.
+
 #### GET `/api/v1/mini-app/gallery/weeks`
 
 List weeks with available card images.

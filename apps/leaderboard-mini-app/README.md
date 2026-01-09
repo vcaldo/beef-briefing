@@ -11,6 +11,7 @@ The Leaderboard Mini App displays activity statistics and user rankings for Tele
 - **Overview Stats**: Total messages, reactions, active users
 - **Activity Timeline**: Daily message/reaction trends with charts
 - **User Rankings**: Leaderboards by various metrics
+- **Media Statistics**: Breakdown by type (photos, videos, GIFs, voice, docs, stickers) with pie chart, timeline, and top senders
 - **Period Filtering**: View stats for 7d, 30d, 90d, or all time
 - **Multiple Metrics**: Rank by messages, reactions sent/received, active days
 - **Telegram Integration**: Seamless authentication via Mini App init data
@@ -60,6 +61,7 @@ All API calls use JWT authentication obtained through Telegram init_data.
 | GET | `/api/v1/mini-app/stats` | Get chat overview |
 | GET | `/api/v1/mini-app/activity` | Get daily activity |
 | GET | `/api/v1/mini-app/leaderboard` | Get user rankings |
+| GET | `/api/v1/mini-app/media-overview` | Get media statistics |
 
 ### Query Parameters
 
@@ -72,6 +74,11 @@ All API calls use JWT authentication obtained through Telegram init_data.
 - `period`: Time period
 - `metric`: `message_count`, `reactions_sent`, `reactions_received`, `active_days`
 - `page`, `limit`: Pagination
+
+**Media Overview**:
+- `chat_id` (required)
+- `period`: `7d`, `30d`, `90d`, `all` (default: `30d`)
+- `limit`: Top senders count (default: `10`, max: `50`)
 
 See [api-service README](../api-service/README.md) for full endpoint documentation.
 

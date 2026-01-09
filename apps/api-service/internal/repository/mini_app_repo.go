@@ -1932,3 +1932,387 @@ func (r *MiniAppRepository) GetUserInfo(ctx context.Context, userID int64) (*Cha
 
 	return &u, nil
 }
+
+// MediaOverviewStats represents aggregate media statistics for a chat.
+type MediaOverviewStats struct {
+	TotalMedia     int64   `json:"total_media"`
+	TotalPhotos    int64   `json:"total_photos"`
+	TotalVideos    int64   `json:"total_videos"`
+	TotalGifs      int64   `json:"total_gifs"`
+	TotalVoice     int64   `json:"total_voice"`
+	TotalDocuments int64   `json:"total_documents"`
+	TotalStickers  int64   `json:"total_stickers"`
+	TotalOther     int64   `json:"total_other"`
+	TotalSize      int64   `json:"total_size"`
+	MediaPerDay    float64 `json:"media_per_day"`
+	// Trends (percentage change from previous period)
+	TotalMediaTrend     *float64 `json:"total_media_trend,omitempty"`
+	TotalPhotosTrend    *float64 `json:"total_photos_trend,omitempty"`
+	TotalVideosTrend    *float64 `json:"total_videos_trend,omitempty"`
+	TotalGifsTrend      *float64 `json:"total_gifs_trend,omitempty"`
+	TotalVoiceTrend     *float64 `json:"total_voice_trend,omitempty"`
+	TotalDocumentsTrend *float64 `json:"total_documents_trend,omitempty"`
+	TotalStickersTrend  *float64 `json:"total_stickers_trend,omitempty"`
+	MediaPerDayTrend    *float64 `json:"media_per_day_trend,omitempty"`
+}
+
+// MediaTypeDistribution represents a media type and its count.
+type MediaTypeDistribution struct {
+	MediaType string `json:"media_type"`
+	Count     int64  `json:"count"`
+	TotalSize int64  `json:"total_size"`
+}
+
+// MediaActivity represents daily media upload counts.
+type MediaActivity struct {
+	Date  string `json:"date"`
+	Count int64  `json:"count"`
+}
+
+// MediaUser represents a user in media rankings.
+type MediaUser struct {
+	Rank           int     `json:"rank"`
+	UserID         int64   `json:"user_id"`
+	FirstName      string  `json:"first_name"`
+	LastName       *string `json:"last_name,omitempty"`
+	Username       *string `json:"username,omitempty"`
+	MediaCount     int64   `json:"media_count"`
+	PhotoObjectKey *string `json:"-"` // Internal use, not serialized
+}
+
+// GetMediaOverviewStats returns aggregate media statistics for a chat.
+func (r *MiniAppRepository) GetMediaOverviewStats(ctx context.Context, chatID int64, startDate, endDate *time.Time) (*MediaOverviewStats, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-media-overview-stats")
+		defer segment.End()
+	}
+
+	stats := &MediaOverviewStats{}
+
+	if startDate == nil && endDate == nil {
+		// All-time: use materialized view
+		err := r.db.QueryRowContext(ctx, `
+			SELECT
+				COALESCE(SUM(count), 0) as total_media,
+				COALESCE(SUM(CASE WHEN media_type = 'photo' THEN count ELSE 0 END), 0) as total_photos,
+				COALESCE(SUM(CASE WHEN media_type IN ('video', 'video_note') THEN count ELSE 0 END), 0) as total_videos,
+				COALESCE(SUM(CASE WHEN media_type = 'animation' THEN count ELSE 0 END), 0) as total_gifs,
+				COALESCE(SUM(CASE WHEN media_type = 'voice' THEN count ELSE 0 END), 0) as total_voice,
+				COALESCE(SUM(CASE WHEN media_type = 'document' THEN count ELSE 0 END), 0) as total_documents,
+				COALESCE(SUM(CASE WHEN media_type = 'sticker' THEN count ELSE 0 END), 0) as total_stickers,
+				COALESCE(SUM(total_size), 0) as total_size
+			FROM mv_media_distribution
+			WHERE chat_id = $1
+		`, chatID).Scan(&stats.TotalMedia, &stats.TotalPhotos, &stats.TotalVideos,
+			&stats.TotalGifs, &stats.TotalVoice, &stats.TotalDocuments, &stats.TotalStickers,
+			&stats.TotalSize)
+		if err != nil {
+			return nil, err
+		}
+
+		// Calculate other (total - known types)
+		stats.TotalOther = stats.TotalMedia - stats.TotalPhotos - stats.TotalVideos -
+			stats.TotalGifs - stats.TotalVoice - stats.TotalDocuments - stats.TotalStickers
+
+		// Calculate media per day using active days
+		var activeDays int64
+		err = r.db.QueryRowContext(ctx, `
+			SELECT COUNT(*) as active_days
+			FROM mv_daily_message_stats
+			WHERE chat_id = $1
+		`, chatID).Scan(&activeDays)
+		if err != nil {
+			return nil, err
+		}
+
+		if activeDays > 0 {
+			stats.MediaPerDay = float64(stats.TotalMedia) / float64(activeDays)
+		}
+	} else {
+		// Date-filtered: use live query combining media_files and photos tables
+		err := r.db.QueryRowContext(ctx, `
+			WITH media_stats AS (
+				SELECT
+					mf.media_type,
+					COUNT(*) as count,
+					COALESCE(SUM(mf.file_size), 0) as total_size
+				FROM media_files mf
+				JOIN messages m ON m.id = mf.message_id
+				WHERE m.chat_id = $1
+					AND m.date >= $2
+					AND m.date < $3
+				GROUP BY mf.media_type
+
+				UNION ALL
+
+				SELECT
+					'photo' as media_type,
+					COUNT(*) as count,
+					COALESCE(SUM(p.file_size), 0) as total_size
+				FROM photos p
+				JOIN messages m ON m.id = p.message_id
+				WHERE m.chat_id = $1
+					AND m.date >= $2
+					AND m.date < $3
+			)
+			SELECT
+				COALESCE(SUM(count), 0) as total_media,
+				COALESCE(SUM(CASE WHEN media_type = 'photo' THEN count ELSE 0 END), 0) as total_photos,
+				COALESCE(SUM(CASE WHEN media_type IN ('video', 'video_note') THEN count ELSE 0 END), 0) as total_videos,
+				COALESCE(SUM(CASE WHEN media_type = 'animation' THEN count ELSE 0 END), 0) as total_gifs,
+				COALESCE(SUM(CASE WHEN media_type = 'voice' THEN count ELSE 0 END), 0) as total_voice,
+				COALESCE(SUM(CASE WHEN media_type = 'document' THEN count ELSE 0 END), 0) as total_documents,
+				COALESCE(SUM(CASE WHEN media_type = 'sticker' THEN count ELSE 0 END), 0) as total_stickers,
+				COALESCE(SUM(total_size), 0) as total_size
+			FROM media_stats
+		`, chatID, startDate, endDate).Scan(&stats.TotalMedia, &stats.TotalPhotos, &stats.TotalVideos,
+			&stats.TotalGifs, &stats.TotalVoice, &stats.TotalDocuments, &stats.TotalStickers,
+			&stats.TotalSize)
+		if err != nil {
+			return nil, err
+		}
+
+		stats.TotalOther = stats.TotalMedia - stats.TotalPhotos - stats.TotalVideos -
+			stats.TotalGifs - stats.TotalVoice - stats.TotalDocuments - stats.TotalStickers
+
+		// Calculate media per day
+		if startDate != nil && endDate != nil {
+			days := int(endDate.Sub(*startDate).Hours() / 24)
+			if days > 0 {
+				stats.MediaPerDay = float64(stats.TotalMedia) / float64(days)
+			}
+		}
+	}
+
+	return stats, nil
+}
+
+// GetMediaTypeDistribution returns the distribution of media types for a chat.
+func (r *MiniAppRepository) GetMediaTypeDistribution(ctx context.Context, chatID int64, startDate, endDate *time.Time) ([]MediaTypeDistribution, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-media-type-distribution")
+		defer segment.End()
+	}
+
+	var rows *sql.Rows
+	var err error
+
+	if startDate == nil && endDate == nil {
+		// All-time: use materialized view
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT media_type, count, COALESCE(total_size, 0) as total_size
+			FROM mv_media_distribution
+			WHERE chat_id = $1
+			ORDER BY count DESC
+		`, chatID)
+	} else {
+		// Date-filtered: use live query
+		rows, err = r.db.QueryContext(ctx, `
+			WITH media_stats AS (
+				SELECT
+					mf.media_type::text as media_type,
+					COUNT(*) as count,
+					COALESCE(SUM(mf.file_size), 0) as total_size
+				FROM media_files mf
+				JOIN messages m ON m.id = mf.message_id
+				WHERE m.chat_id = $1
+					AND m.date >= $2
+					AND m.date < $3
+				GROUP BY mf.media_type
+
+				UNION ALL
+
+				SELECT
+					'photo' as media_type,
+					COUNT(*) as count,
+					COALESCE(SUM(p.file_size), 0) as total_size
+				FROM photos p
+				JOIN messages m ON m.id = p.message_id
+				WHERE m.chat_id = $1
+					AND m.date >= $2
+					AND m.date < $3
+			)
+			SELECT media_type, SUM(count) as count, SUM(total_size) as total_size
+			FROM media_stats
+			GROUP BY media_type
+			ORDER BY count DESC
+		`, chatID, startDate, endDate)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var distribution []MediaTypeDistribution
+	for rows.Next() {
+		var d MediaTypeDistribution
+		if err := rows.Scan(&d.MediaType, &d.Count, &d.TotalSize); err != nil {
+			return nil, err
+		}
+		distribution = append(distribution, d)
+	}
+
+	return distribution, rows.Err()
+}
+
+// GetMediaActivity returns daily media upload activity for a chat.
+func (r *MiniAppRepository) GetMediaActivity(ctx context.Context, chatID int64, startDate, endDate *time.Time, tz *time.Location) ([]MediaActivity, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-media-activity")
+		defer segment.End()
+	}
+
+	tzName := "UTC"
+	if tz != nil {
+		tzName = tz.String()
+	}
+
+	var rows *sql.Rows
+	var err error
+
+	if startDate == nil && endDate == nil {
+		// All-time query with timezone
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				DATE(m.date AT TIME ZONE $2) as activity_date,
+				COUNT(DISTINCT COALESCE(mf.id::text, 'p' || p.id::text)) as media_count
+			FROM messages m
+			LEFT JOIN media_files mf ON mf.message_id = m.id
+			LEFT JOIN photos p ON p.message_id = m.id
+			WHERE m.chat_id = $1
+				AND (mf.id IS NOT NULL OR p.id IS NOT NULL)
+			GROUP BY DATE(m.date AT TIME ZONE $2)
+			ORDER BY activity_date
+		`, chatID, tzName)
+	} else {
+		// Date-filtered query with timezone
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				DATE(m.date AT TIME ZONE $4) as activity_date,
+				COUNT(DISTINCT COALESCE(mf.id::text, 'p' || p.id::text)) as media_count
+			FROM messages m
+			LEFT JOIN media_files mf ON mf.message_id = m.id
+			LEFT JOIN photos p ON p.message_id = m.id
+			WHERE m.chat_id = $1
+				AND m.date >= $2
+				AND m.date < $3
+				AND (mf.id IS NOT NULL OR p.id IS NOT NULL)
+			GROUP BY DATE(m.date AT TIME ZONE $4)
+			ORDER BY activity_date
+		`, chatID, startDate, endDate, tzName)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var activity []MediaActivity
+	for rows.Next() {
+		var date time.Time
+		var a MediaActivity
+		if err := rows.Scan(&date, &a.Count); err != nil {
+			return nil, err
+		}
+		a.Date = date.Format("2006-01-02")
+		activity = append(activity, a)
+	}
+
+	return activity, rows.Err()
+}
+
+// GetTopMediaSenders returns users who send the most media in a chat.
+func (r *MiniAppRepository) GetTopMediaSenders(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]MediaUser, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-top-media-senders")
+		defer segment.End()
+	}
+
+	var rows *sql.Rows
+	var err error
+
+	if startDate == nil && endDate == nil {
+		// All-time: use live query (no MV for per-user media stats)
+		rows, err = r.db.QueryContext(ctx, `
+			WITH user_media AS (
+				SELECT
+					m.user_id,
+					COUNT(DISTINCT COALESCE(mf.id::text, 'p' || p.id::text)) as media_count
+				FROM messages m
+				LEFT JOIN media_files mf ON mf.message_id = m.id
+				LEFT JOIN photos p ON p.message_id = m.id
+				WHERE m.chat_id = $1
+					AND m.user_id IS NOT NULL
+					AND (mf.id IS NOT NULL OR p.id IS NOT NULL)
+				GROUP BY m.user_id
+			)
+			SELECT
+				um.user_id,
+				u.first_name,
+				u.last_name,
+				u.username,
+				um.media_count,
+				ROW_NUMBER() OVER (ORDER BY um.media_count DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = um.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
+			FROM user_media um
+			JOIN users u ON u.id = um.user_id
+			WHERE u.is_bot = false
+			ORDER BY um.media_count DESC
+			LIMIT $2
+		`, chatID, limit)
+	} else {
+		// Date-filtered
+		rows, err = r.db.QueryContext(ctx, `
+			WITH user_media AS (
+				SELECT
+					m.user_id,
+					COUNT(DISTINCT COALESCE(mf.id::text, 'p' || p.id::text)) as media_count
+				FROM messages m
+				LEFT JOIN media_files mf ON mf.message_id = m.id
+				LEFT JOIN photos p ON p.message_id = m.id
+				WHERE m.chat_id = $1
+					AND m.user_id IS NOT NULL
+					AND m.date >= $2
+					AND m.date < $3
+					AND (mf.id IS NOT NULL OR p.id IS NOT NULL)
+				GROUP BY m.user_id
+			)
+			SELECT
+				um.user_id,
+				u.first_name,
+				u.last_name,
+				u.username,
+				um.media_count,
+				ROW_NUMBER() OVER (ORDER BY um.media_count DESC) as rank,
+				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = um.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
+			FROM user_media um
+			JOIN users u ON u.id = um.user_id
+			WHERE u.is_bot = false
+			ORDER BY um.media_count DESC
+			LIMIT $4
+		`, chatID, startDate, endDate, limit)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []MediaUser
+	for rows.Next() {
+		var rank int64
+		var u MediaUser
+		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.MediaCount, &rank, &u.PhotoObjectKey); err != nil {
+			return nil, err
+		}
+		u.Rank = int(rank)
+		users = append(users, u)
+	}
+
+	return users, rows.Err()
+}

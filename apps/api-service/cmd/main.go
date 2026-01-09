@@ -298,6 +298,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		protected.HandleFunc("/profile", miniAppHandler.HandleProfile).Methods("GET", "OPTIONS")
 		protected.HandleFunc("/heatmap", miniAppHandler.HandleHeatmap).Methods("GET", "OPTIONS")
 		protected.HandleFunc("/users", miniAppHandler.HandleUsers).Methods("GET", "OPTIONS")
+		protected.HandleFunc("/media-overview", miniAppHandler.HandleMediaOverview).Methods("GET", "OPTIONS")
 
 		// Gallery endpoints - card images for deck-mini-app
 		protected.HandleFunc("/gallery/weeks", miniAppHandler.HandleGalleryWeeks).Methods("GET", "OPTIONS")

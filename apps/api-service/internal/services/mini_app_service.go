@@ -613,8 +613,11 @@ type HeatmapResponse struct {
 
 // GetHeatmapData returns group and optionally user heatmap data
 func (s *MiniAppService) GetHeatmapData(ctx context.Context, chatID int64, userID *int64, period string, tz *time.Location) (*HeatmapResponse, error) {
-	// Group heatmap with timezone
-	groupHeatmap, err := s.repo.GetGroupHeatmap(ctx, chatID, tz)
+	// Convert period to date range for both group and user heatmaps
+	startDate, endDate := getPeriodDates(period, tz)
+
+	// Group heatmap with timezone and date filtering
+	groupHeatmap, err := s.repo.GetGroupHeatmap(ctx, chatID, startDate, endDate, tz)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get group heatmap: %w", err)
 	}
@@ -625,7 +628,6 @@ func (s *MiniAppService) GetHeatmapData(ctx context.Context, chatID int64, userI
 
 	// User heatmap if requested
 	if userID != nil {
-		startDate, endDate := getPeriodDates(period, tz)
 		userHeatmap, err := s.repo.GetUserHeatmap(ctx, chatID, *userID, startDate, endDate, tz)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get user heatmap: %w", err)

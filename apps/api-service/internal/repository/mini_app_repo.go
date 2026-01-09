@@ -1646,7 +1646,7 @@ func (r *MiniAppRepository) GetTopReplyReceivers(ctx context.Context, chatID int
 }
 
 // GetGroupHeatmap returns the activity heatmap for a chat in the specified timezone.
-func (r *MiniAppRepository) GetGroupHeatmap(ctx context.Context, chatID int64, tz *time.Location) (*HeatmapData, error) {
+func (r *MiniAppRepository) GetGroupHeatmap(ctx context.Context, chatID int64, startDate, endDate *time.Time, tz *time.Location) (*HeatmapData, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("db:mini-app-group-heatmap")
@@ -1658,20 +1658,43 @@ func (r *MiniAppRepository) GetGroupHeatmap(ctx context.Context, chatID int64, t
 		tzName = tz.String()
 	}
 
-	// Query live data with timezone conversion for accurate local time display
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT
-			EXTRACT(DOW FROM m.date AT TIME ZONE $2)::int as day_of_week,
-			EXTRACT(HOUR FROM m.date AT TIME ZONE $2)::int as hour,
-			COUNT(*) as message_count,
-			COUNT(DISTINCT m.user_id) as unique_users
-		FROM messages m
-		WHERE m.chat_id = $1
-		GROUP BY
-			EXTRACT(DOW FROM m.date AT TIME ZONE $2),
-			EXTRACT(HOUR FROM m.date AT TIME ZONE $2)
-		ORDER BY day_of_week, hour
-	`, chatID, tzName)
+	var rows *sql.Rows
+	var err error
+
+	if startDate == nil && endDate == nil {
+		// All-time query with timezone
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				EXTRACT(DOW FROM m.date AT TIME ZONE $2)::int as day_of_week,
+				EXTRACT(HOUR FROM m.date AT TIME ZONE $2)::int as hour,
+				COUNT(*) as message_count,
+				COUNT(DISTINCT m.user_id) as unique_users
+			FROM messages m
+			WHERE m.chat_id = $1
+			GROUP BY
+				EXTRACT(DOW FROM m.date AT TIME ZONE $2),
+				EXTRACT(HOUR FROM m.date AT TIME ZONE $2)
+			ORDER BY day_of_week, hour
+		`, chatID, tzName)
+	} else {
+		// Date-filtered query with timezone
+		rows, err = r.db.QueryContext(ctx, `
+			SELECT
+				EXTRACT(DOW FROM m.date AT TIME ZONE $4)::int as day_of_week,
+				EXTRACT(HOUR FROM m.date AT TIME ZONE $4)::int as hour,
+				COUNT(*) as message_count,
+				COUNT(DISTINCT m.user_id) as unique_users
+			FROM messages m
+			WHERE m.chat_id = $1
+				AND m.date >= $2
+				AND m.date < $3
+			GROUP BY
+				EXTRACT(DOW FROM m.date AT TIME ZONE $4),
+				EXTRACT(HOUR FROM m.date AT TIME ZONE $4)
+			ORDER BY day_of_week, hour
+		`, chatID, startDate, endDate, tzName)
+	}
+
 	if err != nil {
 		return nil, err
 	}

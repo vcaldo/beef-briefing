@@ -10,6 +10,7 @@ import (
 	"beef-briefing/apps/api-service/internal/httputil"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 // MiniAppClaims represents the JWT claims for Mini App authentication
@@ -98,6 +99,14 @@ func (a *JWTAuth) Authenticate(next http.Handler) http.Handler {
 			slog.Warn("invalid JWT token", "path", r.URL.Path, "error", err)
 			httputil.RespondError(w, "invalid or expired token", http.StatusUnauthorized)
 			return
+		}
+
+		// Add New Relic attributes for JWT claims
+		if txn := newrelic.FromContext(r.Context()); txn != nil {
+			txn.AddAttribute("jwt_user_id", claims.UserID)
+			if claims.ChatID != nil {
+				txn.AddAttribute("jwt_chat_id", *claims.ChatID)
+			}
 		}
 
 		// Store claims in context

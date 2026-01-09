@@ -33,6 +33,9 @@ func NewCardHandler(cardService *services.CardService, cfg *config.Config) *Card
 func (h *CardHandler) HandleGetUserCard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:cards:user")
+	}
 
 	// Extract path parameter
 	vars := mux.Vars(r)
@@ -99,6 +102,9 @@ func (h *CardHandler) HandleGetUserCard(w http.ResponseWriter, r *http.Request) 
 func (h *CardHandler) HandleGetChatCards(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:cards:chat")
+	}
 
 	// Parse required chat_id query parameter
 	chatIDStr := r.URL.Query().Get("chat_id")
@@ -179,6 +185,9 @@ func (h *CardHandler) HandleGetChatCards(w http.ResponseWriter, r *http.Request)
 func (h *CardHandler) HandleGetUserHistory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:cards:history")
+	}
 
 	// Extract path parameter
 	vars := mux.Vars(r)
@@ -232,6 +241,9 @@ func (h *CardHandler) HandleGetUserHistory(w http.ResponseWriter, r *http.Reques
 func (h *CardHandler) HandleGetAvailableWeeks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:cards:weeks")
+	}
 
 	// Required chat_id query parameter
 	chatIDStr := r.URL.Query().Get("chat_id")
@@ -266,6 +278,9 @@ func (h *CardHandler) HandleGetAvailableWeeks(w http.ResponseWriter, r *http.Req
 func (h *CardHandler) HandleGetCardImage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:cards:image")
+	}
 
 	// Extract path parameter
 	vars := mux.Vars(r)

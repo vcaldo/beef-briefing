@@ -32,6 +32,9 @@ func NewMLHandler(mlService *services.MLService, cfg *config.Config) *MLHandler 
 func (h *MLHandler) HandleGetMessages(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:ml:messages")
+	}
 
 	// Parse limit from query params
 	limitStr := r.URL.Query().Get("limit")
@@ -71,6 +74,9 @@ func (h *MLHandler) HandleGetMessages(w http.ResponseWriter, r *http.Request) {
 func (h *MLHandler) HandlePostResults(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:ml:results")
+	}
 
 	var req services.SaveResultsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -118,6 +124,9 @@ func (h *MLHandler) HandlePostResults(w http.ResponseWriter, r *http.Request) {
 func (h *MLHandler) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:ml:status")
+	}
 
 	stats, err := h.mlService.GetProcessingStats(ctx)
 	if err != nil {

@@ -44,6 +44,9 @@ type AuthRequest struct {
 func (h *MiniAppHandler) HandleAuth(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:auth")
+	}
 
 	var req AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -85,6 +88,9 @@ func (h *MiniAppHandler) HandleAuth(w http.ResponseWriter, r *http.Request) {
 func (h *MiniAppHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:stats")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
@@ -142,6 +148,9 @@ func (h *MiniAppHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
 func (h *MiniAppHandler) HandleActivity(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:activity")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
@@ -208,6 +217,9 @@ func (h *MiniAppHandler) HandleActivity(w http.ResponseWriter, r *http.Request) 
 func (h *MiniAppHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:leaderboard")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
@@ -309,6 +321,9 @@ func (h *MiniAppHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Reques
 func (h *MiniAppHandler) HandleGalleryWeeks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:gallery:weeks")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
@@ -356,6 +371,9 @@ func (h *MiniAppHandler) HandleGalleryWeeks(w http.ResponseWriter, r *http.Reque
 func (h *MiniAppHandler) HandleGalleryImages(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:gallery:images")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
@@ -434,6 +452,9 @@ func (h *MiniAppHandler) HandleGalleryImages(w http.ResponseWriter, r *http.Requ
 func (h *MiniAppHandler) HandleGalleryImageURL(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:gallery:image-url")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
@@ -490,6 +511,9 @@ func (h *MiniAppHandler) HandleGalleryImageURL(w http.ResponseWriter, r *http.Re
 func (h *MiniAppHandler) HandleReactionsOverview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:reactions")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
@@ -555,6 +579,9 @@ func (h *MiniAppHandler) HandleReactionsOverview(w http.ResponseWriter, r *http.
 func (h *MiniAppHandler) HandleRepliesOverview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:replies")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
@@ -629,6 +656,9 @@ type ProfileResponseWithUser struct {
 func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:profile")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
@@ -727,6 +757,9 @@ func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 func (h *MiniAppHandler) HandleHeatmap(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:heatmap")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
@@ -793,6 +826,9 @@ func (h *MiniAppHandler) HandleHeatmap(w http.ResponseWriter, r *http.Request) {
 func (h *MiniAppHandler) HandleUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:users")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)

@@ -20,7 +20,7 @@ var ErrCardImageNotFound = errors.New("card image not found")
 
 // MinIOClient interface for generating presigned URLs.
 type MinIOClient interface {
-	GetPresignedURLSeconds(objectKey string, expirySeconds int) (string, error)
+	GetPresignedURLSeconds(ctx context.Context, objectKey string, expirySeconds int) (string, error)
 }
 
 // CardService handles user card business logic.
@@ -379,7 +379,7 @@ func (s *CardService) GetCardImageURL(
 		return nil, errors.New("storage client not configured")
 	}
 
-	url, err := s.minioClient.GetPresignedURLSeconds(cardImage.StoragePath, expirySeconds)
+	url, err := s.minioClient.GetPresignedURLSeconds(ctx, cardImage.StoragePath, expirySeconds)
 	if err != nil {
 		return nil, err
 	}
@@ -515,7 +515,7 @@ func (s *CardService) GetGalleryImageURL(
 		return nil, errors.New("storage client not configured")
 	}
 
-	url, err := s.minioClient.GetPresignedURLSeconds(image.StoragePath, expirySeconds)
+	url, err := s.minioClient.GetPresignedURLSeconds(ctx, image.StoragePath, expirySeconds)
 	if err != nil {
 		return nil, err
 	}

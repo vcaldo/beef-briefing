@@ -34,6 +34,9 @@ func NewIngestHandler(ingestService *services.IngestService, cfg *config.Config)
 func (h *IngestHandler) HandleIngest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:ingest")
+	}
 
 	if err := r.ParseMultipartForm(h.config.MaxUploadSizeBytes()); err != nil {
 		slog.Error("failed to parse multipart form", "error", err)

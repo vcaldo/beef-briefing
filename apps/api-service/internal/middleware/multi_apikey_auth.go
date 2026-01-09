@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"beef-briefing/apps/api-service/internal/httputil"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 // MultiAPIKeyAuth validates API keys from multiple authorized applications
@@ -56,6 +58,11 @@ func (a *MultiAPIKeyAuth) Authenticate(next http.Handler) http.Handler {
 			slog.Warn("invalid API key", "path", r.URL.Path, "ip", r.RemoteAddr)
 			httputil.RespondError(w, "invalid api key", http.StatusUnauthorized)
 			return
+		}
+
+		// Add New Relic attribute for authenticated app
+		if txn := newrelic.FromContext(r.Context()); txn != nil {
+			txn.AddAttribute("authenticated_app", authenticatedApp)
 		}
 
 		// Store the authenticated app name in context for logging/auditing

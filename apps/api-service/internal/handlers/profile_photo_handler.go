@@ -45,6 +45,9 @@ func NewProfilePhotoHandler(profilePhotoService *services.ProfilePhotoService, c
 func (h *ProfilePhotoHandler) HandleUserPhotos(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:photos:user-upload")
+	}
 
 	if err := r.ParseMultipartForm(h.config.MaxUploadSizeBytes()); err != nil {
 		slog.Error("failed to parse multipart form", "error", err)
@@ -109,6 +112,9 @@ func (h *ProfilePhotoHandler) HandleUserPhotos(w http.ResponseWriter, r *http.Re
 func (h *ProfilePhotoHandler) HandleChatPhotos(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:photos:chat-upload")
+	}
 
 	if err := r.ParseMultipartForm(h.config.MaxUploadSizeBytes()); err != nil {
 		slog.Error("failed to parse multipart form", "error", err)
@@ -170,6 +176,9 @@ func (h *ProfilePhotoHandler) HandleChatPhotos(w http.ResponseWriter, r *http.Re
 func (h *ProfilePhotoHandler) HandleGetUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:users:list")
+	}
 
 	userIDs, err := h.profilePhotoService.GetAllUserIDs(ctx)
 	if err != nil {
@@ -193,6 +202,9 @@ func (h *ProfilePhotoHandler) HandleGetUsers(w http.ResponseWriter, r *http.Requ
 func (h *ProfilePhotoHandler) HandleGetChats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:chats:list")
+	}
 
 	chatIDs, err := h.profilePhotoService.GetAllChatIDs(ctx)
 	if err != nil {
@@ -256,6 +268,9 @@ var validSizes = map[string]bool{
 func (h *ProfilePhotoHandler) HandleGetUserPhoto(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:photos:user")
+	}
 
 	// Extract user ID from path
 	vars := mux.Vars(r)
@@ -315,6 +330,9 @@ func (h *ProfilePhotoHandler) HandleGetUserPhoto(w http.ResponseWriter, r *http.
 func (h *ProfilePhotoHandler) HandleGetChatPhoto(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:photos:chat")
+	}
 
 	// Extract chat ID from path
 	vars := mux.Vars(r)

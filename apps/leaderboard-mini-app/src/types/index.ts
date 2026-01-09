@@ -18,6 +18,12 @@ export interface StatsResponse {
   total_reactions: number
   total_media: number
   messages_per_day: number
+  // Trend fields (percentage change vs previous period, null if unavailable)
+  total_messages_trend?: number | null
+  total_users_trend?: number | null
+  total_reactions_trend?: number | null
+  total_media_trend?: number | null
+  messages_per_day_trend?: number | null
 }
 
 export interface ActivityDataPoint {
@@ -119,6 +125,14 @@ export interface ProfileStats {
   avg_messages_per_day: number
   rank_by_messages: number
   rank_by_reactions_received: number
+  // Trend fields (percentage change vs previous period, null if unavailable)
+  message_count_trend?: number | null
+  reactions_sent_trend?: number | null
+  reactions_received_trend?: number | null
+  replies_sent_trend?: number | null
+  replies_received_trend?: number | null
+  active_days_trend?: number | null
+  avg_messages_per_day_trend?: number | null
 }
 
 export interface TopInteractor {

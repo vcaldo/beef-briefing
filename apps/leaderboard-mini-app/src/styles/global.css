@@ -132,6 +132,43 @@ body {
   grid-column: 1 / -1;
 }
 
+/* Trend Indicators */
+.trend-indicator {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.trend-up {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.trend-down {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.trend-neutral {
+  color: var(--tg-theme-hint-color);
+  background: transparent;
+}
+
+/* Stat card with trend - adjust layout */
+.stat-card-with-trend {
+  position: relative;
+}
+
+.stat-card-with-trend .trend-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
 /* Activity Chart */
 .activity-section {
   padding: 0 16px 16px;
@@ -699,6 +736,17 @@ body {
   font-size: 11px;
   color: var(--tg-theme-button-color);
   margin-top: 4px;
+}
+
+/* Profile stat card with trend */
+.profile-stat-card-with-trend {
+  position: relative;
+}
+
+.profile-stat-card-with-trend .trend-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
 }
 
 /* Interactors Section */

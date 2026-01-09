@@ -239,10 +239,32 @@ func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*Au
 	}, nil
 }
 
-// GetOverviewStats returns overview statistics for a chat
+// GetOverviewStats returns overview statistics for a chat with trend indicators
 func (s *MiniAppService) GetOverviewStats(ctx context.Context, chatID int64, period string, tz *time.Location) (*repository.OverviewStats, error) {
 	startDate, endDate := getPeriodDates(period, tz)
-	return s.repo.GetOverviewStats(ctx, chatID, startDate, endDate)
+	stats, err := s.repo.GetOverviewStats(ctx, chatID, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get previous period stats for trend calculation
+	prevStart, prevEnd := getPreviousPeriodDates(period, tz)
+	if prevStart != nil && prevEnd != nil {
+		prevStats, err := s.repo.GetOverviewStats(ctx, chatID, prevStart, prevEnd)
+		if err != nil {
+			// Log but don't fail - trends are not critical
+			slog.Warn("failed to get previous period stats for trends", "chat_id", chatID, "error", err)
+		} else if prevStats != nil {
+			// Calculate trends
+			stats.TotalMessagesTrend = calculateTrend(stats.TotalMessages, prevStats.TotalMessages)
+			stats.TotalUsersTrend = calculateTrend(stats.TotalUsers, prevStats.TotalUsers)
+			stats.TotalReactionsTrend = calculateTrend(stats.TotalReactions, prevStats.TotalReactions)
+			stats.TotalMediaTrend = calculateTrend(stats.TotalMedia, prevStats.TotalMedia)
+			stats.MessagesPerDayTrend = calculateTrendFloat64(stats.MessagesPerDay, prevStats.MessagesPerDay)
+		}
+	}
+
+	return stats, nil
 }
 
 // GetDailyActivity returns daily activity for a chat
@@ -332,6 +354,74 @@ func getPeriodDates(period string, tz *time.Location) (*time.Time, *time.Time) {
 		startDate := today.Add(-30 * 24 * time.Hour)
 		return &startDate, &endDate
 	}
+}
+
+// getPreviousPeriodDates calculates the previous period based on current period
+// Returns nil, nil for "max" period (no previous period available)
+func getPreviousPeriodDates(period string, tz *time.Location) (*time.Time, *time.Time) {
+	if tz == nil {
+		tz = time.UTC
+	}
+	now := time.Now().In(tz)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, tz)
+
+	switch period {
+	case "max":
+		return nil, nil // No previous period for max
+	case "ytd":
+		// Previous year's YTD (same days of year)
+		prevYearStart := time.Date(now.Year()-1, 1, 1, 0, 0, 0, 0, tz)
+		prevYearEnd := time.Date(now.Year()-1, now.Month(), now.Day(), 0, 0, 0, 0, tz).Add(24 * time.Hour)
+		return &prevYearStart, &prevYearEnd
+	case "24h":
+		prevStart := today.Add(-2 * 24 * time.Hour)
+		prevEnd := today.Add(-1 * 24 * time.Hour)
+		return &prevStart, &prevEnd
+	case "7d":
+		prevStart := today.Add(-14 * 24 * time.Hour)
+		prevEnd := today.Add(-7 * 24 * time.Hour)
+		return &prevStart, &prevEnd
+	case "30d":
+		prevStart := today.Add(-60 * 24 * time.Hour)
+		prevEnd := today.Add(-30 * 24 * time.Hour)
+		return &prevStart, &prevEnd
+	case "90d":
+		prevStart := today.Add(-180 * 24 * time.Hour)
+		prevEnd := today.Add(-90 * 24 * time.Hour)
+		return &prevStart, &prevEnd
+	case "180d":
+		prevStart := today.Add(-360 * 24 * time.Hour)
+		prevEnd := today.Add(-180 * 24 * time.Hour)
+		return &prevStart, &prevEnd
+	case "365d":
+		prevStart := today.Add(-730 * 24 * time.Hour)
+		prevEnd := today.Add(-365 * 24 * time.Hour)
+		return &prevStart, &prevEnd
+	default:
+		// Default to previous 30 days
+		prevStart := today.Add(-60 * 24 * time.Hour)
+		prevEnd := today.Add(-30 * 24 * time.Hour)
+		return &prevStart, &prevEnd
+	}
+}
+
+// calculateTrend calculates percentage change between current and previous values
+// Returns nil if previous is 0 (division by zero)
+func calculateTrend(current, previous int64) *float64 {
+	if previous == 0 {
+		return nil
+	}
+	trend := float64(current-previous) / float64(previous) * 100
+	return &trend
+}
+
+// calculateTrendFloat64 calculates percentage change for float64 values
+func calculateTrendFloat64(current, previous float64) *float64 {
+	if previous == 0 {
+		return nil
+	}
+	trend := (current - previous) / previous * 100
+	return &trend
 }
 
 // ReactionUserWithPhoto is a reaction user with photo URL
@@ -496,6 +586,25 @@ func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int6
 	stats, err := s.repo.GetUserProfileStats(ctx, chatID, userID, startDate, endDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get profile stats: %w", err)
+	}
+
+	// Get previous period stats for trend calculation
+	prevStart, prevEnd := getPreviousPeriodDates(period, tz)
+	if prevStart != nil && prevEnd != nil {
+		prevStats, err := s.repo.GetUserProfileStats(ctx, chatID, userID, prevStart, prevEnd)
+		if err != nil {
+			// Log but don't fail - trends are not critical
+			slog.Warn("failed to get previous period profile stats for trends", "chat_id", chatID, "user_id", userID, "error", err)
+		} else if prevStats != nil {
+			// Calculate trends
+			stats.MessageCountTrend = calculateTrend(stats.MessageCount, prevStats.MessageCount)
+			stats.ReactionsSentTrend = calculateTrend(stats.ReactionsSent, prevStats.ReactionsSent)
+			stats.ReactionsReceivedTrend = calculateTrend(stats.ReactionsReceived, prevStats.ReactionsReceived)
+			stats.RepliesSentTrend = calculateTrend(stats.RepliesSent, prevStats.RepliesSent)
+			stats.RepliesReceivedTrend = calculateTrend(stats.RepliesReceived, prevStats.RepliesReceived)
+			stats.ActiveDaysTrend = calculateTrend(stats.ActiveDays, prevStats.ActiveDays)
+			stats.AvgMessagesPerDayTrend = calculateTrendFloat64(stats.AvgMessagesPerDay, prevStats.AvgMessagesPerDay)
+		}
 	}
 
 	topReactors, err := s.repo.GetTopReactorsToUser(ctx, chatID, userID, 5, startDate, endDate)

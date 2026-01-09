@@ -1,4 +1,5 @@
 import type { StatsResponse } from '../types'
+import { TrendIndicator } from './common'
 
 interface OverviewStatsProps {
   stats: StatsResponse | null
@@ -50,21 +51,23 @@ export function OverviewStats({ stats, loading, error, onRetry }: OverviewStatsP
   }
 
   const statCards = [
-    { value: stats.total_messages, label: 'Messages' },
-    { value: stats.total_users, label: 'Active Users' },
-    { value: stats.total_reactions, label: 'Reactions' },
-    { value: stats.total_media, label: 'Media Files' },
+    { value: stats.total_messages, label: 'Messages', trend: stats.total_messages_trend },
+    { value: stats.total_users, label: 'Active Users', trend: stats.total_users_trend },
+    { value: stats.total_reactions, label: 'Reactions', trend: stats.total_reactions_trend },
+    { value: stats.total_media, label: 'Media Files', trend: stats.total_media_trend },
   ]
 
   return (
     <div className="stats-grid">
       {statCards.map((stat, index) => (
-        <div key={index} className="stat-card">
+        <div key={index} className="stat-card stat-card-with-trend">
+          <TrendIndicator trend={stat.trend} />
           <div className="stat-value">{formatNumber(stat.value)}</div>
           <div className="stat-label">{stat.label}</div>
         </div>
       ))}
-      <div className="stat-card full-width">
+      <div className="stat-card full-width stat-card-with-trend">
+        <TrendIndicator trend={stats.messages_per_day_trend} />
         <div className="stat-value">{stats.messages_per_day.toFixed(1)}</div>
         <div className="stat-label">Messages per Day</div>
       </div>

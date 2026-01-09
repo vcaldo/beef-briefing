@@ -4,7 +4,7 @@ import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '../../newrelic'
 import { PeriodSelector } from '../PeriodSelector'
 import { ActivityChart } from '../ActivityChart'
-import { Avatar, HeatmapGrid, HeatmapSkeleton } from '../common'
+import { Avatar, HeatmapGrid, HeatmapSkeleton, TrendIndicator } from '../common'
 
 import type {
   Period,
@@ -173,35 +173,41 @@ export function ProfilePage({
         ) : (
           <>
             {/* Row 1: Messages | Avg */}
-            <div className="profile-stat-card">
+            <div className="profile-stat-card profile-stat-card-with-trend">
+              <TrendIndicator trend={data?.stats.message_count_trend} />
               <div className="profile-stat-value">{data?.stats.message_count.toLocaleString() || 0}</div>
               <div className="profile-stat-label">Messages</div>
               {data?.stats.rank_by_messages && (
                 <div className="profile-rank-badge">#{data.stats.rank_by_messages}</div>
               )}
             </div>
-            <div className="profile-stat-card">
+            <div className="profile-stat-card profile-stat-card-with-trend">
+              <TrendIndicator trend={data?.stats.avg_messages_per_day_trend} />
               <div className="profile-stat-value">{data?.stats.avg_messages_per_day?.toFixed(1) || '0'}</div>
               <div className="profile-stat-label">Avg/Day</div>
             </div>
             {/* Row 2: Reactions Received | Reactions Given */}
-            <div className="profile-stat-card">
+            <div className="profile-stat-card profile-stat-card-with-trend">
+              <TrendIndicator trend={data?.stats.reactions_received_trend} />
               <div className="profile-stat-value">{data?.stats.reactions_received.toLocaleString() || 0}</div>
               <div className="profile-stat-label">Reactions Received</div>
               {data?.stats.rank_by_reactions_received && (
                 <div className="profile-rank-badge">#{data.stats.rank_by_reactions_received}</div>
               )}
             </div>
-            <div className="profile-stat-card">
+            <div className="profile-stat-card profile-stat-card-with-trend">
+              <TrendIndicator trend={data?.stats.reactions_sent_trend} />
               <div className="profile-stat-value">{data?.stats.reactions_sent.toLocaleString() || 0}</div>
               <div className="profile-stat-label">Reactions Given</div>
             </div>
             {/* Row 3: Replies Received | Replies Sent */}
-            <div className="profile-stat-card">
+            <div className="profile-stat-card profile-stat-card-with-trend">
+              <TrendIndicator trend={data?.stats.replies_received_trend} />
               <div className="profile-stat-value">{data?.stats.replies_received?.toLocaleString() || 0}</div>
               <div className="profile-stat-label">Replies Received</div>
             </div>
-            <div className="profile-stat-card">
+            <div className="profile-stat-card profile-stat-card-with-trend">
+              <TrendIndicator trend={data?.stats.replies_sent_trend} />
               <div className="profile-stat-value">{data?.stats.replies_sent?.toLocaleString() || 0}</div>
               <div className="profile-stat-label">Replies Sent</div>
             </div>
@@ -210,7 +216,8 @@ export function ProfilePage({
               <div className="profile-stat-value">{data?.stats.current_streak || 0}</div>
               <div className="profile-stat-label">Days Streak</div>
             </div>
-            <div className="profile-stat-card">
+            <div className="profile-stat-card profile-stat-card-with-trend">
+              <TrendIndicator trend={data?.stats.active_days_trend} />
               <div className="profile-stat-value">{data?.stats.active_days || 0}</div>
               <div className="profile-stat-label">Active Days</div>
             </div>

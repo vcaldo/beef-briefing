@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"beef-briefing/apps/api-service/internal/httputil"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
 
@@ -31,6 +32,9 @@ func NewMLHandler(mlService *services.MLService, cfg *config.Config) *MLHandler 
 func (h *MLHandler) HandleGetMessages(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:ml:messages")
+	}
 
 	// Parse limit from query params
 	limitStr := r.URL.Query().Get("limit")
@@ -51,9 +55,7 @@ func (h *MLHandler) HandleGetMessages(w http.ResponseWriter, r *http.Request) {
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "internal server error"})
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -64,8 +66,7 @@ func (h *MLHandler) HandleGetMessages(w http.ResponseWriter, r *http.Request) {
 
 	slog.Debug("returning unprocessed messages", "count", len(response.Messages), "has_more", response.HasMore)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	httputil.RespondJSON(w, response, http.StatusOK)
 }
 
 // HandlePostResults saves ML analysis results.
@@ -73,6 +74,9 @@ func (h *MLHandler) HandleGetMessages(w http.ResponseWriter, r *http.Request) {
 func (h *MLHandler) HandlePostResults(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:ml:results")
+	}
 
 	var req services.SaveResultsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -80,16 +84,12 @@ func (h *MLHandler) HandlePostResults(w http.ResponseWriter, r *http.Request) {
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid request body"})
+		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if len(req.Results) == 0 {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "results array is empty"})
+		httputil.RespondError(w, "results array is empty", http.StatusBadRequest)
 		return
 	}
 
@@ -109,17 +109,14 @@ func (h *MLHandler) HandlePostResults(w http.ResponseWriter, r *http.Request) {
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "internal server error"})
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	httputil.RespondJSON(w, map[string]interface{}{
 		"status": "ok",
 		"saved":  len(req.Results),
-	})
+	}, http.StatusOK)
 }
 
 // HandleGetStatus returns ML processing statistics.
@@ -127,6 +124,9 @@ func (h *MLHandler) HandlePostResults(w http.ResponseWriter, r *http.Request) {
 func (h *MLHandler) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:ml:status")
+	}
 
 	stats, err := h.mlService.GetProcessingStats(ctx)
 	if err != nil {
@@ -134,9 +134,7 @@ func (h *MLHandler) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "internal server error"})
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -146,6 +144,5 @@ func (h *MLHandler) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 		txn.AddAttribute("unprocessed", stats.Unprocessed)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	httputil.RespondJSON(w, stats, http.StatusOK)
 }

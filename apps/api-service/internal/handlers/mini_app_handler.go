@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/httputil"
 	"beef-briefing/apps/api-service/internal/middleware"
 	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/services"
@@ -43,6 +44,9 @@ type AuthRequest struct {
 func (h *MiniAppHandler) HandleAuth(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:auth")
+	}
 
 	var req AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -50,12 +54,12 @@ func (h *MiniAppHandler) HandleAuth(w http.ResponseWriter, r *http.Request) {
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, "invalid request body", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if req.InitData == "" {
-		writeError(w, "init_data is required", http.StatusBadRequest)
+		httputil.RespondError(w, "init_data is required", http.StatusBadRequest)
 		return
 	}
 
@@ -65,7 +69,7 @@ func (h *MiniAppHandler) HandleAuth(w http.ResponseWriter, r *http.Request) {
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, err.Error(), http.StatusUnauthorized)
+		httputil.RespondError(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
@@ -76,8 +80,7 @@ func (h *MiniAppHandler) HandleAuth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	httputil.RespondJSON(w, response, http.StatusOK)
 }
 
 // HandleStats handles chat overview statistics.
@@ -85,29 +88,32 @@ func (h *MiniAppHandler) HandleAuth(w http.ResponseWriter, r *http.Request) {
 func (h *MiniAppHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:stats")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
 	if claims == nil {
-		writeError(w, "unauthorized", http.StatusUnauthorized)
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Parse chat_id
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		writeError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		writeError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
 	// Verify chat access
 	if claims.ChatID != nil && *claims.ChatID != chatID {
-		writeError(w, "access denied to this chat", http.StatusForbidden)
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
 
@@ -116,7 +122,7 @@ func (h *MiniAppHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
 		period = "30d"
 	}
 
-	tz := parseTimezone(r)
+	tz := httputil.ParseTimezone(r)
 
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
@@ -130,12 +136,11 @@ func (h *MiniAppHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	httputil.RespondJSON(w, stats, http.StatusOK)
 }
 
 // HandleActivity handles daily activity timeline.
@@ -143,29 +148,32 @@ func (h *MiniAppHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
 func (h *MiniAppHandler) HandleActivity(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:activity")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
 	if claims == nil {
-		writeError(w, "unauthorized", http.StatusUnauthorized)
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Parse chat_id
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		writeError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		writeError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
 	// Verify chat access
 	if claims.ChatID != nil && *claims.ChatID != chatID {
-		writeError(w, "access denied to this chat", http.StatusForbidden)
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
 
@@ -174,7 +182,7 @@ func (h *MiniAppHandler) HandleActivity(w http.ResponseWriter, r *http.Request) 
 		period = "30d"
 	}
 
-	tz := parseTimezone(r)
+	tz := httputil.ParseTimezone(r)
 
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
@@ -188,7 +196,7 @@ func (h *MiniAppHandler) HandleActivity(w http.ResponseWriter, r *http.Request) 
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -201,8 +209,7 @@ func (h *MiniAppHandler) HandleActivity(w http.ResponseWriter, r *http.Request) 
 		"data": activity,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	httputil.RespondJSON(w, response, http.StatusOK)
 }
 
 // HandleLeaderboard handles user leaderboard.
@@ -210,29 +217,32 @@ func (h *MiniAppHandler) HandleActivity(w http.ResponseWriter, r *http.Request) 
 func (h *MiniAppHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:leaderboard")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
 	if claims == nil {
-		writeError(w, "unauthorized", http.StatusUnauthorized)
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Parse chat_id
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		writeError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		writeError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
 	// Verify chat access
 	if claims.ChatID != nil && *claims.ChatID != chatID {
-		writeError(w, "access denied to this chat", http.StatusForbidden)
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
 
@@ -258,7 +268,7 @@ func (h *MiniAppHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Reques
 		"current_streak":     true,
 	}
 	if !validMetrics[metric] {
-		writeError(w, "invalid metric. Must be one of: message_count, reactions_sent, reactions_received, replies_sent, replies_received, active_days, current_streak", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid metric. Must be one of: message_count, reactions_sent, reactions_received, replies_sent, replies_received, active_days, current_streak", http.StatusBadRequest)
 		return
 	}
 
@@ -276,7 +286,7 @@ func (h *MiniAppHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	tz := parseTimezone(r)
+	tz := httputil.ParseTimezone(r)
 
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
@@ -293,7 +303,7 @@ func (h *MiniAppHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Reques
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -304,58 +314,39 @@ func (h *MiniAppHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Reques
 		"limit": limit,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-}
-
-func writeError(w http.ResponseWriter, message string, status int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
-}
-
-// parseTimezone parses the timezone from query parameter and returns a *time.Location.
-// Falls back to UTC if not provided or invalid.
-func parseTimezone(r *http.Request) *time.Location {
-	tzStr := r.URL.Query().Get("tz")
-	if tzStr == "" {
-		return time.UTC
-	}
-	loc, err := time.LoadLocation(tzStr)
-	if err != nil {
-		slog.Warn("invalid timezone, using UTC", "timezone", tzStr, "error", err)
-		return time.UTC
-	}
-	return loc
+	httputil.RespondJSON(w, response, http.StatusOK)
 }
 
 // HandleGalleryWeeks handles GET /api/v1/mini-app/gallery/weeks?chat_id=...
 func (h *MiniAppHandler) HandleGalleryWeeks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:gallery:weeks")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
 	if claims == nil {
-		writeError(w, "unauthorized", http.StatusUnauthorized)
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Parse chat_id
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		writeError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		writeError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
 	// Verify chat access
 	if claims.ChatID != nil && *claims.ChatID != chatID {
-		writeError(w, "access denied to this chat", http.StatusForbidden)
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
 
@@ -369,41 +360,43 @@ func (h *MiniAppHandler) HandleGalleryWeeks(w http.ResponseWriter, r *http.Reque
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(weeks)
+	httputil.RespondJSON(w, weeks, http.StatusOK)
 }
 
 // HandleGalleryImages handles GET /api/v1/mini-app/gallery/images?chat_id=...&week_start=...
 func (h *MiniAppHandler) HandleGalleryImages(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:gallery:images")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
 	if claims == nil {
-		writeError(w, "unauthorized", http.StatusUnauthorized)
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Parse chat_id
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		writeError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		writeError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
 	// Verify chat access
 	if claims.ChatID != nil && *claims.ChatID != chatID {
-		writeError(w, "access denied to this chat", http.StatusForbidden)
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
 
@@ -412,7 +405,7 @@ func (h *MiniAppHandler) HandleGalleryImages(w http.ResponseWriter, r *http.Requ
 	if ws := r.URL.Query().Get("week_start"); ws != "" {
 		t, err := time.Parse("2006-01-02", ws)
 		if err != nil {
-			writeError(w, "invalid week_start format (expected YYYY-MM-DD)", http.StatusBadRequest)
+			httputil.RespondError(w, "invalid week_start format (expected YYYY-MM-DD)", http.StatusBadRequest)
 			return
 		}
 		weekStart = &t
@@ -423,7 +416,7 @@ func (h *MiniAppHandler) HandleGalleryImages(w http.ResponseWriter, r *http.Requ
 	if uid := r.URL.Query().Get("user_id"); uid != "" {
 		u, err := strconv.ParseInt(uid, 10, 64)
 		if err != nil {
-			writeError(w, "invalid user_id", http.StatusBadRequest)
+			httputil.RespondError(w, "invalid user_id", http.StatusBadRequest)
 			return
 		}
 		userID = &u
@@ -448,23 +441,25 @@ func (h *MiniAppHandler) HandleGalleryImages(w http.ResponseWriter, r *http.Requ
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(images)
+	httputil.RespondJSON(w, images, http.StatusOK)
 }
 
 // HandleGalleryImageURL handles GET /api/v1/mini-app/gallery/image/{id}?expires=...
 func (h *MiniAppHandler) HandleGalleryImageURL(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:gallery:image-url")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
 	if claims == nil {
-		writeError(w, "unauthorized", http.StatusUnauthorized)
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -472,12 +467,12 @@ func (h *MiniAppHandler) HandleGalleryImageURL(w http.ResponseWriter, r *http.Re
 	vars := mux.Vars(r)
 	imageIDStr := vars["id"]
 	if imageIDStr == "" {
-		writeError(w, "image id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "image id is required", http.StatusBadRequest)
 		return
 	}
 	imageID, err := strconv.ParseInt(imageIDStr, 10, 64)
 	if err != nil {
-		writeError(w, "invalid image id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid image id", http.StatusBadRequest)
 		return
 	}
 
@@ -497,19 +492,18 @@ func (h *MiniAppHandler) HandleGalleryImageURL(w http.ResponseWriter, r *http.Re
 	result, err := h.cardService.GetGalleryImageURL(ctx, imageID, expiresIn)
 	if err != nil {
 		if errors.Is(err, services.ErrCardImageNotFound) {
-			writeError(w, "image not found", http.StatusNotFound)
+			httputil.RespondError(w, "image not found", http.StatusNotFound)
 			return
 		}
 		slog.Error("failed to get gallery image URL", "error", err, "image_id", imageID)
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	httputil.RespondJSON(w, result, http.StatusOK)
 }
 
 // HandleReactionsOverview handles reactions overview statistics.
@@ -517,29 +511,32 @@ func (h *MiniAppHandler) HandleGalleryImageURL(w http.ResponseWriter, r *http.Re
 func (h *MiniAppHandler) HandleReactionsOverview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:reactions")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
 	if claims == nil {
-		writeError(w, "unauthorized", http.StatusUnauthorized)
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Parse chat_id
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		writeError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		writeError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
 	// Verify chat access
 	if claims.ChatID != nil && *claims.ChatID != chatID {
-		writeError(w, "access denied to this chat", http.StatusForbidden)
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
 
@@ -555,7 +552,7 @@ func (h *MiniAppHandler) HandleReactionsOverview(w http.ResponseWriter, r *http.
 		}
 	}
 
-	tz := parseTimezone(r)
+	tz := httputil.ParseTimezone(r)
 
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
@@ -570,12 +567,11 @@ func (h *MiniAppHandler) HandleReactionsOverview(w http.ResponseWriter, r *http.
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	httputil.RespondJSON(w, response, http.StatusOK)
 }
 
 // HandleRepliesOverview handles replies overview statistics.
@@ -583,29 +579,32 @@ func (h *MiniAppHandler) HandleReactionsOverview(w http.ResponseWriter, r *http.
 func (h *MiniAppHandler) HandleRepliesOverview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:replies")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
 	if claims == nil {
-		writeError(w, "unauthorized", http.StatusUnauthorized)
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Parse chat_id
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		writeError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		writeError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
 	// Verify chat access
 	if claims.ChatID != nil && *claims.ChatID != chatID {
-		writeError(w, "access denied to this chat", http.StatusForbidden)
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
 
@@ -621,7 +620,7 @@ func (h *MiniAppHandler) HandleRepliesOverview(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	tz := parseTimezone(r)
+	tz := httputil.ParseTimezone(r)
 
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
@@ -636,12 +635,11 @@ func (h *MiniAppHandler) HandleRepliesOverview(w http.ResponseWriter, r *http.Re
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	httputil.RespondJSON(w, response, http.StatusOK)
 }
 
 // ProfileResponseWithUser extends ProfileResponse with user info for impersonation
@@ -658,29 +656,32 @@ type ProfileResponseWithUser struct {
 func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:profile")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
 	if claims == nil {
-		writeError(w, "unauthorized", http.StatusUnauthorized)
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Parse chat_id
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		writeError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		writeError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
 	// Verify chat access
 	if claims.ChatID != nil && *claims.ChatID != chatID {
-		writeError(w, "access denied to this chat", http.StatusForbidden)
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
 
@@ -697,13 +698,13 @@ func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	if targetStr := r.URL.Query().Get("target_user_id"); targetStr != "" {
 		targetUserID, err := strconv.ParseInt(targetStr, 10, 64)
 		if err != nil {
-			writeError(w, "invalid target_user_id", http.StatusBadRequest)
+			httputil.RespondError(w, "invalid target_user_id", http.StatusBadRequest)
 			return
 		}
 
 		// Only admins can view other users' profiles
 		if !h.service.IsAdmin(claims.UserID) {
-			writeError(w, "only admins can view other users' profiles", http.StatusForbidden)
+			httputil.RespondError(w, "only admins can view other users' profiles", http.StatusForbidden)
 			return
 		}
 
@@ -716,7 +717,7 @@ func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tz := parseTimezone(r)
+	tz := httputil.ParseTimezone(r)
 
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
@@ -732,7 +733,7 @@ func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -748,8 +749,7 @@ func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 		response.Username = targetUserInfo.Username
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	httputil.RespondJSON(w, response, http.StatusOK)
 }
 
 // HandleHeatmap handles activity heatmap data.
@@ -757,29 +757,32 @@ func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 func (h *MiniAppHandler) HandleHeatmap(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:heatmap")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
 	if claims == nil {
-		writeError(w, "unauthorized", http.StatusUnauthorized)
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Parse chat_id
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		writeError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		writeError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
 	// Verify chat access
 	if claims.ChatID != nil && *claims.ChatID != chatID {
-		writeError(w, "access denied to this chat", http.StatusForbidden)
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
 
@@ -789,17 +792,14 @@ func (h *MiniAppHandler) HandleHeatmap(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Include user heatmap by default
-	includeUser := true
-	if iu := r.URL.Query().Get("include_user"); iu == "false" {
-		includeUser = false
-	}
+	includeUser := httputil.ParseBool(r, "include_user", true)
 
 	var userID *int64
 	if includeUser {
 		userID = &claims.UserID
 	}
 
-	tz := parseTimezone(r)
+	tz := httputil.ParseTimezone(r)
 
 	if txn != nil {
 		txn.AddAttribute("chat_id", chatID)
@@ -814,12 +814,11 @@ func (h *MiniAppHandler) HandleHeatmap(w http.ResponseWriter, r *http.Request) {
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	httputil.RespondJSON(w, response, http.StatusOK)
 }
 
 // HandleUsers handles listing all users in a chat (admin-only).
@@ -827,35 +826,38 @@ func (h *MiniAppHandler) HandleHeatmap(w http.ResponseWriter, r *http.Request) {
 func (h *MiniAppHandler) HandleUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:users")
+	}
 
 	// Get JWT claims from context
 	claims := middleware.GetClaimsFromContext(ctx)
 	if claims == nil {
-		writeError(w, "unauthorized", http.StatusUnauthorized)
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Admin-only endpoint
 	if !h.service.IsAdmin(claims.UserID) {
-		writeError(w, "admin access required", http.StatusForbidden)
+		httputil.RespondError(w, "admin access required", http.StatusForbidden)
 		return
 	}
 
 	// Parse chat_id
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		writeError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		writeError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
 	// Verify chat access
 	if claims.ChatID != nil && *claims.ChatID != chatID {
-		writeError(w, "access denied to this chat", http.StatusForbidden)
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
 
@@ -870,7 +872,7 @@ func (h *MiniAppHandler) HandleUsers(w http.ResponseWriter, r *http.Request) {
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		writeError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -879,8 +881,7 @@ func (h *MiniAppHandler) HandleUsers(w http.ResponseWriter, r *http.Request) {
 		users = []services.ChatUserWithPhoto{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	httputil.RespondJSON(w, map[string]interface{}{
 		"users": users,
-	})
+	}, http.StatusOK)
 }

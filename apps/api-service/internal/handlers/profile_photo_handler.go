@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"beef-briefing/apps/api-service/internal/httputil"
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
@@ -44,20 +45,23 @@ func NewProfilePhotoHandler(profilePhotoService *services.ProfilePhotoService, c
 func (h *ProfilePhotoHandler) HandleUserPhotos(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:photos:user-upload")
+	}
 
 	if err := r.ParseMultipartForm(h.config.MaxUploadSizeBytes()); err != nil {
 		slog.Error("failed to parse multipart form", "error", err)
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		http.Error(w, "invalid multipart request", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid multipart request", http.StatusBadRequest)
 		return
 	}
 
 	metadataJSON := r.FormValue("metadata")
 	if metadataJSON == "" {
 		slog.Error("missing metadata field in request")
-		http.Error(w, "missing metadata field", http.StatusBadRequest)
+		httputil.RespondError(w, "missing metadata field", http.StatusBadRequest)
 		return
 	}
 
@@ -67,12 +71,12 @@ func (h *ProfilePhotoHandler) HandleUserPhotos(w http.ResponseWriter, r *http.Re
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		http.Error(w, "invalid metadata JSON", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid metadata JSON", http.StatusBadRequest)
 		return
 	}
 
 	if req.UserID == 0 {
-		http.Error(w, "user_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "user_id is required", http.StatusBadRequest)
 		return
 	}
 
@@ -93,12 +97,11 @@ func (h *ProfilePhotoHandler) HandleUserPhotos(w http.ResponseWriter, r *http.Re
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	httputil.RespondOK(w)
 }
 
 // HandleChatPhotos processes chat profile photo uploads.
@@ -109,20 +112,23 @@ func (h *ProfilePhotoHandler) HandleUserPhotos(w http.ResponseWriter, r *http.Re
 func (h *ProfilePhotoHandler) HandleChatPhotos(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:photos:chat-upload")
+	}
 
 	if err := r.ParseMultipartForm(h.config.MaxUploadSizeBytes()); err != nil {
 		slog.Error("failed to parse multipart form", "error", err)
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		http.Error(w, "invalid multipart request", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid multipart request", http.StatusBadRequest)
 		return
 	}
 
 	metadataJSON := r.FormValue("metadata")
 	if metadataJSON == "" {
 		slog.Error("missing metadata field in request")
-		http.Error(w, "missing metadata field", http.StatusBadRequest)
+		httputil.RespondError(w, "missing metadata field", http.StatusBadRequest)
 		return
 	}
 
@@ -132,12 +138,12 @@ func (h *ProfilePhotoHandler) HandleChatPhotos(w http.ResponseWriter, r *http.Re
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		http.Error(w, "invalid metadata JSON", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid metadata JSON", http.StatusBadRequest)
 		return
 	}
 
 	if req.ChatID == 0 {
-		http.Error(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 
@@ -158,12 +164,11 @@ func (h *ProfilePhotoHandler) HandleChatPhotos(w http.ResponseWriter, r *http.Re
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	httputil.RespondOK(w)
 }
 
 // HandleGetUsers returns all user IDs from the database.
@@ -171,6 +176,9 @@ func (h *ProfilePhotoHandler) HandleChatPhotos(w http.ResponseWriter, r *http.Re
 func (h *ProfilePhotoHandler) HandleGetUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:users:list")
+	}
 
 	userIDs, err := h.profilePhotoService.GetAllUserIDs(ctx)
 	if err != nil {
@@ -178,7 +186,7 @@ func (h *ProfilePhotoHandler) HandleGetUsers(w http.ResponseWriter, r *http.Requ
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -186,8 +194,7 @@ func (h *ProfilePhotoHandler) HandleGetUsers(w http.ResponseWriter, r *http.Requ
 		txn.AddAttribute("users_count", len(userIDs))
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string][]int64{"user_ids": userIDs})
+	httputil.RespondJSON(w, map[string][]int64{"user_ids": userIDs}, http.StatusOK)
 }
 
 // HandleGetChats returns all chat IDs from the database.
@@ -195,6 +202,9 @@ func (h *ProfilePhotoHandler) HandleGetUsers(w http.ResponseWriter, r *http.Requ
 func (h *ProfilePhotoHandler) HandleGetChats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:chats:list")
+	}
 
 	chatIDs, err := h.profilePhotoService.GetAllChatIDs(ctx)
 	if err != nil {
@@ -202,7 +212,7 @@ func (h *ProfilePhotoHandler) HandleGetChats(w http.ResponseWriter, r *http.Requ
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -210,8 +220,7 @@ func (h *ProfilePhotoHandler) HandleGetChats(w http.ResponseWriter, r *http.Requ
 		txn.AddAttribute("chats_count", len(chatIDs))
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string][]int64{"chat_ids": chatIDs})
+	httputil.RespondJSON(w, map[string][]int64{"chat_ids": chatIDs}, http.StatusOK)
 }
 
 // extractFiles reads all uploaded files from the multipart form.
@@ -259,6 +268,9 @@ var validSizes = map[string]bool{
 func (h *ProfilePhotoHandler) HandleGetUserPhoto(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:photos:user")
+	}
 
 	// Extract user ID from path
 	vars := mux.Vars(r)
@@ -266,9 +278,7 @@ func (h *ProfilePhotoHandler) HandleGetUserPhoto(w http.ResponseWriter, r *http.
 	userID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		slog.Warn("invalid user ID", "id", idStr, "error", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid user ID"})
+		httputil.RespondError(w, "invalid user_id", http.StatusBadRequest)
 		return
 	}
 
@@ -281,9 +291,7 @@ func (h *ProfilePhotoHandler) HandleGetUserPhoto(w http.ResponseWriter, r *http.
 	// Validate size parameter
 	if !validSizes[size] {
 		slog.Warn("invalid size parameter", "size", size)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid size parameter, must be small, medium, or large"})
+		httputil.RespondError(w, "invalid size parameter, must be small, medium, or large", http.StatusBadRequest)
 		return
 	}
 
@@ -297,9 +305,7 @@ func (h *ProfilePhotoHandler) HandleGetUserPhoto(w http.ResponseWriter, r *http.
 	if err != nil {
 		if errors.Is(err, services.ErrPhotoNotFound) {
 			slog.Debug("user photo not found", "user_id", userID, "size", size)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]string{"error": "photo not found"})
+			httputil.RespondError(w, "photo not found", http.StatusNotFound)
 			return
 		}
 
@@ -307,17 +313,14 @@ func (h *ProfilePhotoHandler) HandleGetUserPhoto(w http.ResponseWriter, r *http.
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "internal server error"})
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(PhotoURLResponse{
+	httputil.RespondJSON(w, PhotoURLResponse{
 		URL:       url,
 		ExpiresIn: 3600,
-	})
+	}, http.StatusOK)
 
 	slog.Debug("served user photo URL", "user_id", userID, "size", size)
 }
@@ -327,6 +330,9 @@ func (h *ProfilePhotoHandler) HandleGetUserPhoto(w http.ResponseWriter, r *http.
 func (h *ProfilePhotoHandler) HandleGetChatPhoto(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:photos:chat")
+	}
 
 	// Extract chat ID from path
 	vars := mux.Vars(r)
@@ -334,9 +340,7 @@ func (h *ProfilePhotoHandler) HandleGetChatPhoto(w http.ResponseWriter, r *http.
 	chatID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		slog.Warn("invalid chat ID", "id", idStr, "error", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid chat ID"})
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
@@ -349,9 +353,7 @@ func (h *ProfilePhotoHandler) HandleGetChatPhoto(w http.ResponseWriter, r *http.
 	// Validate size parameter
 	if !validSizes[size] {
 		slog.Warn("invalid size parameter", "size", size)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid size parameter, must be small, medium, or large"})
+		httputil.RespondError(w, "invalid size parameter, must be small, medium, or large", http.StatusBadRequest)
 		return
 	}
 
@@ -365,9 +367,7 @@ func (h *ProfilePhotoHandler) HandleGetChatPhoto(w http.ResponseWriter, r *http.
 	if err != nil {
 		if errors.Is(err, services.ErrPhotoNotFound) {
 			slog.Debug("chat photo not found", "chat_id", chatID, "size", size)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]string{"error": "photo not found"})
+			httputil.RespondError(w, "photo not found", http.StatusNotFound)
 			return
 		}
 
@@ -375,17 +375,14 @@ func (h *ProfilePhotoHandler) HandleGetChatPhoto(w http.ResponseWriter, r *http.
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "internal server error"})
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(PhotoURLResponse{
+	httputil.RespondJSON(w, PhotoURLResponse{
 		URL:       url,
 		ExpiresIn: 3600,
-	})
+	}, http.StatusOK)
 
 	slog.Debug("served chat photo URL", "chat_id", chatID, "size", size)
 }

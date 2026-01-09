@@ -200,7 +200,7 @@ func (mc *MinIOClient) GetPresignedURL(ctx context.Context, objectKey string, ex
 
 // GetPresignedURLSeconds is a convenience wrapper that takes expiry in seconds.
 // Implements the services.MinIOClient interface.
-func (mc *MinIOClient) GetPresignedURLSeconds(objectKey string, expirySeconds int) (string, error) {
+func (mc *MinIOClient) GetPresignedURLSeconds(ctx context.Context, objectKey string, expirySeconds int) (string, error) {
 	expiry := time.Duration(expirySeconds) * time.Second
-	return mc.GetPresignedURL(context.Background(), objectKey, expiry)
+	return mc.GetPresignedURL(ctx, objectKey, expiry)
 }

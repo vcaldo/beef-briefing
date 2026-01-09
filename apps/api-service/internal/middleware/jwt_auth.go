@@ -2,17 +2,15 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/httputil"
+
 	"github.com/golang-jwt/jwt/v5"
 )
-
-// JWTContextKey is the context key for JWT claims
-const JWTContextKey contextKey = "jwtClaims"
 
 // MiniAppClaims represents the JWT claims for Mini App authentication
 type MiniAppClaims struct {
@@ -84,21 +82,21 @@ func (a *JWTAuth) Authenticate(next http.Handler) http.Handler {
 
 		if authHeader == "" {
 			slog.Warn("missing authorization header", "path", r.URL.Path, "ip", r.RemoteAddr)
-			writeJSONError(w, "missing authorization header", http.StatusUnauthorized)
+			httputil.RespondError(w, "missing authorization header", http.StatusUnauthorized)
 			return
 		}
 
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			slog.Warn("invalid authorization header format", "path", r.URL.Path)
-			writeJSONError(w, "invalid authorization header format", http.StatusUnauthorized)
+			httputil.RespondError(w, "invalid authorization header format", http.StatusUnauthorized)
 			return
 		}
 
 		claims, err := a.ValidateToken(parts[1])
 		if err != nil {
 			slog.Warn("invalid JWT token", "path", r.URL.Path, "error", err)
-			writeJSONError(w, "invalid or expired token", http.StatusUnauthorized)
+			httputil.RespondError(w, "invalid or expired token", http.StatusUnauthorized)
 			return
 		}
 
@@ -116,10 +114,4 @@ func GetClaimsFromContext(ctx context.Context) *MiniAppClaims {
 		return claims
 	}
 	return nil
-}
-
-func writeJSONError(w http.ResponseWriter, message string, status int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }

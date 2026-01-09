@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/httputil"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
 
@@ -29,20 +29,6 @@ func NewCardHandler(cardService *services.CardService, cfg *config.Config) *Card
 	}
 }
 
-// respondJSON writes a JSON response.
-func (h *CardHandler) respondJSON(w http.ResponseWriter, data interface{}, status int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
-
-// respondError writes a JSON error response.
-func (h *CardHandler) respondError(w http.ResponseWriter, message string, status int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
-}
-
 // HandleGetUserCard handles GET /api/v1/cards/{user_id}
 func (h *CardHandler) HandleGetUserCard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -53,19 +39,19 @@ func (h *CardHandler) HandleGetUserCard(w http.ResponseWriter, r *http.Request) 
 	userIDStr := vars["user_id"]
 	userID, err := strconv.ParseInt(userIDStr, 10, 64)
 	if err != nil {
-		h.respondError(w, "invalid user_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid user_id", http.StatusBadRequest)
 		return
 	}
 
 	// Extract required chat_id query parameter
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		h.respondError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		h.respondError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
@@ -75,7 +61,7 @@ func (h *CardHandler) HandleGetUserCard(w http.ResponseWriter, r *http.Request) 
 	if weekStr != "" {
 		parsed, err := time.Parse("2006-01-02", weekStr)
 		if err != nil {
-			h.respondError(w, "invalid week format (use YYYY-MM-DD)", http.StatusBadRequest)
+			httputil.RespondError(w, "invalid week format (use YYYY-MM-DD)", http.StatusBadRequest)
 			return
 		}
 		weekStart = &parsed
@@ -90,14 +76,14 @@ func (h *CardHandler) HandleGetUserCard(w http.ResponseWriter, r *http.Request) 
 	card, user, err := h.cardService.GetUserCard(ctx, userID, chatID, weekStart)
 	if err != nil {
 		if errors.Is(err, services.ErrCardNotFound) {
-			h.respondError(w, "card not found", http.StatusNotFound)
+			httputil.RespondError(w, "card not found", http.StatusNotFound)
 			return
 		}
 		slog.Error("failed to get user card", "user_id", userID, "chat_id", chatID, "error", err)
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		h.respondError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -106,7 +92,7 @@ func (h *CardHandler) HandleGetUserCard(w http.ResponseWriter, r *http.Request) 
 		"user": user,
 	}
 
-	h.respondJSON(w, response, http.StatusOK)
+	httputil.RespondJSON(w, response, http.StatusOK)
 }
 
 // HandleGetChatCards handles GET /api/v1/cards
@@ -117,12 +103,12 @@ func (h *CardHandler) HandleGetChatCards(w http.ResponseWriter, r *http.Request)
 	// Parse required chat_id query parameter
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		h.respondError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		h.respondError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
@@ -131,7 +117,7 @@ func (h *CardHandler) HandleGetChatCards(w http.ResponseWriter, r *http.Request)
 	if weekStr := r.URL.Query().Get("week"); weekStr != "" {
 		parsed, err := time.Parse("2006-01-02", weekStr)
 		if err != nil {
-			h.respondError(w, "invalid week format (use YYYY-MM-DD)", http.StatusBadRequest)
+			httputil.RespondError(w, "invalid week format (use YYYY-MM-DD)", http.StatusBadRequest)
 			return
 		}
 		weekStart = &parsed
@@ -182,11 +168,11 @@ func (h *CardHandler) HandleGetChatCards(w http.ResponseWriter, r *http.Request)
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		h.respondError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	h.respondJSON(w, result, http.StatusOK)
+	httputil.RespondJSON(w, result, http.StatusOK)
 }
 
 // HandleGetUserHistory handles GET /api/v1/cards/{user_id}/history
@@ -199,19 +185,19 @@ func (h *CardHandler) HandleGetUserHistory(w http.ResponseWriter, r *http.Reques
 	userIDStr := vars["user_id"]
 	userID, err := strconv.ParseInt(userIDStr, 10, 64)
 	if err != nil {
-		h.respondError(w, "invalid user_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid user_id", http.StatusBadRequest)
 		return
 	}
 
 	// Required chat_id query parameter
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		h.respondError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		h.respondError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
@@ -235,11 +221,11 @@ func (h *CardHandler) HandleGetUserHistory(w http.ResponseWriter, r *http.Reques
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		h.respondError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	h.respondJSON(w, result, http.StatusOK)
+	httputil.RespondJSON(w, result, http.StatusOK)
 }
 
 // HandleGetAvailableWeeks handles GET /api/v1/cards/weeks
@@ -250,12 +236,12 @@ func (h *CardHandler) HandleGetAvailableWeeks(w http.ResponseWriter, r *http.Req
 	// Required chat_id query parameter
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		h.respondError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		h.respondError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
@@ -269,11 +255,11 @@ func (h *CardHandler) HandleGetAvailableWeeks(w http.ResponseWriter, r *http.Req
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		h.respondError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	h.respondJSON(w, weeks, http.StatusOK)
+	httputil.RespondJSON(w, weeks, http.StatusOK)
 }
 
 // HandleGetCardImage handles GET /api/v1/cards/{user_id}/image
@@ -286,19 +272,19 @@ func (h *CardHandler) HandleGetCardImage(w http.ResponseWriter, r *http.Request)
 	userIDStr := vars["user_id"]
 	userID, err := strconv.ParseInt(userIDStr, 10, 64)
 	if err != nil {
-		h.respondError(w, "invalid user_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid user_id", http.StatusBadRequest)
 		return
 	}
 
 	// Required chat_id query parameter
 	chatIDStr := r.URL.Query().Get("chat_id")
 	if chatIDStr == "" {
-		h.respondError(w, "chat_id is required", http.StatusBadRequest)
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
 		return
 	}
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
-		h.respondError(w, "invalid chat_id", http.StatusBadRequest)
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
 		return
 	}
 
@@ -307,7 +293,7 @@ func (h *CardHandler) HandleGetCardImage(w http.ResponseWriter, r *http.Request)
 	if weekStr := r.URL.Query().Get("week"); weekStr != "" {
 		parsed, err := time.Parse("2006-01-02", weekStr)
 		if err != nil {
-			h.respondError(w, "invalid week format (use YYYY-MM-DD)", http.StatusBadRequest)
+			httputil.RespondError(w, "invalid week format (use YYYY-MM-DD)", http.StatusBadRequest)
 			return
 		}
 		weekStart = &parsed
@@ -337,16 +323,16 @@ func (h *CardHandler) HandleGetCardImage(w http.ResponseWriter, r *http.Request)
 	result, err := h.cardService.GetCardImageURL(ctx, userID, chatID, weekStart, theme, expirySeconds)
 	if err != nil {
 		if errors.Is(err, services.ErrCardImageNotFound) {
-			h.respondError(w, "card image not found", http.StatusNotFound)
+			httputil.RespondError(w, "card image not found", http.StatusNotFound)
 			return
 		}
 		slog.Error("failed to get card image", "user_id", userID, "chat_id", chatID, "error", err)
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		h.respondError(w, "internal server error", http.StatusInternalServerError)
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	h.respondJSON(w, result, http.StatusOK)
+	httputil.RespondJSON(w, result, http.StatusOK)
 }

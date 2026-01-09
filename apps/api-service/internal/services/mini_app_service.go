@@ -569,14 +569,14 @@ func (s *MiniAppService) GetRepliesOverview(ctx context.Context, chatID int64, p
 
 // ProfileResponse represents user profile data
 type ProfileResponse struct {
-	PhotoURL      *string                    `json:"photo_url,omitempty"`
-	Stats         *repository.ProfileStats   `json:"stats"`
-	TopReactors   []TopInteractorWithPhoto   `json:"top_reactors"`
-	TopReactedTo  []TopInteractorWithPhoto   `json:"top_reacted_to"`
-	TopRepliers   []TopInteractorWithPhoto   `json:"top_repliers"`
-	TopRepliedTo  []TopInteractorWithPhoto   `json:"top_replied_to"`
-	Heatmap       *repository.HeatmapData    `json:"heatmap"`
-	Activity      []repository.DailyActivity `json:"activity,omitempty"`
+	PhotoURL     *string                    `json:"photo_url,omitempty"`
+	Stats        *repository.ProfileStats   `json:"stats"`
+	TopReactors  []TopInteractorWithPhoto   `json:"top_reactors"`
+	TopReactedTo []TopInteractorWithPhoto   `json:"top_reacted_to"`
+	TopRepliers  []TopInteractorWithPhoto   `json:"top_repliers"`
+	TopRepliedTo []TopInteractorWithPhoto   `json:"top_replied_to"`
+	Heatmap      *repository.HeatmapData    `json:"heatmap"`
+	Activity     []repository.DailyActivity `json:"activity,omitempty"`
 }
 
 // GetUserProfile returns personal stats and top interactors for a user

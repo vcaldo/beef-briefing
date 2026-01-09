@@ -6,14 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-)
 
-// contextKey is a custom type for context keys to avoid collisions
-type contextKey string
-
-const (
-	// AppNameContextKey is the context key for the authenticated app name
-	AppNameContextKey contextKey = "appName"
+	"beef-briefing/apps/api-service/internal/httputil"
 )
 
 // MultiAPIKeyAuth validates API keys from multiple authorized applications
@@ -36,16 +30,14 @@ func (a *MultiAPIKeyAuth) Authenticate(next http.Handler) http.Handler {
 		// Expected format: "Bearer <api-key>"
 		if authHeader == "" {
 			slog.Warn("missing authorization header", "path", r.URL.Path, "ip", r.RemoteAddr)
-			w.Header().Set("Content-Type", "application/json")
-			http.Error(w, `{"error": "missing authorization header"}`, http.StatusUnauthorized)
+			httputil.RespondError(w, "missing authorization header", http.StatusUnauthorized)
 			return
 		}
 
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			slog.Warn("invalid authorization header format", "path", r.URL.Path)
-			w.Header().Set("Content-Type", "application/json")
-			http.Error(w, `{"error": "invalid authorization header format"}`, http.StatusUnauthorized)
+			httputil.RespondError(w, "invalid authorization header format", http.StatusUnauthorized)
 			return
 		}
 
@@ -62,8 +54,7 @@ func (a *MultiAPIKeyAuth) Authenticate(next http.Handler) http.Handler {
 
 		if authenticatedApp == "" {
 			slog.Warn("invalid API key", "path", r.URL.Path, "ip", r.RemoteAddr)
-			w.Header().Set("Content-Type", "application/json")
-			http.Error(w, `{"error": "invalid API key"}`, http.StatusUnauthorized)
+			httputil.RespondError(w, "invalid api key", http.StatusUnauthorized)
 			return
 		}
 

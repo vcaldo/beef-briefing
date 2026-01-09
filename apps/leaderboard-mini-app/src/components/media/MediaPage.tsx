@@ -174,7 +174,7 @@ function MediaStats({ stats, loading, error }: {
   if (loading) {
     return (
       <div className="stats-grid">
-        {[1, 2, 3, 4].map((i) => (
+        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
           <div key={i} className="stat-card skeleton skeleton-stat" />
         ))}
       </div>
@@ -192,13 +192,35 @@ function MediaStats({ stats, loading, error }: {
         <div className="stat-value">{stats.total_media.toLocaleString()}</div>
         <div className="stat-label">Total Media</div>
       </div>
-      <div className="stat-card">
+      <div className="stat-card stat-card-with-trend">
+        <TrendIndicator trend={stats.total_photos_trend} />
         <div className="stat-value">{stats.total_photos.toLocaleString()}</div>
         <div className="stat-label">Photos</div>
       </div>
-      <div className="stat-card">
+      <div className="stat-card stat-card-with-trend">
+        <TrendIndicator trend={stats.total_videos_trend} />
         <div className="stat-value">{stats.total_videos.toLocaleString()}</div>
         <div className="stat-label">Videos</div>
+      </div>
+      <div className="stat-card stat-card-with-trend">
+        <TrendIndicator trend={stats.total_gifs_trend} />
+        <div className="stat-value">{stats.total_gifs.toLocaleString()}</div>
+        <div className="stat-label">GIFs</div>
+      </div>
+      <div className="stat-card stat-card-with-trend">
+        <TrendIndicator trend={stats.total_voice_trend} />
+        <div className="stat-value">{stats.total_voice.toLocaleString()}</div>
+        <div className="stat-label">Voice</div>
+      </div>
+      <div className="stat-card stat-card-with-trend">
+        <TrendIndicator trend={stats.total_documents_trend} />
+        <div className="stat-value">{stats.total_documents.toLocaleString()}</div>
+        <div className="stat-label">Documents</div>
+      </div>
+      <div className="stat-card stat-card-with-trend">
+        <TrendIndicator trend={stats.total_stickers_trend} />
+        <div className="stat-value">{stats.total_stickers.toLocaleString()}</div>
+        <div className="stat-label">Stickers</div>
       </div>
       <div className="stat-card stat-card-with-trend">
         <TrendIndicator trend={stats.media_per_day_trend} />

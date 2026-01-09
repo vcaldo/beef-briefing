@@ -220,10 +220,21 @@ export interface MediaOverviewStats {
   total_media: number
   total_photos: number
   total_videos: number
+  total_gifs: number
+  total_voice: number
+  total_documents: number
+  total_stickers: number
   total_other: number
   total_size: number
   media_per_day: number
+  // Trends (percentage change from previous period)
   total_media_trend?: number | null
+  total_photos_trend?: number | null
+  total_videos_trend?: number | null
+  total_gifs_trend?: number | null
+  total_voice_trend?: number | null
+  total_documents_trend?: number | null
+  total_stickers_trend?: number | null
   media_per_day_trend?: number | null
 }
 

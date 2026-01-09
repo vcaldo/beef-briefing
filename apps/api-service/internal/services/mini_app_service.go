@@ -426,18 +426,28 @@ func getPreviousPeriodDates(period string, tz *time.Location) (*time.Time, *time
 }
 
 // calculateTrend calculates percentage change between current and previous values
-// Returns nil if previous is 0 (division by zero)
+// Returns nil if both are 0, returns 100 if previous is 0 but current > 0 (new items)
 func calculateTrend(current, previous int64) *float64 {
 	if previous == 0 {
-		return nil
+		if current > 0 {
+			// New items appeared - show as 100% growth
+			trend := float64(100)
+			return &trend
+		}
+		return nil // Both are 0
 	}
 	trend := float64(current-previous) / float64(previous) * 100
 	return &trend
 }
 
 // calculateTrendFloat64 calculates percentage change for float64 values
+// Returns nil if both are 0, returns 100 if previous is 0 but current > 0
 func calculateTrendFloat64(current, previous float64) *float64 {
 	if previous == 0 {
+		if current > 0 {
+			trend := float64(100)
+			return &trend
+		}
 		return nil
 	}
 	trend := (current - previous) / previous * 100
@@ -890,6 +900,12 @@ func (s *MiniAppService) GetMediaOverview(ctx context.Context, chatID int64, per
 			slog.Warn("failed to get previous period media stats for trends", "chat_id", chatID, "error", err)
 		} else if prevStats != nil {
 			stats.TotalMediaTrend = calculateTrend(stats.TotalMedia, prevStats.TotalMedia)
+			stats.TotalPhotosTrend = calculateTrend(stats.TotalPhotos, prevStats.TotalPhotos)
+			stats.TotalVideosTrend = calculateTrend(stats.TotalVideos, prevStats.TotalVideos)
+			stats.TotalGifsTrend = calculateTrend(stats.TotalGifs, prevStats.TotalGifs)
+			stats.TotalVoiceTrend = calculateTrend(stats.TotalVoice, prevStats.TotalVoice)
+			stats.TotalDocumentsTrend = calculateTrend(stats.TotalDocuments, prevStats.TotalDocuments)
+			stats.TotalStickersTrend = calculateTrend(stats.TotalStickers, prevStats.TotalStickers)
 			stats.MediaPerDayTrend = calculateTrendFloat64(stats.MediaPerDay, prevStats.MediaPerDay)
 		}
 	}

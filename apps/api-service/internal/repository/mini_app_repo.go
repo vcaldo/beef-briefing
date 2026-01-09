@@ -1935,14 +1935,25 @@ func (r *MiniAppRepository) GetUserInfo(ctx context.Context, userID int64) (*Cha
 
 // MediaOverviewStats represents aggregate media statistics for a chat.
 type MediaOverviewStats struct {
-	TotalMedia       int64   `json:"total_media"`
-	TotalPhotos      int64   `json:"total_photos"`
-	TotalVideos      int64   `json:"total_videos"`
-	TotalOther       int64   `json:"total_other"`
-	TotalSize        int64   `json:"total_size"`
-	MediaPerDay      float64 `json:"media_per_day"`
-	TotalMediaTrend  *float64 `json:"total_media_trend,omitempty"`
-	MediaPerDayTrend *float64 `json:"media_per_day_trend,omitempty"`
+	TotalMedia     int64   `json:"total_media"`
+	TotalPhotos    int64   `json:"total_photos"`
+	TotalVideos    int64   `json:"total_videos"`
+	TotalGifs      int64   `json:"total_gifs"`
+	TotalVoice     int64   `json:"total_voice"`
+	TotalDocuments int64   `json:"total_documents"`
+	TotalStickers  int64   `json:"total_stickers"`
+	TotalOther     int64   `json:"total_other"`
+	TotalSize      int64   `json:"total_size"`
+	MediaPerDay    float64 `json:"media_per_day"`
+	// Trends (percentage change from previous period)
+	TotalMediaTrend     *float64 `json:"total_media_trend,omitempty"`
+	TotalPhotosTrend    *float64 `json:"total_photos_trend,omitempty"`
+	TotalVideosTrend    *float64 `json:"total_videos_trend,omitempty"`
+	TotalGifsTrend      *float64 `json:"total_gifs_trend,omitempty"`
+	TotalVoiceTrend     *float64 `json:"total_voice_trend,omitempty"`
+	TotalDocumentsTrend *float64 `json:"total_documents_trend,omitempty"`
+	TotalStickersTrend  *float64 `json:"total_stickers_trend,omitempty"`
+	MediaPerDayTrend    *float64 `json:"media_per_day_trend,omitempty"`
 }
 
 // MediaTypeDistribution represents a media type and its count.
@@ -1986,16 +1997,23 @@ func (r *MiniAppRepository) GetMediaOverviewStats(ctx context.Context, chatID in
 				COALESCE(SUM(count), 0) as total_media,
 				COALESCE(SUM(CASE WHEN media_type = 'photo' THEN count ELSE 0 END), 0) as total_photos,
 				COALESCE(SUM(CASE WHEN media_type IN ('video', 'video_note') THEN count ELSE 0 END), 0) as total_videos,
+				COALESCE(SUM(CASE WHEN media_type = 'animation' THEN count ELSE 0 END), 0) as total_gifs,
+				COALESCE(SUM(CASE WHEN media_type = 'voice' THEN count ELSE 0 END), 0) as total_voice,
+				COALESCE(SUM(CASE WHEN media_type = 'document' THEN count ELSE 0 END), 0) as total_documents,
+				COALESCE(SUM(CASE WHEN media_type = 'sticker' THEN count ELSE 0 END), 0) as total_stickers,
 				COALESCE(SUM(total_size), 0) as total_size
 			FROM mv_media_distribution
 			WHERE chat_id = $1
-		`, chatID).Scan(&stats.TotalMedia, &stats.TotalPhotos, &stats.TotalVideos, &stats.TotalSize)
+		`, chatID).Scan(&stats.TotalMedia, &stats.TotalPhotos, &stats.TotalVideos,
+			&stats.TotalGifs, &stats.TotalVoice, &stats.TotalDocuments, &stats.TotalStickers,
+			&stats.TotalSize)
 		if err != nil {
 			return nil, err
 		}
 
-		// Calculate other (total - photos - videos)
-		stats.TotalOther = stats.TotalMedia - stats.TotalPhotos - stats.TotalVideos
+		// Calculate other (total - known types)
+		stats.TotalOther = stats.TotalMedia - stats.TotalPhotos - stats.TotalVideos -
+			stats.TotalGifs - stats.TotalVoice - stats.TotalDocuments - stats.TotalStickers
 
 		// Calculate media per day using active days
 		var activeDays int64
@@ -2042,14 +2060,21 @@ func (r *MiniAppRepository) GetMediaOverviewStats(ctx context.Context, chatID in
 				COALESCE(SUM(count), 0) as total_media,
 				COALESCE(SUM(CASE WHEN media_type = 'photo' THEN count ELSE 0 END), 0) as total_photos,
 				COALESCE(SUM(CASE WHEN media_type IN ('video', 'video_note') THEN count ELSE 0 END), 0) as total_videos,
+				COALESCE(SUM(CASE WHEN media_type = 'animation' THEN count ELSE 0 END), 0) as total_gifs,
+				COALESCE(SUM(CASE WHEN media_type = 'voice' THEN count ELSE 0 END), 0) as total_voice,
+				COALESCE(SUM(CASE WHEN media_type = 'document' THEN count ELSE 0 END), 0) as total_documents,
+				COALESCE(SUM(CASE WHEN media_type = 'sticker' THEN count ELSE 0 END), 0) as total_stickers,
 				COALESCE(SUM(total_size), 0) as total_size
 			FROM media_stats
-		`, chatID, startDate, endDate).Scan(&stats.TotalMedia, &stats.TotalPhotos, &stats.TotalVideos, &stats.TotalSize)
+		`, chatID, startDate, endDate).Scan(&stats.TotalMedia, &stats.TotalPhotos, &stats.TotalVideos,
+			&stats.TotalGifs, &stats.TotalVoice, &stats.TotalDocuments, &stats.TotalStickers,
+			&stats.TotalSize)
 		if err != nil {
 			return nil, err
 		}
 
-		stats.TotalOther = stats.TotalMedia - stats.TotalPhotos - stats.TotalVideos
+		stats.TotalOther = stats.TotalMedia - stats.TotalPhotos - stats.TotalVideos -
+			stats.TotalGifs - stats.TotalVoice - stats.TotalDocuments - stats.TotalStickers
 
 		// Calculate media per day
 		if startDate != nil && endDate != nil {

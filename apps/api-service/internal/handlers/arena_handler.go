@@ -111,6 +111,10 @@ func (h *ArenaHandler) HandleListMatches(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+	}
+
 	matches, err := h.service.GetActiveMatches(ctx, chatID)
 	if err != nil {
 		slog.Error("failed to list matches", "error", err)
@@ -206,6 +210,11 @@ func (h *ArenaHandler) HandleGetMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", claims.UserID)
+	}
+
 	match, err := h.service.GetMatch(ctx, matchID)
 	if err != nil {
 		slog.Error("failed to get match", "error", err)
@@ -247,6 +256,11 @@ func (h *ArenaHandler) HandleJoinMatch(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	matchID := vars["id"]
 
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", claims.UserID)
+	}
+
 	match, err := h.service.JoinMatch(ctx, matchID, claims.UserID)
 	if err != nil {
 		slog.Error("failed to join match", "error", err)
@@ -285,6 +299,11 @@ func (h *ArenaHandler) HandleLeaveMatch(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	matchID := vars["id"]
 
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", claims.UserID)
+	}
+
 	err := h.service.LeaveMatch(ctx, matchID, claims.UserID)
 	if err != nil {
 		slog.Error("failed to leave match", "error", err)
@@ -322,6 +341,11 @@ func (h *ArenaHandler) HandleStartMatch(w http.ResponseWriter, r *http.Request) 
 
 	vars := mux.Vars(r)
 	matchID := vars["id"]
+
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", claims.UserID)
+	}
 
 	match, err := h.service.StartMatch(ctx, matchID, claims.UserID)
 	if err != nil {
@@ -362,6 +386,11 @@ func (h *ArenaHandler) HandleGetShop(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	matchID := vars["id"]
+
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", claims.UserID)
+	}
 
 	shop, err := h.service.GetShop(ctx, matchID, claims.UserID)
 	if err != nil {
@@ -407,6 +436,12 @@ func (h *ArenaHandler) HandleBuyCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", claims.UserID)
+		txn.AddAttribute("card_index", req.CardIndex)
+	}
+
 	shopState, err := h.service.BuyCard(ctx, matchID, claims.UserID, req.CardIndex)
 	if err != nil {
 		slog.Error("failed to buy card", "error", err)
@@ -448,6 +483,11 @@ func (h *ArenaHandler) HandleReroll(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	matchID := vars["id"]
+
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", claims.UserID)
+	}
 
 	shopState, err := h.service.Reroll(ctx, matchID, claims.UserID)
 	if err != nil {
@@ -493,6 +533,13 @@ func (h *ArenaHandler) HandleUpgrade(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", claims.UserID)
+		txn.AddAttribute("team_slot", req.TeamSlot)
+		txn.AddAttribute("upgrade_type", req.UpgradeType)
 	}
 
 	upgradeType := shop.UpgradeATK
@@ -546,6 +593,11 @@ func (h *ArenaHandler) HandleSetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", claims.UserID)
+	}
+
 	shopState, err := h.service.SetTeamOrder(ctx, matchID, claims.UserID, req.Order)
 	if err != nil {
 		slog.Error("failed to set order", "error", err)
@@ -576,6 +628,11 @@ func (h *ArenaHandler) HandleSubmitTeam(w http.ResponseWriter, r *http.Request) 
 
 	vars := mux.Vars(r)
 	matchID := vars["id"]
+
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", claims.UserID)
+	}
 
 	shopState, err := h.service.SubmitTeam(ctx, matchID, claims.UserID)
 	if err != nil {
@@ -616,6 +673,11 @@ func (h *ArenaHandler) HandleGetBattle(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	matchID := vars["id"]
+
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", claims.UserID)
+	}
 
 	battle, err := h.service.GetBattle(ctx, matchID, claims.UserID)
 	if err != nil {
@@ -660,6 +722,12 @@ func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Reque
 	limit := httputil.ParseIntWithDefault(r, "limit", 50, 1, 100)
 	offset := httputil.ParseIntWithDefault(r, "offset", 0, 0, 10000)
 
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("match_type", matchType)
+		txn.AddAttribute("limit", limit)
+	}
+
 	entries, err := h.service.GetLeaderboard(ctx, chatID, matchType, limit, offset)
 	if err != nil {
 		slog.Error("failed to get leaderboard", "error", err)
@@ -693,6 +761,12 @@ func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) 
 
 	limit := httputil.ParseIntWithDefault(r, "limit", 20, 1, 50)
 	offset := httputil.ParseIntWithDefault(r, "offset", 0, 0, 10000)
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("user_id", claims.UserID)
+		txn.AddAttribute("limit", limit)
+	}
 
 	entries, total, err := h.service.GetMatchHistory(ctx, chatID, claims.UserID, limit, offset)
 	if err != nil {
@@ -761,6 +835,12 @@ func (h *ArenaHandler) HandleGetH2H(w http.ResponseWriter, r *http.Request) {
 	if err != nil || opponentID == 0 {
 		httputil.RespondError(w, "opponent_id is required", http.StatusBadRequest)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("user_id", claims.UserID)
+		txn.AddAttribute("opponent_id", opponentID)
 	}
 
 	record, err := h.service.GetH2HRecord(ctx, chatID, claims.UserID, opponentID)
@@ -863,6 +943,11 @@ func (h *ArenaHandler) HandleShareResult(w http.ResponseWriter, r *http.Request)
 	if matchID == "" {
 		httputil.RespondError(w, "match id is required", http.StatusBadRequest)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", claims.UserID)
 	}
 
 	// Get the match to verify access and status
@@ -976,6 +1061,10 @@ func (h *ArenaHandler) HandleBotGetMatch(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+	}
+
 	match, err := h.service.GetMatch(ctx, matchID)
 	if err != nil {
 		slog.Error("failed to get match", "error", err)
@@ -1014,6 +1103,11 @@ func (h *ArenaHandler) HandleBotJoinMatch(w http.ResponseWriter, r *http.Request
 	if req.UserID == 0 {
 		httputil.RespondError(w, "user_id is required", http.StatusBadRequest)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", req.UserID)
 	}
 
 	match, err := h.service.JoinMatch(ctx, matchID, req.UserID)
@@ -1061,6 +1155,11 @@ func (h *ArenaHandler) HandleBotLeaveMatch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", req.UserID)
+	}
+
 	err := h.service.LeaveMatch(ctx, matchID, req.UserID)
 	if err != nil {
 		slog.Error("failed to leave match", "error", err, "user_id", req.UserID)
@@ -1102,6 +1201,11 @@ func (h *ArenaHandler) HandleBotStartMatch(w http.ResponseWriter, r *http.Reques
 	if req.UserID == 0 {
 		httputil.RespondError(w, "user_id is required", http.StatusBadRequest)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+		txn.AddAttribute("user_id", req.UserID)
 	}
 
 	match, err := h.service.StartMatch(ctx, matchID, req.UserID)
@@ -1162,6 +1266,10 @@ func (h *ArenaHandler) HandleBotAutoStartMatch(w http.ResponseWriter, r *http.Re
 	vars := mux.Vars(r)
 	matchID := vars["id"]
 
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+	}
+
 	result, err := h.service.AutoStartMatch(ctx, matchID)
 	if err != nil {
 		slog.Error("failed to auto-start match", "error", err, "match_id", matchID)
@@ -1193,6 +1301,10 @@ func (h *ArenaHandler) HandleBotForceSubmitTeams(w http.ResponseWriter, r *http.
 
 	vars := mux.Vars(r)
 	matchID := vars["id"]
+
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+	}
 
 	result, err := h.service.ForceSubmitTeams(ctx, matchID)
 	if err != nil {
@@ -1631,6 +1743,10 @@ func (h *ArenaHandler) HandleBotGetShareData(w http.ResponseWriter, r *http.Requ
 	if matchID == "" {
 		httputil.RespondError(w, "match id is required", http.StatusBadRequest)
 		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
 	}
 
 	// Get match details

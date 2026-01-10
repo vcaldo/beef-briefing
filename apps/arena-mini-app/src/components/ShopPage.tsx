@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { apiClient } from '../api/client';
+import { addPageAction, noticeError } from '../newrelic';
 import { useAudio } from '../hooks/useAudio';
 import type { Match, ShopState, ShopCard, GameCard } from '../types';
 import './ShopPage.css';
@@ -87,8 +88,17 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
     try {
       const state = await apiClient.buyCard(match.id, cardIndex);
       setShopState(state);
+      addPageAction('card_purchased', {
+        match_id: match.id,
+        card_index: cardIndex,
+        coins_remaining: state.coins,
+        team_size: state.team.length,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to buy card');
+      if (err instanceof Error) {
+        noticeError(err, { context: 'buy_card', match_id: match.id, card_index: cardIndex });
+      }
     }
   };
 
@@ -98,8 +108,15 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
     try {
       const state = await apiClient.reroll(match.id);
       setShopState(state);
+      addPageAction('shop_rerolled', {
+        match_id: match.id,
+        coins_remaining: state.coins,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reroll');
+      if (err instanceof Error) {
+        noticeError(err, { context: 'reroll', match_id: match.id });
+      }
     }
   };
 
@@ -109,8 +126,17 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
     try {
       const state = await apiClient.upgradeCard(match.id, teamSlot, upgradeType);
       setShopState(state);
+      addPageAction('card_upgraded', {
+        match_id: match.id,
+        team_slot: teamSlot,
+        upgrade_type: upgradeType,
+        coins_remaining: state.coins,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upgrade');
+      if (err instanceof Error) {
+        noticeError(err, { context: 'upgrade', match_id: match.id, team_slot: teamSlot, upgrade_type: upgradeType });
+      }
     }
   };
 
@@ -120,8 +146,16 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
     try {
       const state = await apiClient.submitTeam(match.id);
       setShopState(state);
+      addPageAction('team_submitted', {
+        match_id: match.id,
+        team_size: state.team.length,
+        coins_remaining: state.coins,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit team');
+      if (err instanceof Error) {
+        noticeError(err, { context: 'submit_team', match_id: match.id });
+      }
     }
   };
 
@@ -155,10 +189,16 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
       const newOrder = newTeam.map(c => c.card_id);
       const state = await apiClient.setTeamOrder(match.id, newOrder);
       setShopState(state);
+      addPageAction('team_reordered', {
+        match_id: match.id,
+      });
     } catch (err) {
       // Revert on error
       setShopState(shopState);
       setError(err instanceof Error ? err.message : 'Failed to reorder team');
+      if (err instanceof Error) {
+        noticeError(err, { context: 'reorder_team', match_id: match.id });
+      }
     }
   };
 

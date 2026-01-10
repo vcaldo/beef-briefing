@@ -1,3 +1,6 @@
+// Initialize New Relic Browser monitoring FIRST (must be early, before React)
+import './newrelic'
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import {

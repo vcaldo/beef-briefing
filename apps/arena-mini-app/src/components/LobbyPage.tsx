@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
+import { addPageAction, noticeError } from '../newrelic';
 import type { Match } from '../types';
 import './LobbyPage.css';
 
@@ -40,9 +41,18 @@ export function LobbyPage({ userId, firstName, onMatchSelect }: LobbyPageProps) 
     try {
       const match = await apiClient.createMatch();
       setMatches(prev => [match, ...prev]);
+      addPageAction('match_created', {
+        match_id: match.id,
+      });
       onMatchSelect(match);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create match');
+      if (err instanceof Error) {
+        noticeError(err, { context: 'create_match' });
+      }
+      addPageAction('match_create_error', {
+        error: err instanceof Error ? err.message : 'unknown',
+      });
     } finally {
       setCreating(false);
     }
@@ -53,9 +63,19 @@ export function LobbyPage({ userId, firstName, onMatchSelect }: LobbyPageProps) 
     setError(null);
     try {
       const match = await apiClient.joinMatch(matchId);
+      addPageAction('match_joined', {
+        match_id: matchId,
+      });
       onMatchSelect(match);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join match');
+      if (err instanceof Error) {
+        noticeError(err, { context: 'join_match', match_id: matchId });
+      }
+      addPageAction('match_join_error', {
+        match_id: matchId,
+        error: err instanceof Error ? err.message : 'unknown',
+      });
     }
   };
 
@@ -64,9 +84,20 @@ export function LobbyPage({ userId, firstName, onMatchSelect }: LobbyPageProps) 
     setError(null);
     try {
       const match = await apiClient.startMatch(matchId);
+      addPageAction('match_started', {
+        match_id: matchId,
+        participant_count: match.participants.length,
+      });
       onMatchSelect(match);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start match');
+      if (err instanceof Error) {
+        noticeError(err, { context: 'start_match', match_id: matchId });
+      }
+      addPageAction('match_start_error', {
+        match_id: matchId,
+        error: err instanceof Error ? err.message : 'unknown',
+      });
     }
   };
 

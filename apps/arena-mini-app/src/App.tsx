@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLaunchParams } from '@telegram-apps/sdk-react';
 import { apiClient } from './api/client';
+import { setCustomAttribute, addPageAction, noticeError } from './newrelic';
 import type { AppState, AppPage, Match } from './types';
 import { LobbyPage } from './components/LobbyPage';
 import { ShopPage } from './components/ShopPage';
@@ -32,6 +33,16 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Set timezone attribute on mount
+  useEffect(() => {
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setCustomAttribute('timezone', timezone);
+    } catch {
+      setCustomAttribute('timezone', 'unknown');
+    }
+  }, []);
+
   // Authenticate on mount
   useEffect(() => {
     async function authenticate() {
@@ -40,6 +51,7 @@ function App() {
         if (!initDataRaw) {
           setError('This app must be opened from Telegram');
           setAppState('error');
+          addPageAction('auth_failed', { reason: 'no_init_data' });
           return;
         }
 
@@ -47,10 +59,31 @@ function App() {
         setUserId(auth.user_id);
         setFirstName(auth.first_name);
         setAppState('authenticated');
+
+        // Set New Relic custom attributes for this session
+        setCustomAttribute('user_id', auth.user_id);
+        if (auth.chat_id) {
+          setCustomAttribute('chat_id', auth.chat_id);
+        }
+        setCustomAttribute('username', auth.username || '');
+        setCustomAttribute('first_name', auth.first_name);
+        setCustomAttribute('is_authenticated', true);
+
+        addPageAction('auth_success', {
+          user_id: auth.user_id,
+          chat_id: auth.chat_id,
+        });
       } catch (err) {
         console.error('Auth failed:', err);
         setError(err instanceof Error ? err.message : 'Authentication failed');
         setAppState('error');
+
+        if (err instanceof Error) {
+          noticeError(err, { context: 'authentication' });
+        }
+        addPageAction('auth_error', {
+          error: err instanceof Error ? err.message : 'unknown',
+        });
       }
     }
 
@@ -60,6 +93,12 @@ function App() {
   // Handle match selection
   const handleMatchSelect = (match: Match) => {
     setActiveMatch(match);
+    const targetPage = match.status === 'shop_phase' ? 'shop' : 'battle';
+    addPageAction('match_selected', {
+      match_id: match.id,
+      match_status: match.status,
+      target_page: targetPage,
+    });
     if (match.status === 'shop_phase') {
       setPage('shop');
     } else if (match.status === 'battle_phase' || match.status === 'completed') {
@@ -69,12 +108,20 @@ function App() {
 
   // Handle back to lobby
   const handleBackToLobby = () => {
+    addPageAction('back_to_lobby', {
+      from_page: page,
+      match_id: activeMatch?.id,
+    });
     setActiveMatch(null);
     setPage('lobby');
   };
 
   // Handle navigation
   const handleNavigate = (newPage: AppPage) => {
+    addPageAction('tab_change', {
+      tab: newPage,
+      previous_tab: page,
+    });
     setActiveMatch(null);
     setH2hOpponentId(null);
     setPage(newPage);
@@ -82,6 +129,10 @@ function App() {
 
   // Handle H2H view
   const handleViewH2H = (opponentId: number, opponentName: string) => {
+    addPageAction('h2h_view', {
+      opponent_id: opponentId,
+      opponent_name: opponentName,
+    });
     setH2hOpponentId(opponentId);
     setH2hOpponentName(opponentName);
     setPage('h2h');
@@ -89,6 +140,9 @@ function App() {
 
   // Handle back from H2H
   const handleBackFromH2H = () => {
+    addPageAction('back_from_h2h', {
+      opponent_id: h2hOpponentId,
+    });
     setH2hOpponentId(null);
     setPage('leaderboard');
   };

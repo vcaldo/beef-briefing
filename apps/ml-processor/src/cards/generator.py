@@ -190,10 +190,10 @@ class CardGenerator:
         """
         stats = {}
 
-        # Phase 1: Compute base metrics (everything except overall)
+        # Phase 1: Compute base metrics (everything except overall and combat)
         for stat_name, calculator in CALCULATORS.items():
-            if stat_name == "overall":
-                continue  # Computed in phase 2
+            if stat_name in ("overall", "combat"):
+                continue  # Computed in later phases
 
             try:
                 result = calculator(

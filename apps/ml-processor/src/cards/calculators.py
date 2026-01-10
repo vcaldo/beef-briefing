@@ -1332,14 +1332,13 @@ def calculate_overall_score(
 
 
 def calculate_combat(
-    engine: Engine,  # Not used, but kept for consistent signature
+    engine: Engine,
     user_id: int,
     chat_id: int,
     window_start: datetime,
     window_end: datetime,
-    *,
+    timezone: str | None = None,
     existing_stats: dict | None = None,
-    **kwargs,
 ) -> StatResult | None:
     """
     Calculate combat stats (ATK, DEF, HP) from existing stats.

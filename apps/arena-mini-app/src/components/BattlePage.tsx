@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../api/client';
-import type { Match, BattleResult, MatchRound, BattleEvent, GameCard } from '../types';
+import { useAudio } from '../hooks/useAudio';
+import { BattleCard } from './BattleCard';
+import type { Match, BattleResult, BattleEvent } from '../types';
 import './BattlePage.css';
 
 interface BattlePageProps {
@@ -9,6 +11,15 @@ interface BattlePageProps {
   userId: number;
   onBack: () => void;
 }
+
+// Event timing in ms based on event type
+const EVENT_TIMING: Record<string, number> = {
+  attack: 1200,
+  damage: 800,
+  death: 1000,
+  advance: 600,
+  victory: 2500,
+};
 
 export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   const [battle, setBattle] = useState<BattleResult | null>(null);
@@ -19,6 +30,10 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const [currentEventIndex, setCurrentEventIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  // Audio
+  const { play, muted, toggleMuted } = useAudio();
+  const lastEventRef = useRef<BattleEvent | null>(null);
 
   // Fetch battle results
   const fetchBattle = useCallback(async () => {
@@ -40,7 +55,7 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
     fetchBattle();
   }, [fetchBattle]);
 
-  // Auto-play events
+  // Auto-play events with dynamic timing and audio
   useEffect(() => {
     if (!isPlaying || !battle || battle.rounds.length === 0) return;
 
@@ -59,12 +74,45 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
       return;
     }
 
+    // Get timing for current event type
+    const nextEventIndex = currentEventIndex + 1;
+    const nextEvent = events[nextEventIndex];
+    const timing = nextEvent ? (EVENT_TIMING[nextEvent.type] || 800) : 800;
+
     const timer = setTimeout(() => {
       setCurrentEventIndex(prev => prev + 1);
-    }, 800);
+    }, timing);
 
     return () => clearTimeout(timer);
   }, [isPlaying, battle, currentRoundIndex, currentEventIndex]);
+
+  // Play sounds on event change
+  useEffect(() => {
+    if (!battle || currentEventIndex < 0) return;
+
+    const round = battle.rounds[currentRoundIndex];
+    if (!round) return;
+
+    const event = round.battle_log[currentEventIndex];
+    if (!event || event === lastEventRef.current) return;
+
+    lastEventRef.current = event;
+
+    // Play appropriate sound
+    switch (event.type) {
+      case 'attack':
+        play('attack');
+        // Play hit sound after a delay
+        setTimeout(() => play('hit'), 200);
+        break;
+      case 'death':
+        play('ko');
+        break;
+      case 'victory':
+        play('victory');
+        break;
+    }
+  }, [battle, currentRoundIndex, currentEventIndex, play]);
 
   // Play/pause toggle
   const handlePlayPause = () => {
@@ -177,30 +225,38 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
                 currentEvent={currentEvent}
                 isAttacker={currentEvent?.attacker_id === card.user_id}
                 isDefender={currentEvent?.defender_id === card.user_id}
+                side="left"
               />
             ))}
           </div>
         </div>
 
-        {/* VS */}
+        {/* VS / Event Display */}
         <div className="arena-vs">
-          <AnimatePresence>
+          <AnimatePresence mode="wait">
             {currentEvent && (
               <motion.div
-                key={currentEventIndex}
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                className="event-display"
+                key={`${currentRoundIndex}-${currentEventIndex}`}
+                initial={{ opacity: 0, scale: 0.5, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.2 }}
+                className={`event-display event-${currentEvent.type}`}
               >
-                {currentEvent.type === 'attack' && (
-                  <div className="damage-display">-{currentEvent.damage}</div>
+                {currentEvent.type === 'attack' && currentEvent.damage && (
+                  <div className="damage-display">
+                    <span className="damage-value">-{currentEvent.damage}</span>
+                  </div>
                 )}
                 {currentEvent.type === 'death' && (
-                  <div className="death-display">KO!</div>
+                  <div className="death-display">
+                    <span className="ko-text">KO</span>
+                  </div>
                 )}
                 {currentEvent.type === 'victory' && (
-                  <div className="victory-display">Victory!</div>
+                  <div className="victory-display">
+                    <span className="victory-text">Victory!</span>
+                  </div>
                 )}
               </motion.div>
             )}
@@ -222,6 +278,7 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
                 currentEvent={currentEvent}
                 isAttacker={currentEvent?.attacker_id === card.user_id}
                 isDefender={currentEvent?.defender_id === card.user_id}
+                side="right"
               />
             ))}
           </div>
@@ -240,6 +297,17 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
       {/* Controls */}
       <div className="battle-controls">
         <button
+          className="btn btn-icon mute-btn"
+          onClick={toggleMuted}
+          title={muted ? 'Unmute' : 'Mute'}
+        >
+          {muted ? (
+            <span className="icon-muted">&#128264;</span>
+          ) : (
+            <span className="icon-sound">&#128266;</span>
+          )}
+        </button>
+        <button
           className="btn btn-primary play-btn"
           onClick={handlePlayPause}
         >
@@ -253,67 +321,5 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
         </button>
       </div>
     </div>
-  );
-}
-
-// Battle Card Component
-interface BattleCardProps {
-  card: GameCard;
-  position: number;
-  isActive: boolean;
-  currentEvent: BattleEvent | null;
-  isAttacker: boolean;
-  isDefender: boolean;
-}
-
-function BattleCard({ card, position, isActive, currentEvent, isAttacker, isDefender }: BattleCardProps) {
-  const hp = currentEvent?.defender_id === card.user_id && currentEvent?.hp_after !== undefined
-    ? currentEvent.hp_after
-    : card.hp;
-  const isDead = hp <= 0;
-
-  return (
-    <motion.div
-      className={`battle-card ${isActive ? 'active' : ''} ${isDead ? 'dead' : ''}`}
-      animate={{
-        x: isAttacker ? 20 : 0,
-        scale: isDefender ? 0.95 : 1,
-        opacity: isDead ? 0.3 : 1,
-      }}
-      transition={{ duration: 0.2 }}
-    >
-      <div className="battle-card-photo">
-        {card.photo_url ? (
-          <img src={card.photo_url} alt={card.name} />
-        ) : (
-          <div className="no-photo">{card.name[0]}</div>
-        )}
-      </div>
-      <div className="battle-card-name">{card.name}</div>
-      <div className="battle-card-stats">
-        <span className="stat-atk">ATK {card.atk}</span>
-        <span className="stat-hp">HP {Math.max(0, hp)}/{card.max_hp}</span>
-      </div>
-      <div className="hp-bar">
-        <motion.div
-          className="hp-fill"
-          animate={{ width: `${Math.max(0, (hp / card.max_hp) * 100)}%` }}
-          transition={{ duration: 0.3 }}
-        />
-      </div>
-      <AnimatePresence>
-        {isDefender && currentEvent?.damage && (
-          <motion.div
-            className="damage-number"
-            initial={{ opacity: 1, y: 0 }}
-            animate={{ opacity: 0, y: -30 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            -{currentEvent.damage}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
   );
 }

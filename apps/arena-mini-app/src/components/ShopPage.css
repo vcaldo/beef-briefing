@@ -220,6 +220,66 @@
   font-size: var(--font-size-xs);
 }
 
+/* Drag Handle */
+.drag-handle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  touch-action: none;
+  transition: all 0.2s;
+  z-index: 5;
+}
+
+.drag-handle:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-icon {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+/* Drag Hint */
+.drag-hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Dragging States */
+.team-card {
+  position: relative;
+  touch-action: manipulation;
+}
+
+.team-card.dragging {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transform: scale(1.02);
+  border-color: var(--accent-gold);
+}
+
+.team-slots.dragging-active .team-slot {
+  transition: transform 0.2s ease;
+}
+
+.team-slots.dragging-active .empty-slot {
+  border-color: var(--accent-primary);
+  background: rgba(255, 107, 53, 0.05);
+}
+
 /* Actions */
 .shop-actions {
   padding: var(--spacing-md);

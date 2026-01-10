@@ -1,5 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { apiClient } from '../api/client';
+import { useAudio } from '../hooks/useAudio';
 import type { Match, ShopState, ShopCard, GameCard } from '../types';
 import './ShopPage.css';
 
@@ -10,11 +29,24 @@ interface ShopPageProps {
   onBattleStart: () => void;
 }
 
-export function ShopPage({ match, userId, onBack, onBattleStart }: ShopPageProps) {
+export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: ShopPageProps) {
   const [shopState, setShopState] = useState<ShopState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const { play } = useAudio();
+
+  // Drag-and-drop sensors with touch support
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 150, tolerance: 5 },
+    }),
+    useSensor(KeyboardSensor)
+  );
 
   // Fetch shop state
   const fetchShop = useCallback(async () => {
@@ -90,6 +122,43 @@ export function ShopPage({ match, userId, onBack, onBattleStart }: ShopPageProps
       setShopState(state);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit team');
+    }
+  };
+
+  // Drag handlers
+  const handleDragStart = (_event: DragStartEvent) => {
+    setIsDragging(true);
+    // Haptic feedback on mobile
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setIsDragging(false);
+    const { active, over } = event;
+
+    if (!over || !shopState || active.id === over.id) return;
+
+    const oldIndex = shopState.team.findIndex(c => c.card_id === active.id);
+    const newIndex = shopState.team.findIndex(c => c.card_id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Optimistic update
+    const newTeam = arrayMove(shopState.team, oldIndex, newIndex);
+    setShopState({ ...shopState, team: newTeam });
+    play('place');
+
+    // Persist to API
+    try {
+      const newOrder = newTeam.map(c => c.card_id);
+      const state = await apiClient.setTeamOrder(match.id, newOrder);
+      setShopState(state);
+    } catch (err) {
+      // Revert on error
+      setShopState(shopState);
+      setError(err instanceof Error ? err.message : 'Failed to reorder team');
     }
   };
 
@@ -177,31 +246,47 @@ export function ShopPage({ match, userId, onBack, onBattleStart }: ShopPageProps
 
           {/* Team */}
           <section className="shop-section">
-            <h2>Your Team ({shopState.team.length}/3)</h2>
-            <div className="team-slots">
-              {[0, 1, 2].map(slot => {
-                const card = shopState.team[slot];
-                return (
-                  <div key={slot} className="team-slot">
-                    <div className="slot-label">
-                      {slot === 0 ? 'Front' : slot === 1 ? 'Mid' : 'Back'}
-                    </div>
-                    {card ? (
-                      <TeamCardComponent
-                        card={card}
-                        canUpgrade={canUpgrade}
-                        onUpgradeAtk={() => handleUpgrade(slot, 'atk')}
-                        onUpgradeHp={() => handleUpgrade(slot, 'hp')}
-                      />
-                    ) : (
-                      <div className="empty-slot">
-                        <span>Empty</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="section-header">
+              <h2>Your Team ({shopState.team.length}/3)</h2>
+              {shopState.team.length > 1 && (
+                <span className="drag-hint">Drag to reorder</span>
+              )}
             </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={shopState.team.map(c => c.card_id)}
+                strategy={horizontalListSortingStrategy}
+              >
+                <div className={`team-slots ${isDragging ? 'dragging-active' : ''}`}>
+                  {[0, 1, 2].map(slot => {
+                    const card = shopState.team[slot];
+                    const slotLabel = slot === 0 ? 'Front' : slot === 1 ? 'Mid' : 'Back';
+                    return (
+                      <div key={slot} className="team-slot">
+                        <div className="slot-label">{slotLabel}</div>
+                        {card ? (
+                          <SortableTeamCard
+                            card={card}
+                            canUpgrade={canUpgrade}
+                            onUpgradeAtk={() => handleUpgrade(slot, 'atk')}
+                            onUpgradeHp={() => handleUpgrade(slot, 'hp')}
+                          />
+                        ) : (
+                          <div className="empty-slot">
+                            <span>Empty</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </SortableContext>
+            </DndContext>
           </section>
 
           {/* Submit */}
@@ -261,20 +346,46 @@ function ShopCardComponent({ card, onBuy, canBuy }: ShopCardComponentProps) {
   );
 }
 
-// Team Card Component
-interface TeamCardComponentProps {
+// Sortable Team Card Component (with drag-and-drop)
+interface SortableTeamCardProps {
   card: GameCard;
   canUpgrade: boolean;
   onUpgradeAtk: () => void;
   onUpgradeHp: () => void;
 }
 
-function TeamCardComponent({ card, canUpgrade, onUpgradeAtk, onUpgradeHp }: TeamCardComponentProps) {
+function SortableTeamCard({ card, canUpgrade, onUpgradeAtk, onUpgradeHp }: SortableTeamCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: card.card_id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 100 : 1,
+  };
+
   return (
-    <div className="team-card">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`team-card ${isDragging ? 'dragging' : ''}`}
+      {...attributes}
+    >
+      {/* Drag Handle */}
+      <div className="drag-handle" {...listeners}>
+        <span className="drag-icon">&#x2630;</span>
+      </div>
+
       <div className="card-photo">
         {card.photo_url ? (
-          <img src={card.photo_url} alt={card.name} />
+          <img src={card.photo_url} alt={card.name} draggable={false} />
         ) : (
           <div className="no-photo">{card.name[0]}</div>
         )}

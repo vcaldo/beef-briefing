@@ -21,6 +21,7 @@ class ThemeColors:
     tier_colors: dict[str, list[str]]  # legendary, elite, etc. [start, end]
     effects: dict[str, Any] = field(default_factory=dict)  # avatar_glow, username_glow, etc.
     trend_colors: dict[str, str] = field(default_factory=dict)  # up, down, stable
+    tier_bar_contrast: dict[str, str] = field(default_factory=dict)  # tier_1..tier_6 contrast colors
     text_primary: str = "#ffffff"
     text_secondary: str = "rgba(255, 255, 255, 0.6)"
     border_color: str = "rgba(255, 255, 255, 0.1)"
@@ -46,6 +47,14 @@ class ThemeColors:
                 "up": "#22c55e",
                 "down": "#ef4444",
                 "stable": "rgba(255, 255, 255, 0.5)",
+            }),
+            tier_bar_contrast=data.get("tier_bar_contrast", {
+                "tier_1": "#1a1a2e",
+                "tier_2": "#1a1a2e",
+                "tier_3": "#ffffff",
+                "tier_4": "#1a1a2e",
+                "tier_5": "#ffffff",
+                "tier_6": "#1a1a2e",
             }),
             text_primary=data.get("text_primary", "#ffffff"),
             text_secondary=data.get("text_secondary", "rgba(255, 255, 255, 0.6)"),
@@ -123,6 +132,7 @@ class ThemeConfig:
                 "tier": self.colors.tier_colors,
                 "effects": self.colors.effects,
                 "trend_colors": self.colors.trend_colors,
+                "tier_bar_contrast": self.colors.tier_bar_contrast,
             },
             "typography": {
                 "header_font": self.typography.header_font,
@@ -212,6 +222,14 @@ class ThemeLoader:
                     "up": "#22c55e",
                     "down": "#ef4444",
                     "stable": "rgba(255, 255, 255, 0.5)",
+                },
+                "tier_bar_contrast": {
+                    "tier_1": "#1a1a2e",
+                    "tier_2": "#1a1a2e",
+                    "tier_3": "#ffffff",
+                    "tier_4": "#1a1a2e",
+                    "tier_5": "#ffffff",
+                    "tier_6": "#1a1a2e",
                 },
                 "text_primary": "#ffffff",
                 "text_secondary": "rgba(255, 255, 255, 0.6)",

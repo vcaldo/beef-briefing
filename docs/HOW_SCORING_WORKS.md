@@ -169,6 +169,48 @@ Your Overall Score combines all 6 stats into a single number used for ranking.
 
 ---
 
+## Combat Stats (ATK/DEF/HP)
+
+Combat stats are derived from your existing stats for use in future card game features.
+
+### Attack (ATK) - Range: 1-10
+
+**What it measures:** Your offensive capability based on volume, aggression, and wit.
+
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| Activity | 40% | Your engagement volume |
+| Toxicity | 35% | Aggressive tendencies |
+| Humor | 25% | Wit and comedic timing |
+
+### Defense (DEF) - Range: 1-10
+
+**What it measures:** Your defensive capability based on consistency, positivity, and social support.
+
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| Presence | 40% | How consistently you show up |
+| Aura | 35% | Your positive emotional tone |
+| Popularity | 25% | Social backing from others |
+
+### Health Points (HP) - Range: 3-30
+
+**Formula:** HP = DEF × 3
+
+Higher defense means more HP to withstand attacks in battle.
+
+### Example Cards
+
+| User | Activity | Toxicity | Humor | Presence | Aura | Popularity | → ATK | → DEF | → HP |
+|------|----------|----------|-------|----------|------|------------|-------|-------|------|
+| João | 80 | 45 | 60 | 40 | 65 | 50 | 6 | 5 | 15 |
+| Maria | 30 | 10 | 25 | 90 | 80 | 70 | 2 | 8 | 24 |
+| Pedro | 95 | 70 | 40 | 20 | 30 | 25 | 7 | 3 | 9 |
+
+**Note:** Combat stats don't affect your Overall Score or tier ranking. They're stored for future game features.
+
+---
+
 ## Badges
 
 Badges are special achievements displayed on your card. They affect your Overall Score.

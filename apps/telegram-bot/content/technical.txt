@@ -50,3 +50,20 @@ Métricas de volume (mensagens, reações) são normalizadas pelo percentil 90 d
   • Período: 30 dias (janela deslizante)
   • Cards: Gerados semanalmente (segunda a domingo)
   • Mínimo: 10 mensagens para aparecer no ranking
+
+<b>Estatísticas de Combate</b>
+
+Derivadas das métricas existentes para gamificação:
+
+<i>⚔️ ATK (Ataque)</i>
+  <code>raw_atk = 0.40×Atividade + 0.35×Toxicidade + 0.25×Humor</code>
+  <code>ATK = max(1, round(raw_atk / 10))</code>
+
+<i>🛡️ DEF (Defesa)</i>
+  <code>raw_def = 0.40×Presença + 0.35×Aura + 0.25×Popularidade</code>
+  <code>DEF = max(1, round(raw_def / 10))</code>
+
+<i>🥩 HP (Vida)</i>
+  <code>HP = DEF × 3</code>
+
+Range: ATK/DEF (1-10), HP (3-30)

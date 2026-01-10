@@ -21,11 +21,21 @@ declare -A DEV_SERVICES=(
     ["telegram-bot"]="-|-|"
     ["postgres"]="5432|localhost:5432|"
     ["minio"]="9000|http://localhost:9000|"
+    ["qdrant"]="6333|http://localhost:6333|"
+    ["ml-processor"]="-|-|(manual)"
+    ["card-renderer"]="8051|http://localhost:8051|"
+    ["deck-mini-app-dev"]="5174|http://localhost:5174|"
+    ["leaderboard-mini-app-dev"]="5173|http://localhost:5173|"
+    ["ml-dashboard-backend"]="8000|http://localhost:8000|"
+    ["ml-dashboard-frontend"]="5175|http://localhost:5175|"
 )
 
 declare -A PROD_SERVICES=(
     ["api-service"]="-|https://api.\${DOMAIN}|"
     ["telegram-bot"]="-|-|"
+    ["card-renderer"]="-|https://cards-api.\${DOMAIN}|"
+    ["deck-mini-app"]="-|https://deck.\${DOMAIN}|"
+    ["leaderboard-mini-app"]="-|https://leaderboard.\${DOMAIN}|"
     ["traefik"]="-|https://\${DOMAIN}/dashboard|"
 )
 
@@ -36,7 +46,9 @@ declare -A PROD_SERVICES=(
 DEV_IMAGES=(
     "infrastructure-api-service"
     "infrastructure-telegram-bot"
-    "infrastructure-leaderboard-mini-app-dev"
+    "infrastructure-ml-processor"
+    "infrastructure-card-renderer"
+    "infrastructure-ml-dashboard-backend"
 )
 
 PROD_IMAGES=(
@@ -189,13 +201,14 @@ show_dev_summary() {
     local env_file="${2:-infrastructure/.env.dev}"
 
     echo ""
-    echo -e "${GREEN}+================================================================+${NC}"
-    echo -e "${GREEN}|              DEVELOPMENT ENVIRONMENT READY                    |${NC}"
-    echo -e "${GREEN}+==================+===========+=======+========================+${NC}"
-    echo -e "${GREEN}| Service          | Status    | Port  | URL                    |${NC}"
-    echo -e "${GREEN}+==================+===========+=======+========================+${NC}"
+    echo -e "${GREEN}+===========================================================================+${NC}"
+    echo -e "${GREEN}|                    DEVELOPMENT ENVIRONMENT READY                         |${NC}"
+    echo -e "${GREEN}+=========================+===========+=======+============================+${NC}"
+    echo -e "${GREEN}| Service                 | Status    | Port  | URL                        |${NC}"
+    echo -e "${GREEN}+=========================+===========+=======+============================+${NC}"
 
-    for service in api-service telegram-bot postgres minio; do
+    # Core services
+    for service in api-service telegram-bot postgres minio qdrant; do
         local info="${DEV_SERVICES[$service]}"
         IFS='|' read -r port url _ <<< "$info"
 
@@ -204,11 +217,46 @@ show_dev_summary() {
         local status_colored
         status_colored=$(color_status "$status")
 
-        printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} %-9s ${GREEN}|${NC} %-5s ${GREEN}|${NC} %-22s ${GREEN}|${NC}\n" \
+        printf "${GREEN}|${NC} %-23s ${GREEN}|${NC} %-9s ${GREEN}|${NC} %-5s ${GREEN}|${NC} %-26s ${GREEN}|${NC}\n" \
             "$service" "$status_colored" "$port" "$url"
     done
 
-    echo -e "${GREEN}+==================+===========+=======+========================+${NC}"
+    echo -e "${GREEN}+-------------------------+-----------+-------+----------------------------+${NC}"
+
+    # ML & Card services
+    for service in ml-processor card-renderer; do
+        local info="${DEV_SERVICES[$service]}"
+        IFS='|' read -r port url note <<< "$info"
+
+        local status
+        status=$(get_container_status "$service" "$compose_file" "$env_file")
+        local status_colored
+        status_colored=$(color_status "$status")
+
+        local display_url="$url"
+        [[ -n "$note" ]] && display_url="$note"
+
+        printf "${GREEN}|${NC} %-23s ${GREEN}|${NC} %-9s ${GREEN}|${NC} %-5s ${GREEN}|${NC} %-26s ${GREEN}|${NC}\n" \
+            "$service" "$status_colored" "$port" "$display_url"
+    done
+
+    echo -e "${GREEN}+-------------------------+-----------+-------+----------------------------+${NC}"
+
+    # Mini Apps & Dashboard
+    for service in deck-mini-app-dev leaderboard-mini-app-dev ml-dashboard-backend ml-dashboard-frontend; do
+        local info="${DEV_SERVICES[$service]}"
+        IFS='|' read -r port url _ <<< "$info"
+
+        local status
+        status=$(get_container_status "$service" "$compose_file" "$env_file")
+        local status_colored
+        status_colored=$(color_status "$status")
+
+        printf "${GREEN}|${NC} %-23s ${GREEN}|${NC} %-9s ${GREEN}|${NC} %-5s ${GREEN}|${NC} %-26s ${GREEN}|${NC}\n" \
+            "$service" "$status_colored" "$port" "$url"
+    done
+
+    echo -e "${GREEN}+=========================+===========+=======+============================+${NC}"
     echo ""
 }
 
@@ -223,18 +271,30 @@ show_prod_summary() {
     echo ""
     echo -e "${GREEN}+====================================================================+${NC}"
     echo -e "${GREEN}|                    PRODUCTION DEPLOYMENT COMPLETE                  |${NC}"
-    echo -e "${GREEN}+==================+==========+======================================+${NC}"
-    echo -e "${GREEN}| Service          | Status   | URL                                  |${NC}"
-    echo -e "${GREEN}+==================+==========+======================================+${NC}"
+    echo -e "${GREEN}+====================+==========+====================================+${NC}"
+    echo -e "${GREEN}| Service            | Status   | URL                                |${NC}"
+    echo -e "${GREEN}+====================+==========+====================================+${NC}"
 
-    printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
+    printf "${GREEN}|${NC} %-18s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-34s ${GREEN}|${NC}\n" \
         "api-service" "deployed" "https://api.${domain}"
-    printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
+    printf "${GREEN}|${NC} %-18s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-34s ${GREEN}|${NC}\n" \
         "telegram-bot" "deployed" "-"
-    printf "${GREEN}|${NC} %-16s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-36s ${GREEN}|${NC}\n" \
+    printf "${GREEN}|${NC} %-18s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-34s ${GREEN}|${NC}\n" \
+        "card-renderer" "deployed" "https://cards-api.${domain}"
+
+    echo -e "${GREEN}+--------------------+----------+------------------------------------+${NC}"
+
+    printf "${GREEN}|${NC} %-18s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-34s ${GREEN}|${NC}\n" \
+        "deck-mini-app" "deployed" "https://deck.${domain}"
+    printf "${GREEN}|${NC} %-18s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-34s ${GREEN}|${NC}\n" \
+        "leaderboard-mini-app" "deployed" "https://leaderboard.${domain}"
+
+    echo -e "${GREEN}+--------------------+----------+------------------------------------+${NC}"
+
+    printf "${GREEN}|${NC} %-18s ${GREEN}|${NC} ${GREEN}%-8s${NC} ${GREEN}|${NC} %-34s ${GREEN}|${NC}\n" \
         "traefik" "deployed" "https://${domain}/dashboard"
 
-    echo -e "${GREEN}+==================+==========+======================================+${NC}"
+    echo -e "${GREEN}+====================+==========+====================================+${NC}"
     echo -e "${GREEN}| Image Tag: ${NC}${BLUE}${image_tag}${NC}${GREEN} | Server: ${NC}${BLUE}${ssh_host}${NC}"
     echo -e "${GREEN}| Previous:  ${NC}${YELLOW}${previous_tag}${NC}${GREEN} | Rollback: ${NC}make prod-rollback"
     echo -e "${GREEN}| API IP Allowlist: ${NC}${BLUE}${allowed_ip}${NC}"

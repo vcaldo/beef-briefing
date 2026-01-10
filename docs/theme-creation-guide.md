@@ -158,12 +158,21 @@ Jinja2 template that generates HTML with embedded CSS. Uses theme values via tem
     },
 
     "tier_colors": {
-      "legendary": ["#start", "#end"],
-      "elite": ["#start", "#end"],
-      "outstanding": ["#start", "#end"],
-      "regular": ["#start", "#end"],
-      "beginner": ["#start", "#end"],
-      "rookie": ["#start", "#end"]
+      "tier_1": ["#start", "#end"],
+      "tier_2": ["#start", "#end"],
+      "tier_3": ["#start", "#end"],
+      "tier_4": ["#start", "#end"],
+      "tier_5": ["#start", "#end"],
+      "tier_6": ["#start", "#end"]
+    },
+
+    "tier_bar_contrast": {
+      "tier_1": "#hex",
+      "tier_2": "#hex",
+      "tier_3": "#hex",
+      "tier_4": "#hex",
+      "tier_5": "#hex",
+      "tier_6": "#hex"
     },
 
     "effects": {
@@ -232,16 +241,39 @@ Badges have gradient backgrounds with matching borders:
 | `legendary` | Gold/amber with glow effect, exceptional achievements |
 
 ### Tier Colors (6 levels)
-Used for the "Beef Meter" overall score bar:
+Used for the tier box background pattern and the "Beef Meter" background:
 
 | Tier | Score Range | Character |
 |------|-------------|-----------|
-| `legendary` | 90-100 | Gold, prestigious |
-| `elite` | 75-89 | Cyan/blue, excellent |
-| `outstanding` | 60-74 | Purple, impressive |
-| `regular` | 40-59 | Teal/green, solid |
-| `beginner` | 20-39 | Gray, developing |
-| `rookie` | 0-19 | Pink, starting out |
+| `tier_1` | 81-100 | Gold, prestigious |
+| `tier_2` | 77-80 | Cyan/green, excellent |
+| `tier_3` | 72-76 | Blue/purple, impressive |
+| `tier_4` | 55-71 | Teal/orange, solid |
+| `tier_5` | 32-54 | Gray, developing |
+| `tier_6` | 0-31 | Pink/brown, starting out |
+
+### Tier Bar Contrast Colors
+Used for the Beef Meter progress bar fill. These should contrast against the tier background pattern for visibility:
+
+| Tier | Guideline |
+|------|-----------|
+| `tier_1` | Dark color (e.g., `#1a1a2e`) for contrast against bright gold |
+| `tier_2` | Dark color for contrast against bright cyan/green |
+| `tier_3` | Light/white (`#ffffff`) for contrast against purple/blue |
+| `tier_4` | Dark color for contrast against teal/orange |
+| `tier_5` | Light/white for contrast against gray |
+| `tier_6` | Light/white for contrast against dark tiers |
+
+### Combat Stats
+Cards display RPG-style combat stats derived from user behavior:
+
+| Stat | Range | Derived From |
+|------|-------|--------------|
+| ATK | 1-10 | Activity (40%), Toxicity (35%), Humor (25%) |
+| DEF | 1-10 | Presence (40%), Aura (35%), Popularity (25%) |
+| HP | 3-30 | DEF x 3 |
+
+Combat stats are displayed in the header area where the rank/tier box used to be, with the tier information now shown in the Beef Meter section.
 
 ### Effect Colors
 - `avatar_glow` - Box shadow around avatar circle
@@ -285,10 +317,11 @@ The system generates a Google Fonts import URL automatically.
 ┌─────────────────────────────────────┐
 │ ┌──────┐                    ┌─────┐ │
 │ │Avatar│ Name               │Rank │ │
-│ │ 64px │ @handle            │ #1  │ │
-│ └──────┘                    └─────┘ │
+│ │ 64px │ @handle        │⚔ ATK 7│ │
+│ └──────┘                 │🛡 DEF 5│ │
+│                          │🥩 HP 15│ │
 ├─────────────────────────────────────┤
-│ [Beef Emoji] Beef Meter  72 • Elite │
+│ #1     Elite                     72 │
 │ ████████████████░░░░░░░░░░░░░░░░░░░ │
 ├─────────────────────────────────────┤
 │ ┌───────────────┐ ┌───────────────┐ │
@@ -335,6 +368,16 @@ The system generates a Google Fonts import URL automatically.
 ```jinja2
 {{ overall.score }}        {# 0-100 float #}
 {{ overall.label }}        {# "Elite", "Legendary", etc. #}
+{{ overall.tier_class }}   {# "tier-1", "tier-2", etc. #}
+```
+
+### Combat Stats
+```jinja2
+{% if combat %}
+  {{ combat.atk }}         {# 1-10 attack value #}
+  {{ combat.def_ }}        {# 1-10 defense value #}
+  {{ combat.hp }}          {# 3-30 health points #}
+{% endif %}
 ```
 
 ### Stats Array
@@ -385,6 +428,8 @@ The system generates a Google Fonts import URL automatically.
 {{ theme.colors.stat.aura }}
 {{ theme.colors.stat.aura_gradient[0] }}
 {{ theme.colors.badge.legendary.glow }}
+{{ theme.colors.tier.tier_1[0] }}           {# Tier gradient start #}
+{{ theme.colors.tier_bar_contrast.tier_1 }} {# Tier bar contrast color #}
 {{ theme.colors.tier.elite[0] }}
 {{ theme.colors.effects.avatar_glow }}
 {{ theme.colors.trend_colors.up }}

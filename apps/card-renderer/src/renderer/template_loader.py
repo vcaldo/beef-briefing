@@ -93,6 +93,15 @@ class ActivityContext:
 
 
 @dataclass
+class CombatContext:
+    """Combat stats for template."""
+
+    atk: int
+    def_: int  # Use def_ to avoid Python keyword conflict
+    hp: int
+
+
+@dataclass
 class TemplateContext:
     """Full context for card template rendering."""
 
@@ -125,6 +134,9 @@ class TemplateContext:
 
     # Ranking
     rank: int | None = None
+
+    # Combat stats
+    combat: CombatContext | None = None
 
     # Theme
     theme: str = "gaming"
@@ -395,6 +407,18 @@ class TemplateLoader:
         tier_label = overall.get("label", "")
         overall["tier_class"] = self._tier_class_fn(tier_label) if tier_label else "tier-6"
 
+        # Extract combat stats
+        combat_raw = stats_raw.get("combat", {})
+        combat = (
+            CombatContext(
+                atk=combat_raw.get("atk", 1),
+                def_=combat_raw.get("def", 1),
+                hp=combat_raw.get("hp", 3),
+            )
+            if combat_raw
+            else None
+        )
+
         # Build stats list using refactored method
         stats_list = [
             self._build_stat_context(
@@ -436,6 +460,7 @@ class TemplateLoader:
             popularity=popularity,
             overall=overall,
             rank=rank,
+            combat=combat,
             theme=theme,
         )
 
@@ -518,6 +543,7 @@ class TemplateLoader:
             "popularity": context.popularity,
             "overall": context.overall,
             "rank": context.rank,
+            "combat": context.combat,
             "theme": theme_context,  # Inject theme configuration
         }
 

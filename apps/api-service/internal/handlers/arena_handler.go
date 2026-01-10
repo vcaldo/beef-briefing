@@ -31,6 +31,50 @@ func NewArenaHandler(service *services.ArenaService, cfg *config.Config) *ArenaH
 	}
 }
 
+// chatAccessError represents an error during chat access validation with HTTP status
+type chatAccessError struct {
+	message string
+	status  int
+}
+
+func (e *chatAccessError) Error() string { return e.message }
+
+// parseChatIDWithAuth parses chat_id from request, validates JWT claims, and verifies access.
+// If chat_id is not provided and allowFallback is true, uses chatID from JWT claims.
+// Returns (claims, chatID, error). Error is *chatAccessError which contains the HTTP status.
+func parseChatIDWithAuth(r *http.Request, allowFallback bool) (*middleware.MiniAppClaims, int64, error) {
+	ctx := r.Context()
+	claims := middleware.GetClaimsFromContext(ctx)
+	if claims == nil {
+		return nil, 0, &chatAccessError{"unauthorized", http.StatusUnauthorized}
+	}
+
+	chatID, err := httputil.ParseInt64(r, "chat_id")
+	if err != nil || chatID == 0 {
+		if allowFallback && claims.ChatID != nil {
+			chatID = *claims.ChatID
+		} else {
+			return nil, 0, &chatAccessError{"chat_id is required", http.StatusBadRequest}
+		}
+	}
+
+	// Verify chat access
+	if claims.ChatID != nil && *claims.ChatID != chatID {
+		return nil, 0, &chatAccessError{"access denied to this chat", http.StatusForbidden}
+	}
+
+	return claims, chatID, nil
+}
+
+// handleChatAccessError writes an HTTP error response for chat access errors
+func handleChatAccessError(w http.ResponseWriter, err error) {
+	if cae, ok := err.(*chatAccessError); ok {
+		httputil.RespondError(w, cae.message, cae.status)
+	} else {
+		httputil.RespondError(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
 // CreateMatchRequest represents the request to create a match
 type CreateMatchRequest struct {
 	ChatID int64 `json:"chat_id"`
@@ -61,21 +105,9 @@ func (h *ArenaHandler) HandleListMatches(w http.ResponseWriter, r *http.Request)
 		txn.SetName("api:arena:list-matches")
 	}
 
-	claims := middleware.GetClaimsFromContext(ctx)
-	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	chatID, err := httputil.ParseInt64(r, "chat_id")
-	if err != nil || chatID == 0 {
-		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
-		return
-	}
-
-	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
-		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
+	_, chatID, err := parseChatIDWithAuth(r, false)
+	if err != nil {
+		handleChatAccessError(w, err)
 		return
 	}
 
@@ -614,25 +646,9 @@ func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Reque
 		txn.SetName("api:arena:leaderboard")
 	}
 
-	claims := middleware.GetClaimsFromContext(ctx)
-	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	chatID, err := httputil.ParseInt64(r, "chat_id")
-	if err != nil || chatID == 0 {
-		if claims.ChatID != nil {
-			chatID = *claims.ChatID
-		} else {
-			httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
-			return
-		}
-	}
-
-	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
-		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
+	_, chatID, err := parseChatIDWithAuth(r, true)
+	if err != nil {
+		handleChatAccessError(w, err)
 		return
 	}
 
@@ -669,25 +685,9 @@ func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) 
 		txn.SetName("api:arena:history")
 	}
 
-	claims := middleware.GetClaimsFromContext(ctx)
-	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	chatID, err := httputil.ParseInt64(r, "chat_id")
-	if err != nil || chatID == 0 {
-		if claims.ChatID != nil {
-			chatID = *claims.ChatID
-		} else {
-			httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
-			return
-		}
-	}
-
-	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
-		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
+	claims, chatID, err := parseChatIDWithAuth(r, true)
+	if err != nil {
+		handleChatAccessError(w, err)
 		return
 	}
 
@@ -751,25 +751,9 @@ func (h *ArenaHandler) HandleGetH2H(w http.ResponseWriter, r *http.Request) {
 		txn.SetName("api:arena:h2h")
 	}
 
-	claims := middleware.GetClaimsFromContext(ctx)
-	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	chatID, err := httputil.ParseInt64(r, "chat_id")
-	if err != nil || chatID == 0 {
-		if claims.ChatID != nil {
-			chatID = *claims.ChatID
-		} else {
-			httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
-			return
-		}
-	}
-
-	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
-		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
+	claims, chatID, err := parseChatIDWithAuth(r, true)
+	if err != nil {
+		handleChatAccessError(w, err)
 		return
 	}
 

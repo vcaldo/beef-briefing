@@ -20,26 +20,26 @@ const (
 
 // ShopState represents the current state of a player's shop
 type ShopState struct {
-	MatchID    string             `json:"match_id"`
-	UserID     int64              `json:"user_id"`
-	Coins      int                `json:"coins"`
-	Cards      []*battle.ShopCard `json:"cards"`      // Available cards in shop
-	Team       []*battle.Card     `json:"team"`       // Purchased cards (up to 3)
-	TeamOrder  []int              `json:"team_order"` // Order for battle [front, mid, back]
-	IsReady    bool               `json:"is_ready"`
-	RerollsUsed int               `json:"rerolls_used"`
+	MatchID     string             `json:"match_id"`
+	UserID      int64              `json:"user_id"`
+	Coins       int                `json:"coins"`
+	Cards       []*battle.ShopCard `json:"cards"`      // Available cards in shop
+	Team        []*battle.Card     `json:"team"`       // Purchased cards (up to 3)
+	TeamOrder   []int              `json:"team_order"` // Order for battle [front, mid, back]
+	IsReady     bool               `json:"is_ready"`
+	RerollsUsed int                `json:"rerolls_used"`
 }
 
 // NewShopState creates a new shop state for a player
 func NewShopState(matchID string, userID int64, cards []*battle.ShopCard) *ShopState {
 	return &ShopState{
-		MatchID:    matchID,
-		UserID:     userID,
-		Coins:      StartingCoins,
-		Cards:      cards,
-		Team:       make([]*battle.Card, 0, TeamSize),
-		TeamOrder:  []int{0, 1, 2},
-		IsReady:    false,
+		MatchID:     matchID,
+		UserID:      userID,
+		Coins:       StartingCoins,
+		Cards:       cards,
+		Team:        make([]*battle.Card, 0, TeamSize),
+		TeamOrder:   []int{0, 1, 2},
+		IsReady:     false,
 		RerollsUsed: 0,
 	}
 }

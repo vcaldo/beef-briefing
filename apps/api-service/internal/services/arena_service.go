@@ -25,18 +25,18 @@ const (
 
 // ArenaService errors
 var (
-	ErrNotEnoughCards      = errors.New("not enough cards in group (minimum 10 required)")
-	ErrMatchNotFound       = errors.New("match not found")
-	ErrMatchNotOpen        = errors.New("match is not open for joining")
-	ErrAlreadyJoined       = errors.New("already joined this match")
-	ErrNotParticipant      = errors.New("not a participant in this match")
-	ErrNotCreator          = errors.New("only the match creator can perform this action")
-	ErrMatchNotInShopPhase = errors.New("match is not in shop phase")
-	ErrShopPhaseExpired    = errors.New("shop phase has expired")
+	ErrNotEnoughCards       = errors.New("not enough cards in group (minimum 10 required)")
+	ErrMatchNotFound        = errors.New("match not found")
+	ErrMatchNotOpen         = errors.New("match is not open for joining")
+	ErrAlreadyJoined        = errors.New("already joined this match")
+	ErrNotParticipant       = errors.New("not a participant in this match")
+	ErrNotCreator           = errors.New("only the match creator can perform this action")
+	ErrMatchNotInShopPhase  = errors.New("match is not in shop phase")
+	ErrShopPhaseExpired     = errors.New("shop phase has expired")
 	ErrTeamAlreadySubmitted = errors.New("team already submitted")
-	ErrInvalidCardIndex    = errors.New("invalid card index")
-	ErrNotEnoughCoins      = errors.New("not enough coins")
-	ErrTeamFull            = errors.New("team is full (max 3 cards)")
+	ErrInvalidCardIndex     = errors.New("invalid card index")
+	ErrNotEnoughCoins       = errors.New("not enough coins")
+	ErrTeamFull             = errors.New("team is full (max 3 cards)")
 	ErrCardAlreadyPurchased = errors.New("card already purchased")
 )
 
@@ -47,6 +47,38 @@ type ArenaService struct {
 	dealer        *shop.Dealer
 	storageClient *storage.MinIOClient
 	nrApp         *newrelic.Application
+}
+
+// validateShopPhaseAccess validates that a user can access the shop for a match.
+// It checks: match exists, match is in shop phase, deadline not expired, user is participant, not already submitted.
+// Set checkDeadline to false to skip deadline validation (for SetTeamOrder which allows after deadline).
+func (s *ArenaService) validateShopPhaseAccess(ctx context.Context, matchID string, userID int64, checkDeadline bool) (*repository.Match, *repository.Participant, error) {
+	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get match: %w", err)
+	}
+	if match == nil {
+		return nil, nil, ErrMatchNotFound
+	}
+	if match.Status != repository.MatchStatusShopPhase {
+		return nil, nil, ErrMatchNotInShopPhase
+	}
+	if checkDeadline && match.ShopPhaseDeadline != nil && time.Now().After(*match.ShopPhaseDeadline) {
+		return nil, nil, ErrShopPhaseExpired
+	}
+
+	participant, err := s.gameRepo.GetParticipant(ctx, matchID, userID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get participant: %w", err)
+	}
+	if participant == nil {
+		return nil, nil, ErrNotParticipant
+	}
+	if participant.Status == repository.ParticipantStatusReady {
+		return nil, nil, ErrTeamAlreadySubmitted
+	}
+
+	return match, participant, nil
 }
 
 // NewArenaService creates a new arena service
@@ -74,24 +106,24 @@ type MatchResponse struct {
 
 // ShopResponse represents the shop state for a player
 type ShopResponse struct {
-	MatchID       string              `json:"match_id"`
-	Status        string              `json:"status"`
-	Coins         int                 `json:"coins"`
-	Cards         []*battle.ShopCard  `json:"cards"`
-	Team          []*battle.Card      `json:"team"`
-	TeamOrder     []int               `json:"team_order"`
-	IsReady       bool                `json:"is_ready"`
-	Deadline      *time.Time          `json:"deadline,omitempty"`
-	TimeRemaining int                 `json:"time_remaining_seconds"`
+	MatchID       string             `json:"match_id"`
+	Status        string             `json:"status"`
+	Coins         int                `json:"coins"`
+	Cards         []*battle.ShopCard `json:"cards"`
+	Team          []*battle.Card     `json:"team"`
+	TeamOrder     []int              `json:"team_order"`
+	IsReady       bool               `json:"is_ready"`
+	Deadline      *time.Time         `json:"deadline,omitempty"`
+	TimeRemaining int                `json:"time_remaining_seconds"`
 }
 
 // BattleResponse represents battle results
 type BattleResponse struct {
-	MatchID    string                    `json:"match_id"`
-	Status     string                    `json:"status"`
-	Rounds     []*repository.MatchRound  `json:"rounds"`
-	WinnerID   *int64                    `json:"winner_id,omitempty"`
-	IsComplete bool                      `json:"is_complete"`
+	MatchID    string                   `json:"match_id"`
+	Status     string                   `json:"status"`
+	Rounds     []*repository.MatchRound `json:"rounds"`
+	WinnerID   *int64                   `json:"winner_id,omitempty"`
+	IsComplete bool                     `json:"is_complete"`
 }
 
 // CreateMatch creates a new regular match
@@ -369,29 +401,9 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 
 // BuyCard purchases a card from the shop
 func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64, cardIndex int) (*ShopResponse, error) {
-	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	_, participant, err := s.validateShopPhaseAccess(ctx, matchID, userID, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get match: %w", err)
-	}
-	if match == nil {
-		return nil, ErrMatchNotFound
-	}
-	if match.Status != repository.MatchStatusShopPhase {
-		return nil, ErrMatchNotInShopPhase
-	}
-	if match.ShopPhaseDeadline != nil && time.Now().After(*match.ShopPhaseDeadline) {
-		return nil, ErrShopPhaseExpired
-	}
-
-	participant, err := s.gameRepo.GetParticipant(ctx, matchID, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get participant: %w", err)
-	}
-	if participant == nil {
-		return nil, ErrNotParticipant
-	}
-	if participant.Status == repository.ParticipantStatusReady {
-		return nil, ErrTeamAlreadySubmitted
+		return nil, err
 	}
 
 	// Parse current state
@@ -446,29 +458,9 @@ func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64
 
 // Reroll replaces unpurchased cards with new ones
 func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64) (*ShopResponse, error) {
-	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	match, participant, err := s.validateShopPhaseAccess(ctx, matchID, userID, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get match: %w", err)
-	}
-	if match == nil {
-		return nil, ErrMatchNotFound
-	}
-	if match.Status != repository.MatchStatusShopPhase {
-		return nil, ErrMatchNotInShopPhase
-	}
-	if match.ShopPhaseDeadline != nil && time.Now().After(*match.ShopPhaseDeadline) {
-		return nil, ErrShopPhaseExpired
-	}
-
-	participant, err := s.gameRepo.GetParticipant(ctx, matchID, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get participant: %w", err)
-	}
-	if participant == nil {
-		return nil, ErrNotParticipant
-	}
-	if participant.Status == repository.ParticipantStatusReady {
-		return nil, ErrTeamAlreadySubmitted
+		return nil, err
 	}
 	if participant.CoinsRemaining < shop.RerollCost {
 		return nil, ErrNotEnoughCoins
@@ -537,29 +529,9 @@ func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64)
 
 // UpgradeCard applies an upgrade to a team card
 func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID int64, teamSlot int, upgradeType shop.UpgradeType) (*ShopResponse, error) {
-	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	_, participant, err := s.validateShopPhaseAccess(ctx, matchID, userID, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get match: %w", err)
-	}
-	if match == nil {
-		return nil, ErrMatchNotFound
-	}
-	if match.Status != repository.MatchStatusShopPhase {
-		return nil, ErrMatchNotInShopPhase
-	}
-	if match.ShopPhaseDeadline != nil && time.Now().After(*match.ShopPhaseDeadline) {
-		return nil, ErrShopPhaseExpired
-	}
-
-	participant, err := s.gameRepo.GetParticipant(ctx, matchID, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get participant: %w", err)
-	}
-	if participant == nil {
-		return nil, ErrNotParticipant
-	}
-	if participant.Status == repository.ParticipantStatusReady {
-		return nil, ErrTeamAlreadySubmitted
+		return nil, err
 	}
 	if participant.CoinsRemaining < shop.UpgradeCost {
 		return nil, ErrNotEnoughCoins
@@ -615,26 +587,9 @@ func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID i
 
 // SetTeamOrder sets the battle order for a player's team
 func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID int64, order []int) (*ShopResponse, error) {
-	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	_, participant, err := s.validateShopPhaseAccess(ctx, matchID, userID, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get match: %w", err)
-	}
-	if match == nil {
-		return nil, ErrMatchNotFound
-	}
-	if match.Status != repository.MatchStatusShopPhase {
-		return nil, ErrMatchNotInShopPhase
-	}
-
-	participant, err := s.gameRepo.GetParticipant(ctx, matchID, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get participant: %w", err)
-	}
-	if participant == nil {
-		return nil, ErrNotParticipant
-	}
-	if participant.Status == repository.ParticipantStatusReady {
-		return nil, ErrTeamAlreadySubmitted
+		return nil, err
 	}
 
 	// Validate order
@@ -677,26 +632,9 @@ func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID 
 
 // SubmitTeam submits the team for battle
 func (s *ArenaService) SubmitTeam(ctx context.Context, matchID string, userID int64) (*ShopResponse, error) {
-	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	_, participant, err := s.validateShopPhaseAccess(ctx, matchID, userID, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get match: %w", err)
-	}
-	if match == nil {
-		return nil, ErrMatchNotFound
-	}
-	if match.Status != repository.MatchStatusShopPhase {
-		return nil, ErrMatchNotInShopPhase
-	}
-
-	participant, err := s.gameRepo.GetParticipant(ctx, matchID, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get participant: %w", err)
-	}
-	if participant == nil {
-		return nil, ErrNotParticipant
-	}
-	if participant.Status == repository.ParticipantStatusReady {
-		return nil, ErrTeamAlreadySubmitted
+		return nil, err
 	}
 
 	// Validate team has 3 cards
@@ -939,7 +877,7 @@ func (s *ArenaService) GetLeaderboard(ctx context.Context, chatID int64, matchTy
 // PendingMatch represents a match that needs action
 type PendingMatch struct {
 	*repository.Match
-	Action           string `json:"action"`            // "auto_start" or "force_submit"
+	Action           string `json:"action"` // "auto_start" or "force_submit"
 	ParticipantCount int    `json:"participant_count"`
 }
 
@@ -987,11 +925,11 @@ func (s *ArenaService) GetPendingMatches(ctx context.Context) ([]*PendingMatch, 
 
 // AutoStartResult represents the result of an auto-start attempt
 type AutoStartResult struct {
-	MatchID    string `json:"match_id"`
-	ChatID     int64  `json:"chat_id"`
-	Action     string `json:"action"`     // "started" or "cancelled"
-	Reason     string `json:"reason"`     // Explanation
-	Participants int  `json:"participants"`
+	MatchID      string `json:"match_id"`
+	ChatID       int64  `json:"chat_id"`
+	Action       string `json:"action"` // "started" or "cancelled"
+	Reason       string `json:"reason"` // Explanation
+	Participants int    `json:"participants"`
 }
 
 // AutoStartMatch handles expired join deadline - starts match if 2+ participants, otherwise cancels
@@ -1074,10 +1012,10 @@ func (s *ArenaService) AutoStartMatch(ctx context.Context, matchID string) (*Aut
 
 // ForceSubmitResult represents the result of a force-submit operation
 type ForceSubmitResult struct {
-	MatchID        string   `json:"match_id"`
-	ChatID         int64    `json:"chat_id"`
-	ForcedUsers    []int64  `json:"forced_users"`    // Users who had their teams auto-submitted
-	BattleStarted  bool     `json:"battle_started"`
+	MatchID       string  `json:"match_id"`
+	ChatID        int64   `json:"chat_id"`
+	ForcedUsers   []int64 `json:"forced_users"` // Users who had their teams auto-submitted
+	BattleStarted bool    `json:"battle_started"`
 }
 
 // ForceSubmitTeams auto-assigns teams for participants who haven't submitted
@@ -1229,19 +1167,19 @@ func (s *ArenaService) forceSubmitTeam(ctx context.Context, matchID string, p *r
 
 // Tournament errors
 var (
-	ErrTournamentNotFound         = errors.New("tournament not found")
-	ErrTournamentNotOpen          = errors.New("tournament is not open for registration")
+	ErrTournamentNotFound           = errors.New("tournament not found")
+	ErrTournamentNotOpen            = errors.New("tournament is not open for registration")
 	ErrTournamentRegistrationClosed = errors.New("tournament registration has closed")
-	ErrAlreadyRegistered          = errors.New("already registered for this tournament")
-	ErrNotRegistered              = errors.New("not registered for this tournament")
-	ErrNoParticipants             = errors.New("no participants registered")
+	ErrAlreadyRegistered            = errors.New("already registered for this tournament")
+	ErrNotRegistered                = errors.New("not registered for this tournament")
+	ErrNoParticipants               = errors.New("no participants registered")
 )
 
 // TournamentResponse represents a tournament with participant info
 type TournamentResponse struct {
 	*repository.RankedTournament
 	Participants []*repository.TournamentParticipant `json:"participants,omitempty"`
-	CardCount    int                                  `json:"card_count"`
+	CardCount    int                                 `json:"card_count"`
 }
 
 // TournamentStartResult represents the result of starting a tournament

@@ -34,6 +34,103 @@ func (r *GameRepository) startDBSegment(ctx context.Context, name string) func()
 	return func() {} // no-op if no transaction
 }
 
+// rowScanner is an interface for sql.Row and sql.Rows
+type rowScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+// matchColumns is the standard column order for Match queries
+const matchColumns = `id, chat_id, match_type, format, status, created_at, join_deadline,
+       shop_phase_started_at, shop_phase_deadline, battle_started_at, completed_at,
+       tournament_date, creator_user_id, current_round, winner_user_id`
+
+// scanMatch scans a row into a Match struct, handling nullable fields
+func scanMatch(row rowScanner) (*Match, error) {
+	match := &Match{}
+	var format sql.NullString
+	var tournDate sql.NullString
+
+	err := row.Scan(
+		&match.ID, &match.ChatID, &match.MatchType, &format, &match.Status,
+		&match.CreatedAt, &match.JoinDeadline, &match.ShopPhaseStartedAt,
+		&match.ShopPhaseDeadline, &match.BattleStartedAt, &match.CompletedAt,
+		&tournDate, &match.CreatorUserID, &match.CurrentRound, &match.WinnerUserID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if format.Valid {
+		f := MatchFormat(format.String)
+		match.Format = &f
+	}
+	if tournDate.Valid {
+		match.TournamentDate = &tournDate.String
+	}
+
+	return match, nil
+}
+
+// participantColumns is the standard column order for Participant queries
+const participantColumns = `id, match_id, user_id, status, joined_at, coins_remaining,
+       shop_cards, team, team_order, team_submitted_at,
+       placement, wins, losses, total_damage_dealt`
+
+// scanParticipant scans a row into a Participant struct
+func scanParticipant(row rowScanner) (*Participant, error) {
+	p := &Participant{}
+	err := row.Scan(
+		&p.ID, &p.MatchID, &p.UserID, &p.Status, &p.JoinedAt,
+		&p.CoinsRemaining, &p.ShopCards, &p.Team, &p.TeamOrder,
+		&p.TeamSubmittedAt, &p.Placement, &p.Wins, &p.Losses, &p.TotalDamageDealt,
+	)
+	return p, err
+}
+
+// tournamentColumns is the standard column order for RankedTournament queries
+const tournamentColumns = `id, chat_id, tournament_date, status,
+       announcement_message_id, announced_at, registration_closed_at,
+       completed_at, match_id, winner_user_id, participant_count,
+       bracket_state, created_at`
+
+// scanTournament scans a row into a RankedTournament struct, handling nullable fields
+func scanTournament(row rowScanner) (*RankedTournament, error) {
+	t := &RankedTournament{}
+	var matchID sql.NullString
+
+	err := row.Scan(
+		&t.ID, &t.ChatID, &t.TournamentDate, &t.Status,
+		&t.AnnouncementMessageID, &t.AnnouncedAt, &t.RegistrationClosedAt,
+		&t.CompletedAt, &matchID, &t.WinnerUserID, &t.ParticipantCount,
+		&t.BracketState, &t.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if matchID.Valid {
+		t.MatchID = &matchID.String
+	}
+
+	return t, nil
+}
+
+// roundColumns is the standard column order for MatchRound queries
+const roundColumns = `id, match_id, round_number, player_a_id, player_b_id,
+       player_a_team, player_b_team, winner_id, is_draw, battle_log,
+       player_a_damage, player_b_damage, total_rounds, created_at`
+
+// scanRound scans a row into a MatchRound struct
+func scanRound(row rowScanner) (*MatchRound, error) {
+	round := &MatchRound{}
+	err := row.Scan(
+		&round.ID, &round.MatchID, &round.RoundNumber, &round.PlayerAID, &round.PlayerBID,
+		&round.PlayerATeam, &round.PlayerBTeam, &round.WinnerID, &round.IsDraw, &round.BattleLog,
+		&round.PlayerADmg, &round.PlayerBDmg, &round.TotalRounds, &round.CreatedAt,
+	)
+	return round, err
+}
+
 // MatchType enum
 type MatchType string
 
@@ -117,20 +214,20 @@ type ParticipantWithUser struct {
 
 // MatchRound represents a battle round
 type MatchRound struct {
-	ID           int64           `json:"id"`
-	MatchID      string          `json:"match_id"`
-	RoundNumber  int             `json:"round_number"`
-	PlayerAID    int64           `json:"player_a_id"`
-	PlayerBID    int64           `json:"player_b_id"`
-	PlayerATeam  json.RawMessage `json:"player_a_team"`
-	PlayerBTeam  json.RawMessage `json:"player_b_team"`
-	WinnerID     *int64          `json:"winner_id,omitempty"`
-	IsDraw       bool            `json:"is_draw"`
-	BattleLog    json.RawMessage `json:"battle_log"`
-	PlayerADmg   int             `json:"player_a_damage"`
-	PlayerBDmg   int             `json:"player_b_damage"`
-	TotalRounds  int             `json:"total_rounds"`
-	CreatedAt    time.Time       `json:"created_at"`
+	ID          int64           `json:"id"`
+	MatchID     string          `json:"match_id"`
+	RoundNumber int             `json:"round_number"`
+	PlayerAID   int64           `json:"player_a_id"`
+	PlayerBID   int64           `json:"player_b_id"`
+	PlayerATeam json.RawMessage `json:"player_a_team"`
+	PlayerBTeam json.RawMessage `json:"player_b_team"`
+	WinnerID    *int64          `json:"winner_id,omitempty"`
+	IsDraw      bool            `json:"is_draw"`
+	BattleLog   json.RawMessage `json:"battle_log"`
+	PlayerADmg  int             `json:"player_a_damage"`
+	PlayerBDmg  int             `json:"player_b_damage"`
+	TotalRounds int             `json:"total_rounds"`
+	CreatedAt   time.Time       `json:"created_at"`
 }
 
 // LeaderboardEntry represents a user's game stats
@@ -152,8 +249,8 @@ type LeaderboardEntry struct {
 	FirstMatchAt            *time.Time      `json:"first_match_at,omitempty"`
 	LastMatchAt             *time.Time      `json:"last_match_at,omitempty"`
 	// User info from join
-	FirstName               string          `json:"first_name,omitempty"`
-	Username                string          `json:"username,omitempty"`
+	FirstName string `json:"first_name,omitempty"`
+	Username  string `json:"username,omitempty"`
 }
 
 // CreateMatch creates a new match
@@ -168,36 +265,16 @@ func (r *GameRepository) CreateMatch(ctx context.Context, chatID int64, matchTyp
 		joinDeadline = &deadline
 	}
 
-	query := `
+	query := fmt.Sprintf(`
 		INSERT INTO game_matches (id, chat_id, match_type, creator_user_id, tournament_date, join_deadline)
 		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, chat_id, match_type, format, status, created_at, join_deadline,
-		          shop_phase_started_at, shop_phase_deadline, battle_started_at, completed_at,
-		          tournament_date, creator_user_id, current_round, winner_user_id
-	`
+		RETURNING %s
+	`, matchColumns)
 
-	match := &Match{}
-	var format sql.NullString
-	var tournDate sql.NullString
-
-	err := r.db.QueryRowContext(ctx, query,
-		id, chatID, matchType, creatorUserID, tournamentDate, joinDeadline,
-	).Scan(
-		&match.ID, &match.ChatID, &match.MatchType, &format, &match.Status,
-		&match.CreatedAt, &match.JoinDeadline, &match.ShopPhaseStartedAt,
-		&match.ShopPhaseDeadline, &match.BattleStartedAt, &match.CompletedAt,
-		&tournDate, &match.CreatorUserID, &match.CurrentRound, &match.WinnerUserID,
-	)
+	row := r.db.QueryRowContext(ctx, query, id, chatID, matchType, creatorUserID, tournamentDate, joinDeadline)
+	match, err := scanMatch(row)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create match: %w", err)
-	}
-
-	if format.Valid {
-		f := MatchFormat(format.String)
-		match.Format = &f
-	}
-	if tournDate.Valid {
-		match.TournamentDate = &tournDate.String
 	}
 
 	return match, nil
@@ -207,24 +284,10 @@ func (r *GameRepository) CreateMatch(ctx context.Context, chatID int64, matchTyp
 func (r *GameRepository) GetMatch(ctx context.Context, matchID string) (*Match, error) {
 	defer r.startDBSegment(ctx, "get-match")()
 
-	query := `
-		SELECT id, chat_id, match_type, format, status, created_at, join_deadline,
-		       shop_phase_started_at, shop_phase_deadline, battle_started_at, completed_at,
-		       tournament_date, creator_user_id, current_round, winner_user_id
-		FROM game_matches
-		WHERE id = $1
-	`
+	query := fmt.Sprintf(`SELECT %s FROM game_matches WHERE id = $1`, matchColumns)
 
-	match := &Match{}
-	var format sql.NullString
-	var tournDate sql.NullString
-
-	err := r.db.QueryRowContext(ctx, query, matchID).Scan(
-		&match.ID, &match.ChatID, &match.MatchType, &format, &match.Status,
-		&match.CreatedAt, &match.JoinDeadline, &match.ShopPhaseStartedAt,
-		&match.ShopPhaseDeadline, &match.BattleStartedAt, &match.CompletedAt,
-		&tournDate, &match.CreatorUserID, &match.CurrentRound, &match.WinnerUserID,
-	)
+	row := r.db.QueryRowContext(ctx, query, matchID)
+	match, err := scanMatch(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -232,33 +295,19 @@ func (r *GameRepository) GetMatch(ctx context.Context, matchID string) (*Match, 
 		return nil, fmt.Errorf("failed to get match: %w", err)
 	}
 
-	if format.Valid {
-		f := MatchFormat(format.String)
-		match.Format = &f
-	}
-	if tournDate.Valid {
-		match.TournamentDate = &tournDate.String
-	}
-
 	return match, nil
 }
 
 // GetActiveMatches retrieves active matches for a chat
 func (r *GameRepository) GetActiveMatches(ctx context.Context, chatID int64) ([]*Match, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-active-matches")
-		defer segment.End()
-	}
+	defer r.startDBSegment(ctx, "get-active-matches")()
 
-	query := `
-		SELECT id, chat_id, match_type, format, status, created_at, join_deadline,
-		       shop_phase_started_at, shop_phase_deadline, battle_started_at, completed_at,
-		       tournament_date, creator_user_id, current_round, winner_user_id
+	query := fmt.Sprintf(`
+		SELECT %s
 		FROM game_matches
 		WHERE chat_id = $1 AND status NOT IN ('completed', 'cancelled')
 		ORDER BY created_at DESC
-	`
+	`, matchColumns)
 
 	rows, err := r.db.QueryContext(ctx, query, chatID)
 	if err != nil {
@@ -268,28 +317,10 @@ func (r *GameRepository) GetActiveMatches(ctx context.Context, chatID int64) ([]
 
 	matches := make([]*Match, 0)
 	for rows.Next() {
-		match := &Match{}
-		var format sql.NullString
-		var tournDate sql.NullString
-
-		err := rows.Scan(
-			&match.ID, &match.ChatID, &match.MatchType, &format, &match.Status,
-			&match.CreatedAt, &match.JoinDeadline, &match.ShopPhaseStartedAt,
-			&match.ShopPhaseDeadline, &match.BattleStartedAt, &match.CompletedAt,
-			&tournDate, &match.CreatorUserID, &match.CurrentRound, &match.WinnerUserID,
-		)
+		match, err := scanMatch(rows)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan match row: %w", err)
 		}
-
-		if format.Valid {
-			f := MatchFormat(format.String)
-			match.Format = &f
-		}
-		if tournDate.Valid {
-			match.TournamentDate = &tournDate.String
-		}
-
 		matches = append(matches, match)
 	}
 
@@ -381,27 +412,17 @@ func (r *GameRepository) CompleteMatch(ctx context.Context, matchID string, winn
 
 // AddParticipant adds a user to a match
 func (r *GameRepository) AddParticipant(ctx context.Context, matchID string, userID int64) (*Participant, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:add-participant")
-		defer segment.End()
-	}
+	defer r.startDBSegment(ctx, "add-participant")()
 
-	query := `
+	query := fmt.Sprintf(`
 		INSERT INTO game_match_participants (match_id, user_id)
 		VALUES ($1, $2)
 		ON CONFLICT (match_id, user_id) DO NOTHING
-		RETURNING id, match_id, user_id, status, joined_at, coins_remaining,
-		          shop_cards, team, team_order, team_submitted_at,
-		          placement, wins, losses, total_damage_dealt
-	`
+		RETURNING %s
+	`, participantColumns)
 
-	p := &Participant{}
-	err := r.db.QueryRowContext(ctx, query, matchID, userID).Scan(
-		&p.ID, &p.MatchID, &p.UserID, &p.Status, &p.JoinedAt,
-		&p.CoinsRemaining, &p.ShopCards, &p.Team, &p.TeamOrder,
-		&p.TeamSubmittedAt, &p.Placement, &p.Wins, &p.Losses, &p.TotalDamageDealt,
-	)
+	row := r.db.QueryRowContext(ctx, query, matchID, userID)
+	p, err := scanParticipant(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// Already exists, fetch existing
@@ -415,26 +436,12 @@ func (r *GameRepository) AddParticipant(ctx context.Context, matchID string, use
 
 // GetParticipant retrieves a participant
 func (r *GameRepository) GetParticipant(ctx context.Context, matchID string, userID int64) (*Participant, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-participant")
-		defer segment.End()
-	}
+	defer r.startDBSegment(ctx, "get-participant")()
 
-	query := `
-		SELECT id, match_id, user_id, status, joined_at, coins_remaining,
-		       shop_cards, team, team_order, team_submitted_at,
-		       placement, wins, losses, total_damage_dealt
-		FROM game_match_participants
-		WHERE match_id = $1 AND user_id = $2
-	`
+	query := fmt.Sprintf(`SELECT %s FROM game_match_participants WHERE match_id = $1 AND user_id = $2`, participantColumns)
 
-	p := &Participant{}
-	err := r.db.QueryRowContext(ctx, query, matchID, userID).Scan(
-		&p.ID, &p.MatchID, &p.UserID, &p.Status, &p.JoinedAt,
-		&p.CoinsRemaining, &p.ShopCards, &p.Team, &p.TeamOrder,
-		&p.TeamSubmittedAt, &p.Placement, &p.Wins, &p.Losses, &p.TotalDamageDealt,
-	)
+	row := r.db.QueryRowContext(ctx, query, matchID, userID)
+	p, err := scanParticipant(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -541,32 +548,22 @@ func (r *GameRepository) SubmitTeam(ctx context.Context, matchID string, userID 
 
 // CreateRound creates a battle round record
 func (r *GameRepository) CreateRound(ctx context.Context, matchID string, roundNumber int, playerAID, playerBID int64, playerATeam, playerBTeam, battleLog json.RawMessage, winnerID *int64, isDraw bool, playerADmg, playerBDmg, totalRounds int) (*MatchRound, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:create-round")
-		defer segment.End()
-	}
+	defer r.startDBSegment(ctx, "create-round")()
 
-	query := `
+	query := fmt.Sprintf(`
 		INSERT INTO game_match_rounds (match_id, round_number, player_a_id, player_b_id,
 		                               player_a_team, player_b_team, battle_log,
 		                               winner_id, is_draw, player_a_damage, player_b_damage, total_rounds)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-		RETURNING id, match_id, round_number, player_a_id, player_b_id,
-		          player_a_team, player_b_team, winner_id, is_draw, battle_log,
-		          player_a_damage, player_b_damage, total_rounds, created_at
-	`
+		RETURNING %s
+	`, roundColumns)
 
-	round := &MatchRound{}
-	err := r.db.QueryRowContext(ctx, query,
+	row := r.db.QueryRowContext(ctx, query,
 		matchID, roundNumber, playerAID, playerBID,
 		playerATeam, playerBTeam, battleLog,
 		winnerID, isDraw, playerADmg, playerBDmg, totalRounds,
-	).Scan(
-		&round.ID, &round.MatchID, &round.RoundNumber, &round.PlayerAID, &round.PlayerBID,
-		&round.PlayerATeam, &round.PlayerBTeam, &round.WinnerID, &round.IsDraw, &round.BattleLog,
-		&round.PlayerADmg, &round.PlayerBDmg, &round.TotalRounds, &round.CreatedAt,
 	)
+	round, err := scanRound(row)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create round: %w", err)
 	}
@@ -576,20 +573,14 @@ func (r *GameRepository) CreateRound(ctx context.Context, matchID string, roundN
 
 // GetMatchRounds retrieves all rounds for a match
 func (r *GameRepository) GetMatchRounds(ctx context.Context, matchID string) ([]*MatchRound, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-match-rounds")
-		defer segment.End()
-	}
+	defer r.startDBSegment(ctx, "get-match-rounds")()
 
-	query := `
-		SELECT id, match_id, round_number, player_a_id, player_b_id,
-		       player_a_team, player_b_team, winner_id, is_draw, battle_log,
-		       player_a_damage, player_b_damage, total_rounds, created_at
+	query := fmt.Sprintf(`
+		SELECT %s
 		FROM game_match_rounds
 		WHERE match_id = $1
 		ORDER BY round_number, id
-	`
+	`, roundColumns)
 
 	rows, err := r.db.QueryContext(ctx, query, matchID)
 	if err != nil {
@@ -599,12 +590,7 @@ func (r *GameRepository) GetMatchRounds(ctx context.Context, matchID string) ([]
 
 	rounds := make([]*MatchRound, 0)
 	for rows.Next() {
-		round := &MatchRound{}
-		err := rows.Scan(
-			&round.ID, &round.MatchID, &round.RoundNumber, &round.PlayerAID, &round.PlayerBID,
-			&round.PlayerATeam, &round.PlayerBTeam, &round.WinnerID, &round.IsDraw, &round.BattleLog,
-			&round.PlayerADmg, &round.PlayerBDmg, &round.TotalRounds, &round.CreatedAt,
-		)
+		round, err := scanRound(rows)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan round row: %w", err)
 		}
@@ -712,20 +698,14 @@ func (r *GameRepository) GetReadyParticipantCount(ctx context.Context, matchID s
 
 // GetMatchesByStatus returns all matches with a given status
 func (r *GameRepository) GetMatchesByStatus(ctx context.Context, status MatchStatus) ([]*Match, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-matches-by-status")
-		defer segment.End()
-	}
+	defer r.startDBSegment(ctx, "get-matches-by-status")()
 
-	query := `
-		SELECT id, chat_id, match_type, format, status, creator_user_id,
-		       tournament_date, created_at, join_deadline, shop_phase_started_at,
-		       shop_phase_deadline, battle_started_at, completed_at, winner_user_id
+	query := fmt.Sprintf(`
+		SELECT %s
 		FROM game_matches
 		WHERE status = $1
 		ORDER BY created_at ASC
-	`
+	`, matchColumns)
 
 	rows, err := r.db.QueryContext(ctx, query, status)
 	if err != nil {
@@ -735,16 +715,11 @@ func (r *GameRepository) GetMatchesByStatus(ctx context.Context, status MatchSta
 
 	var matches []*Match
 	for rows.Next() {
-		m := &Match{}
-		err := rows.Scan(
-			&m.ID, &m.ChatID, &m.MatchType, &m.Format, &m.Status, &m.CreatorUserID,
-			&m.TournamentDate, &m.CreatedAt, &m.JoinDeadline, &m.ShopPhaseStartedAt,
-			&m.ShopPhaseDeadline, &m.BattleStartedAt, &m.CompletedAt, &m.WinnerUserID,
-		)
+		match, err := scanMatch(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to scan match row: %w", err)
 		}
-		matches = append(matches, m)
+		matches = append(matches, match)
 	}
 
 	return matches, rows.Err()
@@ -785,19 +760,19 @@ const (
 
 // RankedTournament represents a daily ranked tournament
 type RankedTournament struct {
-	ID                     int64            `json:"id"`
-	ChatID                 int64            `json:"chat_id"`
-	TournamentDate         string           `json:"tournament_date"`
-	Status                 TournamentStatus `json:"status"`
-	AnnouncementMessageID  *int64           `json:"announcement_message_id,omitempty"`
-	AnnouncedAt            *time.Time       `json:"announced_at,omitempty"`
-	RegistrationClosedAt   *time.Time       `json:"registration_closed_at,omitempty"`
-	CompletedAt            *time.Time       `json:"completed_at,omitempty"`
-	MatchID                *string          `json:"match_id,omitempty"`
-	WinnerUserID           *int64           `json:"winner_user_id,omitempty"`
-	ParticipantCount       int              `json:"participant_count"`
-	BracketState           *json.RawMessage `json:"bracket_state,omitempty"`
-	CreatedAt              time.Time        `json:"created_at"`
+	ID                    int64            `json:"id"`
+	ChatID                int64            `json:"chat_id"`
+	TournamentDate        string           `json:"tournament_date"`
+	Status                TournamentStatus `json:"status"`
+	AnnouncementMessageID *int64           `json:"announcement_message_id,omitempty"`
+	AnnouncedAt           *time.Time       `json:"announced_at,omitempty"`
+	RegistrationClosedAt  *time.Time       `json:"registration_closed_at,omitempty"`
+	CompletedAt           *time.Time       `json:"completed_at,omitempty"`
+	MatchID               *string          `json:"match_id,omitempty"`
+	WinnerUserID          *int64           `json:"winner_user_id,omitempty"`
+	ParticipantCount      int              `json:"participant_count"`
+	BracketState          *json.RawMessage `json:"bracket_state,omitempty"`
+	CreatedAt             time.Time        `json:"created_at"`
 }
 
 // TournamentParticipant represents a user registered for a tournament
@@ -848,29 +823,12 @@ func (r *GameRepository) GetOrCreateTournament(ctx context.Context, chatID int64
 
 // GetTournamentByID retrieves a tournament by ID
 func (r *GameRepository) GetTournamentByID(ctx context.Context, id int64) (*RankedTournament, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-tournament-by-id")
-		defer segment.End()
-	}
+	defer r.startDBSegment(ctx, "get-tournament-by-id")()
 
-	query := `
-		SELECT id, chat_id, tournament_date, status,
-		       announcement_message_id, announced_at, registration_closed_at,
-		       completed_at, match_id, winner_user_id, participant_count,
-		       bracket_state, created_at
-		FROM game_ranked_tournaments
-		WHERE id = $1
-	`
+	query := fmt.Sprintf(`SELECT %s FROM game_ranked_tournaments WHERE id = $1`, tournamentColumns)
 
-	t := &RankedTournament{}
-	var matchID sql.NullString
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&t.ID, &t.ChatID, &t.TournamentDate, &t.Status,
-		&t.AnnouncementMessageID, &t.AnnouncedAt, &t.RegistrationClosedAt,
-		&t.CompletedAt, &matchID, &t.WinnerUserID, &t.ParticipantCount,
-		&t.BracketState, &t.CreatedAt,
-	)
+	row := r.db.QueryRowContext(ctx, query, id)
+	t, err := scanTournament(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -878,47 +836,22 @@ func (r *GameRepository) GetTournamentByID(ctx context.Context, id int64) (*Rank
 		return nil, fmt.Errorf("failed to get tournament: %w", err)
 	}
 
-	if matchID.Valid {
-		t.MatchID = &matchID.String
-	}
-
 	return t, nil
 }
 
 // GetTodayTournament retrieves today's tournament for a chat
 func (r *GameRepository) GetTodayTournament(ctx context.Context, chatID int64, date string) (*RankedTournament, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-today-tournament")
-		defer segment.End()
-	}
+	defer r.startDBSegment(ctx, "get-today-tournament")()
 
-	query := `
-		SELECT id, chat_id, tournament_date, status,
-		       announcement_message_id, announced_at, registration_closed_at,
-		       completed_at, match_id, winner_user_id, participant_count,
-		       bracket_state, created_at
-		FROM game_ranked_tournaments
-		WHERE chat_id = $1 AND tournament_date = $2::date
-	`
+	query := fmt.Sprintf(`SELECT %s FROM game_ranked_tournaments WHERE chat_id = $1 AND tournament_date = $2::date`, tournamentColumns)
 
-	t := &RankedTournament{}
-	var matchID sql.NullString
-	err := r.db.QueryRowContext(ctx, query, chatID, date).Scan(
-		&t.ID, &t.ChatID, &t.TournamentDate, &t.Status,
-		&t.AnnouncementMessageID, &t.AnnouncedAt, &t.RegistrationClosedAt,
-		&t.CompletedAt, &matchID, &t.WinnerUserID, &t.ParticipantCount,
-		&t.BracketState, &t.CreatedAt,
-	)
+	row := r.db.QueryRowContext(ctx, query, chatID, date)
+	t, err := scanTournament(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to get today's tournament: %w", err)
-	}
-
-	if matchID.Valid {
-		t.MatchID = &matchID.String
 	}
 
 	return t, nil
@@ -1237,21 +1170,14 @@ func (r *GameRepository) GetChatsWithTimezone(ctx context.Context) ([]*ChatTimez
 
 // GetTournamentsByStatus returns tournaments with a given status
 func (r *GameRepository) GetTournamentsByStatus(ctx context.Context, status TournamentStatus) ([]*RankedTournament, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-tournaments-by-status")
-		defer segment.End()
-	}
+	defer r.startDBSegment(ctx, "get-tournaments-by-status")()
 
-	query := `
-		SELECT id, chat_id, tournament_date, status,
-		       announcement_message_id, announced_at, registration_closed_at,
-		       completed_at, match_id, winner_user_id, participant_count,
-		       bracket_state, created_at
+	query := fmt.Sprintf(`
+		SELECT %s
 		FROM game_ranked_tournaments
 		WHERE status = $1
 		ORDER BY created_at
-	`
+	`, tournamentColumns)
 
 	rows, err := r.db.QueryContext(ctx, query, status)
 	if err != nil {
@@ -1261,19 +1187,9 @@ func (r *GameRepository) GetTournamentsByStatus(ctx context.Context, status Tour
 
 	tournaments := make([]*RankedTournament, 0)
 	for rows.Next() {
-		t := &RankedTournament{}
-		var matchID sql.NullString
-		err := rows.Scan(
-			&t.ID, &t.ChatID, &t.TournamentDate, &t.Status,
-			&t.AnnouncementMessageID, &t.AnnouncedAt, &t.RegistrationClosedAt,
-			&t.CompletedAt, &matchID, &t.WinnerUserID, &t.ParticipantCount,
-			&t.BracketState, &t.CreatedAt,
-		)
+		t, err := scanTournament(rows)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan tournament: %w", err)
-		}
-		if matchID.Valid {
-			t.MatchID = &matchID.String
 		}
 		tournaments = append(tournaments, t)
 	}
@@ -1283,13 +1199,10 @@ func (r *GameRepository) GetTournamentsByStatus(ctx context.Context, status Tour
 
 // GetTournamentsWithPendingRounds returns in-progress tournaments that need next round execution
 func (r *GameRepository) GetTournamentsWithPendingRounds(ctx context.Context) ([]*RankedTournament, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-tournaments-pending-rounds")
-		defer segment.End()
-	}
+	defer r.startDBSegment(ctx, "get-tournaments-pending-rounds")()
 
 	// Get tournaments in in_progress status where the linked match is in battle_phase
+	// Note: Using explicit columns with table alias for JOIN query
 	query := `
 		SELECT t.id, t.chat_id, t.tournament_date, t.status,
 		       t.announcement_message_id, t.announced_at, t.registration_closed_at,
@@ -1310,19 +1223,9 @@ func (r *GameRepository) GetTournamentsWithPendingRounds(ctx context.Context) ([
 
 	tournaments := make([]*RankedTournament, 0)
 	for rows.Next() {
-		t := &RankedTournament{}
-		var matchID sql.NullString
-		err := rows.Scan(
-			&t.ID, &t.ChatID, &t.TournamentDate, &t.Status,
-			&t.AnnouncementMessageID, &t.AnnouncedAt, &t.RegistrationClosedAt,
-			&t.CompletedAt, &matchID, &t.WinnerUserID, &t.ParticipantCount,
-			&t.BracketState, &t.CreatedAt,
-		)
+		t, err := scanTournament(rows)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan tournament: %w", err)
-		}
-		if matchID.Valid {
-			t.MatchID = &matchID.String
 		}
 		tournaments = append(tournaments, t)
 	}

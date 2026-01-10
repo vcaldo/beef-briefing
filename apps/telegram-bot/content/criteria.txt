@@ -90,3 +90,22 @@ Seu tier é definido pelo score geral:
   • Usuários únicos que reagiram
   • Usuários únicos que responderam
   • Mensagens virais (4+ reações)
+
+<b>Estatísticas de Combate</b>
+
+Além das 7 métricas, seu card inclui estatísticas de combate derivadas para futuras funcionalidades de jogo:
+
+<i>⚔️ ATK (1-10)</i> - Poder ofensivo
+  • 40% Atividade
+  • 35% Toxicidade
+  • 25% Humor
+
+<i>🛡️ DEF (1-10)</i> - Capacidade defensiva
+  • 40% Presença
+  • 35% Aura
+  • 25% Popularidade
+
+<i>🥩 HP (3-30)</i> - Pontos de vida
+  • DEF × 3
+
+Essas estatísticas não afetam seu Score Geral ou tier.

@@ -35,6 +35,14 @@
       "tier_5": ["#3d4c53", "#3d4c53"],
       "tier_6": ["#233554", "#233554"]
     },
+    "tier_bar_contrast": {
+      "tier_1": "#0a192f",
+      "tier_2": "#0a192f",
+      "tier_3": "#0a192f",
+      "tier_4": "#0a192f",
+      "tier_5": "#64ffda",
+      "tier_6": "#64ffda"
+    },
     "effects": {
       "avatar_glow": "rgba(100, 255, 218, 0.1)",
       "username_glow": "rgba(0,0,0,0)",

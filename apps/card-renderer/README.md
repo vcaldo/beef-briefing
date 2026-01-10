@@ -159,6 +159,18 @@ make ml-run-render ML_ARGS="--week 2025-01-06 --theme mytheme"
   {{ stat.percentage }}   {# 0-100 for progress bars #}
 {% endfor %}
 
+{# Combat Stats (RPG-style) #}
+{% if combat %}
+  {{ combat.atk }}        {# 1-10 attack value #}
+  {{ combat.def_ }}       {# 1-10 defense value #}
+  {{ combat.hp }}         {# 3-30 health points #}
+{% endif %}
+
+{# Overall Score & Tier #}
+{{ overall.score }}       {# 0-100 overall score #}
+{{ overall.label }}       {# "Lendario", "Bichao", etc. #}
+{{ overall.tier_class }}  {# "tier-1" through "tier-6" #}
+
 {# Badges (max 4) #}
 {% for badge in badges %}
   {{ badge.name }}   {# "Night Owl" #}

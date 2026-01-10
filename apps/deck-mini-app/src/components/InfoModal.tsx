@@ -250,6 +250,44 @@ function CriteriaContent() {
           <li>Mensagens virais (4+ reações)</li>
         </ul>
       </div>
+
+      <h3>Estatísticas de Combate</h3>
+      <p>
+        Além das métricas, seu card inclui stats de combate derivadas para
+        futuras funcionalidades de jogo:
+      </p>
+
+      <div className="metric-card">
+        <h4>⚔️ ATK (1-10)</h4>
+        <p>Poder ofensivo</p>
+        <ul>
+          <li>40% Atividade</li>
+          <li>35% Toxicidade</li>
+          <li>25% Humor</li>
+        </ul>
+      </div>
+
+      <div className="metric-card">
+        <h4>🛡️ DEF (1-10)</h4>
+        <p>Capacidade defensiva</p>
+        <ul>
+          <li>40% Presença</li>
+          <li>35% Aura</li>
+          <li>25% Popularidade</li>
+        </ul>
+      </div>
+
+      <div className="metric-card">
+        <h4>🥩 HP (3-30)</h4>
+        <p>Pontos de vida</p>
+        <ul>
+          <li>DEF × 3</li>
+        </ul>
+      </div>
+
+      <p className="note">
+        Essas estatísticas não afetam seu Score Geral ou tier.
+      </p>
     </div>
   )
 }
@@ -347,6 +385,34 @@ function TechnicalContent() {
         <li>Cards: Gerados semanalmente (segunda a domingo)</li>
         <li>Mínimo: 10 mensagens para aparecer no ranking</li>
       </ul>
+
+      <h3>Estatísticas de Combate</h3>
+      <p>Derivadas das métricas existentes para gamificação:</p>
+
+      <div className="tech-card">
+        <h4>⚔️ ATK (Ataque)</h4>
+        <div className="formula">
+          <code>raw_atk = 0.40×Atividade + 0.35×Toxicidade + 0.25×Humor</code>
+          <code>ATK = max(1, round(raw_atk / 10))</code>
+        </div>
+      </div>
+
+      <div className="tech-card">
+        <h4>🛡️ DEF (Defesa)</h4>
+        <div className="formula">
+          <code>raw_def = 0.40×Presença + 0.35×Aura + 0.25×Popularidade</code>
+          <code>DEF = max(1, round(raw_def / 10))</code>
+        </div>
+      </div>
+
+      <div className="tech-card">
+        <h4>🥩 HP (Vida)</h4>
+        <div className="formula">
+          <code>HP = DEF × 3</code>
+        </div>
+      </div>
+
+      <p>Range: ATK/DEF (1-10), HP (3-30)</p>
     </div>
   )
 }

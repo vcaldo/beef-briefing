@@ -190,10 +190,10 @@ class CardGenerator:
         """
         stats = {}
 
-        # Phase 1: Compute base metrics (everything except overall)
+        # Phase 1: Compute base metrics (everything except overall and combat)
         for stat_name, calculator in CALCULATORS.items():
-            if stat_name == "overall":
-                continue  # Computed in phase 2
+            if stat_name in ("overall", "combat"):
+                continue  # Computed in later phases
 
             try:
                 result = calculator(
@@ -221,6 +221,20 @@ class CardGenerator:
             except Exception as e:
                 logger.warning(
                     f"Calculator overall failed for user {user_id}: {e}"
+                )
+
+        # Phase 3: Compute combat stats with existing stats
+        if "combat" in CALCULATORS and stats:
+            try:
+                result = CALCULATORS["combat"](
+                    self._engine, user_id, chat_id, window_start, window_end,
+                    existing_stats=stats,
+                )
+                if result is not None:
+                    stats["combat"] = result.value
+            except Exception as e:
+                logger.warning(
+                    f"Calculator combat failed for user {user_id}: {e}"
                 )
 
         return stats

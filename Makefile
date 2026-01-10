@@ -479,6 +479,43 @@ ml-clean-cards-prod: ## Clean cards for a chat (prod). Usage: make ml-clean-card
 	./scripts/ml-processor.sh --prod clean-cards $(ML_ARGS)
 
 # =============================================================================
+# ML DASHBOARD (ml-dashboard-*)
+# =============================================================================
+# Dev-only tool for exploring ML-processed data
+# Backend: FastAPI (port 8052) | Frontend: React/Vite (port 5175)
+
+ml-dashboard-up: ## Start ML Dashboard (backend + frontend)
+	@$(DC) up -d ml-dashboard-backend ml-dashboard-frontend
+	@echo ""
+	@echo "ML Dashboard started:"
+	@echo "  Frontend: http://localhost:5175"
+	@echo "  Backend:  http://localhost:8052"
+	@echo ""
+
+ml-dashboard-up-build: ## Rebuild and start ML Dashboard
+	@$(DC) up -d --build ml-dashboard-backend ml-dashboard-frontend
+	@echo ""
+	@echo "ML Dashboard started:"
+	@echo "  Frontend: http://localhost:5175"
+	@echo "  Backend:  http://localhost:8052"
+	@echo ""
+
+ml-dashboard-down: ## Stop ML Dashboard services
+	@$(DC) stop ml-dashboard-backend ml-dashboard-frontend
+
+ml-dashboard-logs: ## Tail logs from ML Dashboard services
+	$(DC) logs -f ml-dashboard-backend ml-dashboard-frontend
+
+ml-dashboard-logs-backend: ## Tail logs from ML Dashboard backend
+	$(DC) logs -f ml-dashboard-backend
+
+ml-dashboard-logs-frontend: ## Tail logs from ML Dashboard frontend
+	$(DC) logs -f ml-dashboard-frontend
+
+ml-dashboard-shell: ## Open shell in ML Dashboard backend container
+	$(DC) exec ml-dashboard-backend /bin/bash
+
+# =============================================================================
 # MINIO CLIENT (mc-*)
 # =============================================================================
 mc-setup-prod: ## Configure MinIO Client alias for production
@@ -518,4 +555,6 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	ml-run ml-run-status ml-run-once ml-run-continuous ml-run-cards ml-run-render \
 	ml-run-prod ml-run-status-prod ml-run-once-prod ml-run-continuous-prod ml-run-cards-prod ml-run-render-prod \
 	ml-shell ml-clean-dev ml-clean-prod ml-clean-cards-dev ml-clean-cards-prod \
+	ml-dashboard-up ml-dashboard-up-build ml-dashboard-down ml-dashboard-logs \
+	ml-dashboard-logs-backend ml-dashboard-logs-frontend ml-dashboard-shell \
 	mc-setup-prod

@@ -953,3 +953,127 @@ func (h *MiniAppHandler) HandleMediaOverview(w http.ResponseWriter, r *http.Requ
 
 	httputil.RespondJSON(w, response, http.StatusOK)
 }
+
+// HandleGetTimezone handles GET /api/v1/mini-app/settings/timezone
+func (h *MiniAppHandler) HandleGetTimezone(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:get-timezone")
+	}
+
+	claims := middleware.GetClaimsFromContext(ctx)
+	if claims == nil {
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	chatIDStr := r.URL.Query().Get("chat_id")
+	if chatIDStr == "" {
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
+		return
+	}
+	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+	if err != nil {
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
+		return
+	}
+
+	// Verify chat access
+	if claims.ChatID != nil && *claims.ChatID != chatID {
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+	}
+
+	response, err := h.service.GetChatTimezone(ctx, chatID)
+	if err != nil {
+		slog.Error("failed to get timezone", "error", err, "chat_id", chatID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	httputil.RespondJSON(w, response, http.StatusOK)
+}
+
+// SetTimezoneRequest represents the request body for setting timezone
+type SetTimezoneRequest struct {
+	Timezone string `json:"timezone"`
+}
+
+// HandleSetTimezone handles PUT /api/v1/mini-app/settings/timezone
+func (h *MiniAppHandler) HandleSetTimezone(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:set-timezone")
+	}
+
+	claims := middleware.GetClaimsFromContext(ctx)
+	if claims == nil {
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Admin-only endpoint
+	if !h.service.IsAdmin(claims.UserID) {
+		httputil.RespondError(w, "admin access required", http.StatusForbidden)
+		return
+	}
+
+	chatIDStr := r.URL.Query().Get("chat_id")
+	if chatIDStr == "" {
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
+		return
+	}
+	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+	if err != nil {
+		httputil.RespondError(w, "invalid chat_id", http.StatusBadRequest)
+		return
+	}
+
+	// Verify chat access
+	if claims.ChatID != nil && *claims.ChatID != chatID {
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
+		return
+	}
+
+	var req SetTimezoneRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Timezone == "" {
+		httputil.RespondError(w, "timezone is required", http.StatusBadRequest)
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("timezone", req.Timezone)
+	}
+
+	if err := h.service.SetChatTimezone(ctx, chatID, req.Timezone); err != nil {
+		errStr := err.Error()
+		if len(errStr) >= 15 && errStr[:15] == "invalid timezone" {
+			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		slog.Error("failed to set timezone", "error", err, "chat_id", chatID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	response, _ := h.service.GetChatTimezone(ctx, chatID)
+	httputil.RespondJSON(w, response, http.StatusOK)
+}

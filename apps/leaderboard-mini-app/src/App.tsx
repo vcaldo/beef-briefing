@@ -10,6 +10,7 @@ import { InteractionsPage } from './components/interactions/InteractionsPage'
 import { MediaPage } from './components/media'
 import { ProfilePage } from './components/profile/ProfilePage'
 import { CardPage } from './components/card'
+import { AdminPage } from './components/admin'
 
 import type {
   TabId,
@@ -285,6 +286,18 @@ function App() {
             isAdmin={isAdmin}
             prefetchedData={prefetched?.period === period ? prefetched.profile : null}
             onPrefetchConsumed={() => setPrefetched(prev => prev ? { ...prev, profile: null } : null)}
+            onTabChange={handleTabChange}
+          />
+        )
+      case 'admin':
+        return (
+          <AdminPage
+            chatTitle={chatTitle}
+            onTabChange={handleTabChange}
+            onTimezoneChange={() => {
+              // Invalidate prefetched data since timezone changed
+              setPrefetched(null)
+            }}
           />
         )
       default:
@@ -333,7 +346,10 @@ function App() {
       <ErrorBoundary key={activeTab} onReset={handleErrorReset}>
         {renderPage()}
       </ErrorBoundary>
-      <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
+      {/* Hide tab bar on admin page (accessed via profile, not tab) */}
+      {activeTab !== 'admin' && (
+        <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
+      )}
     </div>
   )
 }

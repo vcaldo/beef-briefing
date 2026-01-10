@@ -11,6 +11,7 @@ import type {
   ProfileResponse,
   TopInteractor,
   ChatUser,
+  TabId,
 } from '../../types'
 
 interface ProfilePageProps {
@@ -22,6 +23,7 @@ interface ProfilePageProps {
   isAdmin: boolean
   prefetchedData?: ProfileResponse | null
   onPrefetchConsumed?: () => void
+  onTabChange?: (tab: TabId) => void
 }
 
 export function ProfilePage({
@@ -33,6 +35,7 @@ export function ProfilePage({
   isAdmin,
   prefetchedData,
   onPrefetchConsumed,
+  onTabChange,
 }: ProfilePageProps) {
   const [data, setData] = useState<ProfileResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -43,9 +46,25 @@ export function ProfilePage({
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
   const [loadingUsers, setLoadingUsers] = useState(false)
 
+  // Admin badge reveal state (hidden until double-click)
+  const [showAdminBadge, setShowAdminBadge] = useState(false)
+
   // Determine displayed user info (impersonated user or self)
   const displayFirstName = selectedUserId && data?.first_name ? data.first_name : firstName
   const displayUsername = selectedUserId && data?.username !== undefined ? data.username : username
+
+  // Double-click handler to reveal admin badge
+  const handleUsernameDoubleClick = useCallback(() => {
+    if (isAdmin && !showAdminBadge) {
+      setShowAdminBadge(true)
+      addPageAction('admin_badge_revealed')
+    }
+  }, [isAdmin, showAdminBadge])
+
+  // Navigate to admin tab
+  const handleAdminClick = useCallback(() => {
+    onTabChange?.('admin')
+  }, [onTabChange])
 
   // Fetch users list for admin dropdown
   useEffect(() => {
@@ -152,7 +171,20 @@ export function ProfilePage({
           size="large"
         />
         <h2 className="profile-name">{displayFirstName}</h2>
-        {displayUsername && <div className="profile-username">@{displayUsername}</div>}
+        <div
+          className="profile-username-container"
+          onDoubleClick={handleUsernameDoubleClick}
+        >
+          {displayUsername && <div className="profile-username">@{displayUsername}</div>}
+          {showAdminBadge && isAdmin && (
+            <button
+              className="admin-badge-btn"
+              onClick={handleAdminClick}
+            >
+              Admin Settings
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats Grid */}

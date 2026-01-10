@@ -15,6 +15,7 @@ import (
 	"beef-briefing/apps/api-service/internal/handlers"
 	"beef-briefing/apps/api-service/internal/middleware"
 	"beef-briefing/apps/api-service/internal/migrations"
+	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/apps/api-service/internal/storage"
 	"beef-briefing/pkg/config"
@@ -230,11 +231,18 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 
 	// Mini App service and handler (optional - only if configured)
 	var miniAppHandler *handlers.MiniAppHandler
+	var arenaHandler *handlers.ArenaHandler
 	var jwtAuth *middleware.JWTAuth
 	if cfg.MiniAppEnabled() {
 		miniAppService := services.NewMiniAppService(db, cfg.JWTSecretKey, cfg.TelegramBotToken, nrApp, minioClient, cfg)
 		miniAppHandler = handlers.NewMiniAppHandler(miniAppService, cardService, cfg)
 		jwtAuth = middleware.NewJWTAuth(cfg.JWTSecretKey)
+
+		// Arena game service and handler
+		gameRepo := repository.NewGameRepository(db, nrApp)
+		arenaService := services.NewArenaService(db, gameRepo, minioClient, nrApp)
+		arenaHandler = handlers.NewArenaHandler(arenaService, cfg)
+
 		slog.Info("Mini App endpoints enabled")
 	} else {
 		slog.Info("Mini App endpoints disabled (JWT_SECRET_KEY not configured)")
@@ -309,6 +317,25 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		protected.HandleFunc("/gallery/weeks", miniAppHandler.HandleGalleryWeeks).Methods("GET", "OPTIONS")
 		protected.HandleFunc("/gallery/images", miniAppHandler.HandleGalleryImages).Methods("GET", "OPTIONS")
 		protected.HandleFunc("/gallery/image/{id:[0-9]+}", miniAppHandler.HandleGalleryImageURL).Methods("GET", "OPTIONS")
+
+		// Arena game endpoints
+		if arenaHandler != nil {
+			protected.HandleFunc("/arena/matches", arenaHandler.HandleListMatches).Methods("GET", "OPTIONS")
+			protected.HandleFunc("/arena/match", arenaHandler.HandleCreateMatch).Methods("POST", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}", arenaHandler.HandleGetMatch).Methods("GET", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}/join", arenaHandler.HandleJoinMatch).Methods("POST", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}/leave", arenaHandler.HandleLeaveMatch).Methods("POST", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}/start", arenaHandler.HandleStartMatch).Methods("POST", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}/shop", arenaHandler.HandleGetShop).Methods("GET", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}/buy", arenaHandler.HandleBuyCard).Methods("POST", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}/reroll", arenaHandler.HandleReroll).Methods("POST", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}/upgrade", arenaHandler.HandleUpgrade).Methods("POST", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}/order", arenaHandler.HandleSetOrder).Methods("POST", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}/team", arenaHandler.HandleSubmitTeam).Methods("POST", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}/battle", arenaHandler.HandleGetBattle).Methods("GET", "OPTIONS")
+			protected.HandleFunc("/arena/leaderboard", arenaHandler.HandleGetLeaderboard).Methods("GET", "OPTIONS")
+			slog.Info("Arena game endpoints registered")
+		}
 
 		slog.Info("Mini App endpoints registered", "path_prefix", "/api/v1/mini-app")
 	}

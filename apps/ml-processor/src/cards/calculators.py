@@ -1327,6 +1327,69 @@ def calculate_overall_score(
 
 
 # =========================================
+# COMBAT STATS (ATK/DEF/HP)
+# =========================================
+
+
+def calculate_combat(
+    engine: Engine,  # Not used, but kept for consistent signature
+    user_id: int,
+    chat_id: int,
+    window_start: datetime,
+    window_end: datetime,
+    *,
+    existing_stats: dict | None = None,
+    **kwargs,
+) -> StatResult | None:
+    """
+    Calculate combat stats (ATK, DEF, HP) from existing stats.
+
+    These stats are derived for a future card game feature.
+
+    ATK contributors: Activity (volume), Toxicity (aggression), Humor (wit)
+    DEF contributors: Presence (consistency), Aura (positivity), Popularity (support)
+
+    Formula:
+        raw_atk = 0.40 * activity + 0.35 * toxicity + 0.25 * humor
+        raw_def = 0.40 * presence + 0.35 * aura + 0.25 * popularity
+        ATK = max(1, round(raw_atk / 10))  # Range: 1-10
+        DEF = max(1, round(raw_def / 10))  # Range: 1-10
+        HP = DEF * 3                       # Range: 3-30
+    """
+    if not existing_stats:
+        return None
+
+    # Extract scores (default to 0 if stat missing)
+    activity = existing_stats.get("activity", {}).get("score", 0)
+    toxicity = existing_stats.get("toxicity", {}).get("pct", 0)  # Toxicity uses 'pct' not 'score'
+    humor = existing_stats.get("humor", {}).get("score", 0)
+    presence = existing_stats.get("presence", {}).get("score", 0)
+    aura = existing_stats.get("aura", {}).get("score", 0)
+    popularity = existing_stats.get("popularity", {}).get("score", 0)
+
+    # Calculate raw scores (0-100 range)
+    raw_atk = 0.40 * activity + 0.35 * toxicity + 0.25 * humor
+    raw_def = 0.40 * presence + 0.35 * aura + 0.25 * popularity
+
+    # Scale to game values (1-10)
+    atk = max(1, round(raw_atk / 10))
+    def_ = max(1, round(raw_def / 10))
+
+    # HP derived from DEF
+    hp = def_ * 3  # Range: 3-30
+
+    return StatResult(
+        value={
+            "atk": atk,
+            "def": def_,
+            "hp": hp,
+            "raw_atk": round(raw_atk, 1),
+            "raw_def": round(raw_def, 1),
+        }
+    )
+
+
+# =========================================
 # CALCULATOR REGISTRY
 # =========================================
 
@@ -1339,4 +1402,5 @@ CALCULATORS: dict[str, StatCalculator] = {
     "toxicity": calculate_toxicity,
     "popularity": calculate_popularity,
     "overall": calculate_overall_score,
+    "combat": calculate_combat,
 }

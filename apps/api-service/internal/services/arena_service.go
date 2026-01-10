@@ -1157,3 +1157,331 @@ func (s *ArenaService) forceSubmitTeam(ctx context.Context, matchID string, p *r
 
 	return nil
 }
+
+// =====================================================
+// RANKED TOURNAMENT METHODS
+// =====================================================
+
+// Tournament errors
+var (
+	ErrTournamentNotFound         = errors.New("tournament not found")
+	ErrTournamentNotOpen          = errors.New("tournament is not open for registration")
+	ErrTournamentRegistrationClosed = errors.New("tournament registration has closed")
+	ErrAlreadyRegistered          = errors.New("already registered for this tournament")
+	ErrNotRegistered              = errors.New("not registered for this tournament")
+	ErrNoParticipants             = errors.New("no participants registered")
+)
+
+// TournamentResponse represents a tournament with participant info
+type TournamentResponse struct {
+	*repository.RankedTournament
+	Participants []*repository.TournamentParticipant `json:"participants,omitempty"`
+	CardCount    int                                  `json:"card_count"`
+}
+
+// TournamentStartResult represents the result of starting a tournament
+type TournamentStartResult struct {
+	Tournament       *repository.RankedTournament `json:"tournament"`
+	Match            *repository.Match            `json:"match"`
+	ParticipantCount int                          `json:"participant_count"`
+	Format           repository.MatchFormat       `json:"format"`
+	Skipped          bool                         `json:"skipped"`
+	Reason           string                       `json:"reason,omitempty"`
+}
+
+// GetOrCreateTodayTournament gets or creates today's tournament for a chat
+func (s *ArenaService) GetOrCreateTodayTournament(ctx context.Context, chatID int64, date string) (*TournamentResponse, error) {
+	tournament, err := s.gameRepo.GetOrCreateTournament(ctx, chatID, date)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get or create tournament: %w", err)
+	}
+
+	participants, err := s.gameRepo.GetTournamentParticipants(ctx, tournament.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	cardCount, _ := s.dealer.GetCardCount(ctx, chatID)
+
+	return &TournamentResponse{
+		RankedTournament: tournament,
+		Participants:     participants,
+		CardCount:        cardCount,
+	}, nil
+}
+
+// GetTodayTournament retrieves today's tournament for a chat
+func (s *ArenaService) GetTodayTournament(ctx context.Context, chatID int64, date string) (*TournamentResponse, error) {
+	tournament, err := s.gameRepo.GetTodayTournament(ctx, chatID, date)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tournament: %w", err)
+	}
+	if tournament == nil {
+		return nil, nil
+	}
+
+	participants, err := s.gameRepo.GetTournamentParticipants(ctx, tournament.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	cardCount, _ := s.dealer.GetCardCount(ctx, chatID)
+
+	return &TournamentResponse{
+		RankedTournament: tournament,
+		Participants:     participants,
+		CardCount:        cardCount,
+	}, nil
+}
+
+// GetTournamentByID retrieves a tournament by ID
+func (s *ArenaService) GetTournamentByID(ctx context.Context, tournamentID int64) (*TournamentResponse, error) {
+	tournament, err := s.gameRepo.GetTournamentByID(ctx, tournamentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tournament: %w", err)
+	}
+	if tournament == nil {
+		return nil, ErrTournamentNotFound
+	}
+
+	participants, err := s.gameRepo.GetTournamentParticipants(ctx, tournament.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	cardCount, _ := s.dealer.GetCardCount(ctx, tournament.ChatID)
+
+	return &TournamentResponse{
+		RankedTournament: tournament,
+		Participants:     participants,
+		CardCount:        cardCount,
+	}, nil
+}
+
+// SetTournamentAnnounced marks a tournament as announced (open for registration)
+func (s *ArenaService) SetTournamentAnnounced(ctx context.Context, tournamentID int64, messageID int64) error {
+	return s.gameRepo.SetTournamentAnnounced(ctx, tournamentID, messageID)
+}
+
+// JoinTournament adds a user to a tournament
+func (s *ArenaService) JoinTournament(ctx context.Context, tournamentID int64, userID int64) (*TournamentResponse, error) {
+	// Get tournament
+	tournament, err := s.gameRepo.GetTournamentByID(ctx, tournamentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tournament: %w", err)
+	}
+	if tournament == nil {
+		return nil, ErrTournamentNotFound
+	}
+
+	// Check tournament is open
+	if tournament.Status != repository.TournamentStatusOpen {
+		if tournament.Status == repository.TournamentStatusScheduled {
+			return nil, ErrTournamentNotOpen
+		}
+		return nil, ErrTournamentRegistrationClosed
+	}
+
+	// Check if already registered
+	isParticipant, err := s.gameRepo.IsTournamentParticipant(ctx, tournamentID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check participant: %w", err)
+	}
+	if isParticipant {
+		return nil, ErrAlreadyRegistered
+	}
+
+	// Add participant
+	if err := s.gameRepo.AddTournamentParticipant(ctx, tournamentID, userID); err != nil {
+		return nil, fmt.Errorf("failed to add participant: %w", err)
+	}
+
+	// Return updated tournament
+	return s.GetTournamentByID(ctx, tournamentID)
+}
+
+// LeaveTournament removes a user from a tournament
+func (s *ArenaService) LeaveTournament(ctx context.Context, tournamentID int64, userID int64) (*TournamentResponse, error) {
+	// Get tournament
+	tournament, err := s.gameRepo.GetTournamentByID(ctx, tournamentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tournament: %w", err)
+	}
+	if tournament == nil {
+		return nil, ErrTournamentNotFound
+	}
+
+	// Check tournament is still open
+	if tournament.Status != repository.TournamentStatusOpen {
+		return nil, ErrTournamentRegistrationClosed
+	}
+
+	// Check if registered
+	isParticipant, err := s.gameRepo.IsTournamentParticipant(ctx, tournamentID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check participant: %w", err)
+	}
+	if !isParticipant {
+		return nil, ErrNotRegistered
+	}
+
+	// Remove participant
+	if err := s.gameRepo.RemoveTournamentParticipant(ctx, tournamentID, userID); err != nil {
+		return nil, fmt.Errorf("failed to remove participant: %w", err)
+	}
+
+	// Return updated tournament
+	return s.GetTournamentByID(ctx, tournamentID)
+}
+
+// GetTournamentsNeedingAnnouncement returns tournaments that need to be announced
+func (s *ArenaService) GetTournamentsNeedingAnnouncement(ctx context.Context, currentTime time.Time) ([]*repository.TournamentInfo, error) {
+	return s.gameRepo.GetTournamentsNeedingAnnouncement(ctx, currentTime)
+}
+
+// GetTournamentsNeedingClose returns tournaments that need registration closed
+func (s *ArenaService) GetTournamentsNeedingClose(ctx context.Context, currentTime time.Time) ([]*repository.TournamentInfo, error) {
+	return s.gameRepo.GetTournamentsNeedingClose(ctx, currentTime)
+}
+
+// CloseAndStartTournament closes registration and starts the tournament match
+func (s *ArenaService) CloseAndStartTournament(ctx context.Context, tournamentID int64) (*TournamentStartResult, error) {
+	// Get tournament
+	tournament, err := s.gameRepo.GetTournamentByID(ctx, tournamentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tournament: %w", err)
+	}
+	if tournament == nil {
+		return nil, ErrTournamentNotFound
+	}
+
+	// Check tournament is open
+	if tournament.Status != repository.TournamentStatusOpen {
+		return nil, fmt.Errorf("tournament is not open (status: %s)", tournament.Status)
+	}
+
+	// Get participants
+	participants, err := s.gameRepo.GetTournamentParticipants(ctx, tournament.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	// Check participant count
+	if len(participants) < 2 {
+		// Skip tournament - not enough participants
+		if err := s.gameRepo.SkipTournament(ctx, tournamentID); err != nil {
+			return nil, fmt.Errorf("failed to skip tournament: %w", err)
+		}
+
+		reason := "not enough participants"
+		if len(participants) == 0 {
+			reason = "no participants"
+		} else {
+			reason = "only 1 participant"
+		}
+
+		// Refetch tournament
+		tournament, _ = s.gameRepo.GetTournamentByID(ctx, tournamentID)
+
+		return &TournamentStartResult{
+			Tournament:       tournament,
+			ParticipantCount: len(participants),
+			Skipped:          true,
+			Reason:           reason,
+		}, nil
+	}
+
+	// Determine format based on participant count
+	var format repository.MatchFormat
+	if len(participants) == 2 {
+		format = repository.MatchFormat1v1
+	} else {
+		format = repository.MatchFormatArena
+	}
+
+	// Create ranked match
+	tournamentDate := tournament.TournamentDate
+	match, err := s.gameRepo.CreateMatch(ctx, tournament.ChatID, repository.MatchTypeRanked, nil, &tournamentDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create match: %w", err)
+	}
+
+	// Add all tournament participants to the match
+	for _, p := range participants {
+		if _, err := s.gameRepo.AddParticipant(ctx, match.ID, p.UserID); err != nil {
+			return nil, fmt.Errorf("failed to add participant to match: %w", err)
+		}
+	}
+
+	// Start shop phase
+	shopDeadline := time.Now().Add(ShopPhaseDuration)
+	if err := s.gameRepo.StartShopPhase(ctx, match.ID, format, shopDeadline); err != nil {
+		return nil, fmt.Errorf("failed to start shop phase: %w", err)
+	}
+
+	// Deal cards to all participants
+	if err := s.dealCardsToAllParticipants(ctx, match.ID, tournament.ChatID); err != nil {
+		return nil, fmt.Errorf("failed to deal cards: %w", err)
+	}
+
+	// Link tournament to match and update status
+	if err := s.gameRepo.CloseTournamentRegistration(ctx, tournamentID, match.ID); err != nil {
+		return nil, fmt.Errorf("failed to close tournament registration: %w", err)
+	}
+
+	// Refetch updated data
+	tournament, _ = s.gameRepo.GetTournamentByID(ctx, tournamentID)
+	match, _ = s.gameRepo.GetMatch(ctx, match.ID)
+
+	return &TournamentStartResult{
+		Tournament:       tournament,
+		Match:            match,
+		ParticipantCount: len(participants),
+		Format:           format,
+		Skipped:          false,
+	}, nil
+}
+
+// dealCardsToAllParticipants deals shop cards to all match participants
+func (s *ArenaService) dealCardsToAllParticipants(ctx context.Context, matchID string, chatID int64) error {
+	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
+	if err != nil {
+		return fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	for _, p := range participants {
+		// Deal cards
+		cards, err := s.dealer.DealCards(ctx, chatID, shop.ShopSize)
+		if err != nil {
+			return fmt.Errorf("failed to deal cards for user %d: %w", p.UserID, err)
+		}
+
+		// Save shop state
+		cardsJSON, err := json.Marshal(cards)
+		if err != nil {
+			return fmt.Errorf("failed to marshal cards: %w", err)
+		}
+
+		emptyTeam := json.RawMessage("[]")
+		if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, p.UserID, shop.StartingCoins, cardsJSON, emptyTeam, []int64{0, 1, 2}); err != nil {
+			return fmt.Errorf("failed to update shop state for user %d: %w", p.UserID, err)
+		}
+	}
+
+	return nil
+}
+
+// GetTournamentsWithPendingRounds returns tournaments that need next round execution
+func (s *ArenaService) GetTournamentsWithPendingRounds(ctx context.Context) ([]*repository.RankedTournament, error) {
+	return s.gameRepo.GetTournamentsWithPendingRounds(ctx)
+}
+
+// CompleteTournament marks a tournament as completed
+func (s *ArenaService) CompleteTournament(ctx context.Context, tournamentID int64, winnerUserID *int64) error {
+	return s.gameRepo.CompleteTournament(ctx, tournamentID, winnerUserID)
+}
+
+// GetChatsWithTimezone returns all chats with their timezone settings
+func (s *ArenaService) GetChatsWithTimezone(ctx context.Context) ([]*repository.ChatTimezone, error) {
+	return s.gameRepo.GetChatsWithTimezone(ctx)
+}

@@ -292,6 +292,17 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		api.HandleFunc("/arena/matches/pending", arenaHandler.HandleBotGetPendingMatches).Methods("GET")
 		api.HandleFunc("/arena/match/{id}/auto-start", arenaHandler.HandleBotAutoStartMatch).Methods("POST")
 		api.HandleFunc("/arena/match/{id}/force-submit", arenaHandler.HandleBotForceSubmitTeams).Methods("POST")
+
+		// Ranked tournament bot endpoints
+		api.HandleFunc("/arena/tournament/today", arenaHandler.HandleBotGetTodayTournament).Methods("GET")
+		api.HandleFunc("/arena/tournament/{id}", arenaHandler.HandleBotGetTournament).Methods("GET")
+		api.HandleFunc("/arena/tournaments/pending-announcements", arenaHandler.HandleBotGetPendingAnnouncements).Methods("GET")
+		api.HandleFunc("/arena/tournament/announce", arenaHandler.HandleBotAnnounceTournament).Methods("POST")
+		api.HandleFunc("/arena/tournament/join", arenaHandler.HandleBotJoinTournament).Methods("POST")
+		api.HandleFunc("/arena/tournament/leave", arenaHandler.HandleBotLeaveTournament).Methods("POST")
+		api.HandleFunc("/arena/tournaments/pending-close", arenaHandler.HandleBotGetPendingClose).Methods("GET")
+		api.HandleFunc("/arena/tournament/{id}/close", arenaHandler.HandleBotCloseTournament).Methods("POST")
+		api.HandleFunc("/arena/tournaments/pending-rounds", arenaHandler.HandleBotGetPendingRounds).Methods("GET")
 		slog.Info("Arena bot endpoints registered", "path_prefix", "/api/v1/arena")
 	}
 

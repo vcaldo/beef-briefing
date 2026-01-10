@@ -73,6 +73,7 @@ func main() {
 	rankingHandler := handlers.NewRankingHandler(nrApp)
 	matchHandler := handlers.NewMatchHandler(apiClient, nrApp)
 	callbackHandler := handlers.NewCallbackHandler(apiClient, nrApp)
+	rankedHandler := handlers.NewRankedHandler(apiClient, nrApp)
 
 	// Create bot instance with allowed updates including reactions
 	opts := []bot.Option{
@@ -115,6 +116,7 @@ func main() {
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/deck", bot.MatchTypePrefix, deckHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/ranking", bot.MatchTypePrefix, rankingHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/match", bot.MatchTypePrefix, matchHandler.Handle)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/ranked", bot.MatchTypePrefix, rankedHandler.Handle)
 
 	// Register callback query handler for inline buttons
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, "", bot.MatchTypePrefix, callbackHandler.Handle)
@@ -124,6 +126,10 @@ func main() {
 	// Start match scheduler in background
 	matchScheduler := scheduler.NewMatchScheduler(apiClient, b, nrApp)
 	go matchScheduler.Start(ctx)
+
+	// Start tournament scheduler in background
+	tournamentScheduler := scheduler.NewTournamentScheduler(apiClient, b, nrApp)
+	go tournamentScheduler.Start(ctx)
 
 	// Start bot with graceful shutdown
 	b.Start(ctx)

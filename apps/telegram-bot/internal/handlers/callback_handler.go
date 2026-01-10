@@ -69,6 +69,10 @@ func (h *CallbackHandler) Handle(ctx context.Context, b *bot.Bot, update *models
 		h.handleLeaveMatch(ctx, b, update.CallbackQuery, matchID, userID, chatID, messageID, txn)
 	case "start_match":
 		h.handleStartMatch(ctx, b, update.CallbackQuery, matchID, userID, chatID, messageID, txn)
+	case "ranked_join":
+		h.handleJoinTournament(ctx, b, update.CallbackQuery, matchID, userID, chatID, messageID, txn)
+	case "ranked_leave":
+		h.handleLeaveTournament(ctx, b, update.CallbackQuery, matchID, userID, chatID, messageID, txn)
 	default:
 		h.answerCallback(ctx, b, update.CallbackQuery.ID, "Unknown action")
 	}
@@ -253,5 +257,109 @@ func (h *CallbackHandler) answerCallback(ctx context.Context, b *bot.Bot, callba
 	})
 	if err != nil {
 		slog.Error("failed to answer callback query", "error", err)
+	}
+}
+
+// =====================================================
+// RANKED TOURNAMENT CALLBACKS
+// =====================================================
+
+// handleJoinTournament handles the ranked_join callback
+func (h *CallbackHandler) handleJoinTournament(ctx context.Context, b *bot.Bot, callback *models.CallbackQuery, _ string, userID, chatID int64, messageID int, txn *newrelic.Transaction) {
+	// Join tournament via API
+	tournament, err := h.apiClient.JoinTournament(ctx, chatID, userID)
+	if err != nil {
+		if errors.Is(err, client.ErrAlreadyRegistered) {
+			h.answerCallback(ctx, b, callback.ID, "You're already registered for this tournament!")
+			return
+		}
+		if errors.Is(err, client.ErrTournamentNotOpen) {
+			h.answerCallback(ctx, b, callback.ID, "Tournament is not open for registration yet.")
+			return
+		}
+		if errors.Is(err, client.ErrTournamentRegistrationClosed) {
+			h.answerCallback(ctx, b, callback.ID, "Registration has closed.")
+			return
+		}
+		if errors.Is(err, client.ErrTournamentNotFound) {
+			h.answerCallback(ctx, b, callback.ID, "Tournament not found.")
+			return
+		}
+
+		slog.Error("failed to join tournament", "chat_id", chatID, "user_id", userID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		h.answerCallback(ctx, b, callback.ID, "Failed to join tournament. Please try again.")
+		return
+	}
+
+	slog.Info("user joined tournament via callback", "chat_id", chatID, "user_id", userID, "participant_count", tournament.ParticipantCount)
+	h.answerCallback(ctx, b, callback.ID, fmt.Sprintf("Joined! (%d participants)", tournament.ParticipantCount))
+
+	// Update announcement message with new count
+	h.updateTournamentMessage(ctx, b, chatID, messageID, tournament)
+}
+
+// handleLeaveTournament handles the ranked_leave callback
+func (h *CallbackHandler) handleLeaveTournament(ctx context.Context, b *bot.Bot, callback *models.CallbackQuery, _ string, userID, chatID int64, messageID int, txn *newrelic.Transaction) {
+	// Leave tournament via API
+	tournament, err := h.apiClient.LeaveTournament(ctx, chatID, userID)
+	if err != nil {
+		if errors.Is(err, client.ErrTournamentRegistrationClosed) {
+			h.answerCallback(ctx, b, callback.ID, "Cannot leave - registration has closed.")
+			return
+		}
+		if errors.Is(err, client.ErrNotRegistered) {
+			h.answerCallback(ctx, b, callback.ID, "You're not registered for this tournament.")
+			return
+		}
+
+		slog.Error("failed to leave tournament", "chat_id", chatID, "user_id", userID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		h.answerCallback(ctx, b, callback.ID, "Failed to leave tournament. Please try again.")
+		return
+	}
+
+	slog.Info("user left tournament via callback", "chat_id", chatID, "user_id", userID, "participant_count", tournament.ParticipantCount)
+	h.answerCallback(ctx, b, callback.ID, "You've left the tournament.")
+
+	// Update announcement message
+	h.updateTournamentMessage(ctx, b, chatID, messageID, tournament)
+}
+
+// updateTournamentMessage updates the tournament announcement message
+func (h *CallbackHandler) updateTournamentMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, tournament *client.RankedTournament) {
+	text := fmt.Sprintf(
+		"🏆 *Ranked Tournament Open!*\n\n"+
+			"Today's arena battle is now accepting participants.\n\n"+
+			"⏰ Registration closes at 18:00\n"+
+			"👥 Participants: %d\n\n"+
+			"Use /ranked to join!",
+		tournament.ParticipantCount,
+	)
+
+	keyboard := &models.InlineKeyboardMarkup{
+		InlineKeyboard: [][]models.InlineKeyboardButton{
+			{
+				{
+					Text:         fmt.Sprintf("Join Tournament (%d)", tournament.ParticipantCount),
+					CallbackData: fmt.Sprintf("ranked_join:%d", tournament.ID),
+				},
+			},
+		},
+	}
+
+	_, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
+		ChatID:      chatID,
+		MessageID:   messageID,
+		Text:        text,
+		ParseMode:   models.ParseModeMarkdown,
+		ReplyMarkup: keyboard,
+	})
+	if err != nil {
+		slog.Error("failed to update tournament message", "error", err)
 	}
 }

@@ -764,3 +764,565 @@ func (r *GameRepository) CancelMatch(ctx context.Context, matchID string) error 
 	_, err := r.db.ExecContext(ctx, query, matchID)
 	return err
 }
+
+// =====================================================
+// RANKED TOURNAMENT METHODS
+// =====================================================
+
+// TournamentStatus enum
+type TournamentStatus string
+
+const (
+	TournamentStatusScheduled  TournamentStatus = "scheduled"
+	TournamentStatusOpen       TournamentStatus = "open"
+	TournamentStatusInProgress TournamentStatus = "in_progress"
+	TournamentStatusCompleted  TournamentStatus = "completed"
+	TournamentStatusSkipped    TournamentStatus = "skipped"
+)
+
+// RankedTournament represents a daily ranked tournament
+type RankedTournament struct {
+	ID                     int64            `json:"id"`
+	ChatID                 int64            `json:"chat_id"`
+	TournamentDate         string           `json:"tournament_date"`
+	Status                 TournamentStatus `json:"status"`
+	AnnouncementMessageID  *int64           `json:"announcement_message_id,omitempty"`
+	AnnouncedAt            *time.Time       `json:"announced_at,omitempty"`
+	RegistrationClosedAt   *time.Time       `json:"registration_closed_at,omitempty"`
+	CompletedAt            *time.Time       `json:"completed_at,omitempty"`
+	MatchID                *string          `json:"match_id,omitempty"`
+	WinnerUserID           *int64           `json:"winner_user_id,omitempty"`
+	ParticipantCount       int              `json:"participant_count"`
+	BracketState           *json.RawMessage `json:"bracket_state,omitempty"`
+	CreatedAt              time.Time        `json:"created_at"`
+}
+
+// TournamentParticipant represents a user registered for a tournament
+type TournamentParticipant struct {
+	ID           int64     `json:"id"`
+	TournamentID int64     `json:"tournament_id"`
+	UserID       int64     `json:"user_id"`
+	JoinedAt     time.Time `json:"joined_at"`
+	FirstName    string    `json:"first_name,omitempty"`
+	Username     string    `json:"username,omitempty"`
+}
+
+// ChatTimezone represents a chat with its timezone
+type ChatTimezone struct {
+	ChatID   int64  `json:"chat_id"`
+	Timezone string `json:"timezone"`
+}
+
+// TournamentInfo contains tournament data for scheduler queries
+type TournamentInfo struct {
+	TournamentID     int64  `json:"tournament_id"`
+	ChatID           int64  `json:"chat_id"`
+	Timezone         string `json:"timezone"`
+	TournamentDate   string `json:"tournament_date"`
+	ParticipantCount int64  `json:"participant_count"`
+}
+
+// GetOrCreateTournament creates or retrieves a tournament for a specific date
+func (r *GameRepository) GetOrCreateTournament(ctx context.Context, chatID int64, date string) (*RankedTournament, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-or-create-tournament")
+		defer segment.End()
+	}
+
+	// Use the database function for atomic get-or-create
+	var tournamentID int64
+	err := r.db.QueryRowContext(ctx,
+		`SELECT get_or_create_tournament($1, $2::date)`,
+		chatID, date,
+	).Scan(&tournamentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get or create tournament: %w", err)
+	}
+
+	return r.GetTournamentByID(ctx, tournamentID)
+}
+
+// GetTournamentByID retrieves a tournament by ID
+func (r *GameRepository) GetTournamentByID(ctx context.Context, id int64) (*RankedTournament, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-tournament-by-id")
+		defer segment.End()
+	}
+
+	query := `
+		SELECT id, chat_id, tournament_date, status,
+		       announcement_message_id, announced_at, registration_closed_at,
+		       completed_at, match_id, winner_user_id, participant_count,
+		       bracket_state, created_at
+		FROM game_ranked_tournaments
+		WHERE id = $1
+	`
+
+	t := &RankedTournament{}
+	var matchID sql.NullString
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&t.ID, &t.ChatID, &t.TournamentDate, &t.Status,
+		&t.AnnouncementMessageID, &t.AnnouncedAt, &t.RegistrationClosedAt,
+		&t.CompletedAt, &matchID, &t.WinnerUserID, &t.ParticipantCount,
+		&t.BracketState, &t.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get tournament: %w", err)
+	}
+
+	if matchID.Valid {
+		t.MatchID = &matchID.String
+	}
+
+	return t, nil
+}
+
+// GetTodayTournament retrieves today's tournament for a chat
+func (r *GameRepository) GetTodayTournament(ctx context.Context, chatID int64, date string) (*RankedTournament, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-today-tournament")
+		defer segment.End()
+	}
+
+	query := `
+		SELECT id, chat_id, tournament_date, status,
+		       announcement_message_id, announced_at, registration_closed_at,
+		       completed_at, match_id, winner_user_id, participant_count,
+		       bracket_state, created_at
+		FROM game_ranked_tournaments
+		WHERE chat_id = $1 AND tournament_date = $2::date
+	`
+
+	t := &RankedTournament{}
+	var matchID sql.NullString
+	err := r.db.QueryRowContext(ctx, query, chatID, date).Scan(
+		&t.ID, &t.ChatID, &t.TournamentDate, &t.Status,
+		&t.AnnouncementMessageID, &t.AnnouncedAt, &t.RegistrationClosedAt,
+		&t.CompletedAt, &matchID, &t.WinnerUserID, &t.ParticipantCount,
+		&t.BracketState, &t.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get today's tournament: %w", err)
+	}
+
+	if matchID.Valid {
+		t.MatchID = &matchID.String
+	}
+
+	return t, nil
+}
+
+// UpdateTournamentStatus updates the status of a tournament
+func (r *GameRepository) UpdateTournamentStatus(ctx context.Context, id int64, status TournamentStatus) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:update-tournament-status")
+		defer segment.End()
+	}
+
+	query := `UPDATE game_ranked_tournaments SET status = $2 WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id, status)
+	return err
+}
+
+// SetTournamentAnnounced marks a tournament as announced
+func (r *GameRepository) SetTournamentAnnounced(ctx context.Context, id int64, messageID int64) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:set-tournament-announced")
+		defer segment.End()
+	}
+
+	query := `
+		UPDATE game_ranked_tournaments
+		SET status = 'open',
+		    announcement_message_id = $2,
+		    announced_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.db.ExecContext(ctx, query, id, messageID)
+	return err
+}
+
+// CloseTournamentRegistration closes registration and links to match
+func (r *GameRepository) CloseTournamentRegistration(ctx context.Context, id int64, matchID string) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:close-tournament-registration")
+		defer segment.End()
+	}
+
+	query := `
+		UPDATE game_ranked_tournaments
+		SET status = 'in_progress',
+		    registration_closed_at = NOW(),
+		    match_id = $2
+		WHERE id = $1
+	`
+	_, err := r.db.ExecContext(ctx, query, id, matchID)
+	return err
+}
+
+// CompleteTournament marks a tournament as completed
+func (r *GameRepository) CompleteTournament(ctx context.Context, id int64, winnerUserID *int64) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:complete-tournament")
+		defer segment.End()
+	}
+
+	query := `
+		UPDATE game_ranked_tournaments
+		SET status = 'completed',
+		    completed_at = NOW(),
+		    winner_user_id = $2
+		WHERE id = $1
+	`
+	_, err := r.db.ExecContext(ctx, query, id, winnerUserID)
+	return err
+}
+
+// SkipTournament marks a tournament as skipped (no participants)
+func (r *GameRepository) SkipTournament(ctx context.Context, id int64) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:skip-tournament")
+		defer segment.End()
+	}
+
+	query := `
+		UPDATE game_ranked_tournaments
+		SET status = 'skipped',
+		    completed_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.db.ExecContext(ctx, query, id)
+	return err
+}
+
+// UpdateTournamentBracket updates the bracket state
+func (r *GameRepository) UpdateTournamentBracket(ctx context.Context, id int64, bracketState json.RawMessage) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:update-tournament-bracket")
+		defer segment.End()
+	}
+
+	query := `UPDATE game_ranked_tournaments SET bracket_state = $2 WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id, bracketState)
+	return err
+}
+
+// AddTournamentParticipant adds a user to a tournament
+func (r *GameRepository) AddTournamentParticipant(ctx context.Context, tournamentID, userID int64) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:add-tournament-participant")
+		defer segment.End()
+	}
+
+	query := `
+		INSERT INTO game_tournament_participants (tournament_id, user_id)
+		VALUES ($1, $2)
+		ON CONFLICT (tournament_id, user_id) DO NOTHING
+	`
+	result, err := r.db.ExecContext(ctx, query, tournamentID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to add tournament participant: %w", err)
+	}
+
+	// Update participant count
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected > 0 {
+		updateQuery := `
+			UPDATE game_ranked_tournaments
+			SET participant_count = participant_count + 1
+			WHERE id = $1
+		`
+		_, err = r.db.ExecContext(ctx, updateQuery, tournamentID)
+		if err != nil {
+			return fmt.Errorf("failed to update participant count: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// RemoveTournamentParticipant removes a user from a tournament
+func (r *GameRepository) RemoveTournamentParticipant(ctx context.Context, tournamentID, userID int64) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:remove-tournament-participant")
+		defer segment.End()
+	}
+
+	query := `
+		DELETE FROM game_tournament_participants
+		WHERE tournament_id = $1 AND user_id = $2
+	`
+	result, err := r.db.ExecContext(ctx, query, tournamentID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to remove tournament participant: %w", err)
+	}
+
+	// Update participant count
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected > 0 {
+		updateQuery := `
+			UPDATE game_ranked_tournaments
+			SET participant_count = GREATEST(0, participant_count - 1)
+			WHERE id = $1
+		`
+		_, err = r.db.ExecContext(ctx, updateQuery, tournamentID)
+		if err != nil {
+			return fmt.Errorf("failed to update participant count: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// GetTournamentParticipants retrieves all participants for a tournament
+func (r *GameRepository) GetTournamentParticipants(ctx context.Context, tournamentID int64) ([]*TournamentParticipant, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-tournament-participants")
+		defer segment.End()
+	}
+
+	query := `
+		SELECT tp.id, tp.tournament_id, tp.user_id, tp.joined_at,
+		       u.first_name, COALESCE(u.username, '')
+		FROM game_tournament_participants tp
+		JOIN users u ON tp.user_id = u.id
+		WHERE tp.tournament_id = $1
+		ORDER BY tp.joined_at
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, tournamentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tournament participants: %w", err)
+	}
+	defer rows.Close()
+
+	participants := make([]*TournamentParticipant, 0)
+	for rows.Next() {
+		p := &TournamentParticipant{}
+		err := rows.Scan(&p.ID, &p.TournamentID, &p.UserID, &p.JoinedAt, &p.FirstName, &p.Username)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan tournament participant: %w", err)
+		}
+		participants = append(participants, p)
+	}
+
+	return participants, rows.Err()
+}
+
+// IsTournamentParticipant checks if a user is already registered for a tournament
+func (r *GameRepository) IsTournamentParticipant(ctx context.Context, tournamentID, userID int64) (bool, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:is-tournament-participant")
+		defer segment.End()
+	}
+
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM game_tournament_participants WHERE tournament_id = $1 AND user_id = $2)`
+	err := r.db.QueryRowContext(ctx, query, tournamentID, userID).Scan(&exists)
+	return exists, err
+}
+
+// GetTournamentsNeedingAnnouncement returns tournaments that should be announced
+func (r *GameRepository) GetTournamentsNeedingAnnouncement(ctx context.Context, currentTime time.Time) ([]*TournamentInfo, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-tournaments-needing-announcement")
+		defer segment.End()
+	}
+
+	query := `SELECT * FROM get_tournaments_needing_announcement($1)`
+
+	rows, err := r.db.QueryContext(ctx, query, currentTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tournaments needing announcement: %w", err)
+	}
+	defer rows.Close()
+
+	tournaments := make([]*TournamentInfo, 0)
+	for rows.Next() {
+		t := &TournamentInfo{}
+		err := rows.Scan(&t.TournamentID, &t.ChatID, &t.Timezone, &t.TournamentDate)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan tournament info: %w", err)
+		}
+		tournaments = append(tournaments, t)
+	}
+
+	return tournaments, rows.Err()
+}
+
+// GetTournamentsNeedingClose returns tournaments that should close registration
+func (r *GameRepository) GetTournamentsNeedingClose(ctx context.Context, currentTime time.Time) ([]*TournamentInfo, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-tournaments-needing-close")
+		defer segment.End()
+	}
+
+	query := `SELECT * FROM get_tournaments_needing_close($1)`
+
+	rows, err := r.db.QueryContext(ctx, query, currentTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tournaments needing close: %w", err)
+	}
+	defer rows.Close()
+
+	tournaments := make([]*TournamentInfo, 0)
+	for rows.Next() {
+		t := &TournamentInfo{}
+		err := rows.Scan(&t.TournamentID, &t.ChatID, &t.Timezone, &t.TournamentDate, &t.ParticipantCount)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan tournament info: %w", err)
+		}
+		tournaments = append(tournaments, t)
+	}
+
+	return tournaments, rows.Err()
+}
+
+// GetChatsWithTimezone returns all chats with their timezone settings
+func (r *GameRepository) GetChatsWithTimezone(ctx context.Context) ([]*ChatTimezone, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-chats-with-timezone")
+		defer segment.End()
+	}
+
+	query := `
+		SELECT id, COALESCE(timezone, 'America/Sao_Paulo')
+		FROM chats
+		WHERE type IN ('group', 'supergroup')
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query chats with timezone: %w", err)
+	}
+	defer rows.Close()
+
+	chats := make([]*ChatTimezone, 0)
+	for rows.Next() {
+		c := &ChatTimezone{}
+		err := rows.Scan(&c.ChatID, &c.Timezone)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan chat timezone: %w", err)
+		}
+		chats = append(chats, c)
+	}
+
+	return chats, rows.Err()
+}
+
+// GetTournamentsByStatus returns tournaments with a given status
+func (r *GameRepository) GetTournamentsByStatus(ctx context.Context, status TournamentStatus) ([]*RankedTournament, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-tournaments-by-status")
+		defer segment.End()
+	}
+
+	query := `
+		SELECT id, chat_id, tournament_date, status,
+		       announcement_message_id, announced_at, registration_closed_at,
+		       completed_at, match_id, winner_user_id, participant_count,
+		       bracket_state, created_at
+		FROM game_ranked_tournaments
+		WHERE status = $1
+		ORDER BY created_at
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, status)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tournaments by status: %w", err)
+	}
+	defer rows.Close()
+
+	tournaments := make([]*RankedTournament, 0)
+	for rows.Next() {
+		t := &RankedTournament{}
+		var matchID sql.NullString
+		err := rows.Scan(
+			&t.ID, &t.ChatID, &t.TournamentDate, &t.Status,
+			&t.AnnouncementMessageID, &t.AnnouncedAt, &t.RegistrationClosedAt,
+			&t.CompletedAt, &matchID, &t.WinnerUserID, &t.ParticipantCount,
+			&t.BracketState, &t.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan tournament: %w", err)
+		}
+		if matchID.Valid {
+			t.MatchID = &matchID.String
+		}
+		tournaments = append(tournaments, t)
+	}
+
+	return tournaments, rows.Err()
+}
+
+// GetTournamentsWithPendingRounds returns in-progress tournaments that need next round execution
+func (r *GameRepository) GetTournamentsWithPendingRounds(ctx context.Context) ([]*RankedTournament, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-tournaments-pending-rounds")
+		defer segment.End()
+	}
+
+	// Get tournaments in in_progress status where the linked match is in battle_phase
+	query := `
+		SELECT t.id, t.chat_id, t.tournament_date, t.status,
+		       t.announcement_message_id, t.announced_at, t.registration_closed_at,
+		       t.completed_at, t.match_id, t.winner_user_id, t.participant_count,
+		       t.bracket_state, t.created_at
+		FROM game_ranked_tournaments t
+		JOIN game_matches m ON t.match_id = m.id
+		WHERE t.status = 'in_progress'
+		  AND m.status = 'battle_phase'
+		ORDER BY t.created_at
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tournaments with pending rounds: %w", err)
+	}
+	defer rows.Close()
+
+	tournaments := make([]*RankedTournament, 0)
+	for rows.Next() {
+		t := &RankedTournament{}
+		var matchID sql.NullString
+		err := rows.Scan(
+			&t.ID, &t.ChatID, &t.TournamentDate, &t.Status,
+			&t.AnnouncementMessageID, &t.AnnouncedAt, &t.RegistrationClosedAt,
+			&t.CompletedAt, &matchID, &t.WinnerUserID, &t.ParticipantCount,
+			&t.BracketState, &t.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan tournament: %w", err)
+		}
+		if matchID.Valid {
+			t.MatchID = &matchID.String
+		}
+		tournaments = append(tournaments, t)
+	}
+
+	return tournaments, rows.Err()
+}

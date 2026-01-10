@@ -1161,3 +1161,586 @@ func (c *APIClient) ForceSubmitTeams(ctx context.Context, matchID string) (*Forc
 
 	return &result, nil
 }
+
+// =============================================================================
+// Ranked Tournament API Methods
+// =============================================================================
+
+// RankedTournament represents a ranked tournament from the API
+type RankedTournament struct {
+	ID                    int64                     `json:"id"`
+	ChatID                int64                     `json:"chat_id"`
+	TournamentDate        string                    `json:"tournament_date"`
+	Status                string                    `json:"status"`
+	AnnouncementMessageID *int64                    `json:"announcement_message_id,omitempty"`
+	AnnouncedAt           *string                   `json:"announced_at,omitempty"`
+	RegistrationClosedAt  *string                   `json:"registration_closed_at,omitempty"`
+	CompletedAt           *string                   `json:"completed_at,omitempty"`
+	MatchID               *string                   `json:"match_id,omitempty"`
+	WinnerUserID          *int64                    `json:"winner_user_id,omitempty"`
+	ParticipantCount      int                       `json:"participant_count"`
+	Participants          []TournamentParticipant   `json:"participants,omitempty"`
+	CardCount             int                       `json:"card_count"`
+}
+
+// TournamentParticipant represents a participant in a tournament
+type TournamentParticipant struct {
+	ID           int64  `json:"id"`
+	TournamentID int64  `json:"tournament_id"`
+	UserID       int64  `json:"user_id"`
+	JoinedAt     string `json:"joined_at"`
+	FirstName    string `json:"first_name,omitempty"`
+	Username     string `json:"username,omitempty"`
+}
+
+// TournamentInfo contains info for scheduler queries
+type TournamentInfo struct {
+	TournamentID     int64  `json:"tournament_id"`
+	ChatID           int64  `json:"chat_id"`
+	Timezone         string `json:"timezone"`
+	TournamentDate   string `json:"tournament_date"`
+	ParticipantCount int64  `json:"participant_count"`
+}
+
+// TournamentStartResult represents the result of starting a tournament
+type TournamentStartResult struct {
+	Tournament       *RankedTournament `json:"tournament"`
+	Match            *ArenaMatch       `json:"match,omitempty"`
+	ParticipantCount int               `json:"participant_count"`
+	Format           string            `json:"format,omitempty"`
+	Skipped          bool              `json:"skipped"`
+	Reason           string            `json:"reason,omitempty"`
+}
+
+// Tournament-specific errors
+var (
+	ErrTournamentNotFound         = fmt.Errorf("tournament not found")
+	ErrTournamentNotOpen          = fmt.Errorf("tournament not open")
+	ErrTournamentRegistrationClosed = fmt.Errorf("tournament registration closed")
+	ErrAlreadyRegistered          = fmt.Errorf("already registered")
+	ErrNotRegistered              = fmt.Errorf("not registered")
+)
+
+// GetTodayTournament retrieves today's tournament for a chat
+func (c *APIClient) GetTodayTournament(ctx context.Context, chatID int64, date string) (*RankedTournament, error) {
+	txn := newrelic.FromContext(ctx)
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/tournament/today?chat_id=%d&date=%s", c.baseURL, chatID, date)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "GET",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result struct {
+		Tournament *RankedTournament `json:"tournament"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.Tournament, nil
+}
+
+// GetPendingAnnouncements retrieves tournaments needing announcement
+func (c *APIClient) GetPendingAnnouncements(ctx context.Context) ([]TournamentInfo, error) {
+	txn := newrelic.FromContext(ctx)
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/tournaments/pending-announcements", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "GET",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result struct {
+		Tournaments []TournamentInfo `json:"tournaments"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.Tournaments, nil
+}
+
+// AnnounceTournament creates and announces a tournament
+func (c *APIClient) AnnounceTournament(ctx context.Context, chatID int64, date string, messageID int64) (*RankedTournament, error) {
+	txn := newrelic.FromContext(ctx)
+
+	reqBody := struct {
+		ChatID    int64  `json:"chat_id"`
+		Date      string `json:"date"`
+		MessageID int64  `json:"message_id"`
+	}{
+		ChatID:    chatID,
+		Date:      date,
+		MessageID: messageID,
+	}
+
+	bodyJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/tournament/announce", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result struct {
+		Tournament *RankedTournament `json:"tournament"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.Tournament, nil
+}
+
+// JoinTournament adds a user to a tournament
+func (c *APIClient) JoinTournament(ctx context.Context, chatID, userID int64) (*RankedTournament, error) {
+	txn := newrelic.FromContext(ctx)
+
+	reqBody := struct {
+		ChatID int64 `json:"chat_id"`
+		UserID int64 `json:"user_id"`
+	}{
+		ChatID: chatID,
+		UserID: userID,
+	}
+
+	bodyJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/tournament/join", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusBadRequest {
+		body, _ := io.ReadAll(resp.Body)
+		if bytes.Contains(body, []byte("not open")) {
+			return nil, ErrTournamentNotOpen
+		}
+		if bytes.Contains(body, []byte("closed")) {
+			return nil, ErrTournamentRegistrationClosed
+		}
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	if resp.StatusCode == http.StatusConflict {
+		return nil, ErrAlreadyRegistered
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrTournamentNotFound
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result struct {
+		Tournament *RankedTournament `json:"tournament"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.Tournament, nil
+}
+
+// LeaveTournament removes a user from a tournament
+func (c *APIClient) LeaveTournament(ctx context.Context, chatID, userID int64) (*RankedTournament, error) {
+	txn := newrelic.FromContext(ctx)
+
+	reqBody := struct {
+		ChatID int64 `json:"chat_id"`
+		UserID int64 `json:"user_id"`
+	}{
+		ChatID: chatID,
+		UserID: userID,
+	}
+
+	bodyJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/tournament/leave", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusBadRequest {
+		body, _ := io.ReadAll(resp.Body)
+		if bytes.Contains(body, []byte("closed")) {
+			return nil, ErrTournamentRegistrationClosed
+		}
+		if bytes.Contains(body, []byte("not registered")) {
+			return nil, ErrNotRegistered
+		}
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result struct {
+		Tournament *RankedTournament `json:"tournament"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.Tournament, nil
+}
+
+// GetPendingCloseTournaments retrieves tournaments needing registration close
+func (c *APIClient) GetPendingCloseTournaments(ctx context.Context) ([]TournamentInfo, error) {
+	txn := newrelic.FromContext(ctx)
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/tournaments/pending-close", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "GET",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result struct {
+		Tournaments []TournamentInfo `json:"tournaments"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.Tournaments, nil
+}
+
+// CloseTournament closes registration and starts a tournament
+func (c *APIClient) CloseTournament(ctx context.Context, tournamentID int64) (*TournamentStartResult, error) {
+	txn := newrelic.FromContext(ctx)
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/tournament/%d/close", c.baseURL, tournamentID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrTournamentNotFound
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result TournamentStartResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// GetPendingRoundsTournaments retrieves tournaments with pending rounds
+func (c *APIClient) GetPendingRoundsTournaments(ctx context.Context) ([]RankedTournament, error) {
+	txn := newrelic.FromContext(ctx)
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/tournaments/pending-rounds", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "GET",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result struct {
+		Tournaments []RankedTournament `json:"tournaments"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.Tournaments, nil
+}

@@ -10,6 +10,7 @@ export interface AuthResponse {
   first_name: string
   username: string | null
   is_admin: boolean
+  chat_timezone?: string | null
 }
 
 export interface StatsResponse {
@@ -64,7 +65,7 @@ export type LeaderboardMetric =
   | 'active_days'
   | 'current_streak'
 
-export type TabId = 'home' | 'leaderboard' | 'interactions' | 'media' | 'profile' | 'card'
+export type TabId = 'home' | 'leaderboard' | 'interactions' | 'media' | 'profile' | 'card' | 'admin'
 
 // Card Gallery Types
 export interface CardImage {
@@ -243,4 +244,10 @@ export interface MediaOverviewResponse {
   distribution: MediaTypeDistribution[]
   activity: MediaActivity[]
   top_senders: MediaUser[]
+}
+
+// Admin Settings Types
+export interface ChatTimezoneResponse {
+  chat_id: number
+  timezone: string | null
 }

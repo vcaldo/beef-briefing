@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata" // Embed timezone database for Alpine containers
 
 	"beef-briefing/apps/api-service/internal/handlers"
 	"beef-briefing/apps/api-service/internal/middleware"
@@ -299,6 +300,10 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		protected.HandleFunc("/heatmap", miniAppHandler.HandleHeatmap).Methods("GET", "OPTIONS")
 		protected.HandleFunc("/users", miniAppHandler.HandleUsers).Methods("GET", "OPTIONS")
 		protected.HandleFunc("/media-overview", miniAppHandler.HandleMediaOverview).Methods("GET", "OPTIONS")
+
+		// Settings endpoints - admin configuration
+		protected.HandleFunc("/settings/timezone", miniAppHandler.HandleGetTimezone).Methods("GET", "OPTIONS")
+		protected.HandleFunc("/settings/timezone", miniAppHandler.HandleSetTimezone).Methods("PUT", "OPTIONS")
 
 		// Gallery endpoints - card images for deck-mini-app
 		protected.HandleFunc("/gallery/weeks", miniAppHandler.HandleGalleryWeeks).Methods("GET", "OPTIONS")

@@ -15,6 +15,7 @@ import type {
   HeatmapResponse,
   ChatUsersResponse,
   MediaOverviewResponse,
+  ChatTimezoneResponse,
   Period,
   LeaderboardMetric,
   CardImage,
@@ -27,7 +28,16 @@ class ApiClient {
   private token: string | null = null
   private chatId: number | null = null
   private isAdmin: boolean = false
-  private timezone: string = getBrowserTimezone()
+  private browserTimezone: string = getBrowserTimezone()
+  private storedTimezone: string | null = null
+
+  /**
+   * Get the effective timezone to use for API requests.
+   * Priority: Stored group timezone > Browser timezone
+   */
+  private getEffectiveTimezone(): string {
+    return this.storedTimezone || this.browserTimezone
+  }
 
   /**
    * Authenticate with Mini App init data.
@@ -49,6 +59,7 @@ class ApiClient {
     this.token = data.token
     this.chatId = data.chat_id
     this.isAdmin = data.is_admin
+    this.storedTimezone = data.chat_timezone || null
     return data
   }
 
@@ -62,7 +73,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/stats?chat_id=${targetChatId}&period=${period}&tz=${encodeURIComponent(this.timezone)}`,
+      `${API_BASE_URL}/api/v1/mini-app/stats?chat_id=${targetChatId}&period=${period}&tz=${encodeURIComponent(this.getEffectiveTimezone())}`,
       { headers: this.getHeaders() }
     )
 
@@ -83,7 +94,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/activity?chat_id=${targetChatId}&period=${period}&tz=${encodeURIComponent(this.timezone)}`,
+      `${API_BASE_URL}/api/v1/mini-app/activity?chat_id=${targetChatId}&period=${period}&tz=${encodeURIComponent(this.getEffectiveTimezone())}`,
       { headers: this.getHeaders() }
     )
 
@@ -110,7 +121,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/leaderboard?chat_id=${targetChatId}&period=${period}&metric=${metric}&page=${page}&limit=${limit}&tz=${encodeURIComponent(this.timezone)}`,
+      `${API_BASE_URL}/api/v1/mini-app/leaderboard?chat_id=${targetChatId}&period=${period}&metric=${metric}&page=${page}&limit=${limit}&tz=${encodeURIComponent(this.getEffectiveTimezone())}`,
       { headers: this.getHeaders() }
     )
 
@@ -135,7 +146,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/reactions-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}&tz=${encodeURIComponent(this.timezone)}`,
+      `${API_BASE_URL}/api/v1/mini-app/reactions-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}&tz=${encodeURIComponent(this.getEffectiveTimezone())}`,
       { headers: this.getHeaders() }
     )
 
@@ -160,7 +171,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/replies-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}&tz=${encodeURIComponent(this.timezone)}`,
+      `${API_BASE_URL}/api/v1/mini-app/replies-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}&tz=${encodeURIComponent(this.getEffectiveTimezone())}`,
       { headers: this.getHeaders() }
     )
 
@@ -181,7 +192,7 @@ class ApiClient {
       throw new Error('No chat ID available')
     }
 
-    let url = `${API_BASE_URL}/api/v1/mini-app/profile?chat_id=${targetChatId}&period=${period}&tz=${encodeURIComponent(this.timezone)}`
+    let url = `${API_BASE_URL}/api/v1/mini-app/profile?chat_id=${targetChatId}&period=${period}&tz=${encodeURIComponent(this.getEffectiveTimezone())}`
     if (targetUserId) {
       url += `&target_user_id=${targetUserId}`
     }
@@ -230,7 +241,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/heatmap?chat_id=${targetChatId}&period=${period}&include_user=${includeUser}&tz=${encodeURIComponent(this.timezone)}`,
+      `${API_BASE_URL}/api/v1/mini-app/heatmap?chat_id=${targetChatId}&period=${period}&include_user=${includeUser}&tz=${encodeURIComponent(this.getEffectiveTimezone())}`,
       { headers: this.getHeaders() }
     )
 
@@ -255,7 +266,7 @@ class ApiClient {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/mini-app/media-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}&tz=${encodeURIComponent(this.timezone)}`,
+      `${API_BASE_URL}/api/v1/mini-app/media-overview?chat_id=${targetChatId}&period=${period}&limit=${limit}&tz=${encodeURIComponent(this.getEffectiveTimezone())}`,
       { headers: this.getHeaders() }
     )
 
@@ -378,7 +389,64 @@ class ApiClient {
   }
 
   getTimezone(): string {
-    return this.timezone
+    return this.getEffectiveTimezone()
+  }
+
+  getStoredTimezone(): string | null {
+    return this.storedTimezone
+  }
+
+  getBrowserTimezone(): string {
+    return this.browserTimezone
+  }
+
+  /**
+   * Get the stored group timezone from the API.
+   */
+  async getGroupTimezone(chatId?: number): Promise<ChatTimezoneResponse> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/settings/timezone?chat_id=${targetChatId}`,
+      { headers: this.getHeaders() }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch timezone')
+    }
+
+    return response.json()
+  }
+
+  /**
+   * Set the group timezone (admin only).
+   */
+  async setGroupTimezone(timezone: string, chatId?: number): Promise<ChatTimezoneResponse> {
+    const targetChatId = chatId || this.chatId
+    if (!targetChatId) {
+      throw new Error('No chat ID available')
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/settings/timezone?chat_id=${targetChatId}`,
+      {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ timezone }),
+      }
+    )
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to set timezone' }))
+      throw new Error(error.error || 'Failed to set timezone')
+    }
+
+    const result: ChatTimezoneResponse = await response.json()
+    this.storedTimezone = result.timezone // Update cached value
+    return result
   }
 }
 

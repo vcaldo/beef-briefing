@@ -345,11 +345,18 @@ func (r *MiniAppRepository) GetUserDailyActivity(ctx context.Context, chatID, us
 }
 
 // GetUserRankings returns user rankings for a chat.
-func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, metric string, limit, offset int, startDate, endDate *time.Time) ([]UserRanking, error) {
+// tzName is the IANA timezone name for streak calculations (e.g., "America/Sao_Paulo").
+// If empty, defaults to UTC.
+func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, metric string, limit, offset int, startDate, endDate *time.Time, tzName string) ([]UserRanking, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("db:mini-app-user-rankings")
 		defer segment.End()
+	}
+
+	// Default to UTC if no timezone specified
+	if tzName == "" {
+		tzName = "UTC"
 	}
 
 	var rows *sql.Rows
@@ -358,13 +365,13 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 	if startDate == nil && endDate == nil {
 		// All-time: use materialized view for standard metrics, live query for reply/streak metrics
 		if metric == "current_streak" {
-			// Streak metric: compute consecutive days for all users
+			// Streak metric: compute consecutive days for all users (timezone-aware)
 			query := `
 				WITH user_dates AS (
-					SELECT user_id, DATE(date) as activity_date
+					SELECT user_id, DATE(date AT TIME ZONE $4) as activity_date
 					FROM messages
 					WHERE chat_id = $1
-					GROUP BY user_id, DATE(date)
+					GROUP BY user_id, DATE(date AT TIME ZONE $4)
 				),
 				numbered AS (
 					SELECT
@@ -382,8 +389,8 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 					SELECT
 						n.user_id,
 						CASE
-							-- Only count streak if last activity was today or yesterday
-							WHEN la.last_active >= CURRENT_DATE - INTERVAL '1 day'
+							-- Only count streak if last activity was today or yesterday (in specified timezone)
+							WHEN la.last_active >= (CURRENT_TIMESTAMP AT TIME ZONE $4)::date - INTERVAL '1 day'
 							THEN (
 								SELECT COUNT(*)
 								FROM numbered n2
@@ -414,7 +421,7 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 				ORDER BY COALESCE(us.streak, 0) DESC, mv.message_count DESC
 				LIMIT $2 OFFSET $3
 			`
-			rows, err = r.db.QueryContext(ctx, query, chatID, limit, offset)
+			rows, err = r.db.QueryContext(ctx, query, chatID, limit, offset, tzName)
 		} else if metric == "replies_sent" || metric == "replies_received" {
 			// Reply metrics need live computation
 			query := `
@@ -472,15 +479,15 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 	} else {
 		// Date-filtered: use live query
 		if metric == "current_streak" {
-			// Streak metric with date filter
+			// Streak metric with date filter (timezone-aware)
 			query := `
 				WITH user_dates AS (
-					SELECT user_id, DATE(date) as activity_date
+					SELECT user_id, DATE(date AT TIME ZONE $6) as activity_date
 					FROM messages
 					WHERE chat_id = $1
 						AND date >= $2
 						AND date < $3
-					GROUP BY user_id, DATE(date)
+					GROUP BY user_id, DATE(date AT TIME ZONE $6)
 				),
 				numbered AS (
 					SELECT
@@ -498,8 +505,8 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 					SELECT
 						n.user_id,
 						CASE
-							-- Only count streak if last activity was within period end or yesterday
-							WHEN la.last_active >= LEAST($3::date, CURRENT_DATE) - INTERVAL '1 day'
+							-- Only count streak if last activity was within period end or yesterday (in specified timezone)
+							WHEN la.last_active >= LEAST($3::date, (CURRENT_TIMESTAMP AT TIME ZONE $6)::date) - INTERVAL '1 day'
 							THEN (
 								SELECT COUNT(*)
 								FROM numbered n2
@@ -544,7 +551,7 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 				ORDER BY COALESCE(us.streak, 0) DESC, ui.message_count DESC
 				LIMIT $4 OFFSET $5
 			`
-			rows, err = r.db.QueryContext(ctx, query, chatID, startDate, endDate, limit, offset)
+			rows, err = r.db.QueryContext(ctx, query, chatID, startDate, endDate, limit, offset, tzName)
 		} else {
 			query := `
 				WITH user_stats AS (
@@ -555,7 +562,7 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 						u.username,
 						u.is_bot,
 						COUNT(*) as message_count,
-						COUNT(DISTINCT DATE(m.date)) as active_days
+						COUNT(DISTINCT DATE(m.date AT TIME ZONE $6)) as active_days
 					FROM messages m
 					JOIN users u ON u.id = m.user_id
 					WHERE m.chat_id = $1
@@ -618,7 +625,7 @@ func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, m
 				ORDER BY COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) DESC
 				LIMIT $4 OFFSET $5
 			`
-			rows, err = r.db.QueryContext(ctx, query, chatID, startDate, endDate, limit, offset)
+			rows, err = r.db.QueryContext(ctx, query, chatID, startDate, endDate, limit, offset, tzName)
 		}
 	}
 
@@ -923,7 +930,9 @@ func (r *MiniAppRepository) GetTopReactionReceivers(ctx context.Context, chatID 
 }
 
 // GetUserProfileStats returns personal stats for a user including their rankings.
-func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time) (*ProfileStats, error) {
+// tzName is the IANA timezone name for streak calculations (e.g., "America/Sao_Paulo").
+// If empty, defaults to UTC.
+func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time, tzName string) (*ProfileStats, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("db:mini-app-user-profile-stats")
@@ -1001,7 +1010,7 @@ func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, use
 				SELECT
 					m.user_id,
 					COUNT(*) as message_count,
-					COUNT(DISTINCT DATE(m.date)) as active_days
+					COUNT(DISTINCT DATE(m.date AT TIME ZONE $5)) as active_days
 				FROM messages m
 				JOIN users u ON u.id = m.user_id
 				WHERE m.chat_id = $1
@@ -1076,7 +1085,7 @@ func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, use
 				rank_by_reactions
 			FROM combined
 			WHERE user_id = $4
-		`, chatID, startDate, endDate, userID).Scan(
+		`, chatID, startDate, endDate, userID, tzName).Scan(
 			&stats.MessageCount,
 			&stats.ReactionsSent,
 			&stats.ReactionsReceived,
@@ -1100,7 +1109,7 @@ func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, use
 	}
 
 	// Calculate current streak
-	streak, err := r.getUserCurrentStreak(ctx, chatID, userID, startDate, endDate)
+	streak, err := r.getUserCurrentStreak(ctx, chatID, userID, startDate, endDate, tzName)
 	if err != nil {
 		// Log but don't fail - streak is not critical
 		stats.CurrentStreak = 0
@@ -1112,15 +1121,22 @@ func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, use
 }
 
 // getUserCurrentStreak calculates the current consecutive days streak for a user.
-func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time) (int64, error) {
+// tzName is the IANA timezone name for streak calculations (e.g., "America/Sao_Paulo").
+// If empty, defaults to UTC.
+func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time, tzName string) (int64, error) {
+	// Default to UTC if no timezone specified
+	if tzName == "" {
+		tzName = "UTC"
+	}
+
 	var query string
 	var args []interface{}
 
 	if startDate == nil && endDate == nil {
-		// All-time streak: consecutive days ending today or yesterday (active streak only)
+		// All-time streak: consecutive days ending today or yesterday (active streak only, timezone-aware)
 		query = `
 			WITH user_dates AS (
-				SELECT DISTINCT DATE(date) as activity_date
+				SELECT DISTINCT DATE(date AT TIME ZONE $3) as activity_date
 				FROM messages
 				WHERE chat_id = $1 AND user_id = $2
 			),
@@ -1134,8 +1150,8 @@ func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, us
 				FROM user_dates
 			)
 			SELECT CASE
-				-- Only count streak if last activity was today or yesterday
-				WHEN (SELECT last_active FROM most_recent) >= CURRENT_DATE - INTERVAL '1 day'
+				-- Only count streak if last activity was today or yesterday (in specified timezone)
+				WHEN (SELECT last_active FROM most_recent) >= (CURRENT_TIMESTAMP AT TIME ZONE $3)::date - INTERVAL '1 day'
 				THEN (
 					SELECT COUNT(*)
 					FROM numbered
@@ -1144,12 +1160,12 @@ func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, us
 				ELSE 0
 			END
 		`
-		args = []interface{}{chatID, userID}
+		args = []interface{}{chatID, userID, tzName}
 	} else {
-		// Period-filtered streak: consecutive days ending at period end or yesterday
+		// Period-filtered streak: consecutive days ending at period end or yesterday (timezone-aware)
 		query = `
 			WITH user_dates AS (
-				SELECT DISTINCT DATE(date) as activity_date
+				SELECT DISTINCT DATE(date AT TIME ZONE $5) as activity_date
 				FROM messages
 				WHERE chat_id = $1 AND user_id = $2
 					AND date >= $3 AND date < $4
@@ -1164,8 +1180,8 @@ func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, us
 				FROM user_dates
 			)
 			SELECT CASE
-				-- Only count streak if last activity was within the period's end or yesterday
-				WHEN (SELECT last_active FROM most_recent) >= LEAST($4::date, CURRENT_DATE) - INTERVAL '1 day'
+				-- Only count streak if last activity was within the period's end or yesterday (in specified timezone)
+				WHEN (SELECT last_active FROM most_recent) >= LEAST($4::date, (CURRENT_TIMESTAMP AT TIME ZONE $5)::date) - INTERVAL '1 day'
 				THEN (
 					SELECT COUNT(*)
 					FROM numbered
@@ -1174,7 +1190,7 @@ func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, us
 				ELSE 0
 			END
 		`
-		args = []interface{}{chatID, userID, startDate, endDate}
+		args = []interface{}{chatID, userID, startDate, endDate, tzName}
 	}
 
 	var streak int64
@@ -2315,4 +2331,46 @@ func (r *MiniAppRepository) GetTopMediaSenders(ctx context.Context, chatID int64
 	}
 
 	return users, rows.Err()
+}
+
+// GetChatTimezone returns the configured timezone for a chat, or nil if not set.
+func (r *MiniAppRepository) GetChatTimezone(ctx context.Context, chatID int64) (*string, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-chat-timezone")
+		defer segment.End()
+	}
+
+	var timezone sql.NullString
+	err := r.db.QueryRowContext(ctx,
+		`SELECT timezone FROM chats WHERE id = $1`,
+		chatID,
+	).Scan(&timezone)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if timezone.Valid {
+		return &timezone.String, nil
+	}
+	return nil, nil
+}
+
+// SetChatTimezone sets the timezone for a chat. Only admins should call this.
+func (r *MiniAppRepository) SetChatTimezone(ctx context.Context, chatID int64, timezone string) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:mini-app-set-chat-timezone")
+		defer segment.End()
+	}
+
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE chats SET timezone = $1, updated_at = NOW() WHERE id = $2`,
+		timezone, chatID,
+	)
+	return err
 }

@@ -53,13 +53,20 @@ type ValidatedInitData struct {
 
 // AuthResponse represents the response from Mini App authentication
 type AuthResponse struct {
-	Token     string  `json:"token"`
-	UserID    int64   `json:"user_id"`
-	ChatID    *int64  `json:"chat_id,omitempty"`
-	ChatTitle *string `json:"chat_title,omitempty"`
-	FirstName string  `json:"first_name"`
-	Username  *string `json:"username,omitempty"`
-	IsAdmin   bool    `json:"is_admin"`
+	Token        string  `json:"token"`
+	UserID       int64   `json:"user_id"`
+	ChatID       *int64  `json:"chat_id,omitempty"`
+	ChatTitle    *string `json:"chat_title,omitempty"`
+	FirstName    string  `json:"first_name"`
+	Username     *string `json:"username,omitempty"`
+	IsAdmin      bool    `json:"is_admin"`
+	ChatTimezone *string `json:"chat_timezone,omitempty"`
+}
+
+// ChatTimezoneResponse represents the response for get/set chat timezone
+type ChatTimezoneResponse struct {
+	ChatID   int64   `json:"chat_id"`
+	Timezone *string `json:"timezone"`
 }
 
 // MiniAppService handles Mini App authentication and analytics
@@ -219,12 +226,17 @@ func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*Au
 		return nil, fmt.Errorf("failed to create JWT token: %w", err)
 	}
 
-	// Fetch chat title if chat ID is available
+	// Fetch chat title and timezone if chat ID is available
 	var chatTitle *string
+	var chatTimezone *string
 	if validated.ChatID != nil {
 		chatTitle, err = s.repo.GetChatTitle(ctx, *validated.ChatID)
 		if err != nil {
 			slog.Warn("failed to get chat title", "chat_id", *validated.ChatID, "error", err)
+		}
+		chatTimezone, err = s.repo.GetChatTimezone(ctx, *validated.ChatID)
+		if err != nil {
+			slog.Warn("failed to get chat timezone", "chat_id", *validated.ChatID, "error", err)
 		}
 	}
 
@@ -234,13 +246,14 @@ func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*Au
 	)
 
 	return &AuthResponse{
-		Token:     token,
-		UserID:    validated.UserID,
-		ChatID:    validated.ChatID,
-		ChatTitle: chatTitle,
-		FirstName: validated.FirstName,
-		Username:  validated.Username,
-		IsAdmin:   s.config.IsAdmin(validated.UserID),
+		Token:        token,
+		UserID:       validated.UserID,
+		ChatID:       validated.ChatID,
+		ChatTitle:    chatTitle,
+		FirstName:    validated.FirstName,
+		Username:     validated.Username,
+		IsAdmin:      s.config.IsAdmin(validated.UserID),
+		ChatTimezone: chatTimezone,
 	}, nil
 }
 
@@ -309,7 +322,13 @@ func (s *MiniAppService) GetUserRankings(ctx context.Context, chatID int64, metr
 	startDate, endDate := getPeriodDates(period, tz)
 	offset := (page - 1) * limit
 
-	rankings, err := s.repo.GetUserRankings(ctx, chatID, metric, limit, offset, startDate, endDate)
+	// Get timezone name for streak calculations
+	tzName := "UTC"
+	if tz != nil {
+		tzName = tz.String()
+	}
+
+	rankings, err := s.repo.GetUserRankings(ctx, chatID, metric, limit, offset, startDate, endDate, tzName)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -628,7 +647,13 @@ func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int6
 
 	startDate, endDate := getPeriodDates(period, tz)
 
-	stats, err := s.repo.GetUserProfileStats(ctx, chatID, userID, startDate, endDate)
+	// Get timezone name for streak calculations
+	tzName := "UTC"
+	if tz != nil {
+		tzName = tz.String()
+	}
+
+	stats, err := s.repo.GetUserProfileStats(ctx, chatID, userID, startDate, endDate, tzName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get profile stats: %w", err)
 	}
@@ -636,7 +661,7 @@ func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int6
 	// Get previous period stats for trend calculation
 	prevStart, prevEnd := getPreviousPeriodDates(period, tz)
 	if prevStart != nil && prevEnd != nil {
-		prevStats, err := s.repo.GetUserProfileStats(ctx, chatID, userID, prevStart, prevEnd)
+		prevStats, err := s.repo.GetUserProfileStats(ctx, chatID, userID, prevStart, prevEnd, tzName)
 		if err != nil {
 			// Log but don't fail - trends are not critical
 			slog.Warn("failed to get previous period profile stats for trends", "chat_id", chatID, "user_id", userID, "error", err)
@@ -954,4 +979,38 @@ func (s *MiniAppService) GetMediaOverview(ctx context.Context, chatID int64, per
 		Activity:     activity,
 		TopSenders:   sendersWithPhoto,
 	}, nil
+}
+
+// GetChatTimezone returns the stored timezone for a chat
+func (s *MiniAppService) GetChatTimezone(ctx context.Context, chatID int64) (*ChatTimezoneResponse, error) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:get-chat-timezone")
+		defer segment.End()
+	}
+
+	tz, err := s.repo.GetChatTimezone(ctx, chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ChatTimezoneResponse{
+		ChatID:   chatID,
+		Timezone: tz,
+	}, nil
+}
+
+// SetChatTimezone sets the timezone for a chat (admin only)
+func (s *MiniAppService) SetChatTimezone(ctx context.Context, chatID int64, timezone string) error {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		segment := txn.StartSegment("service:mini-app:set-chat-timezone")
+		defer segment.End()
+	}
+
+	// Validate timezone is a valid IANA identifier
+	_, err := time.LoadLocation(timezone)
+	if err != nil {
+		return fmt.Errorf("invalid timezone: %s", timezone)
+	}
+
+	return s.repo.SetChatTimezone(ctx, chatID, timezone)
 }

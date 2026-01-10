@@ -158,6 +158,43 @@ func (s *MatchScheduler) sendMatchStartedNotification(ctx context.Context, chatI
 	if err != nil {
 		slog.Error("failed to send match started notification", "chat_id", chatID, "error", err)
 	}
+
+	// Send DM notifications to participants
+	s.sendShopPhaseDMs(ctx, matchID)
+}
+
+// sendShopPhaseDMs sends DM notifications to all participants when shop phase starts
+func (s *MatchScheduler) sendShopPhaseDMs(ctx context.Context, matchID string) {
+	// Get match details to get participant user IDs
+	match, err := s.apiClient.GetArenaMatch(ctx, matchID)
+	if err != nil {
+		slog.Error("failed to get match for DM notifications", "match_id", matchID, "error", err)
+		return
+	}
+
+	for _, p := range match.Participants {
+		go s.sendShopPhaseDM(ctx, p.UserID, matchID, p.Name)
+	}
+}
+
+// sendShopPhaseDM sends a DM to a single participant
+func (s *MatchScheduler) sendShopPhaseDM(ctx context.Context, userID int64, matchID string, userName string) {
+	text := "🎮 *Your match is starting!*\n\n" +
+		"Build your team now - you have 3 minutes.\n\n" +
+		"Open the Arena to pick your cards!"
+
+	_, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:    userID,
+		Text:      text,
+		ParseMode: "Markdown",
+	})
+
+	if err != nil {
+		// This is expected if the user hasn't started a chat with the bot
+		slog.Debug("failed to send shop phase DM", "user_id", userID, "error", err)
+	} else {
+		slog.Info("sent shop phase DM", "user_id", userID, "match_id", matchID)
+	}
 }
 
 // sendMatchCancelledNotification sends a notification when a match is cancelled

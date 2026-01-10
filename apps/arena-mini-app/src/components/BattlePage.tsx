@@ -31,6 +31,10 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   const [currentEventIndex, setCurrentEventIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  // Share state
+  const [sharing, setSharing] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
+
   // Audio
   const { play, muted, toggleMuted } = useAudio();
   const lastEventRef = useRef<BattleEvent | null>(null);
@@ -136,6 +140,23 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
       const lastRound = battle.rounds[battle.rounds.length - 1];
       setCurrentEventIndex(lastRound.battle_log.length - 1);
       setIsPlaying(false);
+    }
+  };
+
+  // Share to group
+  const handleShare = async () => {
+    if (!battle || sharing || shareSuccess) return;
+
+    setSharing(true);
+    try {
+      await apiClient.shareResult(match.id);
+      setShareSuccess(true);
+      // Reset after showing success
+      setTimeout(() => setShareSuccess(false), 3000);
+    } catch (err) {
+      console.error('Failed to share:', err);
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -319,6 +340,15 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
         >
           Skip to End
         </button>
+        {battle.is_complete && (
+          <button
+            className={`btn share-btn ${shareSuccess ? 'btn-success' : 'btn-secondary'}`}
+            onClick={handleShare}
+            disabled={sharing || shareSuccess}
+          >
+            {sharing ? 'Sharing...' : shareSuccess ? 'Shared!' : 'Share to Group'}
+          </button>
+        )}
       </div>
     </div>
   );

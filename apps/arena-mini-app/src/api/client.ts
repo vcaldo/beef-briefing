@@ -4,6 +4,8 @@ import type {
   ShopState,
   BattleResult,
   LeaderboardEntry,
+  MatchHistoryEntry,
+  H2HRecord,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -213,6 +215,45 @@ class ApiClient {
       { headers: this.getHeaders() }
     );
     if (!response.ok) throw new Error('Failed to fetch leaderboard');
+    return response.json();
+  }
+
+  // History endpoints
+  async getHistory(
+    limit: number = 20,
+    offset: number = 0
+  ): Promise<{ matches: MatchHistoryEntry[]; total: number; has_more: boolean }> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/arena/history?${this.getChatIdParam()}&limit=${limit}&offset=${offset}`,
+      { headers: this.getHeaders() }
+    );
+    if (!response.ok) throw new Error('Failed to fetch history');
+    return response.json();
+  }
+
+  // Head-to-head endpoints
+  async getH2H(
+    opponentId?: number
+  ): Promise<{ record: H2HRecord | null; recent_matches: MatchHistoryEntry[] }> {
+    let url = `${API_BASE_URL}/api/v1/mini-app/arena/h2h?${this.getChatIdParam()}`;
+    if (opponentId) {
+      url += `&opponent_id=${opponentId}`;
+    }
+    const response = await fetch(url, { headers: this.getHeaders() });
+    if (!response.ok) throw new Error('Failed to fetch H2H');
+    return response.json();
+  }
+
+  // Share result
+  async shareResult(matchId: string): Promise<{ success: boolean; message?: string }> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/arena/match/${matchId}/share`,
+      { method: 'POST', headers: this.getHeaders() }
+    );
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to share result');
+    }
     return response.json();
   }
 }

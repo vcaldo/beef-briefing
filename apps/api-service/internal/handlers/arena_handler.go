@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -656,6 +657,265 @@ func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Reque
 	httputil.RespondJSON(w, map[string]interface{}{
 		"entries": entries,
 		"type":    matchType,
+	}, http.StatusOK)
+}
+
+// HandleGetHistory retrieves the user's match history.
+// GET /api/v1/mini-app/arena/history?chat_id=X&limit=20&offset=0
+func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:history")
+	}
+
+	claims := middleware.GetClaimsFromContext(ctx)
+	if claims == nil {
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	chatID, err := httputil.ParseInt64(r, "chat_id")
+	if err != nil || chatID == 0 {
+		if claims.ChatID != nil {
+			chatID = *claims.ChatID
+		} else {
+			httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Verify chat access
+	if claims.ChatID != nil && *claims.ChatID != chatID {
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
+		return
+	}
+
+	limit := httputil.ParseIntWithDefault(r, "limit", 20, 1, 50)
+	offset := httputil.ParseIntWithDefault(r, "offset", 0, 0, 10000)
+
+	entries, total, err := h.service.GetMatchHistory(ctx, chatID, claims.UserID, limit, offset)
+	if err != nil {
+		slog.Error("failed to get match history", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "failed to get match history", http.StatusInternalServerError)
+		return
+	}
+
+	// Transform entries for response
+	type MatchHistoryResponse struct {
+		MatchID   string `json:"match_id"`
+		MatchType string `json:"match_type"`
+		Opponent  struct {
+			UserID    int64  `json:"user_id"`
+			FirstName string `json:"first_name"`
+			Username  string `json:"username,omitempty"`
+		} `json:"opponent"`
+		Result       string          `json:"result"`
+		YourTeam     json.RawMessage `json:"your_team"`
+		OpponentTeam json.RawMessage `json:"opponent_team"`
+		CompletedAt  string          `json:"completed_at"`
+	}
+
+	matches := make([]MatchHistoryResponse, 0, len(entries))
+	for _, e := range entries {
+		m := MatchHistoryResponse{
+			MatchID:      e.MatchID,
+			MatchType:    string(e.MatchType),
+			Result:       e.Result,
+			YourTeam:     e.YourTeam,
+			OpponentTeam: e.OpponentTeam,
+			CompletedAt:  e.CompletedAt.Format(time.RFC3339),
+		}
+		m.Opponent.UserID = e.OpponentID
+		m.Opponent.FirstName = e.OpponentName
+		m.Opponent.Username = e.OpponentUser
+		matches = append(matches, m)
+	}
+
+	httputil.RespondJSON(w, map[string]interface{}{
+		"matches":  matches,
+		"total":    total,
+		"has_more": offset+len(entries) < total,
+	}, http.StatusOK)
+}
+
+// HandleGetH2H retrieves head-to-head record against a specific opponent.
+// GET /api/v1/mini-app/arena/h2h?chat_id=X&opponent_id=Y
+func (h *ArenaHandler) HandleGetH2H(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:h2h")
+	}
+
+	claims := middleware.GetClaimsFromContext(ctx)
+	if claims == nil {
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	chatID, err := httputil.ParseInt64(r, "chat_id")
+	if err != nil || chatID == 0 {
+		if claims.ChatID != nil {
+			chatID = *claims.ChatID
+		} else {
+			httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Verify chat access
+	if claims.ChatID != nil && *claims.ChatID != chatID {
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
+		return
+	}
+
+	opponentID, err := httputil.ParseInt64(r, "opponent_id")
+	if err != nil || opponentID == 0 {
+		httputil.RespondError(w, "opponent_id is required", http.StatusBadRequest)
+		return
+	}
+
+	record, err := h.service.GetH2HRecord(ctx, chatID, claims.UserID, opponentID)
+	if err != nil {
+		slog.Error("failed to get h2h record", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "failed to get h2h record", http.StatusInternalServerError)
+		return
+	}
+
+	// Get recent matches vs opponent
+	recentMatches, err := h.service.GetRecentMatchesVsOpponent(ctx, chatID, claims.UserID, opponentID, 10)
+	if err != nil {
+		slog.Error("failed to get recent matches", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "failed to get recent matches", http.StatusInternalServerError)
+		return
+	}
+
+	// Transform record for response
+	type OpponentInfo struct {
+		UserID    int64  `json:"user_id"`
+		FirstName string `json:"first_name"`
+		Username  string `json:"username,omitempty"`
+	}
+
+	type H2HResponse struct {
+		Opponent    OpponentInfo `json:"opponent"`
+		Wins        int          `json:"wins"`
+		Losses      int          `json:"losses"`
+		LastMatchAt *string      `json:"last_match_at,omitempty"`
+	}
+
+	type RecentMatchResponse struct {
+		MatchID      string          `json:"match_id"`
+		MatchType    string          `json:"match_type"`
+		Result       string          `json:"result"`
+		YourTeam     json.RawMessage `json:"your_team"`
+		OpponentTeam json.RawMessage `json:"opponent_team"`
+		CompletedAt  string          `json:"completed_at"`
+	}
+
+	var response struct {
+		Record        *H2HResponse          `json:"record"`
+		RecentMatches []RecentMatchResponse `json:"recent_matches"`
+	}
+
+	if record != nil {
+		response.Record = &H2HResponse{
+			Opponent: OpponentInfo{
+				UserID:    record.OpponentID,
+				FirstName: record.OpponentName,
+				Username:  record.OpponentUser,
+			},
+			Wins:   record.Wins,
+			Losses: record.Losses,
+		}
+		if record.LastMatchAt != nil {
+			t := record.LastMatchAt.Format(time.RFC3339)
+			response.Record.LastMatchAt = &t
+		}
+	}
+
+	response.RecentMatches = make([]RecentMatchResponse, 0, len(recentMatches))
+	for _, m := range recentMatches {
+		response.RecentMatches = append(response.RecentMatches, RecentMatchResponse{
+			MatchID:      m.MatchID,
+			MatchType:    string(m.MatchType),
+			Result:       m.Result,
+			YourTeam:     m.YourTeam,
+			OpponentTeam: m.OpponentTeam,
+			CompletedAt:  m.CompletedAt.Format(time.RFC3339),
+		})
+	}
+
+	httputil.RespondJSON(w, response, http.StatusOK)
+}
+
+// HandleShareResult allows sharing a match result to the group.
+// POST /api/v1/mini-app/arena/match/{id}/share
+func (h *ArenaHandler) HandleShareResult(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:share-result")
+	}
+
+	claims := middleware.GetClaimsFromContext(ctx)
+	if claims == nil {
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	matchID := vars["id"]
+	if matchID == "" {
+		httputil.RespondError(w, "match id is required", http.StatusBadRequest)
+		return
+	}
+
+	// Get the match to verify access and status
+	match, err := h.service.GetMatch(ctx, matchID)
+	if err != nil {
+		slog.Error("failed to get match", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "match not found", http.StatusNotFound)
+		return
+	}
+
+	// Verify the user was in this match
+	isParticipant := false
+	for _, p := range match.Participants {
+		if p.UserID == claims.UserID {
+			isParticipant = true
+			break
+		}
+	}
+	if !isParticipant {
+		httputil.RespondError(w, "not a participant in this match", http.StatusForbidden)
+		return
+	}
+
+	// Verify match is completed
+	if match.Status != "completed" {
+		httputil.RespondError(w, "match not completed", http.StatusBadRequest)
+		return
+	}
+
+	// Return share info - the actual sharing is done by the bot
+	httputil.RespondJSON(w, map[string]interface{}{
+		"success":  true,
+		"match_id": matchID,
+		"chat_id":  match.ChatID,
 	}, http.StatusOK)
 }
 
@@ -1370,6 +1630,75 @@ func (h *ArenaHandler) HandleBotGetPendingRounds(w http.ResponseWriter, r *http.
 
 	httputil.RespondJSON(w, map[string]interface{}{
 		"tournaments": tournaments,
+	}, http.StatusOK)
+}
+
+// HandleBotGetShareData returns data needed to share a match result.
+// GET /api/v1/arena/match/{id}/share-data
+func (h *ArenaHandler) HandleBotGetShareData(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:bot-get-share-data")
+	}
+
+	vars := mux.Vars(r)
+	matchID := vars["id"]
+	if matchID == "" {
+		httputil.RespondError(w, "match id is required", http.StatusBadRequest)
+		return
+	}
+
+	// Get match details
+	match, err := h.service.GetMatch(ctx, matchID)
+	if err != nil {
+		slog.Error("failed to get match", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "match not found", http.StatusNotFound)
+		return
+	}
+
+	if match.Status != "completed" {
+		httputil.RespondError(w, "match not completed", http.StatusBadRequest)
+		return
+	}
+
+	// Find winner and loser names
+	var winnerName, loserName string
+	for _, p := range match.Participants {
+		if match.WinnerUserID != nil && p.UserID == *match.WinnerUserID {
+			winnerName = p.FirstName
+		} else {
+			loserName = p.FirstName
+		}
+	}
+
+	// Format the message
+	matchTypeLabel := "Casual"
+	if match.MatchType == "ranked" {
+		matchTypeLabel = "Ranked"
+	}
+
+	var message string
+	if match.WinnerUserID != nil {
+		message = fmt.Sprintf("🏆 *BEEF ARENA RESULT*\n\n"+
+			"*%s* defeated *%s*!\n\n"+
+			"📊 Match Type: %s",
+			winnerName, loserName, matchTypeLabel)
+	} else {
+		message = fmt.Sprintf("🏆 *BEEF ARENA RESULT*\n\n"+
+			"Match ended in a *DRAW*!\n\n"+
+			"📊 Match Type: %s",
+			matchTypeLabel)
+	}
+
+	httputil.RespondJSON(w, map[string]interface{}{
+		"chat_id":    match.ChatID,
+		"message":    message,
+		"winner_id":  match.WinnerUserID,
+		"match_type": match.MatchType,
 	}, http.StatusOK)
 }
 

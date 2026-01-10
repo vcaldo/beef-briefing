@@ -228,7 +228,46 @@ func (s *TournamentScheduler) closeTournament(ctx context.Context, t client.Tour
 		}
 	}
 
+	// Send DM notifications to participants
+	if result.Match != nil && result.Match.ID != "" {
+		s.sendTournamentShopPhaseDMs(ctx, result.Match.ID)
+	}
+
 	slog.Info("tournament started", "tournament_id", t.TournamentID, "participants", result.ParticipantCount, "format", result.Format)
+}
+
+// sendTournamentShopPhaseDMs sends DM notifications to tournament participants
+func (s *TournamentScheduler) sendTournamentShopPhaseDMs(ctx context.Context, matchID string) {
+	// Get match details to get participant user IDs
+	match, err := s.apiClient.GetArenaMatch(ctx, matchID)
+	if err != nil {
+		slog.Error("failed to get tournament match for DM notifications", "match_id", matchID, "error", err)
+		return
+	}
+
+	for _, p := range match.Participants {
+		go s.sendTournamentDM(ctx, p.UserID, matchID)
+	}
+}
+
+// sendTournamentDM sends a DM to a single tournament participant
+func (s *TournamentScheduler) sendTournamentDM(ctx context.Context, userID int64, matchID string) {
+	text := "🏆 *Ranked Tournament Starting!*\n\n" +
+		"Build your team now - you have 3 minutes.\n\n" +
+		"Open the Arena to pick your cards!"
+
+	_, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:    userID,
+		Text:      text,
+		ParseMode: models.ParseModeMarkdown,
+	})
+
+	if err != nil {
+		// This is expected if the user hasn't started a chat with the bot
+		slog.Debug("failed to send tournament shop phase DM", "user_id", userID, "error", err)
+	} else {
+		slog.Info("sent tournament shop phase DM", "user_id", userID, "match_id", matchID)
+	}
 }
 
 // processPendingRounds handles tournaments with pending battle rounds

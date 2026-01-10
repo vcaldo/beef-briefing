@@ -1485,3 +1485,18 @@ func (s *ArenaService) CompleteTournament(ctx context.Context, tournamentID int6
 func (s *ArenaService) GetChatsWithTimezone(ctx context.Context) ([]*repository.ChatTimezone, error) {
 	return s.gameRepo.GetChatsWithTimezone(ctx)
 }
+
+// GetMatchHistory retrieves a user's match history
+func (s *ArenaService) GetMatchHistory(ctx context.Context, chatID, userID int64, limit, offset int) ([]*repository.MatchHistoryEntry, int, error) {
+	return s.gameRepo.GetMatchHistory(ctx, chatID, userID, limit, offset)
+}
+
+// GetH2HRecord retrieves head-to-head record against a specific opponent
+func (s *ArenaService) GetH2HRecord(ctx context.Context, chatID, userID, opponentID int64) (*repository.H2HRecord, error) {
+	return s.gameRepo.GetH2HRecord(ctx, chatID, userID, opponentID)
+}
+
+// GetRecentMatchesVsOpponent retrieves recent matches against a specific opponent
+func (s *ArenaService) GetRecentMatchesVsOpponent(ctx context.Context, chatID, userID, opponentID int64, limit int) ([]*repository.MatchHistoryEntry, error) {
+	return s.gameRepo.GetRecentMatchesVsOpponent(ctx, chatID, userID, opponentID, limit)
+}

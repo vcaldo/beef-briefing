@@ -292,6 +292,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		api.HandleFunc("/arena/matches/pending", arenaHandler.HandleBotGetPendingMatches).Methods("GET")
 		api.HandleFunc("/arena/match/{id}/auto-start", arenaHandler.HandleBotAutoStartMatch).Methods("POST")
 		api.HandleFunc("/arena/match/{id}/force-submit", arenaHandler.HandleBotForceSubmitTeams).Methods("POST")
+		api.HandleFunc("/arena/match/{id}/share-data", arenaHandler.HandleBotGetShareData).Methods("GET")
 
 		// Ranked tournament bot endpoints
 		api.HandleFunc("/arena/tournament/today", arenaHandler.HandleBotGetTodayTournament).Methods("GET")
@@ -357,7 +358,10 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 			protected.HandleFunc("/arena/match/{id}/order", arenaHandler.HandleSetOrder).Methods("POST", "OPTIONS")
 			protected.HandleFunc("/arena/match/{id}/team", arenaHandler.HandleSubmitTeam).Methods("POST", "OPTIONS")
 			protected.HandleFunc("/arena/match/{id}/battle", arenaHandler.HandleGetBattle).Methods("GET", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}/share", arenaHandler.HandleShareResult).Methods("POST", "OPTIONS")
 			protected.HandleFunc("/arena/leaderboard", arenaHandler.HandleGetLeaderboard).Methods("GET", "OPTIONS")
+			protected.HandleFunc("/arena/history", arenaHandler.HandleGetHistory).Methods("GET", "OPTIONS")
+			protected.HandleFunc("/arena/h2h", arenaHandler.HandleGetH2H).Methods("GET", "OPTIONS")
 			slog.Info("Arena game endpoints registered")
 		}
 

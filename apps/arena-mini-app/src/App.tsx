@@ -5,6 +5,10 @@ import type { AppState, AppPage, Match } from './types';
 import { LobbyPage } from './components/LobbyPage';
 import { ShopPage } from './components/ShopPage';
 import { BattlePage } from './components/BattlePage';
+import { LeaderboardPage } from './components/LeaderboardPage';
+import { HistoryPage } from './components/HistoryPage';
+import { H2HPage } from './components/H2HPage';
+import { Navigation } from './components/Navigation';
 
 function App() {
   const launchParams = useLaunchParams();
@@ -17,6 +21,10 @@ function App() {
   // Current page and active match
   const [page, setPage] = useState<AppPage>('lobby');
   const [activeMatch, setActiveMatch] = useState<Match | null>(null);
+
+  // H2H state
+  const [h2hOpponentId, setH2hOpponentId] = useState<number | null>(null);
+  const [h2hOpponentName, setH2hOpponentName] = useState<string>('');
 
   // Minimum splash time for smooth UX
   useEffect(() => {
@@ -65,6 +73,29 @@ function App() {
     setPage('lobby');
   };
 
+  // Handle navigation
+  const handleNavigate = (newPage: AppPage) => {
+    setActiveMatch(null);
+    setH2hOpponentId(null);
+    setPage(newPage);
+  };
+
+  // Handle H2H view
+  const handleViewH2H = (opponentId: number, opponentName: string) => {
+    setH2hOpponentId(opponentId);
+    setH2hOpponentName(opponentName);
+    setPage('h2h');
+  };
+
+  // Handle back from H2H
+  const handleBackFromH2H = () => {
+    setH2hOpponentId(null);
+    setPage('leaderboard');
+  };
+
+  // Show navigation only on main pages (not in active match flow)
+  const showNavigation = !activeMatch && (page === 'lobby' || page === 'leaderboard' || page === 'history');
+
   // Loading state
   if (appState === 'loading' || (appState === 'authenticated' && !splashMinTimeElapsed)) {
     return (
@@ -108,6 +139,31 @@ function App() {
           match={activeMatch}
           userId={userId!}
           onBack={handleBackToLobby}
+        />
+      )}
+      {page === 'leaderboard' && (
+        <LeaderboardPage
+          userId={userId!}
+          onViewH2H={handleViewH2H}
+        />
+      )}
+      {page === 'history' && (
+        <HistoryPage
+          userId={userId!}
+        />
+      )}
+      {page === 'h2h' && h2hOpponentId && (
+        <H2HPage
+          opponentId={h2hOpponentId}
+          opponentName={h2hOpponentName}
+          onBack={handleBackFromH2H}
+        />
+      )}
+
+      {showNavigation && (
+        <Navigation
+          currentPage={page}
+          onNavigate={handleNavigate}
         />
       )}
     </div>

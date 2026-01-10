@@ -1326,3 +1326,205 @@ func (r *GameRepository) GetTournamentsWithPendingRounds(ctx context.Context) ([
 
 	return tournaments, rows.Err()
 }
+
+// MatchHistoryEntry represents a match in the user's history
+type MatchHistoryEntry struct {
+	MatchID      string    `json:"match_id"`
+	MatchType    MatchType `json:"match_type"`
+	OpponentID   int64     `json:"opponent_id"`
+	OpponentName string    `json:"opponent_name"`
+	OpponentUser string    `json:"opponent_username,omitempty"`
+	Result       string    `json:"result"` // "win", "loss", "draw"
+	YourTeam     []byte    `json:"your_team"`
+	OpponentTeam []byte    `json:"opponent_team"`
+	CompletedAt  time.Time `json:"completed_at"`
+}
+
+// GetMatchHistory retrieves a user's match history
+func (r *GameRepository) GetMatchHistory(ctx context.Context, chatID, userID int64, limit, offset int) ([]*MatchHistoryEntry, int, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-match-history")
+		defer segment.End()
+	}
+
+	// Count total matches
+	var total int
+	countQuery := `
+		SELECT COUNT(*)
+		FROM game_match_rounds r
+		JOIN game_matches m ON r.match_id = m.id
+		WHERE m.chat_id = $1
+		  AND m.status = 'completed'
+		  AND (r.player_a_id = $2 OR r.player_b_id = $2)
+	`
+	if err := r.db.QueryRowContext(ctx, countQuery, chatID, userID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count match history: %w", err)
+	}
+
+	// Get match history
+	query := `
+		SELECT
+			m.id, m.match_type, m.completed_at,
+			CASE WHEN r.player_a_id = $2 THEN r.player_b_id ELSE r.player_a_id END as opponent_id,
+			u.first_name as opponent_name, COALESCE(u.username, '') as opponent_username,
+			CASE
+				WHEN r.is_draw THEN 'draw'
+				WHEN r.winner_id = $2 THEN 'win'
+				ELSE 'loss'
+			END as result,
+			CASE WHEN r.player_a_id = $2 THEN r.player_a_team ELSE r.player_b_team END as your_team,
+			CASE WHEN r.player_a_id = $2 THEN r.player_b_team ELSE r.player_a_team END as opponent_team
+		FROM game_match_rounds r
+		JOIN game_matches m ON r.match_id = m.id
+		JOIN users u ON u.id = CASE WHEN r.player_a_id = $2 THEN r.player_b_id ELSE r.player_a_id END
+		WHERE m.chat_id = $1
+		  AND m.status = 'completed'
+		  AND (r.player_a_id = $2 OR r.player_b_id = $2)
+		ORDER BY m.completed_at DESC
+		LIMIT $3 OFFSET $4
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, chatID, userID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query match history: %w", err)
+	}
+	defer rows.Close()
+
+	entries := make([]*MatchHistoryEntry, 0)
+	for rows.Next() {
+		e := &MatchHistoryEntry{}
+		err := rows.Scan(
+			&e.MatchID, &e.MatchType, &e.CompletedAt,
+			&e.OpponentID, &e.OpponentName, &e.OpponentUser,
+			&e.Result, &e.YourTeam, &e.OpponentTeam,
+		)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to scan match history row: %w", err)
+		}
+		entries = append(entries, e)
+	}
+
+	return entries, total, rows.Err()
+}
+
+// H2HRecord represents head-to-head record against an opponent
+type H2HRecord struct {
+	OpponentID   int64      `json:"opponent_id"`
+	OpponentName string     `json:"opponent_name"`
+	OpponentUser string     `json:"opponent_username,omitempty"`
+	Wins         int        `json:"wins"`
+	Losses       int        `json:"losses"`
+	LastMatchAt  *time.Time `json:"last_match_at,omitempty"`
+}
+
+// GetH2HRecord retrieves head-to-head record for a specific opponent
+func (r *GameRepository) GetH2HRecord(ctx context.Context, chatID, userID, opponentID int64) (*H2HRecord, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-h2h-record")
+		defer segment.End()
+	}
+
+	query := `
+		SELECT
+			l.head_to_head->$3::text,
+			u.first_name, COALESCE(u.username, ''), l.last_match_at
+		FROM game_leaderboard l
+		JOIN users u ON u.id = $3
+		WHERE l.user_id = $2 AND l.chat_id = $1
+	`
+
+	var h2hJSON []byte
+	var firstName, username string
+	var lastMatchAt *time.Time
+
+	err := r.db.QueryRowContext(ctx, query, chatID, userID, opponentID).Scan(&h2hJSON, &firstName, &username, &lastMatchAt)
+	if err == sql.ErrNoRows {
+		// No record exists, return empty
+		return &H2HRecord{
+			OpponentID:   opponentID,
+			OpponentName: firstName,
+			OpponentUser: username,
+			Wins:         0,
+			Losses:       0,
+		}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get h2h record: %w", err)
+	}
+
+	record := &H2HRecord{
+		OpponentID:   opponentID,
+		OpponentName: firstName,
+		OpponentUser: username,
+		LastMatchAt:  lastMatchAt,
+	}
+
+	// Parse the JSONB h2h data
+	if len(h2hJSON) > 0 {
+		var h2hData struct {
+			Wins   int `json:"wins"`
+			Losses int `json:"losses"`
+		}
+		if err := json.Unmarshal(h2hJSON, &h2hData); err == nil {
+			record.Wins = h2hData.Wins
+			record.Losses = h2hData.Losses
+		}
+	}
+
+	return record, nil
+}
+
+// GetRecentMatchesVsOpponent retrieves recent matches against a specific opponent
+func (r *GameRepository) GetRecentMatchesVsOpponent(ctx context.Context, chatID, userID, opponentID int64, limit int) ([]*MatchHistoryEntry, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-recent-matches-vs-opponent")
+		defer segment.End()
+	}
+
+	query := `
+		SELECT
+			m.id, m.match_type, m.completed_at,
+			$3::bigint as opponent_id,
+			u.first_name as opponent_name, COALESCE(u.username, '') as opponent_username,
+			CASE
+				WHEN r.is_draw THEN 'draw'
+				WHEN r.winner_id = $2 THEN 'win'
+				ELSE 'loss'
+			END as result,
+			CASE WHEN r.player_a_id = $2 THEN r.player_a_team ELSE r.player_b_team END as your_team,
+			CASE WHEN r.player_a_id = $2 THEN r.player_b_team ELSE r.player_a_team END as opponent_team
+		FROM game_match_rounds r
+		JOIN game_matches m ON r.match_id = m.id
+		JOIN users u ON u.id = $3
+		WHERE m.chat_id = $1
+		  AND m.status = 'completed'
+		  AND ((r.player_a_id = $2 AND r.player_b_id = $3) OR (r.player_a_id = $3 AND r.player_b_id = $2))
+		ORDER BY m.completed_at DESC
+		LIMIT $4
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, chatID, userID, opponentID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query recent matches: %w", err)
+	}
+	defer rows.Close()
+
+	entries := make([]*MatchHistoryEntry, 0)
+	for rows.Next() {
+		e := &MatchHistoryEntry{}
+		err := rows.Scan(
+			&e.MatchID, &e.MatchType, &e.CompletedAt,
+			&e.OpponentID, &e.OpponentName, &e.OpponentUser,
+			&e.Result, &e.YourTeam, &e.OpponentTeam,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan recent match row: %w", err)
+		}
+		entries = append(entries, e)
+	}
+
+	return entries, rows.Err()
+}

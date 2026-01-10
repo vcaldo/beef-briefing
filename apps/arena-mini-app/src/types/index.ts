@@ -140,6 +140,33 @@ export interface AuthResponse {
   chat_timezone?: string;
 }
 
+// Match history types
+export interface MatchHistoryEntry {
+  match_id: string;
+  match_type: MatchType;
+  opponent: {
+    user_id: number;
+    first_name: string;
+    username?: string;
+  };
+  result: 'win' | 'loss' | 'draw';
+  your_team: GameCard[];
+  opponent_team: GameCard[];
+  completed_at: string;
+}
+
+// Head-to-head types
+export interface H2HRecord {
+  opponent: {
+    user_id: number;
+    first_name: string;
+    username?: string;
+  };
+  wins: number;
+  losses: number;
+  last_match_at?: string;
+}
+
 // App state
-export type AppPage = 'lobby' | 'shop' | 'battle' | 'results' | 'leaderboard';
+export type AppPage = 'lobby' | 'shop' | 'battle' | 'results' | 'leaderboard' | 'history' | 'h2h';
 export type AppState = 'loading' | 'authenticated' | 'error';

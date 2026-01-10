@@ -258,6 +258,10 @@
   flex: 1;
 }
 
+.share-btn {
+  flex: 1;
+}
+
 /* Enhanced Event Display */
 .event-display {
   position: absolute;

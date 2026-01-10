@@ -1,0 +1,169 @@
+import { useState, useEffect } from 'react'
+import { useChat } from '../App'
+import { api } from '../api/client'
+import type { Topic, Message } from '../types'
+
+function TopicCard({ topic, onClick }: { topic: Topic; onClick: () => void }) {
+  return (
+    <div className="topic-card" onClick={onClick}>
+      <div className="topic-header">
+        <span className="topic-id">Topic #{topic.topic_id}</span>
+        <span className="topic-count">{topic.actual_count} messages</span>
+      </div>
+      <div className="topic-keywords">
+        {(topic.keywords || []).slice(0, 8).map((keyword, i) => (
+          <span key={i} className="keyword-tag">{keyword}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function TopicMessages({
+  chatId,
+  topicId,
+  onClose,
+}: {
+  chatId: number
+  topicId: number
+  onClose: () => void
+}) {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [loading, setLoading] = useState(true)
+  const [total, setTotal] = useState(0)
+
+  useEffect(() => {
+    api
+      .getTopicMessages(chatId, topicId, 50, 0)
+      .then((res) => {
+        setMessages(res.messages)
+        setTotal(res.total)
+      })
+      .finally(() => setLoading(false))
+  }, [chatId, topicId])
+
+  return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: '16px' }}>Topic #{topicId}</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            {total} messages in this topic
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-muted)',
+            fontSize: '20px',
+            cursor: 'pointer',
+          }}
+        >
+          &times;
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="loading">Loading messages...</div>
+      ) : (
+        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          {messages.map((msg) => {
+            const userName = msg.first_name
+              ? `${msg.first_name}${msg.last_name ? ' ' + msg.last_name : ''}`
+              : msg.username || 'Unknown'
+
+            return (
+              <div
+                key={msg.id}
+                style={{
+                  padding: 'var(--spacing-sm)',
+                  borderBottom: '1px solid var(--border-subtle)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 500, fontSize: '13px' }}>{userName}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {((msg as Message & { similarity?: number }).similarity * 100).toFixed(0)}% match
+                  </span>
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  {msg.text.length > 200 ? msg.text.slice(0, 200) + '...' : msg.text}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function TopicsPage() {
+  const { chatId } = useChat()
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [outlierCount, setOutlierCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!chatId) return
+    setLoading(true)
+    api
+      .getTopics(chatId)
+      .then((res) => {
+        setTopics(res.topics)
+        setOutlierCount(res.outlier_count)
+      })
+      .finally(() => setLoading(false))
+  }, [chatId])
+
+  if (!chatId) {
+    return <div className="loading">Select a chat to view topics</div>
+  }
+
+  if (loading) {
+    return <div className="loading">Loading topics...</div>
+  }
+
+  return (
+    <div>
+      <header className="page-header">
+        <h1 className="page-title">Topic Clusters</h1>
+        <p className="page-subtitle">
+          {topics.length} topics discovered | {outlierCount.toLocaleString()} unclustered messages
+        </p>
+      </header>
+
+      {/* Selected topic detail */}
+      {selectedTopicId !== null && (
+        <TopicMessages
+          chatId={chatId}
+          topicId={selectedTopicId}
+          onClose={() => setSelectedTopicId(null)}
+        />
+      )}
+
+      {/* Topics grid */}
+      {topics.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--text-muted)' }}>
+          <p>No topics found.</p>
+          <p style={{ fontSize: '12px', marginTop: '8px' }}>
+            Topics are generated by clustering message embeddings. Run the ML processor to generate topics.
+          </p>
+        </div>
+      ) : (
+        <div className="topics-grid">
+          {topics.map((topic) => (
+            <TopicCard
+              key={topic.topic_id}
+              topic={topic}
+              onClick={() => setSelectedTopicId(topic.topic_id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

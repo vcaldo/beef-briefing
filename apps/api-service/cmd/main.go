@@ -282,6 +282,19 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	api.HandleFunc("/cards/{user_id}/history", cardHandler.HandleGetUserHistory).Methods("GET")
 	api.HandleFunc("/cards/{user_id}/image", cardHandler.HandleGetCardImage).Methods("GET")
 
+	// Arena bot endpoints (API key authenticated, used by telegram-bot)
+	if arenaHandler != nil {
+		api.HandleFunc("/arena/match", arenaHandler.HandleBotCreateMatch).Methods("POST")
+		api.HandleFunc("/arena/match/{id}", arenaHandler.HandleBotGetMatch).Methods("GET")
+		api.HandleFunc("/arena/match/{id}/join", arenaHandler.HandleBotJoinMatch).Methods("POST")
+		api.HandleFunc("/arena/match/{id}/leave", arenaHandler.HandleBotLeaveMatch).Methods("POST")
+		api.HandleFunc("/arena/match/{id}/start", arenaHandler.HandleBotStartMatch).Methods("POST")
+		api.HandleFunc("/arena/matches/pending", arenaHandler.HandleBotGetPendingMatches).Methods("GET")
+		api.HandleFunc("/arena/match/{id}/auto-start", arenaHandler.HandleBotAutoStartMatch).Methods("POST")
+		api.HandleFunc("/arena/match/{id}/force-submit", arenaHandler.HandleBotForceSubmitTeams).Methods("POST")
+		slog.Info("Arena bot endpoints registered", "path_prefix", "/api/v1/arena")
+	}
+
 	slog.Info("all API endpoints require authentication", "path_prefix", "/api/v1")
 
 	// Mini App routes (JWT authenticated, CORS enabled)

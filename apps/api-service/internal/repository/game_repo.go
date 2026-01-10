@@ -87,9 +87,9 @@ type Participant struct {
 	Status           ParticipantStatus `json:"status"`
 	JoinedAt         time.Time         `json:"joined_at"`
 	CoinsRemaining   int               `json:"coins_remaining"`
-	ShopCards        json.RawMessage   `json:"shop_cards,omitempty"`
-	Team             json.RawMessage   `json:"team,omitempty"`
-	TeamOrder        []int             `json:"team_order"`
+	ShopCards        *json.RawMessage  `json:"shop_cards,omitempty"`
+	Team             *json.RawMessage  `json:"team,omitempty"`
+	TeamOrder        pq.Int64Array     `json:"team_order"`
 	TeamSubmittedAt  *time.Time        `json:"team_submitted_at,omitempty"`
 	Placement        *int              `json:"placement,omitempty"`
 	Wins             int               `json:"wins"`
@@ -319,8 +319,8 @@ func (r *GameRepository) UpdateMatchFormat(ctx context.Context, matchID string, 
 	return err
 }
 
-// StartShopPhase transitions match to shop phase
-func (r *GameRepository) StartShopPhase(ctx context.Context, matchID string, deadline time.Time) error {
+// StartShopPhase transitions match to shop phase with format
+func (r *GameRepository) StartShopPhase(ctx context.Context, matchID string, format MatchFormat, deadline time.Time) error {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("db:start-shop-phase")
@@ -330,11 +330,12 @@ func (r *GameRepository) StartShopPhase(ctx context.Context, matchID string, dea
 	query := `
 		UPDATE game_matches
 		SET status = 'shop_phase',
+		    format = $2,
 		    shop_phase_started_at = NOW(),
-		    shop_phase_deadline = $2
+		    shop_phase_deadline = $3
 		WHERE id = $1
 	`
-	_, err := r.db.ExecContext(ctx, query, matchID, deadline)
+	_, err := r.db.ExecContext(ctx, query, matchID, format, deadline)
 	return err
 }
 
@@ -395,7 +396,7 @@ func (r *GameRepository) AddParticipant(ctx context.Context, matchID string, use
 	p := &Participant{}
 	err := r.db.QueryRowContext(ctx, query, matchID, userID).Scan(
 		&p.ID, &p.MatchID, &p.UserID, &p.Status, &p.JoinedAt,
-		&p.CoinsRemaining, &p.ShopCards, &p.Team, pq.Array(&p.TeamOrder),
+		&p.CoinsRemaining, &p.ShopCards, &p.Team, &p.TeamOrder,
 		&p.TeamSubmittedAt, &p.Placement, &p.Wins, &p.Losses, &p.TotalDamageDealt,
 	)
 	if err != nil {
@@ -428,7 +429,7 @@ func (r *GameRepository) GetParticipant(ctx context.Context, matchID string, use
 	p := &Participant{}
 	err := r.db.QueryRowContext(ctx, query, matchID, userID).Scan(
 		&p.ID, &p.MatchID, &p.UserID, &p.Status, &p.JoinedAt,
-		&p.CoinsRemaining, &p.ShopCards, &p.Team, pq.Array(&p.TeamOrder),
+		&p.CoinsRemaining, &p.ShopCards, &p.Team, &p.TeamOrder,
 		&p.TeamSubmittedAt, &p.Placement, &p.Wins, &p.Losses, &p.TotalDamageDealt,
 	)
 	if err != nil {
@@ -471,7 +472,7 @@ func (r *GameRepository) GetMatchParticipants(ctx context.Context, matchID strin
 		p := &ParticipantWithUser{}
 		err := rows.Scan(
 			&p.ID, &p.MatchID, &p.UserID, &p.Status, &p.JoinedAt,
-			&p.CoinsRemaining, &p.ShopCards, &p.Team, pq.Array(&p.TeamOrder),
+			&p.CoinsRemaining, &p.ShopCards, &p.Team, &p.TeamOrder,
 			&p.TeamSubmittedAt, &p.Placement, &p.Wins, &p.Losses, &p.TotalDamageDealt,
 			&p.FirstName, &p.Username,
 		)
@@ -498,7 +499,7 @@ func (r *GameRepository) RemoveParticipant(ctx context.Context, matchID string, 
 }
 
 // UpdateParticipantShop updates a participant's shop state
-func (r *GameRepository) UpdateParticipantShop(ctx context.Context, matchID string, userID int64, coins int, shopCards, team json.RawMessage, teamOrder []int) error {
+func (r *GameRepository) UpdateParticipantShop(ctx context.Context, matchID string, userID int64, coins int, shopCards, team json.RawMessage, teamOrder []int64) error {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("db:update-participant-shop")
@@ -704,4 +705,62 @@ func (r *GameRepository) GetReadyParticipantCount(ctx context.Context, matchID s
 	query := `SELECT COUNT(*) FROM game_match_participants WHERE match_id = $1 AND status = 'ready'`
 	err := r.db.QueryRowContext(ctx, query, matchID).Scan(&count)
 	return count, err
+}
+
+// GetMatchesByStatus returns all matches with a given status
+func (r *GameRepository) GetMatchesByStatus(ctx context.Context, status MatchStatus) ([]*Match, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-matches-by-status")
+		defer segment.End()
+	}
+
+	query := `
+		SELECT id, chat_id, match_type, format, status, creator_user_id,
+		       tournament_date, created_at, join_deadline, shop_phase_started_at,
+		       shop_phase_deadline, battle_started_at, completed_at, winner_user_id
+		FROM game_matches
+		WHERE status = $1
+		ORDER BY created_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var matches []*Match
+	for rows.Next() {
+		m := &Match{}
+		err := rows.Scan(
+			&m.ID, &m.ChatID, &m.MatchType, &m.Format, &m.Status, &m.CreatorUserID,
+			&m.TournamentDate, &m.CreatedAt, &m.JoinDeadline, &m.ShopPhaseStartedAt,
+			&m.ShopPhaseDeadline, &m.BattleStartedAt, &m.CompletedAt, &m.WinnerUserID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		matches = append(matches, m)
+	}
+
+	return matches, rows.Err()
+}
+
+// CancelMatch marks a match as cancelled
+func (r *GameRepository) CancelMatch(ctx context.Context, matchID string) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:cancel-match")
+		defer segment.End()
+	}
+
+	query := `
+		UPDATE game_matches
+		SET status = 'cancelled',
+		    completed_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.db.ExecContext(ctx, query, matchID)
+	return err
 }

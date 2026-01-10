@@ -11,6 +11,7 @@ import (
 
 	"beef-briefing/apps/telegram-bot/internal/client"
 	"beef-briefing/apps/telegram-bot/internal/handlers"
+	"beef-briefing/apps/telegram-bot/internal/scheduler"
 	"beef-briefing/pkg/config"
 
 	"github.com/go-telegram/bot"
@@ -70,6 +71,8 @@ func main() {
 	technicalHandler := handlers.NewTechnicalHandler(nrApp)
 	deckHandler := handlers.NewDeckHandler(nrApp)
 	rankingHandler := handlers.NewRankingHandler(nrApp)
+	matchHandler := handlers.NewMatchHandler(apiClient, nrApp)
+	callbackHandler := handlers.NewCallbackHandler(apiClient, nrApp)
 
 	// Create bot instance with allowed updates including reactions
 	opts := []bot.Option{
@@ -111,8 +114,16 @@ func main() {
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/technical", bot.MatchTypePrefix, technicalHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/deck", bot.MatchTypePrefix, deckHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/ranking", bot.MatchTypePrefix, rankingHandler.Handle)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/match", bot.MatchTypePrefix, matchHandler.Handle)
+
+	// Register callback query handler for inline buttons
+	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, "", bot.MatchTypePrefix, callbackHandler.Handle)
 
 	slog.Info("bot initialized successfully, starting long polling...")
+
+	// Start match scheduler in background
+	matchScheduler := scheduler.NewMatchScheduler(apiClient, b, nrApp)
+	go matchScheduler.Start(ctx)
 
 	// Start bot with graceful shutdown
 	b.Start(ctx)

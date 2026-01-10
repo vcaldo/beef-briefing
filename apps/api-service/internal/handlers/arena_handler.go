@@ -657,3 +657,314 @@ func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Reque
 		"type":    matchType,
 	}, http.StatusOK)
 }
+
+// =============================================================================
+// Bot-accessible endpoints (API key authenticated, not JWT)
+// =============================================================================
+
+// BotCreateMatchRequest represents the request to create a match from bot
+type BotCreateMatchRequest struct {
+	ChatID        int64 `json:"chat_id"`
+	CreatorUserID int64 `json:"creator_user_id"`
+}
+
+// BotJoinMatchRequest represents the request to join a match from bot
+type BotJoinMatchRequest struct {
+	UserID int64 `json:"user_id"`
+}
+
+// HandleBotCreateMatch creates a new match (bot endpoint).
+// POST /api/v1/arena/match
+func (h *ArenaHandler) HandleBotCreateMatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:bot-create-match")
+	}
+
+	var req BotCreateMatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.ChatID == 0 || req.CreatorUserID == 0 {
+		httputil.RespondError(w, "chat_id and creator_user_id are required", http.StatusBadRequest)
+		return
+	}
+
+	match, err := h.service.CreateMatch(ctx, req.ChatID, req.CreatorUserID)
+	if err != nil {
+		slog.Error("failed to create match", "error", err, "chat_id", req.ChatID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		if err == services.ErrNotEnoughCards {
+			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		httputil.RespondError(w, "failed to create match", http.StatusInternalServerError)
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("match_id", match.ID)
+		txn.AddAttribute("chat_id", req.ChatID)
+	}
+
+	httputil.RespondJSON(w, match, http.StatusCreated)
+}
+
+// HandleBotGetMatch retrieves a match by ID (bot endpoint).
+// GET /api/v1/arena/match/{id}
+func (h *ArenaHandler) HandleBotGetMatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:bot-get-match")
+	}
+
+	vars := mux.Vars(r)
+	matchID := vars["id"]
+	if matchID == "" {
+		httputil.RespondError(w, "match id is required", http.StatusBadRequest)
+		return
+	}
+
+	match, err := h.service.GetMatch(ctx, matchID)
+	if err != nil {
+		slog.Error("failed to get match", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		if err == services.ErrMatchNotFound {
+			httputil.RespondError(w, "match not found", http.StatusNotFound)
+			return
+		}
+		httputil.RespondError(w, "failed to get match", http.StatusInternalServerError)
+		return
+	}
+
+	httputil.RespondJSON(w, match, http.StatusOK)
+}
+
+// HandleBotJoinMatch joins a match (bot endpoint).
+// POST /api/v1/arena/match/{id}/join
+func (h *ArenaHandler) HandleBotJoinMatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:bot-join-match")
+	}
+
+	vars := mux.Vars(r)
+	matchID := vars["id"]
+
+	var req BotJoinMatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.UserID == 0 {
+		httputil.RespondError(w, "user_id is required", http.StatusBadRequest)
+		return
+	}
+
+	match, err := h.service.JoinMatch(ctx, matchID, req.UserID)
+	if err != nil {
+		slog.Error("failed to join match", "error", err, "user_id", req.UserID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		switch err {
+		case services.ErrMatchNotFound:
+			httputil.RespondError(w, "match not found", http.StatusNotFound)
+		case services.ErrMatchNotOpen:
+			httputil.RespondError(w, "match is not open for joining", http.StatusBadRequest)
+		case services.ErrAlreadyJoined:
+			httputil.RespondError(w, "already joined this match", http.StatusBadRequest)
+		default:
+			httputil.RespondError(w, "failed to join match", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	httputil.RespondJSON(w, match, http.StatusOK)
+}
+
+// HandleBotLeaveMatch leaves a match (bot endpoint).
+// POST /api/v1/arena/match/{id}/leave
+func (h *ArenaHandler) HandleBotLeaveMatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:bot-leave-match")
+	}
+
+	vars := mux.Vars(r)
+	matchID := vars["id"]
+
+	var req BotJoinMatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.UserID == 0 {
+		httputil.RespondError(w, "user_id is required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.service.LeaveMatch(ctx, matchID, req.UserID)
+	if err != nil {
+		slog.Error("failed to leave match", "error", err, "user_id", req.UserID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		switch err {
+		case services.ErrMatchNotFound:
+			httputil.RespondError(w, "match not found", http.StatusNotFound)
+		case services.ErrMatchNotOpen:
+			httputil.RespondError(w, "cannot leave after match has started", http.StatusBadRequest)
+		default:
+			httputil.RespondError(w, "failed to leave match", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	httputil.RespondOK(w)
+}
+
+// HandleBotStartMatch starts a match (bot endpoint, creator only).
+// POST /api/v1/arena/match/{id}/start
+func (h *ArenaHandler) HandleBotStartMatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:bot-start-match")
+	}
+
+	vars := mux.Vars(r)
+	matchID := vars["id"]
+
+	var req BotJoinMatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.UserID == 0 {
+		httputil.RespondError(w, "user_id is required", http.StatusBadRequest)
+		return
+	}
+
+	match, err := h.service.StartMatch(ctx, matchID, req.UserID)
+	if err != nil {
+		slog.Error("failed to start match", "error", err, "user_id", req.UserID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		switch err {
+		case services.ErrMatchNotFound:
+			httputil.RespondError(w, "match not found", http.StatusNotFound)
+		case services.ErrNotCreator:
+			httputil.RespondError(w, "only the match creator can start the match", http.StatusForbidden)
+		case services.ErrMatchNotOpen:
+			httputil.RespondError(w, "match has already started", http.StatusBadRequest)
+		default:
+			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		}
+		return
+	}
+
+	httputil.RespondJSON(w, match, http.StatusOK)
+}
+
+// HandleBotGetPendingMatches retrieves matches that need action (expired deadlines).
+// GET /api/v1/arena/matches/pending
+func (h *ArenaHandler) HandleBotGetPendingMatches(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:bot-get-pending")
+	}
+
+	matches, err := h.service.GetPendingMatches(ctx)
+	if err != nil {
+		slog.Error("failed to get pending matches", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "failed to get pending matches", http.StatusInternalServerError)
+		return
+	}
+
+	httputil.RespondJSON(w, map[string]interface{}{
+		"matches": matches,
+	}, http.StatusOK)
+}
+
+// HandleBotAutoStartMatch auto-starts a match when join deadline expires.
+// POST /api/v1/arena/match/{id}/auto-start
+func (h *ArenaHandler) HandleBotAutoStartMatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:bot-auto-start")
+	}
+
+	vars := mux.Vars(r)
+	matchID := vars["id"]
+
+	result, err := h.service.AutoStartMatch(ctx, matchID)
+	if err != nil {
+		slog.Error("failed to auto-start match", "error", err, "match_id", matchID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		switch err {
+		case services.ErrMatchNotFound:
+			httputil.RespondError(w, "match not found", http.StatusNotFound)
+		case services.ErrMatchNotOpen:
+			httputil.RespondError(w, "match is not in open state", http.StatusBadRequest)
+		default:
+			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		}
+		return
+	}
+
+	httputil.RespondJSON(w, result, http.StatusOK)
+}
+
+// HandleBotForceSubmitTeams forces team submission for all unready participants.
+// POST /api/v1/arena/match/{id}/force-submit
+func (h *ArenaHandler) HandleBotForceSubmitTeams(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:bot-force-submit")
+	}
+
+	vars := mux.Vars(r)
+	matchID := vars["id"]
+
+	result, err := h.service.ForceSubmitTeams(ctx, matchID)
+	if err != nil {
+		slog.Error("failed to force submit teams", "error", err, "match_id", matchID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		switch err {
+		case services.ErrMatchNotFound:
+			httputil.RespondError(w, "match not found", http.StatusNotFound)
+		case services.ErrMatchNotInShopPhase:
+			httputil.RespondError(w, "match is not in shop phase", http.StatusBadRequest)
+		default:
+			httputil.RespondError(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	httputil.RespondJSON(w, result, http.StatusOK)
+}

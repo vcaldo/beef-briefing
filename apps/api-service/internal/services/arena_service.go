@@ -259,13 +259,10 @@ func (s *ArenaService) StartMatch(ctx context.Context, matchID string, userID in
 	if count > 2 {
 		format = repository.MatchFormatArena
 	}
-	if err := s.gameRepo.UpdateMatchFormat(ctx, matchID, format); err != nil {
-		return nil, fmt.Errorf("failed to update match format: %w", err)
-	}
 
-	// Start shop phase
+	// Start shop phase (also sets format)
 	deadline := time.Now().Add(ShopPhaseDuration)
-	if err := s.gameRepo.StartShopPhase(ctx, matchID, deadline); err != nil {
+	if err := s.gameRepo.StartShopPhase(ctx, matchID, format, deadline); err != nil {
 		return nil, fmt.Errorf("failed to start shop phase: %w", err)
 	}
 
@@ -292,7 +289,7 @@ func (s *ArenaService) dealCardsToParticipants(ctx context.Context, matchID stri
 
 		shopCardsJSON, _ := json.Marshal(cards)
 		teamJSON, _ := json.Marshal([]*battle.Card{})
-		teamOrder := []int{0, 1, 2}
+		teamOrder := []int64{0, 1, 2}
 
 		if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, p.UserID, shop.StartingCoins, shopCardsJSON, teamJSON, teamOrder); err != nil {
 			return fmt.Errorf("failed to save shop state for user %d: %w", p.UserID, err)
@@ -323,7 +320,7 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 	// Parse shop cards
 	var cards []*battle.ShopCard
 	if participant.ShopCards != nil {
-		if err := json.Unmarshal(participant.ShopCards, &cards); err != nil {
+		if err := json.Unmarshal(*participant.ShopCards, &cards); err != nil {
 			return nil, fmt.Errorf("failed to parse shop cards: %w", err)
 		}
 	}
@@ -331,7 +328,7 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 	// Parse team
 	var team []*battle.Card
 	if participant.Team != nil {
-		if err := json.Unmarshal(participant.Team, &team); err != nil {
+		if err := json.Unmarshal(*participant.Team, &team); err != nil {
 			return nil, fmt.Errorf("failed to parse team: %w", err)
 		}
 	}
@@ -345,13 +342,19 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 		}
 	}
 
+	// Convert TeamOrder from int64 to int for API response
+	teamOrder := make([]int, len(participant.TeamOrder))
+	for i, v := range participant.TeamOrder {
+		teamOrder[i] = int(v)
+	}
+
 	return &ShopResponse{
 		MatchID:       matchID,
 		Status:        string(match.Status),
 		Coins:         participant.CoinsRemaining,
 		Cards:         cards,
 		Team:          team,
-		TeamOrder:     participant.TeamOrder,
+		TeamOrder:     teamOrder,
 		IsReady:       participant.Status == repository.ParticipantStatusReady,
 		Deadline:      match.ShopPhaseDeadline,
 		TimeRemaining: timeRemaining,
@@ -387,13 +390,13 @@ func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64
 
 	// Parse current state
 	var cards []*battle.ShopCard
-	if err := json.Unmarshal(participant.ShopCards, &cards); err != nil {
+	if err := json.Unmarshal(*participant.ShopCards, &cards); err != nil {
 		return nil, fmt.Errorf("failed to parse shop cards: %w", err)
 	}
 
 	var team []*battle.Card
 	if participant.Team != nil {
-		if err := json.Unmarshal(participant.Team, &team); err != nil {
+		if err := json.Unmarshal(*participant.Team, &team); err != nil {
 			return nil, fmt.Errorf("failed to parse team: %w", err)
 		}
 	}
@@ -461,7 +464,7 @@ func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64)
 
 	// Parse current cards
 	var cards []*battle.ShopCard
-	if err := json.Unmarshal(participant.ShopCards, &cards); err != nil {
+	if err := json.Unmarshal(*participant.ShopCards, &cards); err != nil {
 		return nil, fmt.Errorf("failed to parse shop cards: %w", err)
 	}
 
@@ -501,7 +504,7 @@ func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64)
 
 	var team []*battle.Card
 	if participant.Team != nil {
-		json.Unmarshal(participant.Team, &team)
+		json.Unmarshal(*participant.Team, &team)
 	}
 	teamJSON, _ := json.Marshal(team)
 
@@ -545,7 +548,7 @@ func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID i
 	// Parse team
 	var team []*battle.Card
 	if participant.Team != nil {
-		if err := json.Unmarshal(participant.Team, &team); err != nil {
+		if err := json.Unmarshal(*participant.Team, &team); err != nil {
 			return nil, fmt.Errorf("failed to parse team: %w", err)
 		}
 	}
@@ -571,7 +574,7 @@ func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID i
 
 	// Save state
 	var cards []*battle.ShopCard
-	json.Unmarshal(participant.ShopCards, &cards)
+	json.Unmarshal(*participant.ShopCards, &cards)
 	shopCardsJSON, _ := json.Marshal(cards)
 	teamJSON, _ := json.Marshal(team)
 
@@ -609,7 +612,7 @@ func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID 
 	// Validate order
 	var team []*battle.Card
 	if participant.Team != nil {
-		json.Unmarshal(participant.Team, &team)
+		json.Unmarshal(*participant.Team, &team)
 	}
 	if len(order) != len(team) {
 		return nil, errors.New("order length must match team size")
@@ -617,11 +620,17 @@ func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID 
 
 	// Save state
 	var cards []*battle.ShopCard
-	json.Unmarshal(participant.ShopCards, &cards)
+	json.Unmarshal(*participant.ShopCards, &cards)
 	shopCardsJSON, _ := json.Marshal(cards)
 	teamJSON, _ := json.Marshal(team)
 
-	if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, userID, participant.CoinsRemaining, shopCardsJSON, teamJSON, order); err != nil {
+	// Convert order to int64
+	order64 := make([]int64, len(order))
+	for i, v := range order {
+		order64[i] = int64(v)
+	}
+
+	if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, userID, participant.CoinsRemaining, shopCardsJSON, teamJSON, order64); err != nil {
 		return nil, fmt.Errorf("failed to save shop state: %w", err)
 	}
 
@@ -655,7 +664,7 @@ func (s *ArenaService) SubmitTeam(ctx context.Context, matchID string, userID in
 	// Validate team has 3 cards
 	var team []*battle.Card
 	if participant.Team != nil {
-		json.Unmarshal(participant.Team, &team)
+		json.Unmarshal(*participant.Team, &team)
 	}
 	if len(team) != shop.TeamSize {
 		return nil, shop.ErrTeamIncomplete
@@ -716,19 +725,19 @@ func (s *ArenaService) StartBattle(ctx context.Context, matchID string) (*Battle
 func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *repository.ParticipantWithUser, roundNumber int) (*BattleResponse, error) {
 	// Parse teams
 	var teamACards, teamBCards []*battle.Card
-	json.Unmarshal(pA.Team, &teamACards)
-	json.Unmarshal(pB.Team, &teamBCards)
+	json.Unmarshal(*pA.Team, &teamACards)
+	json.Unmarshal(*pB.Team, &teamBCards)
 
 	// Apply team order
 	orderedA := make([]*battle.Card, len(teamACards))
 	orderedB := make([]*battle.Card, len(teamBCards))
 	for i, idx := range pA.TeamOrder {
-		if idx >= 0 && idx < len(teamACards) {
+		if idx >= 0 && idx < int64(len(teamACards)) {
 			orderedA[i] = teamACards[idx]
 		}
 	}
 	for i, idx := range pB.TeamOrder {
-		if idx >= 0 && idx < len(teamBCards) {
+		if idx >= 0 && idx < int64(len(teamBCards)) {
 			orderedB[i] = teamBCards[idx]
 		}
 	}
@@ -868,4 +877,283 @@ func (s *ArenaService) GetLeaderboard(ctx context.Context, chatID int64, matchTy
 		mt = repository.MatchTypeRegular
 	}
 	return s.gameRepo.GetLeaderboard(ctx, chatID, mt, limit, offset)
+}
+
+// =============================================================================
+// Bot/Scheduler methods (for background processing)
+// =============================================================================
+
+// PendingMatch represents a match that needs action
+type PendingMatch struct {
+	*repository.Match
+	Action           string `json:"action"`            // "auto_start" or "force_submit"
+	ParticipantCount int    `json:"participant_count"`
+}
+
+// GetPendingMatches returns matches with expired deadlines that need action
+func (s *ArenaService) GetPendingMatches(ctx context.Context) ([]*PendingMatch, error) {
+	pendingMatches := make([]*PendingMatch, 0)
+	now := time.Now()
+
+	// Get open matches with expired join deadline
+	openMatches, err := s.gameRepo.GetMatchesByStatus(ctx, repository.MatchStatusOpen)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get open matches: %w", err)
+	}
+
+	for _, match := range openMatches {
+		if match.JoinDeadline != nil && now.After(*match.JoinDeadline) {
+			count, _ := s.gameRepo.GetParticipantCount(ctx, match.ID)
+			pendingMatches = append(pendingMatches, &PendingMatch{
+				Match:            match,
+				Action:           "auto_start",
+				ParticipantCount: count,
+			})
+		}
+	}
+
+	// Get shop phase matches with expired shop deadline
+	shopMatches, err := s.gameRepo.GetMatchesByStatus(ctx, repository.MatchStatusShopPhase)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get shop phase matches: %w", err)
+	}
+
+	for _, match := range shopMatches {
+		if match.ShopPhaseDeadline != nil && now.After(*match.ShopPhaseDeadline) {
+			count, _ := s.gameRepo.GetParticipantCount(ctx, match.ID)
+			pendingMatches = append(pendingMatches, &PendingMatch{
+				Match:            match,
+				Action:           "force_submit",
+				ParticipantCount: count,
+			})
+		}
+	}
+
+	return pendingMatches, nil
+}
+
+// AutoStartResult represents the result of an auto-start attempt
+type AutoStartResult struct {
+	MatchID    string `json:"match_id"`
+	ChatID     int64  `json:"chat_id"`
+	Action     string `json:"action"`     // "started" or "cancelled"
+	Reason     string `json:"reason"`     // Explanation
+	Participants int  `json:"participants"`
+}
+
+// AutoStartMatch handles expired join deadline - starts match if 2+ participants, otherwise cancels
+func (s *ArenaService) AutoStartMatch(ctx context.Context, matchID string) (*AutoStartResult, error) {
+	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match: %w", err)
+	}
+	if match == nil {
+		return nil, ErrMatchNotFound
+	}
+	if match.Status != repository.MatchStatusOpen {
+		return nil, ErrMatchNotOpen
+	}
+
+	participantCount, err := s.gameRepo.GetParticipantCount(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participant count: %w", err)
+	}
+
+	// Need at least 2 participants
+	if participantCount < 2 {
+		// Cancel the match
+		if err := s.gameRepo.CancelMatch(ctx, matchID); err != nil {
+			return nil, fmt.Errorf("failed to cancel match: %w", err)
+		}
+		return &AutoStartResult{
+			MatchID:      matchID,
+			ChatID:       match.ChatID,
+			Action:       "cancelled",
+			Reason:       "not enough participants (minimum 2 required)",
+			Participants: participantCount,
+		}, nil
+	}
+
+	// Start the match - determine format based on participant count
+	format := repository.MatchFormat1v1
+	if participantCount > 2 {
+		format = repository.MatchFormatArena
+	}
+
+	// Start shop phase
+	deadline := time.Now().Add(ShopPhaseDuration)
+	if err := s.gameRepo.StartShopPhase(ctx, matchID, format, deadline); err != nil {
+		return nil, fmt.Errorf("failed to start shop phase: %w", err)
+	}
+
+	// Deal cards to all participants
+	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	for _, p := range participants {
+		cards, err := s.dealer.DealCards(ctx, match.ChatID, shop.ShopSize)
+		if err != nil {
+			return nil, fmt.Errorf("failed to deal cards for user %d: %w", p.UserID, err)
+		}
+		cardsJSON, _ := json.Marshal(cards)
+		emptyTeam, _ := json.Marshal([]*battle.Card{})
+		if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, p.UserID, shop.StartingCoins, cardsJSON, emptyTeam, []int64{0, 1, 2}); err != nil {
+			return nil, fmt.Errorf("failed to initialize shop for user %d: %w", p.UserID, err)
+		}
+	}
+
+	return &AutoStartResult{
+		MatchID:      matchID,
+		ChatID:       match.ChatID,
+		Action:       "started",
+		Reason:       fmt.Sprintf("match started with %d participants", participantCount),
+		Participants: participantCount,
+	}, nil
+}
+
+// ForceSubmitResult represents the result of a force-submit operation
+type ForceSubmitResult struct {
+	MatchID        string   `json:"match_id"`
+	ChatID         int64    `json:"chat_id"`
+	ForcedUsers    []int64  `json:"forced_users"`    // Users who had their teams auto-submitted
+	BattleStarted  bool     `json:"battle_started"`
+}
+
+// ForceSubmitTeams auto-assigns teams for participants who haven't submitted
+func (s *ArenaService) ForceSubmitTeams(ctx context.Context, matchID string) (*ForceSubmitResult, error) {
+	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match: %w", err)
+	}
+	if match == nil {
+		return nil, ErrMatchNotFound
+	}
+	if match.Status != repository.MatchStatusShopPhase {
+		return nil, ErrMatchNotInShopPhase
+	}
+
+	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	forcedUsers := make([]int64, 0)
+
+	for _, p := range participants {
+		if p.Status == repository.ParticipantStatusReady {
+			continue // Already submitted
+		}
+
+		// Force submit for this participant
+		if err := s.forceSubmitTeam(ctx, matchID, p); err != nil {
+			return nil, fmt.Errorf("failed to force submit for user %d: %w", p.UserID, err)
+		}
+		forcedUsers = append(forcedUsers, p.UserID)
+	}
+
+	// Start battle now that all teams are submitted
+	_, err = s.StartBattle(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start battle: %w", err)
+	}
+
+	return &ForceSubmitResult{
+		MatchID:       matchID,
+		ChatID:        match.ChatID,
+		ForcedUsers:   forcedUsers,
+		BattleStarted: true,
+	}, nil
+}
+
+// forceSubmitTeam auto-buys cards and submits team for a participant
+func (s *ArenaService) forceSubmitTeam(ctx context.Context, matchID string, p *repository.ParticipantWithUser) error {
+	// Parse current shop state
+	var cards []*battle.ShopCard
+	if p.ShopCards != nil {
+		if err := json.Unmarshal(*p.ShopCards, &cards); err != nil {
+			return fmt.Errorf("failed to parse shop cards: %w", err)
+		}
+	}
+
+	var team []*battle.Card
+	if p.Team != nil {
+		if err := json.Unmarshal(*p.Team, &team); err != nil {
+			return fmt.Errorf("failed to parse team: %w", err)
+		}
+	}
+
+	coins := p.CoinsRemaining
+
+	// Auto-buy cards until we have 3 or run out of coins
+	for len(team) < shop.TeamSize && coins >= shop.CardCost {
+		// Find best available card (highest ATK)
+		bestIdx := -1
+		bestATK := -1
+		for i, card := range cards {
+			if card != nil && !card.IsPurchased && card.ATK > bestATK {
+				bestATK = card.ATK
+				bestIdx = i
+			}
+		}
+		if bestIdx == -1 {
+			break // No cards available
+		}
+
+		// Buy the card
+		cards[bestIdx].IsPurchased = true
+		team = append(team, cards[bestIdx].ToCard())
+		coins -= shop.CardCost
+	}
+
+	// If still not enough cards, something is wrong
+	if len(team) < shop.TeamSize {
+		// Create dummy cards if needed (shouldn't happen normally)
+		for len(team) < shop.TeamSize {
+			if len(cards) > 0 {
+				// Just grab any card
+				for i, card := range cards {
+					if card != nil && !card.IsPurchased {
+						cards[i].IsPurchased = true
+						team = append(team, card.ToCard())
+						break
+					}
+				}
+			}
+			if len(team) < shop.TeamSize {
+				break // Can't complete team
+			}
+		}
+	}
+
+	// Sort team by ATK descending (glass cannon strategy)
+	// Order: [0]=highest ATK, [1]=second, [2]=lowest
+	order := make([]int64, len(team))
+	for i := range order {
+		order[i] = int64(i)
+	}
+
+	// Sort by ATK
+	for i := 0; i < len(team)-1; i++ {
+		for j := i + 1; j < len(team); j++ {
+			if team[order[j]].ATK > team[order[i]].ATK {
+				order[i], order[j] = order[j], order[i]
+			}
+		}
+	}
+
+	// Save shop state
+	cardsJSON, _ := json.Marshal(cards)
+	teamJSON, _ := json.Marshal(team)
+	if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, p.UserID, coins, cardsJSON, teamJSON, order); err != nil {
+		return fmt.Errorf("failed to save shop state: %w", err)
+	}
+
+	// Submit team
+	if err := s.gameRepo.SubmitTeam(ctx, matchID, p.UserID); err != nil {
+		return fmt.Errorf("failed to submit team: %w", err)
+	}
+
+	return nil
 }

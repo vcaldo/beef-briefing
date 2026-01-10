@@ -615,3 +615,549 @@ func (c *APIClient) SendChatProfilePhotos(ctx context.Context, chatID int64, pho
 
 	return nil
 }
+
+// =============================================================================
+// Arena Game API Methods
+// =============================================================================
+
+// ArenaMatch represents a match from the arena API
+type ArenaMatch struct {
+	ID                string             `json:"id"`
+	ChatID            int64              `json:"chat_id"`
+	MatchType         string             `json:"match_type"`
+	Format            string             `json:"format"`
+	Status            string             `json:"status"`
+	CreatorUserID     *int64             `json:"creator_user_id,omitempty"`
+	JoinDeadline      *string            `json:"join_deadline,omitempty"`
+	ShopPhaseDeadline *string            `json:"shop_phase_deadline,omitempty"`
+	CreatedAt         string             `json:"created_at"`
+	Participants      []ArenaParticipant `json:"participants"`
+	CardCount         int                `json:"card_count"`
+}
+
+// ArenaParticipant represents a participant in a match
+type ArenaParticipant struct {
+	UserID   int64  `json:"user_id"`
+	Username string `json:"username,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Status   string `json:"status"`
+}
+
+// PendingMatch represents a match needing action
+type PendingMatch struct {
+	ArenaMatch
+	Action           string `json:"action"`
+	ParticipantCount int    `json:"participant_count"`
+}
+
+// AutoStartResult represents the result of auto-starting a match
+type AutoStartResult struct {
+	MatchID      string `json:"match_id"`
+	ChatID       int64  `json:"chat_id"`
+	Action       string `json:"action"`
+	Reason       string `json:"reason"`
+	Participants int    `json:"participants"`
+}
+
+// ForceSubmitResult represents the result of force-submitting teams
+type ForceSubmitResult struct {
+	MatchID       string  `json:"match_id"`
+	ChatID        int64   `json:"chat_id"`
+	ForcedUsers   []int64 `json:"forced_users"`
+	BattleStarted bool    `json:"battle_started"`
+}
+
+// Arena-specific errors
+var (
+	ErrMatchNotFound  = fmt.Errorf("match not found")
+	ErrMatchNotOpen   = fmt.Errorf("match is not open")
+	ErrNotEnoughCards = fmt.Errorf("not enough cards")
+	ErrAlreadyJoined  = fmt.Errorf("already joined")
+)
+
+// CreateArenaMatch creates a new arena match
+func (c *APIClient) CreateArenaMatch(ctx context.Context, chatID, creatorUserID int64) (*ArenaMatch, error) {
+	txn := newrelic.FromContext(ctx)
+
+	reqBody := struct {
+		ChatID        int64 `json:"chat_id"`
+		CreatorUserID int64 `json:"creator_user_id"`
+	}{
+		ChatID:        chatID,
+		CreatorUserID: creatorUserID,
+	}
+
+	bodyJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/match", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusBadRequest {
+		body, _ := io.ReadAll(resp.Body)
+		if bytes.Contains(body, []byte("not enough cards")) {
+			return nil, ErrNotEnoughCards
+		}
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result ArenaMatch
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// GetArenaMatch retrieves a match by ID
+func (c *APIClient) GetArenaMatch(ctx context.Context, matchID string) (*ArenaMatch, error) {
+	txn := newrelic.FromContext(ctx)
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%s", c.baseURL, matchID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "GET",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrMatchNotFound
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result ArenaMatch
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// JoinArenaMatch joins a match
+func (c *APIClient) JoinArenaMatch(ctx context.Context, matchID string, userID int64) (*ArenaMatch, error) {
+	txn := newrelic.FromContext(ctx)
+
+	reqBody := struct {
+		UserID int64 `json:"user_id"`
+	}{UserID: userID}
+
+	bodyJSON, _ := json.Marshal(reqBody)
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%s/join", c.baseURL, matchID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusBadRequest {
+		body, _ := io.ReadAll(resp.Body)
+		if bytes.Contains(body, []byte("already joined")) {
+			return nil, ErrAlreadyJoined
+		}
+		if bytes.Contains(body, []byte("not open")) {
+			return nil, ErrMatchNotOpen
+		}
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result ArenaMatch
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// LeaveArenaMatch leaves a match
+func (c *APIClient) LeaveArenaMatch(ctx context.Context, matchID string, userID int64) error {
+	txn := newrelic.FromContext(ctx)
+
+	reqBody := struct {
+		UserID int64 `json:"user_id"`
+	}{UserID: userID}
+
+	bodyJSON, _ := json.Marshal(reqBody)
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%s/leave", c.baseURL, matchID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	return nil
+}
+
+// StartArenaMatch starts a match (creator only)
+func (c *APIClient) StartArenaMatch(ctx context.Context, matchID string, userID int64) (*ArenaMatch, error) {
+	txn := newrelic.FromContext(ctx)
+
+	reqBody := struct {
+		UserID int64 `json:"user_id"`
+	}{UserID: userID}
+
+	bodyJSON, _ := json.Marshal(reqBody)
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%s/start", c.baseURL, matchID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result ArenaMatch
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// GetPendingMatches retrieves matches needing action
+func (c *APIClient) GetPendingMatches(ctx context.Context) ([]PendingMatch, error) {
+	txn := newrelic.FromContext(ctx)
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/matches/pending", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "GET",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result struct {
+		Matches []PendingMatch `json:"matches"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.Matches, nil
+}
+
+// AutoStartMatch auto-starts a match when deadline expires
+func (c *APIClient) AutoStartMatch(ctx context.Context, matchID string) (*AutoStartResult, error) {
+	txn := newrelic.FromContext(ctx)
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%s/auto-start", c.baseURL, matchID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result AutoStartResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// ForceSubmitTeams forces team submission for unready participants
+func (c *APIClient) ForceSubmitTeams(ctx context.Context, matchID string) (*ForceSubmitResult, error) {
+	txn := newrelic.FromContext(ctx)
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%s/force-submit", c.baseURL, matchID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result ForceSubmitResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}

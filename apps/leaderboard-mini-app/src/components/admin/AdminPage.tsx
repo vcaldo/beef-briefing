@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '../../newrelic'
 
-import type { TabId } from '../../types'
+import type { TabId, ChatUser } from '../../types'
 
 // Common IANA timezones for quick selection
 const COMMON_TIMEZONES = [
@@ -26,9 +26,16 @@ interface AdminPageProps {
   chatTitle: string | null
   onTabChange?: (tab: TabId) => void
   onTimezoneChange?: (timezone: string | null) => void
+  onImpersonate?: (userId: number | null) => void
+  impersonatedUserId?: number | null
 }
 
-export function AdminPage({ chatTitle, onTabChange, onTimezoneChange }: AdminPageProps) {
+export function AdminPage({ chatTitle, onTabChange, onTimezoneChange, onImpersonate, impersonatedUserId }: AdminPageProps) {
+  // Impersonation state
+  const [users, setUsers] = useState<ChatUser[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(true)
+
+  // Timezone state
   const [currentTimezone, setCurrentTimezone] = useState<string | null>(null)
   const [selectedTimezone, setSelectedTimezone] = useState<string>('')
   const [customTimezone, setCustomTimezone] = useState<string>('')
@@ -38,6 +45,21 @@ export function AdminPage({ chatTitle, onTabChange, onTimezoneChange }: AdminPag
   const [success, setSuccess] = useState<string | null>(null)
 
   const browserTimezone = apiClient.getBrowserTimezone()
+
+  // Fetch users list for impersonation on mount
+  useEffect(() => {
+    async function fetchUsers() {
+      try {
+        const response = await apiClient.getChatUsers()
+        setUsers(response.users)
+      } catch (err) {
+        console.error('Failed to fetch users:', err)
+      } finally {
+        setLoadingUsers(false)
+      }
+    }
+    fetchUsers()
+  }, [])
 
   // Fetch current timezone on mount
   useEffect(() => {
@@ -113,6 +135,34 @@ export function AdminPage({ chatTitle, onTabChange, onTimezoneChange }: AdminPag
         {chatTitle && <p className="app-header-subtitle">{chatTitle}</p>}
       </header>
 
+      {/* Impersonation Section */}
+      <section className="admin-settings-section">
+        <h2 className="section-title">Impersonate User</h2>
+        <p className="section-subtitle">
+          Select a user to view their profile and stats.
+        </p>
+
+        {loadingUsers ? (
+          <div className="admin-loading">
+            <div className="skeleton skeleton-row" style={{ height: '44px' }} />
+          </div>
+        ) : (
+          <select
+            className="admin-selector-dropdown"
+            value={impersonatedUserId || ''}
+            onChange={(e) => onImpersonate?.(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">-- My Profile --</option>
+            {users.map((user) => (
+              <option key={user.user_id} value={user.user_id}>
+                {user.first_name} {user.last_name || ''} {user.username ? `(@${user.username})` : ''}
+              </option>
+            ))}
+          </select>
+        )}
+      </section>
+
+      {/* Timezone Section */}
       <section className="admin-settings-section">
         <h2 className="section-title">Group Timezone</h2>
         <p className="section-subtitle">

@@ -10,7 +10,6 @@ import type {
   Period,
   ProfileResponse,
   TopInteractor,
-  ChatUser,
   TabId,
 } from '../../types'
 
@@ -24,6 +23,7 @@ interface ProfilePageProps {
   prefetchedData?: ProfileResponse | null
   onPrefetchConsumed?: () => void
   onTabChange?: (tab: TabId) => void
+  impersonatedUserId?: number | null
 }
 
 export function ProfilePage({
@@ -36,22 +36,18 @@ export function ProfilePage({
   prefetchedData,
   onPrefetchConsumed,
   onTabChange,
+  impersonatedUserId,
 }: ProfilePageProps) {
   const [data, setData] = useState<ProfileResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Admin impersonation state
-  const [users, setUsers] = useState<ChatUser[]>([])
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
-  const [loadingUsers, setLoadingUsers] = useState(false)
-
   // Admin badge reveal state (hidden until double-click)
   const [showAdminBadge, setShowAdminBadge] = useState(false)
 
   // Determine displayed user info (impersonated user or self)
-  const displayFirstName = selectedUserId && data?.first_name ? data.first_name : firstName
-  const displayUsername = selectedUserId && data?.username !== undefined ? data.username : username
+  const displayFirstName = impersonatedUserId && data?.first_name ? data.first_name : firstName
+  const displayUsername = impersonatedUserId && data?.username !== undefined ? data.username : username
 
   // Double-click handler to reveal admin badge
   const handleUsernameDoubleClick = useCallback(() => {
@@ -66,35 +62,17 @@ export function ProfilePage({
     onTabChange?.('admin')
   }, [onTabChange])
 
-  // Fetch users list for admin dropdown
-  useEffect(() => {
-    async function fetchUsers() {
-      if (!isAdmin || !apiClient.isAuthenticated()) return
-
-      setLoadingUsers(true)
-      try {
-        const response = await apiClient.getChatUsers()
-        setUsers(response.users)
-      } catch (err) {
-        console.error('Failed to fetch users:', err)
-      } finally {
-        setLoadingUsers(false)
-      }
-    }
-    fetchUsers()
-  }, [isAdmin])
-
   const fetchData = useCallback(async () => {
     if (!apiClient.isAuthenticated()) return
 
     setLoading(true)
     setError(null)
     try {
-      const response = await apiClient.getProfile(period, undefined, selectedUserId || undefined)
+      const response = await apiClient.getProfile(period, undefined, impersonatedUserId || undefined)
       setData(response)
       addPageAction('profile_loaded', {
         period,
-        is_impersonating: !!selectedUserId,
+        is_impersonating: !!impersonatedUserId,
         message_count: response.stats.message_count,
       })
     } catch (err) {
@@ -106,23 +84,18 @@ export function ProfilePage({
     } finally {
       setLoading(false)
     }
-  }, [period, selectedUserId])
+  }, [period, impersonatedUserId])
 
   // Use prefetched data if available and not impersonating, otherwise fetch
   useEffect(() => {
     // Only use prefetch for own profile (not impersonating)
-    if (prefetchedData && !selectedUserId) {
+    if (prefetchedData && !impersonatedUserId) {
       setData(prefetchedData)
       onPrefetchConsumed?.()
       return
     }
     fetchData()
-  }, [period, selectedUserId, prefetchedData, onPrefetchConsumed, fetchData])
-
-  // Handle user selection change
-  const handleUserChange = (userId: number | null) => {
-    setSelectedUserId(userId)
-  }
+  }, [period, impersonatedUserId, prefetchedData, onPrefetchConsumed, fetchData])
 
   return (
     <div className="page-container">
@@ -131,31 +104,8 @@ export function ProfilePage({
         {chatTitle && <p className="app-header-subtitle">{chatTitle}</p>}
       </header>
 
-      {/* Admin User Selector */}
-      {isAdmin && (
-        <div className="admin-selector">
-          <label className="admin-selector-label">View as user:</label>
-          {loadingUsers ? (
-            <div className="skeleton skeleton-row" style={{ height: '44px' }} />
-          ) : (
-            <select
-              className="admin-selector-dropdown"
-              value={selectedUserId || ''}
-              onChange={(e) => handleUserChange(e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">-- My Profile --</option>
-              {users.map((user) => (
-                <option key={user.user_id} value={user.user_id}>
-                  {user.first_name} {user.last_name || ''} {user.username ? `(@${user.username})` : ''}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-      )}
-
       {/* Impersonation Banner */}
-      {selectedUserId && (
+      {impersonatedUserId && (
         <div className="impersonation-banner">
           Viewing {displayFirstName}'s profile
         </div>

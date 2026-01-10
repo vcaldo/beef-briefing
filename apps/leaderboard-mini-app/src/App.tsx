@@ -63,6 +63,9 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [period, setPeriod] = useState<Period>('7d')
 
+  // Admin impersonation state (persists across tab changes)
+  const [impersonatedUserId, setImpersonatedUserId] = useState<number | null>(null)
+
   // Prefetched data for all tabs (loaded during splash screen)
   const [prefetched, setPrefetched] = useState<PrefetchedData | null>(null)
 
@@ -287,6 +290,7 @@ function App() {
             prefetchedData={prefetched?.period === period ? prefetched.profile : null}
             onPrefetchConsumed={() => setPrefetched(prev => prev ? { ...prev, profile: null } : null)}
             onTabChange={handleTabChange}
+            impersonatedUserId={impersonatedUserId}
           />
         )
       case 'admin':
@@ -298,6 +302,8 @@ function App() {
               // Invalidate prefetched data since timezone changed
               setPrefetched(null)
             }}
+            onImpersonate={setImpersonatedUserId}
+            impersonatedUserId={impersonatedUserId}
           />
         )
       default:

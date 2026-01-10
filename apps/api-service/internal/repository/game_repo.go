@@ -23,6 +23,17 @@ func NewGameRepository(db *sql.DB, nrApp *newrelic.Application) *GameRepository 
 	return &GameRepository{db: db, nrApp: nrApp}
 }
 
+// startDBSegment starts a NewRelic segment for database operations and returns a cleanup function.
+// Usage: defer r.startDBSegment(ctx, "operation-name")()
+func (r *GameRepository) startDBSegment(ctx context.Context, name string) func() {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:" + name)
+		return segment.End
+	}
+	return func() {} // no-op if no transaction
+}
+
 // MatchType enum
 type MatchType string
 
@@ -147,11 +158,7 @@ type LeaderboardEntry struct {
 
 // CreateMatch creates a new match
 func (r *GameRepository) CreateMatch(ctx context.Context, chatID int64, matchType MatchType, creatorUserID *int64, tournamentDate *string) (*Match, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:create-match")
-		defer segment.End()
-	}
+	defer r.startDBSegment(ctx, "create-match")()
 
 	id := uuid.New().String()
 
@@ -198,11 +205,7 @@ func (r *GameRepository) CreateMatch(ctx context.Context, chatID int64, matchTyp
 
 // GetMatch retrieves a match by ID
 func (r *GameRepository) GetMatch(ctx context.Context, matchID string) (*Match, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-match")
-		defer segment.End()
-	}
+	defer r.startDBSegment(ctx, "get-match")()
 
 	query := `
 		SELECT id, chat_id, match_type, format, status, created_at, join_deadline,

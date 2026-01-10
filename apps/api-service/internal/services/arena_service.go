@@ -287,8 +287,14 @@ func (s *ArenaService) dealCardsToParticipants(ctx context.Context, matchID stri
 			return fmt.Errorf("failed to deal cards for user %d: %w", p.UserID, err)
 		}
 
-		shopCardsJSON, _ := json.Marshal(cards)
-		teamJSON, _ := json.Marshal([]*battle.Card{})
+		shopCardsJSON, err := json.Marshal(cards)
+		if err != nil {
+			return fmt.Errorf("failed to marshal shop cards for user %d: %w", p.UserID, err)
+		}
+		teamJSON, err := json.Marshal([]*battle.Card{})
+		if err != nil {
+			return fmt.Errorf("failed to marshal team for user %d: %w", p.UserID, err)
+		}
 		teamOrder := []int64{0, 1, 2}
 
 		if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, p.UserID, shop.StartingCoins, shopCardsJSON, teamJSON, teamOrder); err != nil {
@@ -422,8 +428,14 @@ func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64
 	coins := participant.CoinsRemaining - shop.CardCost
 
 	// Save state
-	shopCardsJSON, _ := json.Marshal(cards)
-	teamJSON, _ := json.Marshal(team)
+	shopCardsJSON, err := json.Marshal(cards)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal shop cards: %w", err)
+	}
+	teamJSON, err := json.Marshal(team)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal team: %w", err)
+	}
 
 	if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, userID, coins, shopCardsJSON, teamJSON, participant.TeamOrder); err != nil {
 		return nil, fmt.Errorf("failed to save shop state: %w", err)
@@ -500,13 +512,21 @@ func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64)
 	coins := participant.CoinsRemaining - shop.RerollCost
 
 	// Save state
-	shopCardsJSON, _ := json.Marshal(cards)
+	shopCardsJSON, err := json.Marshal(cards)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal shop cards: %w", err)
+	}
 
 	var team []*battle.Card
 	if participant.Team != nil {
-		json.Unmarshal(*participant.Team, &team)
+		if err := json.Unmarshal(*participant.Team, &team); err != nil {
+			return nil, fmt.Errorf("failed to parse team: %w", err)
+		}
 	}
-	teamJSON, _ := json.Marshal(team)
+	teamJSON, err := json.Marshal(team)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal team: %w", err)
+	}
 
 	if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, userID, coins, shopCardsJSON, teamJSON, participant.TeamOrder); err != nil {
 		return nil, fmt.Errorf("failed to save shop state: %w", err)
@@ -574,9 +594,17 @@ func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID i
 
 	// Save state
 	var cards []*battle.ShopCard
-	json.Unmarshal(*participant.ShopCards, &cards)
-	shopCardsJSON, _ := json.Marshal(cards)
-	teamJSON, _ := json.Marshal(team)
+	if err := json.Unmarshal(*participant.ShopCards, &cards); err != nil {
+		return nil, fmt.Errorf("failed to parse shop cards: %w", err)
+	}
+	shopCardsJSON, err := json.Marshal(cards)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal shop cards: %w", err)
+	}
+	teamJSON, err := json.Marshal(team)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal team: %w", err)
+	}
 
 	if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, userID, coins, shopCardsJSON, teamJSON, participant.TeamOrder); err != nil {
 		return nil, fmt.Errorf("failed to save shop state: %w", err)
@@ -612,7 +640,9 @@ func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID 
 	// Validate order
 	var team []*battle.Card
 	if participant.Team != nil {
-		json.Unmarshal(*participant.Team, &team)
+		if err := json.Unmarshal(*participant.Team, &team); err != nil {
+			return nil, fmt.Errorf("failed to parse team: %w", err)
+		}
 	}
 	if len(order) != len(team) {
 		return nil, errors.New("order length must match team size")
@@ -620,9 +650,17 @@ func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID 
 
 	// Save state
 	var cards []*battle.ShopCard
-	json.Unmarshal(*participant.ShopCards, &cards)
-	shopCardsJSON, _ := json.Marshal(cards)
-	teamJSON, _ := json.Marshal(team)
+	if err := json.Unmarshal(*participant.ShopCards, &cards); err != nil {
+		return nil, fmt.Errorf("failed to parse shop cards: %w", err)
+	}
+	shopCardsJSON, err := json.Marshal(cards)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal shop cards: %w", err)
+	}
+	teamJSON, err := json.Marshal(team)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal team: %w", err)
+	}
 
 	// Convert order to int64
 	order64 := make([]int64, len(order))
@@ -664,7 +702,9 @@ func (s *ArenaService) SubmitTeam(ctx context.Context, matchID string, userID in
 	// Validate team has 3 cards
 	var team []*battle.Card
 	if participant.Team != nil {
-		json.Unmarshal(*participant.Team, &team)
+		if err := json.Unmarshal(*participant.Team, &team); err != nil {
+			return nil, fmt.Errorf("failed to parse team: %w", err)
+		}
 	}
 	if len(team) != shop.TeamSize {
 		return nil, shop.ErrTeamIncomplete
@@ -725,8 +765,12 @@ func (s *ArenaService) StartBattle(ctx context.Context, matchID string) (*Battle
 func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *repository.ParticipantWithUser, roundNumber int) (*BattleResponse, error) {
 	// Parse teams
 	var teamACards, teamBCards []*battle.Card
-	json.Unmarshal(*pA.Team, &teamACards)
-	json.Unmarshal(*pB.Team, &teamBCards)
+	if err := json.Unmarshal(*pA.Team, &teamACards); err != nil {
+		return nil, fmt.Errorf("failed to parse team A: %w", err)
+	}
+	if err := json.Unmarshal(*pB.Team, &teamBCards); err != nil {
+		return nil, fmt.Errorf("failed to parse team B: %w", err)
+	}
 
 	// Apply team order
 	orderedA := make([]*battle.Card, len(teamACards))
@@ -749,11 +793,20 @@ func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *re
 	result := battle.Simulate(teamA, teamB)
 
 	// Save round
-	teamAJSON, _ := json.Marshal(orderedA)
-	teamBJSON, _ := json.Marshal(orderedB)
-	eventsJSON, _ := json.Marshal(result.Events)
+	teamAJSON, err := json.Marshal(orderedA)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal team A: %w", err)
+	}
+	teamBJSON, err := json.Marshal(orderedB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal team B: %w", err)
+	}
+	eventsJSON, err := json.Marshal(result.Events)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal events: %w", err)
+	}
 
-	_, err := s.gameRepo.CreateRound(ctx, matchID, roundNumber,
+	_, err = s.gameRepo.CreateRound(ctx, matchID, roundNumber,
 		pA.UserID, pB.UserID,
 		teamAJSON, teamBJSON, eventsJSON,
 		result.WinnerID, result.IsDraw,
@@ -997,8 +1050,14 @@ func (s *ArenaService) AutoStartMatch(ctx context.Context, matchID string) (*Aut
 		if err != nil {
 			return nil, fmt.Errorf("failed to deal cards for user %d: %w", p.UserID, err)
 		}
-		cardsJSON, _ := json.Marshal(cards)
-		emptyTeam, _ := json.Marshal([]*battle.Card{})
+		cardsJSON, err := json.Marshal(cards)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal cards for user %d: %w", p.UserID, err)
+		}
+		emptyTeam, err := json.Marshal([]*battle.Card{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal empty team for user %d: %w", p.UserID, err)
+		}
 		if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, p.UserID, shop.StartingCoins, cardsJSON, emptyTeam, []int64{0, 1, 2}); err != nil {
 			return nil, fmt.Errorf("failed to initialize shop for user %d: %w", p.UserID, err)
 		}
@@ -1144,8 +1203,14 @@ func (s *ArenaService) forceSubmitTeam(ctx context.Context, matchID string, p *r
 	}
 
 	// Save shop state
-	cardsJSON, _ := json.Marshal(cards)
-	teamJSON, _ := json.Marshal(team)
+	cardsJSON, err := json.Marshal(cards)
+	if err != nil {
+		return fmt.Errorf("failed to marshal cards: %w", err)
+	}
+	teamJSON, err := json.Marshal(team)
+	if err != nil {
+		return fmt.Errorf("failed to marshal team: %w", err)
+	}
 	if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, p.UserID, coins, cardsJSON, teamJSON, order); err != nil {
 		return fmt.Errorf("failed to save shop state: %w", err)
 	}

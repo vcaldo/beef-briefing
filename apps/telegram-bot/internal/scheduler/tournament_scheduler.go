@@ -111,7 +111,9 @@ func (s *TournamentScheduler) sendTournamentAnnouncement(ctx context.Context, t 
 	}
 
 	// Calculate close time in local timezone
-	closeTime := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 18, 0, 0, 0, loc)
+	// First convert current time to local timezone, then extract date components
+	now := time.Now().In(loc)
+	closeTime := time.Date(now.Year(), now.Month(), now.Day(), 18, 0, 0, 0, loc)
 
 	text := fmt.Sprintf(
 		"🏆 *Ranked Tournament Open!*\n\n"+

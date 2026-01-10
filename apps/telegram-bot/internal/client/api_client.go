@@ -42,6 +42,39 @@ func (c *APIClient) addAuthHeader(req *http.Request) {
 	}
 }
 
+// doRequestWithSegment executes an HTTP request with NewRelic external segment tracking.
+// This centralizes the boilerplate for creating external segments and executing requests.
+func (c *APIClient) doRequestWithSegment(ctx context.Context, req *http.Request, apiURL, method string) (*http.Response, error) {
+	txn := newrelic.FromContext(ctx)
+
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: method,
+			Library:   "net/http",
+		}
+	}
+
+	resp, err := c.httpClient.Do(req)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
+	return resp, err
+}
+
 // SendUpdate sends an update with optional media files to the API service
 func (c *APIClient) SendUpdate(ctx context.Context, update interface{}, files map[string][]byte) error {
 	// Get transaction from context
@@ -753,8 +786,6 @@ func (c *APIClient) CreateArenaMatch(ctx context.Context, chatID, creatorUserID 
 
 // GetArenaMatch retrieves a match by ID
 func (c *APIClient) GetArenaMatch(ctx context.Context, matchID string) (*ArenaMatch, error) {
-	txn := newrelic.FromContext(ctx)
-
 	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%s", c.baseURL, matchID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
@@ -762,31 +793,7 @@ func (c *APIClient) GetArenaMatch(ctx context.Context, matchID string) (*ArenaMa
 	}
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "GET",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "GET")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -811,8 +818,6 @@ func (c *APIClient) GetArenaMatch(ctx context.Context, matchID string) (*ArenaMa
 
 // JoinArenaMatch joins a match
 func (c *APIClient) JoinArenaMatch(ctx context.Context, matchID string, userID int64) (*ArenaMatch, error) {
-	txn := newrelic.FromContext(ctx)
-
 	reqBody := struct {
 		UserID int64 `json:"user_id"`
 	}{UserID: userID}
@@ -827,31 +832,7 @@ func (c *APIClient) JoinArenaMatch(ctx context.Context, matchID string, userID i
 	req.Header.Set("Content-Type", "application/json")
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "POST",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "POST")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -883,8 +864,6 @@ func (c *APIClient) JoinArenaMatch(ctx context.Context, matchID string, userID i
 
 // LeaveArenaMatch leaves a match
 func (c *APIClient) LeaveArenaMatch(ctx context.Context, matchID string, userID int64) error {
-	txn := newrelic.FromContext(ctx)
-
 	reqBody := struct {
 		UserID int64 `json:"user_id"`
 	}{UserID: userID}
@@ -899,31 +878,7 @@ func (c *APIClient) LeaveArenaMatch(ctx context.Context, matchID string, userID 
 	req.Header.Set("Content-Type", "application/json")
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "POST",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "POST")
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
@@ -939,8 +894,6 @@ func (c *APIClient) LeaveArenaMatch(ctx context.Context, matchID string, userID 
 
 // StartArenaMatch starts a match (creator only)
 func (c *APIClient) StartArenaMatch(ctx context.Context, matchID string, userID int64) (*ArenaMatch, error) {
-	txn := newrelic.FromContext(ctx)
-
 	reqBody := struct {
 		UserID int64 `json:"user_id"`
 	}{UserID: userID}
@@ -955,31 +908,7 @@ func (c *APIClient) StartArenaMatch(ctx context.Context, matchID string, userID 
 	req.Header.Set("Content-Type", "application/json")
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "POST",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "POST")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -1000,8 +929,6 @@ func (c *APIClient) StartArenaMatch(ctx context.Context, matchID string, userID 
 
 // GetPendingMatches retrieves matches needing action
 func (c *APIClient) GetPendingMatches(ctx context.Context) ([]PendingMatch, error) {
-	txn := newrelic.FromContext(ctx)
-
 	apiURL := fmt.Sprintf("%s/api/v1/arena/matches/pending", c.baseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
@@ -1009,31 +936,7 @@ func (c *APIClient) GetPendingMatches(ctx context.Context) ([]PendingMatch, erro
 	}
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "GET",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "GET")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -1056,8 +959,6 @@ func (c *APIClient) GetPendingMatches(ctx context.Context) ([]PendingMatch, erro
 
 // AutoStartMatch auto-starts a match when deadline expires
 func (c *APIClient) AutoStartMatch(ctx context.Context, matchID string) (*AutoStartResult, error) {
-	txn := newrelic.FromContext(ctx)
-
 	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%s/auto-start", c.baseURL, matchID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, nil)
 	if err != nil {
@@ -1065,31 +966,7 @@ func (c *APIClient) AutoStartMatch(ctx context.Context, matchID string) (*AutoSt
 	}
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "POST",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "POST")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -1110,8 +987,6 @@ func (c *APIClient) AutoStartMatch(ctx context.Context, matchID string) (*AutoSt
 
 // ForceSubmitTeams forces team submission for unready participants
 func (c *APIClient) ForceSubmitTeams(ctx context.Context, matchID string) (*ForceSubmitResult, error) {
-	txn := newrelic.FromContext(ctx)
-
 	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%s/force-submit", c.baseURL, matchID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, nil)
 	if err != nil {
@@ -1119,31 +994,7 @@ func (c *APIClient) ForceSubmitTeams(ctx context.Context, matchID string) (*Forc
 	}
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "POST",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "POST")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -1223,8 +1074,6 @@ var (
 
 // GetTodayTournament retrieves today's tournament for a chat
 func (c *APIClient) GetTodayTournament(ctx context.Context, chatID int64, date string) (*RankedTournament, error) {
-	txn := newrelic.FromContext(ctx)
-
 	apiURL := fmt.Sprintf("%s/api/v1/arena/tournament/today?chat_id=%d&date=%s", c.baseURL, chatID, date)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
@@ -1232,31 +1081,7 @@ func (c *APIClient) GetTodayTournament(ctx context.Context, chatID int64, date s
 	}
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "GET",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "GET")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -1279,8 +1104,6 @@ func (c *APIClient) GetTodayTournament(ctx context.Context, chatID int64, date s
 
 // GetPendingAnnouncements retrieves tournaments needing announcement
 func (c *APIClient) GetPendingAnnouncements(ctx context.Context) ([]TournamentInfo, error) {
-	txn := newrelic.FromContext(ctx)
-
 	apiURL := fmt.Sprintf("%s/api/v1/arena/tournaments/pending-announcements", c.baseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
@@ -1288,31 +1111,7 @@ func (c *APIClient) GetPendingAnnouncements(ctx context.Context) ([]TournamentIn
 	}
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "GET",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "GET")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -1335,8 +1134,6 @@ func (c *APIClient) GetPendingAnnouncements(ctx context.Context) ([]TournamentIn
 
 // AnnounceTournament creates and announces a tournament
 func (c *APIClient) AnnounceTournament(ctx context.Context, chatID int64, date string, messageID int64) (*RankedTournament, error) {
-	txn := newrelic.FromContext(ctx)
-
 	reqBody := struct {
 		ChatID    int64  `json:"chat_id"`
 		Date      string `json:"date"`
@@ -1360,31 +1157,7 @@ func (c *APIClient) AnnounceTournament(ctx context.Context, chatID int64, date s
 	req.Header.Set("Content-Type", "application/json")
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "POST",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "POST")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -1407,8 +1180,6 @@ func (c *APIClient) AnnounceTournament(ctx context.Context, chatID int64, date s
 
 // JoinTournament adds a user to a tournament
 func (c *APIClient) JoinTournament(ctx context.Context, chatID, userID int64) (*RankedTournament, error) {
-	txn := newrelic.FromContext(ctx)
-
 	reqBody := struct {
 		ChatID int64 `json:"chat_id"`
 		UserID int64 `json:"user_id"`
@@ -1430,31 +1201,7 @@ func (c *APIClient) JoinTournament(ctx context.Context, chatID, userID int64) (*
 	req.Header.Set("Content-Type", "application/json")
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "POST",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "POST")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -1496,8 +1243,6 @@ func (c *APIClient) JoinTournament(ctx context.Context, chatID, userID int64) (*
 
 // LeaveTournament removes a user from a tournament
 func (c *APIClient) LeaveTournament(ctx context.Context, chatID, userID int64) (*RankedTournament, error) {
-	txn := newrelic.FromContext(ctx)
-
 	reqBody := struct {
 		ChatID int64 `json:"chat_id"`
 		UserID int64 `json:"user_id"`
@@ -1519,31 +1264,7 @@ func (c *APIClient) LeaveTournament(ctx context.Context, chatID, userID int64) (
 	req.Header.Set("Content-Type", "application/json")
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "POST",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "POST")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -1577,8 +1298,6 @@ func (c *APIClient) LeaveTournament(ctx context.Context, chatID, userID int64) (
 
 // GetPendingCloseTournaments retrieves tournaments needing registration close
 func (c *APIClient) GetPendingCloseTournaments(ctx context.Context) ([]TournamentInfo, error) {
-	txn := newrelic.FromContext(ctx)
-
 	apiURL := fmt.Sprintf("%s/api/v1/arena/tournaments/pending-close", c.baseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
@@ -1586,31 +1305,7 @@ func (c *APIClient) GetPendingCloseTournaments(ctx context.Context) ([]Tournamen
 	}
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "GET",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "GET")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -1633,8 +1328,6 @@ func (c *APIClient) GetPendingCloseTournaments(ctx context.Context) ([]Tournamen
 
 // CloseTournament closes registration and starts a tournament
 func (c *APIClient) CloseTournament(ctx context.Context, tournamentID int64) (*TournamentStartResult, error) {
-	txn := newrelic.FromContext(ctx)
-
 	apiURL := fmt.Sprintf("%s/api/v1/arena/tournament/%d/close", c.baseURL, tournamentID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, nil)
 	if err != nil {
@@ -1642,31 +1335,7 @@ func (c *APIClient) CloseTournament(ctx context.Context, tournamentID int64) (*T
 	}
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "POST",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "POST")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -1691,8 +1360,6 @@ func (c *APIClient) CloseTournament(ctx context.Context, tournamentID int64) (*T
 
 // GetPendingRoundsTournaments retrieves tournaments with pending rounds
 func (c *APIClient) GetPendingRoundsTournaments(ctx context.Context) ([]RankedTournament, error) {
-	txn := newrelic.FromContext(ctx)
-
 	apiURL := fmt.Sprintf("%s/api/v1/arena/tournaments/pending-rounds", c.baseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
@@ -1700,31 +1367,7 @@ func (c *APIClient) GetPendingRoundsTournaments(ctx context.Context) ([]RankedTo
 	}
 	c.addAuthHeader(req)
 
-	var externalSegment *newrelic.ExternalSegment
-	if txn != nil {
-		parsedURL, _ := url.Parse(apiURL)
-		host := c.baseURL
-		if parsedURL != nil {
-			host = parsedURL.Host
-		}
-		externalSegment = &newrelic.ExternalSegment{
-			StartTime: txn.StartSegmentNow(),
-			URL:       apiURL,
-			Host:      host,
-			Procedure: "GET",
-			Library:   "net/http",
-		}
-	}
-
-	resp, err := c.httpClient.Do(req)
-
-	if externalSegment != nil {
-		if resp != nil {
-			externalSegment.Response = resp
-		}
-		externalSegment.End()
-	}
-
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "GET")
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}

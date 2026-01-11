@@ -14,14 +14,13 @@ export function LeaderboardPage({ userId, onViewH2H }: LeaderboardPageProps) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [type, setType] = useState<'ranked' | 'regular'>('regular');
 
   useEffect(() => {
     async function fetchLeaderboard() {
       setLoading(true);
       setError(null);
       try {
-        const { entries } = await apiClient.getLeaderboard(type);
+        const { entries } = await apiClient.getLeaderboard('ranked');
         setEntries(entries);
         setError(null);
       } catch (err) {
@@ -30,7 +29,6 @@ export function LeaderboardPage({ userId, onViewH2H }: LeaderboardPageProps) {
         setError(errorMessage);
         noticeError(err instanceof Error ? err : new Error(errorMessage), {
           context: 'fetch_leaderboard',
-          leaderboard_type: type,
         });
       } finally {
         setLoading(false);
@@ -38,43 +36,24 @@ export function LeaderboardPage({ userId, onViewH2H }: LeaderboardPageProps) {
     }
 
     fetchLeaderboard();
-  }, [type]);
+  }, []);
 
-  const getWins = (entry: LeaderboardEntry) =>
-    type === 'ranked' ? entry.ranked_wins : entry.regular_wins;
-
-  const getLosses = (entry: LeaderboardEntry) =>
-    type === 'ranked' ? entry.ranked_losses : entry.regular_losses;
-
-  const getStreak = (entry: LeaderboardEntry) =>
-    type === 'ranked' ? entry.ranked_current_streak : entry.regular_current_streak;
-
-  const getWinRate = (entry: LeaderboardEntry) => {
-    const wins = getWins(entry);
-    const losses = getLosses(entry);
-    const total = wins + losses;
+  const getCasualWinRate = (entry: LeaderboardEntry) => {
+    const total = entry.regular_wins + entry.regular_losses;
     if (total === 0) return 0;
-    return Math.round((wins / total) * 100);
+    return Math.round((entry.regular_wins / total) * 100);
+  };
+
+  const getRankedWinRate = (entry: LeaderboardEntry) => {
+    const total = entry.ranked_wins + entry.ranked_losses;
+    if (total === 0) return 0;
+    return Math.round((entry.ranked_wins / total) * 100);
   };
 
   return (
     <div className="leaderboard-page">
       <header className="leaderboard-header">
         <h1>Leaderboard</h1>
-        <div className="leaderboard-tabs">
-          <button
-            className={`tab-btn ${type === 'ranked' ? 'active' : ''}`}
-            onClick={() => setType('ranked')}
-          >
-            Ranked
-          </button>
-          <button
-            className={`tab-btn ${type === 'regular' ? 'active' : ''}`}
-            onClick={() => setType('regular')}
-          >
-            Casual
-          </button>
-        </div>
       </header>
 
       {error ? (
@@ -91,7 +70,7 @@ export function LeaderboardPage({ userId, onViewH2H }: LeaderboardPageProps) {
         <div className="leaderboard-empty">
           <p>No matches played yet</p>
           <p className="leaderboard-empty-hint">
-            Play some {type} matches to appear here!
+            Play some matches to appear here!
           </p>
         </div>
       ) : (
@@ -124,24 +103,20 @@ export function LeaderboardPage({ userId, onViewH2H }: LeaderboardPageProps) {
                     )}
                     {isCurrentUser && <span className="you-badge">You</span>}
                   </div>
-                  <div className="entry-stats-row">
-                    <span className="stat-wins">{getWins(entry)}W</span>
-                    <span className="stat-losses">{getLosses(entry)}L</span>
-                    <span className="stat-winrate">{getWinRate(entry)}%</span>
+                  <div className="entry-stats-container">
+                    <div className="entry-stats-row casual">
+                      <span className="stat-label">Casual:</span>
+                      <span className="stat-wins">{entry.regular_wins}W</span>
+                      <span className="stat-losses">{entry.regular_losses}L</span>
+                      <span className="stat-winrate">{getCasualWinRate(entry)}%</span>
+                    </div>
+                    <div className="entry-stats-row ranked">
+                      <span className="stat-label">Ranked:</span>
+                      <span className="stat-wins">{entry.ranked_wins}W</span>
+                      <span className="stat-losses">{entry.ranked_losses}L</span>
+                      <span className="stat-winrate">{getRankedWinRate(entry)}%</span>
+                    </div>
                   </div>
-                </div>
-
-                <div className="entry-streak">
-                  {getStreak(entry) > 0 && (
-                    <div className="streak-current">
-                      🔥 {getStreak(entry)}
-                    </div>
-                  )}
-                  {type === 'ranked' && entry.ranked_tournaments_won > 0 && (
-                    <div className="tournaments-won">
-                      🏆 {entry.ranked_tournaments_won}
-                    </div>
-                  )}
                 </div>
 
                 <div className="entry-arrow">›</div>

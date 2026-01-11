@@ -16,32 +16,6 @@
   color: var(--text-primary);
 }
 
-.leaderboard-tabs {
-  display: flex;
-  gap: var(--spacing-xs);
-  background: var(--bg-secondary);
-  padding: var(--spacing-xs);
-  border-radius: var(--radius-md);
-}
-
-.leaderboard-tabs .tab-btn {
-  flex: 1;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-secondary);
-  font-family: var(--font-family);
-  font-size: var(--font-size-md);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.leaderboard-tabs .tab-btn.active {
-  background: var(--accent-primary);
-  color: white;
-}
 
 .leaderboard-loading {
   display: flex;
@@ -137,11 +111,33 @@
   font-weight: 600;
 }
 
+.entry-stats-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--spacing-xs);
+}
+
 .entry-stats-row {
   display: flex;
-  gap: var(--spacing-sm);
-  margin-top: var(--spacing-xs);
-  font-size: var(--font-size-sm);
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 13px;
+}
+
+.entry-stats-row .stat-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+  min-width: 55px;
+  font-size: 12px;
+}
+
+.entry-stats-row.casual .stat-label {
+  color: var(--accent-info);
+}
+
+.entry-stats-row.ranked .stat-label {
+  color: var(--accent-warning);
 }
 
 .stat-wins {
@@ -156,26 +152,7 @@
 
 .stat-winrate {
   color: var(--text-secondary);
-}
-
-.entry-streak {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.streak-current {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--accent-primary);
-}
-
-.tournaments-won {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--accent-gold);
+  font-size: 12px;
 }
 
 .entry-arrow {

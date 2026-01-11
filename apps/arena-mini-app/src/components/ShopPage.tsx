@@ -150,8 +150,11 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
 
     // Persist to API
     try {
-      const cardIds = newOrder.map(c => c.card_id);
-      const state = await apiClient.setTeamOrder(match.id, cardIds);
+      // Convert new order to indices based on original team positions
+      const indices = newOrder.map(card =>
+        shopState.team.findIndex(originalCard => originalCard.card_id === card.card_id)
+      );
+      const state = await apiClient.setTeamOrder(match.id, indices);
       setShopState(state);
       addPageAction('team_reordered', {
         match_id: match.id,

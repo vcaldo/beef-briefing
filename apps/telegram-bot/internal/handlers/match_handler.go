@@ -108,7 +108,7 @@ func (h *MatchHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Up
 
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      chatID,
-		Text:        fmt.Sprintf("⚔️ *Arena Match Created*\n\nCreator: [user](tg://user?id=%d)\nClick the button to join and play.", userID),
+		Text:        fmt.Sprintf("⚔️ *Arena Match Created*\n\nCreator: [user](tg://user?id=%d)\nClick the button to join and play", userID),
 		ParseMode:   models.ParseModeMarkdown,
 		ReplyMarkup: keyboard,
 	})

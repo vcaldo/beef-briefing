@@ -47,16 +47,17 @@ Commands:
   shell        Open interactive shell in container
 
 Options (passed through to main.py):
-  --chat-id ID      Chat ID (default: $DEFAULT_CHAT_ID)
-  --limit N         Limit messages to process
-  --batch-size N    Messages per batch
-  --from-date D     Process from date (YYYY-MM-DD)
-  --to-date D       Process until date (YYYY-MM-DD)
-  --week D          Week start for cards/render (YYYY-MM-DD)
-  --window-days N   Rolling window for cards (default: 30)
-  --min-messages N  Min messages for cards (default: 10)
-  --theme T         Theme for card images (default: gaming)
-  --force           Force regenerate card images
+  --chat-id ID           Chat ID (default: $DEFAULT_CHAT_ID)
+  --source-chat-id ID    Source chat ID for messages (enables impersonation mode)
+  --limit N              Limit messages to process
+  --batch-size N         Messages per batch
+  --from-date D          Process from date (YYYY-MM-DD)
+  --to-date D            Process until date (YYYY-MM-DD)
+  --week D               Week start for cards/render (YYYY-MM-DD)
+  --window-days N        Rolling window for cards (default: 30)
+  --min-messages N       Min messages for cards (default: 10)
+  --theme T              Theme for card images (default: gaming)
+  --force                Force regenerate card images
 
 Examples:
   $0 process --limit 100                    # Dev: local postgres
@@ -66,6 +67,7 @@ Examples:
   $0 cards --week 2025-01-06                # Generate cards (dev)
   $0 render --week 2025-01-06               # Render card images (dev)
   $0 render --force                         # Force re-render images
+  $0 cards --chat-id -1009876543 --source-chat-id -1001234567 --timezone UTC  # Impersonation mode
   $0 shell                                  # Open shell
 EOF
     exit 1

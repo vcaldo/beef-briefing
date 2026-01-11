@@ -449,6 +449,23 @@ ml-run-cards-prod: ## Generate weekly user cards (prod)
 ml-run-render-prod: ## Render card images (prod)
 	./scripts/ml-processor.sh --prod render $(ML_ARGS)
 
+# Impersonation mode (generate cards from source chat, store to target chat)
+ml-cards-impersonate: ## Generate cards with impersonation (dev) - SOURCE_CHAT_ID TARGET_CHAT_ID ML_ARGS required
+	@if [ -z "$(SOURCE_CHAT_ID)" ] || [ -z "$(TARGET_CHAT_ID)" ]; then \
+		echo "Error: SOURCE_CHAT_ID and TARGET_CHAT_ID are required"; \
+		echo "Usage: make ml-cards-impersonate SOURCE_CHAT_ID=-1001234 TARGET_CHAT_ID=-1005678 ML_ARGS='--timezone UTC'"; \
+		exit 1; \
+	fi
+	./scripts/ml-processor.sh cards --chat-id $(TARGET_CHAT_ID) --source-chat-id $(SOURCE_CHAT_ID) $(ML_ARGS)
+
+ml-cards-impersonate-prod: ## Generate cards with impersonation (prod) - SOURCE_CHAT_ID TARGET_CHAT_ID ML_ARGS required
+	@if [ -z "$(SOURCE_CHAT_ID)" ] || [ -z "$(TARGET_CHAT_ID)" ]; then \
+		echo "Error: SOURCE_CHAT_ID and TARGET_CHAT_ID are required"; \
+		echo "Usage: make ml-cards-impersonate-prod SOURCE_CHAT_ID=-1001234 TARGET_CHAT_ID=-1005678 ML_ARGS='--timezone UTC'"; \
+		exit 1; \
+	fi
+	./scripts/ml-processor.sh --prod cards --chat-id $(TARGET_CHAT_ID) --source-chat-id $(SOURCE_CHAT_ID) $(ML_ARGS)
+
 # Utility
 ml-shell: ## Open shell in ml-processor container
 	./scripts/ml-processor.sh shell

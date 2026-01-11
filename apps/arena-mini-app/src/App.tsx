@@ -55,6 +55,11 @@ function App() {
           return;
         }
 
+        // Parse URL query parameters (for game launches)
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlChatId = urlParams.get('chat_id');
+        const urlUserId = urlParams.get('user_id');
+
         const auth = await apiClient.authenticate(initDataRaw);
         setUserId(auth.user_id);
         setFirstName(auth.first_name);
@@ -73,6 +78,11 @@ function App() {
           user_id: auth.user_id,
           chat_id: auth.chat_id,
         });
+
+        // If launched from game, handle match joining
+        if (urlChatId && urlUserId) {
+          await handleGameLaunch(parseInt(urlChatId), parseInt(urlUserId));
+        }
       } catch (err) {
         console.error('Auth failed:', err);
         setError(err instanceof Error ? err.message : 'Authentication failed');
@@ -114,6 +124,40 @@ function App() {
     });
     setActiveMatch(null);
     setPage('lobby');
+  };
+
+  // Handle game launch - auto-join or show lobby
+  const handleGameLaunch = async (chatId: number, userId: number) => {
+    try {
+      // Check for active matches in this chat
+      const { matches } = await apiClient.getActiveMatches();
+      const activeMatch = matches.find((m) =>
+        m.chat_id === chatId && m.status === 'open'
+      );
+
+      if (activeMatch) {
+        // Auto-join the active match
+        const match = await apiClient.joinMatch(activeMatch.id);
+        handleMatchSelect(match);
+        addPageAction('game_launch_joined', {
+          chat_id: chatId,
+          match_id: match.id,
+        });
+      } else {
+        // No active match - show lobby
+        setPage('lobby');
+        addPageAction('game_launch_no_match', {
+          chat_id: chatId,
+        });
+      }
+    } catch (err) {
+      console.error('Game launch error:', err);
+      // Fail gracefully - show lobby
+      setPage('lobby');
+      addPageAction('game_launch_error', {
+        error: err instanceof Error ? err.message : 'unknown',
+      });
+    }
   };
 
   // Handle navigation

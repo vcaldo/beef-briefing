@@ -34,6 +34,12 @@ func (h *CallbackHandler) Handle(ctx context.Context, b *bot.Bot, update *models
 		return
 	}
 
+	// Check if this is a game callback
+	if update.CallbackQuery.GameShortName != "" {
+		h.handleGameCallback(ctx, b, update.CallbackQuery)
+		return
+	}
+
 	callbackData := update.CallbackQuery.Data
 	userID := update.CallbackQuery.From.ID
 	chatID := update.CallbackQuery.Message.Message.Chat.ID
@@ -258,6 +264,37 @@ func (h *CallbackHandler) answerCallback(ctx context.Context, b *bot.Bot, callba
 	if err != nil {
 		slog.Error("failed to answer callback query", "error", err)
 	}
+}
+
+// handleGameCallback processes game button clicks
+func (h *CallbackHandler) handleGameCallback(ctx context.Context, b *bot.Bot, callback *models.CallbackQuery) {
+	if callback.GameShortName == "" {
+		slog.Warn("game callback without game_short_name", "user_id", callback.From.ID)
+		h.answerCallback(ctx, b, callback.ID, "Invalid game callback")
+		return
+	}
+
+	userID := callback.From.ID
+	chatID := callback.Message.Message.Chat.ID
+
+	// Build game URL with query parameters
+	gameURL := fmt.Sprintf(
+		"https://arena.barra-pesada.online?chat_id=%d&user_id=%d",
+		chatID,
+		userID,
+	)
+
+	// Answer callback query with game URL
+	_, err := b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: callback.ID,
+		URL:             gameURL,
+	})
+	if err != nil {
+		slog.Error("failed to answer game callback", "error", err)
+		return
+	}
+
+	slog.Info("game callback answered", "user_id", userID, "chat_id", chatID, "game_url", gameURL)
 }
 
 // =====================================================

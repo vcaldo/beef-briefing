@@ -86,37 +86,25 @@ func (h *MatchHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Up
 		txn.AddAttribute("match_id", match.ID)
 	}
 
-	// Send match message with inline keyboard
-	messageText := fmt.Sprintf(
-		"⚔️ *Arena Match Created!*\n\n"+
-			"👤 Creator: [user](tg://user?id=%d)\n"+
-			"⏰ Join window: 5 minutes\n"+
-			"👥 Participants: %d\n\n"+
-			"Click *Join Match* to participate!",
-		userID,
-		len(match.Participants),
-	)
-
+	// Send game widget instead of text message
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
 			{
-				{Text: "🎮 Join Match", CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
-				{Text: "🚪 Leave", CallbackData: fmt.Sprintf("leave_match:%s", match.ID)},
-			},
-			{
-				{Text: "▶️ Start Match", CallbackData: fmt.Sprintf("start_match:%s", match.ID)},
+				{
+					Text:         "🎮 Play Arena Match",
+					CallbackGame: &models.CallbackGame{},
+				},
 			},
 		},
 	}
 
-	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
+	_, err = b.SendGame(ctx, &bot.SendGameParams{
 		ChatID:      chatID,
-		Text:        messageText,
-		ParseMode:   models.ParseModeMarkdown,
+		GameShorName: "arena", // Note: typo in library (missing 't')
 		ReplyMarkup: keyboard,
 	})
 	if err != nil {
-		slog.Error("failed to send match message", "match_id", match.ID, "error", err)
+		slog.Error("failed to send game widget", "match_id", match.ID, "error", err)
 		if txn != nil {
 			txn.NoticeError(err)
 		}

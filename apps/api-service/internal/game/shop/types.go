@@ -61,14 +61,18 @@ func (s *ShopState) CanBuy(cardIndex int) bool {
 	return true
 }
 
-// CanReroll checks if a reroll is possible
+// CanReroll checks if a reroll is possible while ensuring enough coins remain to complete the team
 func (s *ShopState) CanReroll() bool {
-	return s.Coins >= RerollCost
+	remainingCards := TeamSize - len(s.Team)
+	coinsNeededForCards := remainingCards * CardCost
+	return s.Coins >= (RerollCost + coinsNeededForCards)
 }
 
-// CanUpgrade checks if an upgrade is possible
+// CanUpgrade checks if an upgrade is possible while ensuring enough coins remain to complete the team
 func (s *ShopState) CanUpgrade(teamSlot int) bool {
-	if s.Coins < UpgradeCost {
+	remainingCards := TeamSize - len(s.Team)
+	coinsNeededForCards := remainingCards * CardCost
+	if s.Coins < (UpgradeCost + coinsNeededForCards) {
 		return false
 	}
 	if teamSlot < 0 || teamSlot >= len(s.Team) {

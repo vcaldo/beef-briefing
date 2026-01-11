@@ -228,9 +228,11 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
     );
   }
 
+  const remainingCardsNeeded = 3 - shopState.team.length;
+  const coinsNeededForCards = remainingCardsNeeded * 2; // CardCost = 2
   const canBuy = shopState.coins >= 2 && shopState.team.length < 3;
-  const canReroll = shopState.coins >= 1;
-  const canUpgrade = shopState.coins >= 2;
+  const canReroll = shopState.coins >= (1 + coinsNeededForCards); // RerollCost = 1
+  const canUpgrade = shopState.coins >= (2 + coinsNeededForCards); // UpgradeCost = 2
   const canSubmit = shopState.team.length === 3 && !shopState.is_ready;
 
   return (

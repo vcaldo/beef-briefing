@@ -534,6 +534,23 @@ func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64)
 		return nil, ErrNotEnoughCoins
 	}
 
+	// Unmarshal team to check size for validation
+	var currentTeam []*battle.Card
+	if participant.Team != nil {
+		if err := json.Unmarshal(*participant.Team, &currentTeam); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal team: %w", err)
+		}
+	}
+
+	// Calculate coins needed to complete team
+	remainingCards := shop.TeamSize - len(currentTeam)
+	coinsNeededForCards := remainingCards * shop.CardCost
+
+	// Check if player can afford to complete team after reroll
+	if participant.CoinsRemaining < (shop.RerollCost + coinsNeededForCards) {
+		return nil, ErrNotEnoughCoins
+	}
+
 	// Parse current cards
 	var cards []*battle.ShopCard
 	if err := json.Unmarshal(*participant.ShopCards, &cards); err != nil {
@@ -577,13 +594,7 @@ func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64)
 		return nil, fmt.Errorf("failed to marshal shop cards: %w", err)
 	}
 
-	var team []*battle.Card
-	if participant.Team != nil {
-		if err := json.Unmarshal(*participant.Team, &team); err != nil {
-			return nil, fmt.Errorf("failed to parse team: %w", err)
-		}
-	}
-	teamJSON, err := json.Marshal(team)
+	teamJSON, err := json.Marshal(currentTeam)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal team: %w", err)
 	}
@@ -617,6 +628,15 @@ func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID i
 		if err := json.Unmarshal(*participant.Team, &team); err != nil {
 			return nil, fmt.Errorf("failed to parse team: %w", err)
 		}
+	}
+
+	// Calculate coins needed to complete team
+	remainingCards := shop.TeamSize - len(team)
+	coinsNeededForCards := remainingCards * shop.CardCost
+
+	// Check if player can afford to complete team after upgrade
+	if participant.CoinsRemaining < (shop.UpgradeCost + coinsNeededForCards) {
+		return nil, ErrNotEnoughCoins
 	}
 
 	if teamSlot < 0 || teamSlot >= len(team) {

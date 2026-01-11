@@ -86,25 +86,34 @@ func (h *MatchHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Up
 		txn.AddAttribute("match_id", match.ID)
 	}
 
-	// Send game widget instead of text message
+	// Build game URL
+	gameURL := fmt.Sprintf(
+		"https://arena.barra-pesada.online?chat_id=%d",
+		chatID,
+	)
+
+	// Send game widget with WebApp button (opens in Telegram Mini App iframe)
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
 			{
 				{
-					Text:         "🎮 Play Arena Match",
-					CallbackGame: &models.CallbackGame{},
+					Text: "🎮 Play Arena Match",
+					WebApp: &models.WebAppInfo{
+						URL: gameURL,
+					},
 				},
 			},
 		},
 	}
 
-	_, err = b.SendGame(ctx, &bot.SendGameParams{
+	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      chatID,
-		GameShorName: "arena", // Note: typo in library (missing 't')
+		Text:        fmt.Sprintf("⚔️ *Arena Match Created!*\n\nCreator: [user](tg://user?id=%d)\nClick the button to join and play!", userID),
+		ParseMode:   models.ParseModeMarkdown,
 		ReplyMarkup: keyboard,
 	})
 	if err != nil {
-		slog.Error("failed to send game widget", "match_id", match.ID, "error", err)
+		slog.Error("failed to send game match message", "match_id", match.ID, "error", err)
 		if txn != nil {
 			txn.NoticeError(err)
 		}

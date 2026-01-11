@@ -262,15 +262,20 @@ html, body {
   padding: var(--spacing-lg);
   text-align: center;
   gap: var(--spacing-md);
+  background: var(--bg-primary);
 }
 
 .error-icon {
-  font-size: 48px;
+  font-size: 64px;
+  color: var(--accent-danger);
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 .error-message {
-  color: var(--accent-danger);
-  font-size: var(--font-size-md);
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  max-width: 300px;
+  line-height: 1.5;
 }
 
 /* Tab bar */

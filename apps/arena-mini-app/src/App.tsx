@@ -47,17 +47,39 @@ function App() {
   useEffect(() => {
     async function authenticate() {
       try {
-        const initDataRaw = launchParams?.initDataRaw;
-        if (!initDataRaw) {
-          setError('This app must be opened from Telegram');
-          setAppState('error');
-          addPageAction('auth_failed', { reason: 'no_init_data' });
-          return;
-        }
-
-        // Parse URL query parameters (for game launches)
+        // Parse URL query parameters (for game launches and fallback auth)
         const urlParams = new URLSearchParams(window.location.search);
         const urlChatId = urlParams.get('chat_id');
+        const urlUserId = urlParams.get('user_id');
+
+        const initDataRaw = launchParams?.initDataRaw;
+
+        // Log authentication context
+        console.debug('Auth context:', {
+          hasInitData: !!initDataRaw,
+          hasChatId: !!urlChatId,
+          hasUserId: !!urlUserId,
+          launchParamsExists: !!launchParams,
+        });
+
+        if (!initDataRaw) {
+          // If we have query parameters from a direct link (game callback), show helpful message
+          if (urlChatId || urlUserId) {
+            setError(
+              'Please open this link by clicking the button in Telegram. ' +
+              'The app must be opened from within Telegram to work properly.'
+            );
+          } else {
+            setError('This app must be opened from Telegram');
+          }
+          setAppState('error');
+          addPageAction('auth_failed', {
+            reason: 'no_init_data',
+            hasChatId: !!urlChatId,
+            hasUserId: !!urlUserId,
+          });
+          return;
+        }
 
         const auth = await apiClient.authenticate(initDataRaw);
         setUserId(auth.user_id);

@@ -204,58 +204,205 @@
   gap: var(--spacing-sm);
 }
 
-.recent-match {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-sm) var(--spacing-md);
+/* Compact match entry */
+.recent-match-entry {
   background: var(--bg-card);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
 }
 
-.result-indicator {
-  width: 28px;
-  height: 28px;
+.recent-match-entry:active {
+  transform: scale(0.98);
+}
+
+.recent-match-entry.expanded {
+  border-color: var(--accent-primary);
+}
+
+.match-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  gap: var(--spacing-sm);
+}
+
+.match-players {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex: 1;
+  min-width: 0;
+}
+
+.match-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.match-player-name {
+  font-size: 9px;
+  color: var(--text-muted);
+  max-width: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-vs {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.match-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.match-result-badge {
+  width: 20px;
+  height: 20px;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: var(--font-size-sm);
-  flex-shrink: 0;
+  font-size: 10px;
 }
 
-.result-indicator.win {
+.match-result-badge.result-win {
   background: rgba(46, 213, 115, 0.2);
   color: var(--accent-success);
 }
 
-.result-indicator.loss {
+.match-result-badge.result-loss {
   background: rgba(255, 71, 87, 0.2);
   color: var(--accent-danger);
 }
 
-.result-indicator.draw {
+.match-result-badge.result-draw {
   background: rgba(160, 160, 176, 0.2);
   color: var(--text-secondary);
 }
 
-.match-opponent {
-  flex: 1;
-  font-size: var(--font-size-sm);
-  color: var(--text-primary);
-  font-weight: 500;
+.match-type-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 3px;
+  border-radius: 2px;
 }
 
-.match-type-badge {
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  color: var(--text-muted);
-  font-weight: 600;
+.match-type-badge.ranked {
+  background: rgba(255, 215, 0, 0.2);
+  color: var(--accent-gold);
+}
+
+.match-type-badge.regular {
+  background: rgba(78, 205, 196, 0.2);
+  color: var(--accent-secondary);
 }
 
 .match-date {
-  font-size: var(--font-size-sm);
+  font-size: 10px;
   color: var(--text-muted);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* Battle log section */
+.match-battle-log {
+  border-top: 1px solid var(--border-color);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--bg-secondary);
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
+}
+
+.battle-log-loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-xs);
+}
+
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+}
+
+.battle-log-header {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.battle-log {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.battle-round {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.log-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 1px 0;
+  font-size: 10px;
+}
+
+.log-icon {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+
+.log-message {
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+
+.log-attack .log-message {
+  color: var(--text-primary);
+}
+
+.log-death .log-message {
+  color: var(--accent-danger);
+}
+
+.log-victory .log-message {
+  color: var(--accent-success);
+  font-weight: 600;
+}
+
+.battle-log-empty {
+  text-align: center;
+  padding: var(--spacing-xs);
+  color: var(--text-muted);
+  font-size: 10px;
 }

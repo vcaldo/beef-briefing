@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { noticeError } from '../newrelic';
-import type { ArenaProfile, MatchHistoryEntry } from '../types';
+import type { ArenaProfile, MatchHistoryEntry, GameCard, BattleResult, BattleEvent } from '../types';
+import { Avatar } from './Avatar';
 import { ErrorDisplay } from './ErrorDisplay';
 import './ProfilePage.css';
 
@@ -9,11 +10,67 @@ interface ProfilePageProps {
   onBack: () => void;
 }
 
+// Helper to get user photo from team
+const getUserPhoto = (team: GameCard[]): string | null => {
+  return team[0]?.photo_url || null;
+};
+
+// Helper to find a card by ID across both teams
+const findCard = (cardId: number, yourTeam: GameCard[], opponentTeam: GameCard[]): GameCard | null => {
+  return yourTeam.find(c => c.card_id === cardId) || opponentTeam.find(c => c.card_id === cardId) || null;
+};
+
+// Get event icon
+const getEventIcon = (type: string): string => {
+  switch (type) {
+    case 'attack': return '\u2694\uFE0F';
+    case 'death': return '\uD83D\uDC80';
+    case 'victory': return '\uD83D\uDC51';
+    case 'advance': return '\u27A1\uFE0F';
+    default: return '';
+  }
+};
+
+// Format battle event for compact display
+const formatBattleEvent = (
+  event: BattleEvent,
+  yourTeam: GameCard[],
+  opponentTeam: GameCard[],
+  isWinner: boolean
+): string | null => {
+  const attacker = event.attacker_card_id ? findCard(event.attacker_card_id, yourTeam, opponentTeam) : null;
+  const defender = event.defender_card_id ? findCard(event.defender_card_id, yourTeam, opponentTeam) : null;
+
+  switch (event.type) {
+    case 'attack':
+      if (attacker && defender && event.damage) {
+        return `${attacker.name} (${attacker.atk}) \u2192 ${defender.name} (${event.hp_before}) = ${event.damage} dmg`;
+      }
+      return event.message || 'Attack';
+    case 'death':
+      if (defender) {
+        return `${defender.name} defeated`;
+      }
+      return event.message || 'Defeated';
+    case 'victory':
+      return isWinner ? 'Victory!' : 'Defeat';
+    case 'advance':
+      return null; // Skip advance events for compact view
+    default:
+      return event.message || null;
+  }
+};
+
 export function ProfilePage({ onBack }: ProfilePageProps) {
   const [profile, setProfile] = useState<ArenaProfile | null>(null);
   const [recentMatches, setRecentMatches] = useState<MatchHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Expanded match state
+  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+  const [battleData, setBattleData] = useState<BattleResult | null>(null);
+  const [loadingBattle, setLoadingBattle] = useState(false);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -38,6 +95,31 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
 
     fetchProfile();
   }, []);
+
+  const handleMatchClick = async (match: MatchHistoryEntry) => {
+    if (expandedMatchId === match.match_id) {
+      setExpandedMatchId(null);
+      setBattleData(null);
+      return;
+    }
+
+    setExpandedMatchId(match.match_id);
+    setLoadingBattle(true);
+    setBattleData(null);
+
+    try {
+      const battle = await apiClient.getBattle(match.match_id);
+      setBattleData(battle);
+    } catch (err) {
+      console.error('Failed to fetch battle:', err);
+      noticeError(err instanceof Error ? err : new Error('Failed to fetch battle'), {
+        context: 'fetch_battle',
+        match_id: match.match_id,
+      });
+    } finally {
+      setLoadingBattle(false);
+    }
+  };
 
   const getRankedWinRate = () => {
     if (!profile) return 0;
@@ -66,7 +148,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
 
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
     return formatDate(dateStr);
   };
 
@@ -78,6 +160,22 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
   const getBestStreak = () => {
     if (!profile) return 0;
     return Math.max(profile.ranked_best_streak, profile.regular_best_streak);
+  };
+
+  const getResultClass = (result: string) => {
+    switch (result) {
+      case 'win': return 'result-win';
+      case 'loss': return 'result-loss';
+      default: return 'result-draw';
+    }
+  };
+
+  const getResultText = (result: string) => {
+    switch (result) {
+      case 'win': return 'W';
+      case 'loss': return 'L';
+      default: return 'D';
+    }
   };
 
   return (
@@ -186,19 +284,85 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
             <div className="profile-recent">
               <h2>Recent Matches</h2>
               <div className="recent-list">
-                {recentMatches.map((match) => (
-                  <div
-                    key={match.match_id}
-                    className={`recent-match ${match.result}`}
-                  >
-                    <span className={`result-indicator ${match.result}`}>
-                      {match.result === 'win' ? 'W' : match.result === 'loss' ? 'L' : 'D'}
-                    </span>
-                    <span className="match-opponent">vs {match.opponent.first_name}</span>
-                    <span className="match-type-badge">{match.match_type}</span>
-                    <span className="match-date">{formatRelativeDate(match.completed_at)}</span>
-                  </div>
-                ))}
+                {recentMatches.map((match) => {
+                  const isExpanded = expandedMatchId === match.match_id;
+                  const yourPhoto = getUserPhoto(match.your_team);
+                  const opponentPhoto = getUserPhoto(match.opponent_team);
+                  const isWinner = match.result === 'win';
+
+                  return (
+                    <div
+                      key={match.match_id}
+                      className={`recent-match-entry ${isExpanded ? 'expanded' : ''}`}
+                      onClick={() => handleMatchClick(match)}
+                    >
+                      <div className="match-compact">
+                        <div className="match-players">
+                          <div className="match-player you">
+                            <Avatar src={yourPhoto} name="You" size="sm" />
+                            <span className="match-player-name">You</span>
+                          </div>
+                          <span className="match-vs">vs</span>
+                          <div className="match-player opponent">
+                            <Avatar src={opponentPhoto} name={match.opponent.first_name} size="sm" />
+                            <span className="match-player-name">{match.opponent.first_name}</span>
+                          </div>
+                        </div>
+
+                        <div className="match-meta">
+                          <span className={`match-result-badge ${getResultClass(match.result)}`}>
+                            {getResultText(match.result)}
+                          </span>
+                          <span className={`match-type-badge ${match.match_type}`}>
+                            {match.match_type === 'ranked' ? 'R' : 'C'}
+                          </span>
+                          <span className="match-date">{formatRelativeDate(match.completed_at)}</span>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="match-battle-log">
+                          {loadingBattle ? (
+                            <div className="battle-log-loading">
+                              <div className="spinner spinner-sm" />
+                            </div>
+                          ) : battleData && battleData.rounds.length > 0 ? (
+                            <div className="battle-log">
+                              <div className="battle-log-header">Battle Log</div>
+                              {battleData.rounds.map((round, roundIndex) => (
+                                <div key={roundIndex} className="battle-round">
+                                  {round.battle_log.map((event, eventIndex) => {
+                                    const message = formatBattleEvent(
+                                      event,
+                                      match.your_team,
+                                      match.opponent_team,
+                                      isWinner
+                                    );
+                                    if (!message) return null;
+
+                                    return (
+                                      <div
+                                        key={eventIndex}
+                                        className={`log-entry log-${event.type}`}
+                                      >
+                                        <span className="log-icon">{getEventIcon(event.type)}</span>
+                                        <span className="log-message">{message}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="battle-log-empty">
+                              No battle data available
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

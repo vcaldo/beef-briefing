@@ -1,5 +1,14 @@
 -- =====================================================
--- BEEF ARENA - Card Game Schema
+-- BEEF ARENA - Card Game Schema (Consolidated)
+-- =====================================================
+-- This migration consolidates the entire game arena feature:
+-- - Core match system with 1v1 and arena formats
+-- - Ranked daily tournaments
+-- - Leaderboard tracking
+-- - Per-group tournament configuration
+
+-- =====================================================
+-- ENUMS
 -- =====================================================
 
 -- Match types
@@ -7,6 +16,15 @@ CREATE TYPE game_match_type AS ENUM ('ranked', 'regular');
 CREATE TYPE game_match_format AS ENUM ('1v1', 'arena');
 CREATE TYPE game_match_status AS ENUM ('open', 'shop_phase', 'battle_phase', 'completed', 'cancelled');
 CREATE TYPE game_participant_status AS ENUM ('joined', 'ready', 'eliminated', 'winner');
+
+-- Tournament statuses
+CREATE TYPE game_tournament_status AS ENUM (
+    'scheduled',    -- Created but not announced yet
+    'open',         -- Announced, accepting participants (00:01 - 18:00)
+    'in_progress',  -- Registration closed, match running
+    'completed',    -- Tournament finished with winner
+    'skipped'       -- No participants at close time
+);
 
 -- =====================================================
 -- GAME MATCHES
@@ -17,6 +35,7 @@ CREATE TABLE IF NOT EXISTS game_matches (
     chat_id BIGINT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     match_type game_match_type NOT NULL,
     format game_match_format,  -- NULL until determined by participant count
+
     status game_match_status NOT NULL DEFAULT 'open',
 
     -- Timestamps
@@ -177,6 +196,79 @@ CREATE INDEX idx_game_leaderboard_ranked ON game_leaderboard(chat_id, ranked_win
 CREATE INDEX idx_game_leaderboard_regular ON game_leaderboard(chat_id, regular_wins DESC);
 
 -- =====================================================
+-- RANKED TOURNAMENTS
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS game_ranked_tournaments (
+    id BIGSERIAL PRIMARY KEY,
+    chat_id BIGINT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    tournament_date DATE NOT NULL,
+    status game_tournament_status NOT NULL DEFAULT 'scheduled',
+
+    -- Announcement tracking
+    announcement_message_id BIGINT,  -- Telegram message ID for editing/referencing
+    announced_at TIMESTAMPTZ,
+
+    -- Lifecycle timestamps
+    registration_closed_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+
+    -- Link to match (created when registration closes)
+    match_id UUID REFERENCES game_matches(id) ON DELETE SET NULL,
+
+    -- Results (copied from match for convenience)
+    winner_user_id BIGINT REFERENCES users(id),
+    participant_count INT NOT NULL DEFAULT 0,
+
+    -- Bracket state for arena format (3+ players)
+    -- Format: {rounds: [[{player_a, player_b, winner}]], current_round: N, next_round_at: timestamp}
+    bracket_state JSONB,
+
+    -- Metadata
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    -- Only one tournament per chat per day
+    UNIQUE(chat_id, tournament_date)
+);
+
+-- Indexes for scheduler queries
+CREATE INDEX idx_ranked_tournaments_status ON game_ranked_tournaments(status);
+CREATE INDEX idx_ranked_tournaments_chat_date ON game_ranked_tournaments(chat_id, tournament_date);
+CREATE INDEX idx_ranked_tournaments_scheduled ON game_ranked_tournaments(status, chat_id)
+    WHERE status IN ('scheduled', 'open', 'in_progress');
+
+-- =====================================================
+-- TOURNAMENT PARTICIPANTS
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS game_tournament_participants (
+    id BIGSERIAL PRIMARY KEY,
+    tournament_id BIGINT NOT NULL REFERENCES game_ranked_tournaments(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    -- Only one entry per user per tournament
+    UNIQUE(tournament_id, user_id)
+);
+
+CREATE INDEX idx_tournament_participants_tournament ON game_tournament_participants(tournament_id);
+CREATE INDEX idx_tournament_participants_user ON game_tournament_participants(user_id);
+
+-- =====================================================
+-- PER-GROUP TOURNAMENT CONFIGURATION
+-- =====================================================
+
+ALTER TABLE chats
+ADD COLUMN IF NOT EXISTS ranked_tournaments_enabled BOOLEAN NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS idx_chats_ranked_enabled
+ON chats(ranked_tournaments_enabled)
+WHERE ranked_tournaments_enabled = true;
+
+COMMENT ON COLUMN chats.ranked_tournaments_enabled IS
+'Controls whether daily ranked tournaments are enabled for this chat. Default: false (opt-in)';
+
+-- =====================================================
 -- HELPER FUNCTION: Update leaderboard after match
 -- =====================================================
 
@@ -206,6 +298,7 @@ BEGIN
         IF p_is_win THEN
             UPDATE game_leaderboard
             SET ranked_wins = ranked_wins + 1,
+                ranked_tournaments_played = ranked_tournaments_played + 1,
                 ranked_current_streak = ranked_current_streak + 1,
                 ranked_best_streak = GREATEST(ranked_best_streak, ranked_current_streak + 1),
                 ranked_tournaments_won = ranked_tournaments_won + (CASE WHEN p_is_tournament_win THEN 1 ELSE 0 END)
@@ -213,6 +306,7 @@ BEGIN
         ELSE
             UPDATE game_leaderboard
             SET ranked_losses = ranked_losses + 1,
+                ranked_tournaments_played = ranked_tournaments_played + 1,
                 ranked_current_streak = 0
             WHERE user_id = p_user_id AND chat_id = p_chat_id;
         END IF;
@@ -220,12 +314,14 @@ BEGIN
         IF p_is_win THEN
             UPDATE game_leaderboard
             SET regular_wins = regular_wins + 1,
+                regular_matches_played = regular_matches_played + 1,
                 regular_current_streak = regular_current_streak + 1,
                 regular_best_streak = GREATEST(regular_best_streak, regular_current_streak + 1)
             WHERE user_id = p_user_id AND chat_id = p_chat_id;
         ELSE
             UPDATE game_leaderboard
             SET regular_losses = regular_losses + 1,
+                regular_matches_played = regular_matches_played + 1,
                 regular_current_streak = 0
             WHERE user_id = p_user_id AND chat_id = p_chat_id;
         END IF;
@@ -257,5 +353,92 @@ BEGIN
         SET head_to_head = v_h2h
         WHERE user_id = p_user_id AND chat_id = p_chat_id;
     END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =====================================================
+-- HELPER: Get tournaments needing announcement
+-- =====================================================
+-- Returns tournaments in 'scheduled' status for chats where local time is 00:01-00:10
+
+CREATE OR REPLACE FUNCTION get_tournaments_needing_announcement(p_current_time TIMESTAMPTZ)
+RETURNS TABLE (
+    tournament_id BIGINT,
+    chat_id BIGINT,
+    timezone VARCHAR,
+    tournament_date DATE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        t.id AS tournament_id,
+        t.chat_id,
+        COALESCE(c.timezone, 'America/Sao_Paulo') AS timezone,
+        t.tournament_date
+    FROM game_ranked_tournaments t
+    JOIN chats c ON c.id = t.chat_id
+    WHERE t.status = 'scheduled'
+      AND c.ranked_tournaments_enabled = true
+      AND (p_current_time AT TIME ZONE COALESCE(c.timezone, 'America/Sao_Paulo'))::TIME
+          BETWEEN '00:01:00' AND '00:10:00'
+      AND t.tournament_date = (p_current_time AT TIME ZONE COALESCE(c.timezone, 'America/Sao_Paulo'))::DATE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =====================================================
+-- HELPER: Get tournaments needing registration close
+-- =====================================================
+-- Returns tournaments in 'open' status for chats where local time is 18:00-18:05
+
+CREATE OR REPLACE FUNCTION get_tournaments_needing_close(p_current_time TIMESTAMPTZ)
+RETURNS TABLE (
+    tournament_id BIGINT,
+    chat_id BIGINT,
+    timezone VARCHAR,
+    tournament_date DATE,
+    participant_count BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        t.id AS tournament_id,
+        t.chat_id,
+        COALESCE(c.timezone, 'America/Sao_Paulo') AS timezone,
+        t.tournament_date,
+        (SELECT COUNT(*) FROM game_tournament_participants p WHERE p.tournament_id = t.id)
+    FROM game_ranked_tournaments t
+    JOIN chats c ON c.id = t.chat_id
+    WHERE t.status = 'open'
+      AND c.ranked_tournaments_enabled = true
+      AND (p_current_time AT TIME ZONE COALESCE(c.timezone, 'America/Sao_Paulo'))::TIME
+          BETWEEN '18:00:00' AND '18:05:00'
+      AND t.tournament_date = (p_current_time AT TIME ZONE COALESCE(c.timezone, 'America/Sao_Paulo'))::DATE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =====================================================
+-- HELPER: Create or get today's tournament for a chat
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION get_or_create_tournament(
+    p_chat_id BIGINT,
+    p_date DATE
+) RETURNS BIGINT AS $$
+DECLARE
+    v_tournament_id BIGINT;
+BEGIN
+    -- Try to get existing tournament
+    SELECT id INTO v_tournament_id
+    FROM game_ranked_tournaments
+    WHERE chat_id = p_chat_id AND tournament_date = p_date;
+
+    -- Create if not exists
+    IF v_tournament_id IS NULL THEN
+        INSERT INTO game_ranked_tournaments (chat_id, tournament_date)
+        VALUES (p_chat_id, p_date)
+        RETURNING id INTO v_tournament_id;
+    END IF;
+
+    RETURN v_tournament_id;
 END;
 $$ LANGUAGE plpgsql;

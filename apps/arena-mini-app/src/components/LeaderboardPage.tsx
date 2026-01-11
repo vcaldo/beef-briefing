@@ -14,7 +14,7 @@ export function LeaderboardPage({ userId, onViewH2H }: LeaderboardPageProps) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [type, setType] = useState<'ranked' | 'regular'>('ranked');
+  const [type, setType] = useState<'ranked' | 'regular'>('regular');
 
   useEffect(() => {
     async function fetchLeaderboard() {

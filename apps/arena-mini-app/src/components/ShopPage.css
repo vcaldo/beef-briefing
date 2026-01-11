@@ -119,25 +119,17 @@
   color: var(--text-muted);
 }
 
-/* Card image specific styling */
+/* Card image specific styling - maintain 1.9:1 aspect ratio */
 .card-photo.card-image {
-  aspect-ratio: 1.9;  /* Match card image dimensions (1200x630) */
-  overflow: hidden;
+  aspect-ratio: 1.9;
+  background: transparent;
 }
 
 .card-photo img.card-image-style {
-  /* Show entire card image without cropping */
   object-fit: contain;
   object-position: center;
   width: 100%;
   height: 100%;
-  border-radius: 8px;
-}
-
-/* Container sizing determined by aspect-ratio and grid width */
-.shop-card .card-photo.card-image,
-.team-card .card-photo.card-image {
-  width: 100%;
 }
 
 .card-info {

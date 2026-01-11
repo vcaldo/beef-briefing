@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 
 	"beef-briefing/apps/telegram-bot/internal/client"
 
@@ -15,15 +16,17 @@ import (
 
 // MatchHandler handles the /match command
 type MatchHandler struct {
-	apiClient *client.APIClient
-	nrApp     *newrelic.Application
+	apiClient   *client.APIClient
+	nrApp       *newrelic.Application
+	botUsername string
 }
 
 // NewMatchHandler creates a new MatchHandler
 func NewMatchHandler(apiClient *client.APIClient, nrApp *newrelic.Application) *MatchHandler {
 	return &MatchHandler{
-		apiClient: apiClient,
-		nrApp:     nrApp,
+		apiClient:   apiClient,
+		nrApp:       nrApp,
+		botUsername: os.Getenv("TELEGRAM_BOT_USERNAME"),
 	}
 }
 
@@ -86,21 +89,27 @@ func (h *MatchHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Up
 		txn.AddAttribute("match_id", match.ID)
 	}
 
-	// Build game URL
-	gameURL := fmt.Sprintf(
-		"https://arena.barra-pesada.online?chat_id=%d",
-		chatID,
-	)
+	// Check if Mini App is configured
+	if h.botUsername == "" {
+		slog.Warn("TELEGRAM_BOT_USERNAME not configured, arena Mini App unavailable", "chat_id", chatID)
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: chatID,
+			Text:   "The arena feature is not configured. Please contact the administrator.",
+		})
+		return
+	}
 
-	// Send game widget with WebApp button (opens in Telegram Mini App iframe)
+	// Build Mini App URL using t.me direct link format (works in group chats)
+	// Format: https://t.me/<bot_username>/<app_short_name>?startapp=<chat_id>
+	miniAppURL := fmt.Sprintf("https://t.me/%s/arena?startapp=%d", h.botUsername, chatID)
+
+	// Create inline keyboard with URL button to Mini App
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
 			{
 				{
 					Text: "🎮 Play Arena Match",
-					WebApp: &models.WebAppInfo{
-						URL: gameURL,
-					},
+					URL:  miniAppURL,
 				},
 			},
 		},

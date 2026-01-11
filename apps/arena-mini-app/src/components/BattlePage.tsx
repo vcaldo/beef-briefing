@@ -51,6 +51,33 @@ function isCardDefender(
   );
 }
 
+/**
+ * Gets a player's display name from the participants list.
+ */
+function getPlayerName(userId: number, participants: any[]): string {
+  const participant = participants.find(p => p.user_id === userId);
+  if (!participant) return 'Unknown';
+  return participant.username || participant.first_name;
+}
+
+/**
+ * Gets an emoji icon for a battle event type.
+ */
+function getEventIcon(type: string): string {
+  switch (type) {
+    case 'attack':
+      return '⚔️';
+    case 'death':
+      return '💀';
+    case 'victory':
+      return '👑';
+    case 'advance':
+      return '➡️';
+    default:
+      return '';
+  }
+}
+
 export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   const [battle, setBattle] = useState<BattleResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -142,7 +169,10 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
         play('ko');
         break;
       case 'victory':
-        play('victory');
+        // Only play victory sound if current user won
+        if (isWinner) {
+          play('victory');
+        }
         break;
     }
   }, [battle, currentRoundIndex, currentEventIndex, play]);
@@ -268,7 +298,8 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
         {/* Player A Team (Left) */}
         <div className="arena-team team-a">
           <div className="team-label">
-            {isUserPlayerA ? 'You' : 'Opponent'}
+            {getPlayerName(currentRound.player_a_id, match.participants)}
+            {isUserPlayerA && ' (You)'}
           </div>
           <div className="team-cards">
             {currentRound.player_a_team.map((card, i) => (
@@ -311,7 +342,9 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
                 )}
                 {currentEvent.type === 'victory' && (
                   <div className="victory-display">
-                    <span className="victory-text">Victory!</span>
+                    <span className={`victory-text ${isWinner ? 'win' : 'loss'}`}>
+                      {isWinner ? 'Victory!' : 'Defeat!'}
+                    </span>
                   </div>
                 )}
               </motion.div>
@@ -322,7 +355,8 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
         {/* Player B Team (Right) */}
         <div className="arena-team team-b">
           <div className="team-label">
-            {!isUserPlayerA ? 'You' : 'Opponent'}
+            {getPlayerName(currentRound.player_b_id, match.participants)}
+            {!isUserPlayerA && ' (You)'}
           </div>
           <div className="team-cards">
             {currentRound.player_b_team.map((card, i) => (
@@ -345,8 +379,9 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
       {/* Battle Log */}
       <div className="battle-log">
         {currentRound.battle_log.slice(0, currentEventIndex + 1).map((event, i) => (
-          <div key={i} className={`log-entry ${event.type}`}>
-            {event.message}
+          <div key={i} className={`log-entry log-entry-${event.type}`}>
+            <span className="log-icon">{getEventIcon(event.type)}</span>
+            <span className="log-message">{event.message}</span>
           </div>
         ))}
       </div>

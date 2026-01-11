@@ -916,19 +916,21 @@ func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *re
 	}
 
 	// Update leaderboard
-	match, _ := s.gameRepo.GetMatch(ctx, matchID)
-	matchType := repository.MatchTypeRegular
-	if match != nil {
-		matchType = match.MatchType
+	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match for leaderboard update: %w", err)
+	}
+	if match == nil {
+		return nil, fmt.Errorf("match not found for leaderboard update: %s", matchID)
 	}
 
 	if result.WinnerID != nil {
 		if *result.WinnerID == pA.UserID {
-			s.gameRepo.UpdateLeaderboard(ctx, pA.UserID, match.ChatID, matchType, true, &pB.UserID, false)
-			s.gameRepo.UpdateLeaderboard(ctx, pB.UserID, match.ChatID, matchType, false, &pA.UserID, false)
+			s.gameRepo.UpdateLeaderboard(ctx, pA.UserID, match.ChatID, match.MatchType, true, &pB.UserID, false)
+			s.gameRepo.UpdateLeaderboard(ctx, pB.UserID, match.ChatID, match.MatchType, false, &pA.UserID, false)
 		} else {
-			s.gameRepo.UpdateLeaderboard(ctx, pB.UserID, match.ChatID, matchType, true, &pA.UserID, false)
-			s.gameRepo.UpdateLeaderboard(ctx, pA.UserID, match.ChatID, matchType, false, &pB.UserID, false)
+			s.gameRepo.UpdateLeaderboard(ctx, pB.UserID, match.ChatID, match.MatchType, true, &pA.UserID, false)
+			s.gameRepo.UpdateLeaderboard(ctx, pA.UserID, match.ChatID, match.MatchType, false, &pB.UserID, false)
 		}
 	}
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { noticeError } from '../newrelic';
-import type { MatchHistoryEntry } from '../types';
+import type { MatchHistoryEntry, GameCard } from '../types';
 import { ErrorDisplay } from './ErrorDisplay';
 import './HistoryPage.css';
 
@@ -141,19 +141,25 @@ export function HistoryPage(_props: HistoryPageProps) {
 
                 <div className="entry-teams">
                   <div className="team-preview your-team">
-                    {match.your_team.slice(0, 3).map((card, i) => (
-                      <div key={i} className="team-card-mini">
-                        <span className="card-atk">{card.atk}</span>
-                      </div>
-                    ))}
+                    {match.your_team
+                      .filter((card): card is GameCard => card !== null && card !== undefined)
+                      .slice(0, 3)
+                      .map((card, i) => (
+                        <div key={i} className="team-card-mini">
+                          <span className="card-atk">{card.atk}</span>
+                        </div>
+                      ))}
                   </div>
                   <span className="vs-divider">vs</span>
                   <div className="team-preview opponent-team">
-                    {match.opponent_team.slice(0, 3).map((card, i) => (
-                      <div key={i} className="team-card-mini">
-                        <span className="card-atk">{card.atk}</span>
-                      </div>
-                    ))}
+                    {match.opponent_team
+                      .filter((card): card is GameCard => card !== null && card !== undefined)
+                      .slice(0, 3)
+                      .map((card, i) => (
+                        <div key={i} className="team-card-mini">
+                          <span className="card-atk">{card.atk}</span>
+                        </div>
+                      ))}
                   </div>
                 </div>
               </div>

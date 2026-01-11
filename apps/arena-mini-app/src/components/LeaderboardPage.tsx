@@ -8,9 +8,10 @@ import './LeaderboardPage.css';
 interface LeaderboardPageProps {
   userId: number;
   onViewH2H: (opponentId: number, opponentName: string) => void;
+  onViewProfile: () => void;
 }
 
-export function LeaderboardPage({ userId, onViewH2H }: LeaderboardPageProps) {
+export function LeaderboardPage({ userId, onViewH2H, onViewProfile }: LeaderboardPageProps) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +84,13 @@ export function LeaderboardPage({ userId, onViewH2H }: LeaderboardPageProps) {
               <div
                 key={entry.user_id}
                 className={`leaderboard-entry ${isCurrentUser ? 'current-user' : ''}`}
-                onClick={() => onViewH2H(entry.user_id, entry.first_name)}
+                onClick={() => {
+                  if (isCurrentUser) {
+                    onViewProfile();
+                  } else {
+                    onViewH2H(entry.user_id, entry.first_name);
+                  }
+                }}
               >
                 <div className="entry-rank">
                   {rank <= 3 ? (

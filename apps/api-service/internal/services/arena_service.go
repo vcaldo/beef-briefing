@@ -1751,3 +1751,38 @@ func (s *ArenaService) GetRecentMatchesVsOpponent(ctx context.Context, chatID, u
 
 	return s.gameRepo.GetRecentMatchesVsOpponent(ctx, chatID, userID, opponentID, limit)
 }
+
+// ArenaProfileResponse represents a user's arena profile
+type ArenaProfileResponse struct {
+	*repository.UserProfile
+	RecentMatches []*repository.MatchHistoryEntry `json:"recent_matches"`
+}
+
+// GetProfile retrieves a user's profile with stats, ranks, and recent matches
+func (s *ArenaService) GetProfile(ctx context.Context, chatID, userID int64) (*ArenaProfileResponse, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:GetProfile")
+		defer segment.End()
+	}
+
+	// Get user profile with rank positions
+	profile, err := s.gameRepo.GetUserProfile(ctx, chatID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user profile: %w", err)
+	}
+	if profile == nil {
+		return nil, nil
+	}
+
+	// Get recent matches (limit to 10)
+	matches, _, err := s.gameRepo.GetMatchHistory(ctx, chatID, userID, 10, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get recent matches: %w", err)
+	}
+
+	return &ArenaProfileResponse{
+		UserProfile:   profile,
+		RecentMatches: matches,
+	}, nil
+}

@@ -368,6 +368,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 			protected.HandleFunc("/arena/leaderboard", arenaHandler.HandleGetLeaderboard).Methods("GET", "OPTIONS")
 			protected.HandleFunc("/arena/history", arenaHandler.HandleGetHistory).Methods("GET", "OPTIONS")
 			protected.HandleFunc("/arena/h2h", arenaHandler.HandleGetH2H).Methods("GET", "OPTIONS")
+			protected.HandleFunc("/arena/profile", arenaHandler.HandleGetProfile).Methods("GET", "OPTIONS")
 			slog.Info("Arena game endpoints registered")
 		}
 

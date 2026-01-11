@@ -1434,3 +1434,85 @@ func (r *GameRepository) GetRecentMatchesVsOpponent(ctx context.Context, chatID,
 
 	return entries, rows.Err()
 }
+
+// UserProfile represents a user's arena profile with rank positions
+type UserProfile struct {
+	UserID                  int64      `json:"user_id"`
+	FirstName               string     `json:"first_name"`
+	Username                string     `json:"username,omitempty"`
+	RankedWins              int        `json:"ranked_wins"`
+	RankedLosses            int        `json:"ranked_losses"`
+	RankedTournamentsPlayed int        `json:"ranked_tournaments_played"`
+	RankedTournamentsWon    int        `json:"ranked_tournaments_won"`
+	RankedCurrentStreak     int        `json:"ranked_current_streak"`
+	RankedBestStreak        int        `json:"ranked_best_streak"`
+	RankedRank              int        `json:"ranked_rank"`
+	RegularWins             int        `json:"regular_wins"`
+	RegularLosses           int        `json:"regular_losses"`
+	RegularMatchesPlayed    int        `json:"regular_matches_played"`
+	RegularCurrentStreak    int        `json:"regular_current_streak"`
+	RegularBestStreak       int        `json:"regular_best_streak"`
+	RegularRank             int        `json:"regular_rank"`
+	FirstMatchAt            *time.Time `json:"first_match_at,omitempty"`
+	LastMatchAt             *time.Time `json:"last_match_at,omitempty"`
+}
+
+// GetUserProfile retrieves a user's profile with rank positions
+func (r *GameRepository) GetUserProfile(ctx context.Context, chatID, userID int64) (*UserProfile, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-user-profile")
+		defer segment.End()
+	}
+
+	query := `
+		WITH ranked_lb AS (
+			SELECT user_id, ROW_NUMBER() OVER (ORDER BY ranked_wins DESC, ranked_losses ASC) as rank
+			FROM game_leaderboard
+			WHERE chat_id = $1 AND (ranked_wins > 0 OR ranked_losses > 0)
+		),
+		regular_lb AS (
+			SELECT user_id, ROW_NUMBER() OVER (ORDER BY regular_wins DESC, regular_losses ASC) as rank
+			FROM game_leaderboard
+			WHERE chat_id = $1 AND (regular_wins > 0 OR regular_losses > 0)
+		)
+		SELECT
+			l.user_id,
+			u.first_name, COALESCE(u.username, ''),
+			l.ranked_wins, l.ranked_losses,
+			l.ranked_tournaments_played, l.ranked_tournaments_won,
+			l.ranked_current_streak, l.ranked_best_streak,
+			COALESCE(rl.rank, 0),
+			l.regular_wins, l.regular_losses, l.regular_matches_played,
+			l.regular_current_streak, l.regular_best_streak,
+			COALESCE(rgl.rank, 0),
+			l.first_match_at, l.last_match_at
+		FROM game_leaderboard l
+		JOIN users u ON u.id = l.user_id
+		LEFT JOIN ranked_lb rl ON rl.user_id = l.user_id
+		LEFT JOIN regular_lb rgl ON rgl.user_id = l.user_id
+		WHERE l.chat_id = $1 AND l.user_id = $2
+	`
+
+	var profile UserProfile
+	err := r.db.QueryRowContext(ctx, query, chatID, userID).Scan(
+		&profile.UserID,
+		&profile.FirstName, &profile.Username,
+		&profile.RankedWins, &profile.RankedLosses,
+		&profile.RankedTournamentsPlayed, &profile.RankedTournamentsWon,
+		&profile.RankedCurrentStreak, &profile.RankedBestStreak,
+		&profile.RankedRank,
+		&profile.RegularWins, &profile.RegularLosses, &profile.RegularMatchesPlayed,
+		&profile.RegularCurrentStreak, &profile.RegularBestStreak,
+		&profile.RegularRank,
+		&profile.FirstMatchAt, &profile.LastMatchAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user profile: %w", err)
+	}
+
+	return &profile, nil
+}

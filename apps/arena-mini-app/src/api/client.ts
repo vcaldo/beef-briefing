@@ -6,6 +6,7 @@ import type {
   LeaderboardEntry,
   MatchHistoryEntry,
   H2HRecord,
+  ArenaProfile,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -241,6 +242,16 @@ class ApiClient {
     }
     const response = await fetch(url, { headers: this.getHeaders() });
     if (!response.ok) throw new Error('Failed to fetch H2H');
+    return response.json();
+  }
+
+  // Profile endpoint
+  async getProfile(): Promise<{ profile: ArenaProfile | null; recent_matches: MatchHistoryEntry[] }> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/mini-app/arena/profile?${this.getChatIdParam()}`,
+      { headers: this.getHeaders() }
+    );
+    if (!response.ok) throw new Error('Failed to fetch profile');
     return response.json();
   }
 

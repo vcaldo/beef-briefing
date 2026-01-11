@@ -77,18 +77,20 @@
 /* Shop Cards Grid */
 .shop-cards {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-sm);
+  grid-template-columns: 1fr;
+  gap: var(--spacing-md);
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 .shop-card {
   background: var(--bg-card);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
-  padding: var(--spacing-sm);
+  padding: var(--spacing-md);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
   transition: all 0.2s;
 }
 
@@ -138,7 +140,7 @@
 
 .card-name {
   font-weight: 600;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-lg);
   margin-bottom: var(--spacing-xs);
   white-space: nowrap;
   overflow: hidden;
@@ -153,8 +155,8 @@
 
 .buy-btn {
   width: 100%;
-  padding: var(--spacing-xs);
-  font-size: var(--font-size-sm);
+  padding: var(--spacing-sm);
+  font-size: var(--font-size-md);
 }
 
 .purchased-badge {

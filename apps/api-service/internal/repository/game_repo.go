@@ -1235,15 +1235,17 @@ func (r *GameRepository) GetTournamentsWithPendingRounds(ctx context.Context) ([
 
 // MatchHistoryEntry represents a match in the user's history
 type MatchHistoryEntry struct {
-	MatchID      string    `json:"match_id"`
-	MatchType    MatchType `json:"match_type"`
-	OpponentID   int64     `json:"opponent_id"`
-	OpponentName string    `json:"opponent_name"`
-	OpponentUser string    `json:"opponent_username,omitempty"`
-	Result       string    `json:"result"` // "win", "loss", "draw"
-	YourTeam     []byte    `json:"your_team"`
-	OpponentTeam []byte    `json:"opponent_team"`
-	CompletedAt  time.Time `json:"completed_at"`
+	MatchID          string    `json:"match_id"`
+	MatchType        MatchType `json:"match_type"`
+	OpponentID       int64     `json:"opponent_id"`
+	OpponentName     string    `json:"opponent_name"`
+	OpponentUser     string    `json:"opponent_username,omitempty"`
+	Result           string    `json:"result"` // "win", "loss", "draw"
+	YourTeam         []byte    `json:"your_team"`
+	OpponentTeam     []byte    `json:"opponent_team"`
+	CompletedAt      time.Time `json:"completed_at"`
+	YourPhotoKey     *string   `json:"-"` // minio object key for your photo
+	OpponentPhotoKey *string   `json:"-"` // minio object key for opponent photo
 }
 
 // GetMatchHistory retrieves a user's match history
@@ -1268,7 +1270,7 @@ func (r *GameRepository) GetMatchHistory(ctx context.Context, chatID, userID int
 		return nil, 0, fmt.Errorf("failed to count match history: %w", err)
 	}
 
-	// Get match history
+	// Get match history with user profile photos
 	query := `
 		SELECT
 			m.id, m.match_type, m.completed_at,
@@ -1280,10 +1282,21 @@ func (r *GameRepository) GetMatchHistory(ctx context.Context, chatID, userID int
 				ELSE 'loss'
 			END as result,
 			CASE WHEN r.player_a_id = $2 THEN r.player_a_team ELSE r.player_b_team END as your_team,
-			CASE WHEN r.player_a_id = $2 THEN r.player_b_team ELSE r.player_a_team END as opponent_team
+			CASE WHEN r.player_a_id = $2 THEN r.player_b_team ELSE r.player_a_team END as opponent_team,
+			your_photo.minio_object_key as your_photo_key,
+			opp_photo.minio_object_key as opponent_photo_key
 		FROM game_match_rounds r
 		JOIN game_matches m ON r.match_id = m.id
 		JOIN users u ON u.id = CASE WHEN r.player_a_id = $2 THEN r.player_b_id ELSE r.player_a_id END
+		LEFT JOIN LATERAL (
+			SELECT minio_object_key FROM user_profile_photos
+			WHERE user_id = $2 ORDER BY width DESC LIMIT 1
+		) your_photo ON true
+		LEFT JOIN LATERAL (
+			SELECT minio_object_key FROM user_profile_photos
+			WHERE user_id = CASE WHEN r.player_a_id = $2 THEN r.player_b_id ELSE r.player_a_id END
+			ORDER BY width DESC LIMIT 1
+		) opp_photo ON true
 		WHERE m.chat_id = $1
 		  AND m.status = 'completed'
 		  AND (r.player_a_id = $2 OR r.player_b_id = $2)
@@ -1304,6 +1317,7 @@ func (r *GameRepository) GetMatchHistory(ctx context.Context, chatID, userID int
 			&e.MatchID, &e.MatchType, &e.CompletedAt,
 			&e.OpponentID, &e.OpponentName, &e.OpponentUser,
 			&e.Result, &e.YourTeam, &e.OpponentTeam,
+			&e.YourPhotoKey, &e.OpponentPhotoKey,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to scan match history row: %w", err)

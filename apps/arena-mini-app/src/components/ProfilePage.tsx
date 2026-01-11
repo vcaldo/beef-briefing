@@ -10,11 +10,6 @@ interface ProfilePageProps {
   onBack: () => void;
 }
 
-// Helper to get user photo from team
-const getUserPhoto = (team: GameCard[]): string | null => {
-  return team[0]?.photo_url || null;
-};
-
 // Helper to find a card by ID across both teams
 const findCard = (cardId: number, yourTeam: GameCard[], opponentTeam: GameCard[]): GameCard | null => {
   return yourTeam.find(c => c.card_id === cardId) || opponentTeam.find(c => c.card_id === cardId) || null;
@@ -286,8 +281,8 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
               <div className="recent-list">
                 {recentMatches.map((match) => {
                   const isExpanded = expandedMatchId === match.match_id;
-                  const yourPhoto = getUserPhoto(match.your_team);
-                  const opponentPhoto = getUserPhoto(match.opponent_team);
+                  const yourPhoto = match.your_photo_url || null;
+                  const opponentPhoto = match.opponent.photo_url || null;
                   const isWinner = match.result === 'win';
 
                   return (

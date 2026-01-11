@@ -791,12 +791,14 @@ func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) 
 
 	// Transform entries for response
 	type MatchHistoryResponse struct {
-		MatchID   string `json:"match_id"`
-		MatchType string `json:"match_type"`
-		Opponent  struct {
-			UserID    int64  `json:"user_id"`
-			FirstName string `json:"first_name"`
-			Username  string `json:"username,omitempty"`
+		MatchID      string  `json:"match_id"`
+		MatchType    string  `json:"match_type"`
+		YourPhotoURL *string `json:"your_photo_url,omitempty"`
+		Opponent     struct {
+			UserID    int64   `json:"user_id"`
+			FirstName string  `json:"first_name"`
+			Username  string  `json:"username,omitempty"`
+			PhotoURL  *string `json:"photo_url,omitempty"`
 		} `json:"opponent"`
 		Result       string          `json:"result"`
 		YourTeam     json.RawMessage `json:"your_team"`
@@ -817,6 +819,19 @@ func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) 
 		m.Opponent.UserID = e.OpponentID
 		m.Opponent.FirstName = e.OpponentName
 		m.Opponent.Username = e.OpponentUser
+
+		// Generate presigned URLs for photos
+		if e.YourPhotoKey != nil && *e.YourPhotoKey != "" {
+			if url, err := h.service.GetPhotoPresignedURL(ctx, *e.YourPhotoKey); err == nil && url != "" {
+				m.YourPhotoURL = &url
+			}
+		}
+		if e.OpponentPhotoKey != nil && *e.OpponentPhotoKey != "" {
+			if url, err := h.service.GetPhotoPresignedURL(ctx, *e.OpponentPhotoKey); err == nil && url != "" {
+				m.Opponent.PhotoURL = &url
+			}
+		}
+
 		matches = append(matches, m)
 	}
 

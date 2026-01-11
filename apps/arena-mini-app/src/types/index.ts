@@ -147,10 +147,12 @@ export interface AuthResponse {
 export interface MatchHistoryEntry {
   match_id: string;
   match_type: MatchType;
+  your_photo_url?: string;
   opponent: {
     user_id: number;
     first_name: string;
     username?: string;
+    photo_url?: string;
   };
   result: 'win' | 'loss' | 'draw';
   your_team: GameCard[];

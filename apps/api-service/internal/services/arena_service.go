@@ -1789,3 +1789,11 @@ func (s *ArenaService) GetProfile(ctx context.Context, chatID, userID int64) (*A
 		RecentMatches: matches,
 	}, nil
 }
+
+// GetPhotoPresignedURL generates a presigned URL for a photo object key
+func (s *ArenaService) GetPhotoPresignedURL(ctx context.Context, objectKey string) (string, error) {
+	if objectKey == "" {
+		return "", nil
+	}
+	return s.storageClient.GetPresignedURL(ctx, objectKey, 24*time.Hour)
+}

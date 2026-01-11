@@ -23,17 +23,19 @@ const (
 
 // TournamentScheduler handles background tournament processing
 type TournamentScheduler struct {
-	apiClient *client.APIClient
-	bot       *bot.Bot
-	nrApp     *newrelic.Application
+	apiClient     *client.APIClient
+	bot           *bot.Bot
+	nrApp         *newrelic.Application
+	rankedEnabled bool
 }
 
 // NewTournamentScheduler creates a new tournament scheduler
-func NewTournamentScheduler(apiClient *client.APIClient, b *bot.Bot, nrApp *newrelic.Application) *TournamentScheduler {
+func NewTournamentScheduler(apiClient *client.APIClient, b *bot.Bot, nrApp *newrelic.Application, rankedEnabled bool) *TournamentScheduler {
 	return &TournamentScheduler{
-		apiClient: apiClient,
-		bot:       b,
-		nrApp:     nrApp,
+		apiClient:     apiClient,
+		bot:           b,
+		nrApp:         nrApp,
+		rankedEnabled: rankedEnabled,
 	}
 }
 
@@ -57,6 +59,12 @@ func (s *TournamentScheduler) Start(ctx context.Context) {
 
 // processTournaments checks for and processes tournament actions
 func (s *TournamentScheduler) processTournaments(ctx context.Context) {
+	// Check if ranked tournaments are globally enabled
+	if !s.rankedEnabled {
+		slog.Debug("ranked tournaments globally disabled, skipping processing")
+		return
+	}
+
 	// Start New Relic transaction if available
 	var txn *newrelic.Transaction
 	if s.nrApp != nil {

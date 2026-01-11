@@ -319,6 +319,79 @@ DEFAULT_CARD_THEME=neon_arcade
 
 Theme files are located in `apps/card-renderer/templates/themes/`. Each theme has a `theme.json` (colors/typography) and `card.html` (template).
 
+### Ranked Tournaments Configuration
+
+Control whether daily ranked tournaments run globally or per-group.
+
+**Default Behavior:**
+- **Groups are disabled by default** (opt-in model)
+- Global setting is enabled by default
+- Groups must explicitly enable ranked tournaments
+
+**Environment Variables** (in `.env.dev` or `.env.prod`):
+```bash
+# Global kill switch for all ranked tournaments
+RANKED_TOURNAMENTS_ENABLED=true   # Default: true
+```
+
+**Per-Group Control** (via Makefile):
+
+*Development:*
+```bash
+# Enable for specific group (required to start tournaments)
+make ranked-enable CHAT_ID=-1002345678901
+
+# Disable for specific group
+make ranked-disable CHAT_ID=-1002345678901
+
+# Check status of all groups
+make ranked-status
+
+# Check status of specific group
+make ranked-status-chat CHAT_ID=-1002345678901
+
+# Enable all groups (requires confirmation)
+make ranked-enable-all
+
+# Disable all groups (requires confirmation)
+make ranked-disable-all
+```
+
+*Production (requires `make pg-tunnel` in another terminal):*
+```bash
+# Enable for specific group (required to start tournaments)
+make ranked-enable-prod CHAT_ID=-1002345678901
+
+# Disable for specific group
+make ranked-disable-prod CHAT_ID=-1002345678901
+
+# Check status of all groups
+make ranked-status-prod
+
+# Check status of specific group
+make ranked-status-chat-prod CHAT_ID=-1002345678901
+
+# Enable all groups (requires confirmation)
+make ranked-enable-all-prod
+
+# Disable all groups (requires confirmation)
+make ranked-disable-all-prod
+```
+
+**Per-Group Control** (via SQL, alternative):
+```sql
+-- Enable for specific group
+UPDATE chats SET ranked_tournaments_enabled = true WHERE id = <chat_id>;
+
+-- Disable for specific group
+UPDATE chats SET ranked_tournaments_enabled = false WHERE id = <chat_id>;
+
+-- Find chat ID by name
+SELECT id, title FROM chats WHERE title ILIKE '%group name%';
+```
+
+Tournaments run **only if both global AND group settings are enabled**.
+
 ## Import CLI Usage
 
 Import Telegram Desktop exports into the system:

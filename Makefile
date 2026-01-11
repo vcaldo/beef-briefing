@@ -533,6 +533,157 @@ ml-dashboard-shell: ## Open shell in ML Dashboard backend container
 	$(DC) exec ml-dashboard-backend /bin/bash
 
 # =============================================================================
+# RANKED TOURNAMENTS (ranked-*)
+# =============================================================================
+# Development targets (default) - use local docker-compose postgres
+# Production targets (-prod suffix) - require: make pg-tunnel in another terminal
+
+# Enable for specific chat
+ranked-enable: ## Enable ranked tournaments for a specific chat (dev) - requires CHAT_ID
+	@if [ -z "$(CHAT_ID)" ]; then \
+		echo "Error: CHAT_ID is required. Usage: make ranked-enable CHAT_ID=-1002345678901"; \
+		exit 1; \
+	fi
+	@echo "Enabling ranked tournaments for chat $(CHAT_ID) (dev)..."
+	@$(DC) exec -T $(POSTGRES_SERVICE) psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c \
+		"UPDATE chats SET ranked_tournaments_enabled = true WHERE id = $(CHAT_ID); \
+		 SELECT id, title, ranked_tournaments_enabled FROM chats WHERE id = $(CHAT_ID);"
+	@echo "✅ Ranked tournaments enabled for chat $(CHAT_ID)"
+
+ranked-enable-prod: ## Enable ranked tournaments for a specific chat (prod) - requires CHAT_ID and pg-tunnel
+	@if [ -z "$(CHAT_ID)" ]; then \
+		echo "Error: CHAT_ID is required. Usage: make ranked-enable-prod CHAT_ID=-1002345678901"; \
+		exit 1; \
+	fi
+	@echo "Enabling ranked tournaments for chat $(CHAT_ID) (prod)..."
+	@echo "Note: Requires 'make pg-tunnel' running in another terminal"
+	@psql -h localhost -p 5433 -U postgres -d beef_briefing -c \
+		"UPDATE chats SET ranked_tournaments_enabled = true WHERE id = $(CHAT_ID); \
+		 SELECT id, title, ranked_tournaments_enabled FROM chats WHERE id = $(CHAT_ID);"
+	@echo "✅ Ranked tournaments enabled for chat $(CHAT_ID)"
+
+# Disable for specific chat
+ranked-disable: ## Disable ranked tournaments for a specific chat (dev) - requires CHAT_ID
+	@if [ -z "$(CHAT_ID)" ]; then \
+		echo "Error: CHAT_ID is required. Usage: make ranked-disable CHAT_ID=-1002345678901"; \
+		exit 1; \
+	fi
+	@echo "Disabling ranked tournaments for chat $(CHAT_ID) (dev)..."
+	@$(DC) exec -T $(POSTGRES_SERVICE) psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c \
+		"UPDATE chats SET ranked_tournaments_enabled = false WHERE id = $(CHAT_ID); \
+		 SELECT id, title, ranked_tournaments_enabled FROM chats WHERE id = $(CHAT_ID);"
+	@echo "❌ Ranked tournaments disabled for chat $(CHAT_ID)"
+
+ranked-disable-prod: ## Disable ranked tournaments for a specific chat (prod) - requires CHAT_ID and pg-tunnel
+	@if [ -z "$(CHAT_ID)" ]; then \
+		echo "Error: CHAT_ID is required. Usage: make ranked-disable-prod CHAT_ID=-1002345678901"; \
+		exit 1; \
+	fi
+	@echo "Disabling ranked tournaments for chat $(CHAT_ID) (prod)..."
+	@echo "Note: Requires 'make pg-tunnel' running in another terminal"
+	@psql -h localhost -p 5433 -U postgres -d beef_briefing -c \
+		"UPDATE chats SET ranked_tournaments_enabled = false WHERE id = $(CHAT_ID); \
+		 SELECT id, title, ranked_tournaments_enabled FROM chats WHERE id = $(CHAT_ID);"
+	@echo "❌ Ranked tournaments disabled for chat $(CHAT_ID)"
+
+# Enable all groups
+ranked-enable-all: ## Enable ranked tournaments for ALL groups (dev)
+	@echo "⚠️  Enabling ranked tournaments for ALL groups (dev)..."
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		$(DC) exec -T $(POSTGRES_SERVICE) psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c \
+			"UPDATE chats SET ranked_tournaments_enabled = true; \
+			 SELECT COUNT(*) as enabled_chats FROM chats WHERE ranked_tournaments_enabled = true;"; \
+		echo "✅ Ranked tournaments enabled for all groups"; \
+	else \
+		echo "Cancelled."; \
+	fi
+
+ranked-enable-all-prod: ## Enable ranked tournaments for ALL groups (prod) - requires pg-tunnel
+	@echo "⚠️  Enabling ranked tournaments for ALL groups (prod)..."
+	@echo "Note: Requires 'make pg-tunnel' running in another terminal"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		psql -h localhost -p 5433 -U postgres -d beef_briefing -c \
+			"UPDATE chats SET ranked_tournaments_enabled = true; \
+			 SELECT COUNT(*) as enabled_chats FROM chats WHERE ranked_tournaments_enabled = true;"; \
+		echo "✅ Ranked tournaments enabled for all groups"; \
+	else \
+		echo "Cancelled."; \
+	fi
+
+# Disable all groups
+ranked-disable-all: ## Disable ranked tournaments for ALL groups (dev)
+	@echo "⚠️  Disabling ranked tournaments for ALL groups (dev)..."
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		$(DC) exec -T $(POSTGRES_SERVICE) psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c \
+			"UPDATE chats SET ranked_tournaments_enabled = false; \
+			 SELECT COUNT(*) as disabled_chats FROM chats WHERE ranked_tournaments_enabled = false;"; \
+		echo "❌ Ranked tournaments disabled for all groups"; \
+	else \
+		echo "Cancelled."; \
+	fi
+
+ranked-disable-all-prod: ## Disable ranked tournaments for ALL groups (prod) - requires pg-tunnel
+	@echo "⚠️  Disabling ranked tournaments for ALL groups (prod)..."
+	@echo "Note: Requires 'make pg-tunnel' running in another terminal"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		psql -h localhost -p 5433 -U postgres -d beef_briefing -c \
+			"UPDATE chats SET ranked_tournaments_enabled = false; \
+			 SELECT COUNT(*) as disabled_chats FROM chats WHERE ranked_tournaments_enabled = false;"; \
+		echo "❌ Ranked tournaments disabled for all groups"; \
+	else \
+		echo "Cancelled."; \
+	fi
+
+# Show status
+ranked-status: ## Show ranked tournament status for all chats (dev)
+	@echo "📊 Ranked Tournament Status (dev)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@$(DC) exec -T $(POSTGRES_SERVICE) psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c \
+		"SELECT id, title, CASE WHEN ranked_tournaments_enabled THEN '✅ Enabled' ELSE '❌ Disabled' END as status \
+		 FROM chats ORDER BY ranked_tournaments_enabled DESC, title;"
+
+ranked-status-prod: ## Show ranked tournament status for all chats (prod) - requires pg-tunnel
+	@echo "📊 Ranked Tournament Status (prod)"
+	@echo "Note: Requires 'make pg-tunnel' running in another terminal"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@psql -h localhost -p 5433 -U postgres -d beef_briefing -c \
+		"SELECT id, title, CASE WHEN ranked_tournaments_enabled THEN '✅ Enabled' ELSE '❌ Disabled' END as status \
+		 FROM chats ORDER BY ranked_tournaments_enabled DESC, title;"
+
+ranked-status-chat: ## Show ranked tournament status for specific chat (dev) - requires CHAT_ID
+	@if [ -z "$(CHAT_ID)" ]; then \
+		echo "Error: CHAT_ID is required. Usage: make ranked-status-chat CHAT_ID=-1002345678901"; \
+		exit 1; \
+	fi
+	@$(DC) exec -T $(POSTGRES_SERVICE) psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c \
+		"SELECT id, title, CASE WHEN ranked_tournaments_enabled THEN '✅ Enabled' ELSE '❌ Disabled' END as status, \
+		        timezone, created_at \
+		 FROM chats WHERE id = $(CHAT_ID);"
+
+ranked-status-chat-prod: ## Show ranked tournament status for specific chat (prod) - requires CHAT_ID and pg-tunnel
+	@if [ -z "$(CHAT_ID)" ]; then \
+		echo "Error: CHAT_ID is required. Usage: make ranked-status-chat-prod CHAT_ID=-1002345678901"; \
+		exit 1; \
+	fi
+	@echo "Note: Requires 'make pg-tunnel' running in another terminal"
+	@psql -h localhost -p 5433 -U postgres -d beef_briefing -c \
+		"SELECT id, title, CASE WHEN ranked_tournaments_enabled THEN '✅ Enabled' ELSE '❌ Disabled' END as status, \
+		        timezone, created_at \
+		 FROM chats WHERE id = $(CHAT_ID);"
+
+.PHONY: ranked-enable ranked-enable-prod ranked-disable ranked-disable-prod \
+        ranked-enable-all ranked-enable-all-prod ranked-disable-all ranked-disable-all-prod \
+        ranked-status ranked-status-prod ranked-status-chat ranked-status-chat-prod
+
+# =============================================================================
 # MINIO CLIENT (mc-*)
 # =============================================================================
 mc-setup-prod: ## Configure MinIO Client alias for production
@@ -574,4 +725,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	ml-shell ml-clean-dev ml-clean-prod ml-clean-cards-dev ml-clean-cards-prod \
 	ml-dashboard-up ml-dashboard-up-build ml-dashboard-down ml-dashboard-logs \
 	ml-dashboard-logs-backend ml-dashboard-logs-frontend ml-dashboard-shell \
+	ranked-enable ranked-enable-prod ranked-disable ranked-disable-prod \
+	ranked-enable-all ranked-enable-all-prod ranked-disable-all ranked-disable-all-prod \
+	ranked-status ranked-status-prod ranked-status-chat ranked-status-chat-prod \
 	mc-setup-prod

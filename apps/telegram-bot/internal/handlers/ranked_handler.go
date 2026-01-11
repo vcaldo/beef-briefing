@@ -60,6 +60,23 @@ func (h *RankedHandler) Handle(ctx context.Context, b *bot.Bot, update *models.U
 		return
 	}
 
+	// Check if ranked tournaments are enabled for this chat
+	chatInfo, err := h.apiClient.GetChatInfo(ctx, chatID)
+	if err != nil {
+		slog.Error("failed to get chat info", "chat_id", chatID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		h.sendMessage(ctx, b, chatID, "⚠️ Failed to check tournament settings. Please try again.")
+		return
+	}
+
+	if chatInfo != nil && !chatInfo.RankedTournamentsEnabled {
+		slog.Info("ranked tournaments disabled for chat", "chat_id", chatID)
+		h.sendMessage(ctx, b, chatID, "⚠️ Ranked tournaments are disabled for this group.")
+		return
+	}
+
 	slog.Info("processing /ranked command", "chat_id", chatID, "user_id", userID)
 
 	// Get today's date in default timezone

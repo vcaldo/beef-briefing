@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -128,7 +129,11 @@ func main() {
 	go matchScheduler.Start(ctx)
 
 	// Start tournament scheduler in background
-	tournamentScheduler := scheduler.NewTournamentScheduler(apiClient, b, nrApp)
+	rankedEnabled := getEnvBool("RANKED_TOURNAMENTS_ENABLED", true)
+	if !rankedEnabled {
+		slog.Warn("ranked tournaments are globally disabled")
+	}
+	tournamentScheduler := scheduler.NewTournamentScheduler(apiClient, b, nrApp, rankedEnabled)
 	go tournamentScheduler.Start(ctx)
 
 	// Start bot with graceful shutdown
@@ -204,4 +209,18 @@ func parseLogLevel(level string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+// getEnvBool reads a boolean environment variable with a default value
+func getEnvBool(name string, defaultVal bool) bool {
+	val := os.Getenv(name)
+	if val == "" {
+		return defaultVal
+	}
+	b, err := strconv.ParseBool(val)
+	if err != nil {
+		slog.Warn("failed to parse boolean env var", "name", name, "value", val, "error", err)
+		return defaultVal
+	}
+	return b
 }

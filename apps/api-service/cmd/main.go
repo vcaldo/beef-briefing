@@ -229,6 +229,9 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	cardService := services.NewCardService(db, minioClient, nrApp)
 	cardHandler := handlers.NewCardHandler(cardService, cfg)
 
+	// Chat handler
+	chatHandler := handlers.NewChatHandler(db)
+
 	// Mini App service and handler (optional - only if configured)
 	var miniAppHandler *handlers.MiniAppHandler
 	var arenaHandler *handlers.ArenaHandler
@@ -281,6 +284,9 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	api.HandleFunc("/cards/{user_id}", cardHandler.HandleGetUserCard).Methods("GET")
 	api.HandleFunc("/cards/{user_id}/history", cardHandler.HandleGetUserHistory).Methods("GET")
 	api.HandleFunc("/cards/{user_id}/image", cardHandler.HandleGetCardImage).Methods("GET")
+
+	// Chat configuration routes
+	api.HandleFunc("/chat/{chat_id}", chatHandler.GetChatInfo).Methods("GET")
 
 	// Arena bot endpoints (API key authenticated, used by telegram-bot)
 	if arenaHandler != nil {

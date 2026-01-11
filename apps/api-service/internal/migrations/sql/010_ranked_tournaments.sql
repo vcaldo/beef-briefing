@@ -96,6 +96,7 @@ BEGIN
     FROM game_ranked_tournaments t
     JOIN chats c ON c.id = t.chat_id
     WHERE t.status = 'scheduled'
+      AND c.ranked_tournaments_enabled = true
       AND (p_current_time AT TIME ZONE COALESCE(c.timezone, 'America/Sao_Paulo'))::TIME
           BETWEEN '00:01:00' AND '00:10:00'
       AND t.tournament_date = (p_current_time AT TIME ZONE COALESCE(c.timezone, 'America/Sao_Paulo'))::DATE;
@@ -126,6 +127,7 @@ BEGIN
     FROM game_ranked_tournaments t
     JOIN chats c ON c.id = t.chat_id
     WHERE t.status = 'open'
+      AND c.ranked_tournaments_enabled = true
       AND (p_current_time AT TIME ZONE COALESCE(c.timezone, 'America/Sao_Paulo'))::TIME
           BETWEEN '18:00:00' AND '18:05:00'
       AND t.tournament_date = (p_current_time AT TIME ZONE COALESCE(c.timezone, 'America/Sao_Paulo'))::DATE;

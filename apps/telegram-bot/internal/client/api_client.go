@@ -1387,3 +1387,39 @@ func (c *APIClient) GetPendingRoundsTournaments(ctx context.Context) ([]RankedTo
 
 	return result.Tournaments, nil
 }
+
+// ChatInfo represents chat configuration information
+type ChatInfo struct {
+	ChatID                   int64  `json:"chat_id"`
+	Timezone                 string `json:"timezone"`
+	RankedTournamentsEnabled bool   `json:"ranked_tournaments_enabled"`
+}
+
+// GetChatInfo retrieves chat configuration information
+func (c *APIClient) GetChatInfo(ctx context.Context, chatID int64) (*ChatInfo, error) {
+	endpoint := fmt.Sprintf("%s/api/v1/chat/%d", c.baseURL, chatID)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+
+	var chatInfo ChatInfo
+	if err := json.NewDecoder(resp.Body).Decode(&chatInfo); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	return &chatInfo, nil
+}

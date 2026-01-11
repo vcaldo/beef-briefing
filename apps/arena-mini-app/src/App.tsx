@@ -58,7 +58,6 @@ function App() {
         // Parse URL query parameters (for game launches)
         const urlParams = new URLSearchParams(window.location.search);
         const urlChatId = urlParams.get('chat_id');
-        const urlUserId = urlParams.get('user_id');
 
         const auth = await apiClient.authenticate(initDataRaw);
         setUserId(auth.user_id);
@@ -80,8 +79,8 @@ function App() {
         });
 
         // If launched from game, handle match joining
-        if (urlChatId && urlUserId) {
-          await handleGameLaunch(parseInt(urlChatId), parseInt(urlUserId));
+        if (urlChatId) {
+          await handleGameLaunch(parseInt(urlChatId));
         }
       } catch (err) {
         console.error('Auth failed:', err);
@@ -127,7 +126,7 @@ function App() {
   };
 
   // Handle game launch - auto-join or show lobby
-  const handleGameLaunch = async (chatId: number, userId: number) => {
+  const handleGameLaunch = async (chatId: number) => {
     try {
       // Check for active matches in this chat
       const { matches } = await apiClient.getActiveMatches();

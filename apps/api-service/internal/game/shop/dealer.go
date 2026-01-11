@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"beef-briefing/apps/api-service/internal/game/battle"
 
@@ -13,13 +14,18 @@ import (
 
 // Dealer handles card dealing from the database
 type Dealer struct {
-	db    *sql.DB
-	nrApp *newrelic.Application
+	db            *sql.DB
+	nrApp         *newrelic.Application
+	storageClient interface {
+		GetPresignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error)
+	}
 }
 
 // NewDealer creates a new card dealer
-func NewDealer(db *sql.DB, nrApp *newrelic.Application) *Dealer {
-	return &Dealer{db: db, nrApp: nrApp}
+func NewDealer(db *sql.DB, nrApp *newrelic.Application, storageClient interface {
+	GetPresignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error)
+}) *Dealer {
+	return &Dealer{db: db, nrApp: nrApp, storageClient: storageClient}
 }
 
 // CombatStats represents the combat section of card stats
@@ -248,18 +254,18 @@ func (d *Dealer) GetCardCount(ctx context.Context, chatID int64) (int, error) {
 	return count, nil
 }
 
-// getUserPhotoURL fetches the user's profile photo URL
+// getUserPhotoURL fetches the user's profile photo URL as a presigned HTTPS URL
 func (d *Dealer) getUserPhotoURL(ctx context.Context, userID int64) (string, error) {
 	query := `
-		SELECT storage_path
+		SELECT minio_object_key
 		FROM user_profile_photos
 		WHERE user_id = $1
-		ORDER BY updated_at DESC
+		ORDER BY width DESC
 		LIMIT 1
 	`
 
-	var storagePath string
-	err := d.db.QueryRowContext(ctx, query, userID).Scan(&storagePath)
+	var minioObjectKey string
+	err := d.db.QueryRowContext(ctx, query, userID).Scan(&minioObjectKey)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", nil
@@ -267,7 +273,16 @@ func (d *Dealer) getUserPhotoURL(ctx context.Context, userID int64) (string, err
 		return "", err
 	}
 
-	// The storage path needs to be converted to a URL
-	// This will be handled by the service layer with presigned URLs
-	return storagePath, nil
+	// Convert object key to presigned URL
+	if d.storageClient == nil || minioObjectKey == "" {
+		return "", nil
+	}
+
+	url, err := d.storageClient.GetPresignedURL(ctx, minioObjectKey, time.Hour)
+	if err != nil {
+		// Log warning but don't fail the entire card deal
+		return "", nil
+	}
+
+	return url, nil
 }

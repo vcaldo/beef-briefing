@@ -93,7 +93,7 @@ func NewArenaService(
 	return &ArenaService{
 		db:            db,
 		gameRepo:      gameRepo,
-		dealer:        shop.NewDealer(db, nrApp),
+		dealer:        shop.NewDealer(db, nrApp, storageClient),
 		storageClient: storageClient,
 		nrApp:         nrApp,
 	}

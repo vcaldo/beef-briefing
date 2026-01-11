@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
+import { noticeError } from '../newrelic';
 import type { LeaderboardEntry } from '../types';
+import { ErrorDisplay } from './ErrorDisplay';
 import './LeaderboardPage.css';
 
 interface LeaderboardPageProps {
@@ -11,16 +13,25 @@ interface LeaderboardPageProps {
 export function LeaderboardPage({ userId, onViewH2H }: LeaderboardPageProps) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [type, setType] = useState<'ranked' | 'regular'>('ranked');
 
   useEffect(() => {
     async function fetchLeaderboard() {
       setLoading(true);
+      setError(null);
       try {
         const { entries } = await apiClient.getLeaderboard(type);
         setEntries(entries);
+        setError(null);
       } catch (err) {
         console.error('Failed to fetch leaderboard:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load leaderboard';
+        setError(errorMessage);
+        noticeError(err instanceof Error ? err : new Error(errorMessage), {
+          context: 'fetch_leaderboard',
+          leaderboard_type: type,
+        });
       } finally {
         setLoading(false);
       }
@@ -66,7 +77,13 @@ export function LeaderboardPage({ userId, onViewH2H }: LeaderboardPageProps) {
         </div>
       </header>
 
-      {loading ? (
+      {error ? (
+        <ErrorDisplay
+          error={error}
+          title="Failed to load leaderboard"
+          onRetry={() => window.location.reload()}
+        />
+      ) : loading ? (
         <div className="leaderboard-loading">
           <div className="spinner" />
         </div>

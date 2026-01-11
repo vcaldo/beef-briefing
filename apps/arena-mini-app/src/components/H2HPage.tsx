@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
+import { noticeError } from '../newrelic';
 import type { H2HRecord, MatchHistoryEntry } from '../types';
+import { ErrorDisplay } from './ErrorDisplay';
 import './H2HPage.css';
 
 interface H2HPageProps {
@@ -13,16 +15,25 @@ export function H2HPage({ opponentId, opponentName, onBack }: H2HPageProps) {
   const [record, setRecord] = useState<H2HRecord | null>(null);
   const [recentMatches, setRecentMatches] = useState<MatchHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchH2H() {
       setLoading(true);
+      setError(null);
       try {
         const result = await apiClient.getH2H(opponentId);
         setRecord(result.record);
         setRecentMatches(result.recent_matches || []);
+        setError(null);
       } catch (err) {
         console.error('Failed to fetch H2H:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load head-to-head data';
+        setError(errorMessage);
+        noticeError(err instanceof Error ? err : new Error(errorMessage), {
+          context: 'fetch_h2h',
+          opponent_id: opponentId,
+        });
       } finally {
         setLoading(false);
       }
@@ -52,7 +63,14 @@ export function H2HPage({ opponentId, opponentName, onBack }: H2HPageProps) {
         <h1>vs {opponentName}</h1>
       </header>
 
-      {loading ? (
+      {error ? (
+        <ErrorDisplay
+          error={error}
+          title="Failed to load head-to-head"
+          onRetry={() => window.location.reload()}
+          onBack={onBack}
+        />
+      ) : loading ? (
         <div className="h2h-loading">
           <div className="spinner" />
         </div>

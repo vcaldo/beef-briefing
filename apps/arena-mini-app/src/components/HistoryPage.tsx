@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
+import { noticeError } from '../newrelic';
 import type { MatchHistoryEntry } from '../types';
+import { ErrorDisplay } from './ErrorDisplay';
 import './HistoryPage.css';
 
 interface HistoryPageProps {
@@ -10,6 +12,7 @@ interface HistoryPageProps {
 export function HistoryPage(_props: HistoryPageProps) {
   const [matches, setMatches] = useState<MatchHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -23,6 +26,7 @@ export function HistoryPage(_props: HistoryPageProps) {
   async function fetchHistory(newOffset: number, reset: boolean) {
     if (reset) {
       setLoading(true);
+      setError(null);
     } else {
       setLoadingMore(true);
     }
@@ -36,8 +40,14 @@ export function HistoryPage(_props: HistoryPageProps) {
       }
       setHasMore(result.has_more);
       setOffset(newOffset + result.matches.length);
+      setError(null);
     } catch (err) {
       console.error('Failed to fetch history:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load match history';
+      setError(errorMessage);
+      noticeError(err instanceof Error ? err : new Error(errorMessage), {
+        context: 'fetch_history',
+      });
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -88,7 +98,13 @@ export function HistoryPage(_props: HistoryPageProps) {
         <h1>Match History</h1>
       </header>
 
-      {loading ? (
+      {error ? (
+        <ErrorDisplay
+          error={error}
+          title="Failed to load history"
+          onRetry={() => fetchHistory(0, true)}
+        />
+      ) : loading ? (
         <div className="history-loading">
           <div className="spinner" />
         </div>

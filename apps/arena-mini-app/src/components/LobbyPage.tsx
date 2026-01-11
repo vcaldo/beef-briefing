@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { addPageAction, noticeError } from '../newrelic';
 import type { Match } from '../types';
+import { ErrorDisplay } from './ErrorDisplay';
 import './LobbyPage.css';
 
 interface LobbyPageProps {
@@ -22,8 +23,14 @@ export function LobbyPage({ userId, firstName, onMatchSelect }: LobbyPageProps) 
       try {
         const { matches } = await apiClient.getActiveMatches();
         setMatches(matches);
+        setError(null);
       } catch (err) {
         console.error('Failed to fetch matches:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load active matches';
+        setError(errorMessage);
+        noticeError(err instanceof Error ? err : new Error(errorMessage), {
+          context: 'fetch_active_matches',
+        });
       } finally {
         setLoading(false);
       }
@@ -125,24 +132,28 @@ export function LobbyPage({ userId, firstName, onMatchSelect }: LobbyPageProps) 
       </header>
 
       {error && (
-        <div className="lobby-error">
-          {error}
-        </div>
+        <ErrorDisplay
+          error={error}
+          title="Failed to load matches"
+          onRetry={() => window.location.reload()}
+        />
       )}
 
-      <section className="lobby-section">
-        <button
-          className="btn btn-primary create-match-btn"
-          onClick={handleCreateMatch}
-          disabled={creating}
-        >
-          {creating ? 'Creating...' : 'Create Match'}
-        </button>
-      </section>
+      {!error && (
+        <>
+          <section className="lobby-section">
+            <button
+              className="btn btn-primary create-match-btn"
+              onClick={handleCreateMatch}
+              disabled={creating}
+            >
+              {creating ? 'Creating...' : 'Create Match'}
+            </button>
+          </section>
 
-      <section className="lobby-section">
-        <h2>Active Matches</h2>
-        {loading ? (
+          <section className="lobby-section">
+            <h2>Active Matches</h2>
+            {loading ? (
           <div className="lobby-loading">
             <div className="spinner" />
           </div>
@@ -218,7 +229,9 @@ export function LobbyPage({ userId, firstName, onMatchSelect }: LobbyPageProps) 
             ))}
           </div>
         )}
-      </section>
+          </section>
+        </>
+      )}
     </div>
   );
 }

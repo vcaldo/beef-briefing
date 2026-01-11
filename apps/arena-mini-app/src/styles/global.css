@@ -313,3 +313,114 @@ html, body {
 .tab-btn-icon {
   font-size: 20px;
 }
+
+/* Error Boundary Fallback */
+.error-boundary-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--spacing-lg);
+  text-align: center;
+  gap: var(--spacing-md);
+  background: var(--bg-primary);
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.error-boundary-fallback .fallback-icon {
+  font-size: 64px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.error-boundary-fallback .fallback-title {
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+}
+
+.error-boundary-fallback .fallback-message {
+  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+/* Invalid State Fallback */
+.invalid-state-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--spacing-lg);
+  text-align: center;
+  gap: var(--spacing-md);
+  background: var(--bg-primary);
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.invalid-state-fallback .fallback-icon {
+  font-size: 64px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.invalid-state-fallback .fallback-title {
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+}
+
+.invalid-state-fallback .fallback-message {
+  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+/* Error Display Component */
+.error-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--spacing-lg);
+  text-align: center;
+  gap: var(--spacing-md);
+  background: var(--bg-primary);
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.error-display-icon {
+  font-size: 64px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.error-display-title {
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+}
+
+.error-display-message {
+  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+.error-display-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.error-display-actions .btn {
+  min-width: 120px;
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLaunchParams } from '@telegram-apps/sdk-react';
 import { apiClient } from './api/client';
 import { setCustomAttribute, addPageAction, noticeError } from './newrelic';
@@ -10,6 +10,23 @@ import { LeaderboardPage } from './components/LeaderboardPage';
 import { HistoryPage } from './components/HistoryPage';
 import { H2HPage } from './components/H2HPage';
 import { Navigation } from './components/Navigation';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+// Fallback component for invalid state combinations
+function InvalidStateFallback({ onReset }: { onReset: () => void }) {
+  return (
+    <div className="invalid-state-fallback">
+      <div className="fallback-icon">⚠️</div>
+      <div className="fallback-title">Page not available</div>
+      <div className="fallback-message">
+        We encountered an issue loading this page. Let's get you back on track.
+      </div>
+      <button className="btn btn-primary" onClick={onReset}>
+        Return to Lobby
+      </button>
+    </div>
+  );
+}
 
 function App() {
   const launchParams = useLaunchParams();
@@ -212,8 +229,52 @@ function App() {
     setPage('leaderboard');
   };
 
+  // State validation - check if page and dependencies are consistent
+  const isValidShopState = page === 'shop' && activeMatch;
+  const isValidBattleState = page === 'battle' && activeMatch;
+  const isValidH2HState = page === 'h2h' && h2hOpponentId;
+
   // Show navigation only on main pages (not in active match flow)
   const showNavigation = !activeMatch && (page === 'lobby' || page === 'leaderboard' || page === 'history');
+
+  // Track page transitions for debugging
+  const prevPageRef = useRef<AppPage>(page);
+  useEffect(() => {
+    if (prevPageRef.current !== page) {
+      addPageAction('page_transition', {
+        from: prevPageRef.current,
+        to: page,
+        hasActiveMatch: !!activeMatch,
+        hasH2hOpponentId: !!h2hOpponentId,
+      });
+      prevPageRef.current = page;
+    }
+  }, [page, activeMatch, h2hOpponentId]);
+
+  // Track invalid state combinations for debugging
+  useEffect(() => {
+    if (page === 'shop' && !activeMatch) {
+      console.error('Invalid state: shop page without activeMatch', { page, activeMatch });
+      addPageAction('invalid_state_shop', {
+        page,
+        hasActiveMatch: !!activeMatch,
+      });
+    }
+    if (page === 'battle' && !activeMatch) {
+      console.error('Invalid state: battle page without activeMatch', { page, activeMatch });
+      addPageAction('invalid_state_battle', {
+        page,
+        hasActiveMatch: !!activeMatch,
+      });
+    }
+    if (page === 'h2h' && !h2hOpponentId) {
+      console.error('Invalid state: h2h page without opponentId', { page, h2hOpponentId });
+      addPageAction('invalid_state_h2h', {
+        page,
+        hasOpponentId: !!h2hOpponentId,
+      });
+    }
+  }, [page, activeMatch, h2hOpponentId]);
 
   // Loading state
   if (appState === 'loading' || (appState === 'authenticated' && !splashMinTimeElapsed)) {
@@ -238,46 +299,75 @@ function App() {
   // Render current page
   return (
     <div className="app">
-      {page === 'lobby' && (
-        <LobbyPage
-          userId={userId!}
-          firstName={firstName}
-          onMatchSelect={handleMatchSelect}
-        />
-      )}
-      {page === 'shop' && activeMatch && (
-        <ShopPage
-          match={activeMatch}
-          userId={userId!}
-          onBack={handleBackToLobby}
-          onBattleStart={() => setPage('battle')}
-        />
-      )}
-      {page === 'battle' && activeMatch && (
-        <BattlePage
-          match={activeMatch}
-          userId={userId!}
-          onBack={handleBackToLobby}
-        />
-      )}
-      {page === 'leaderboard' && (
-        <LeaderboardPage
-          userId={userId!}
-          onViewH2H={handleViewH2H}
-        />
-      )}
-      {page === 'history' && (
-        <HistoryPage
-          userId={userId!}
-        />
-      )}
-      {page === 'h2h' && h2hOpponentId && (
-        <H2HPage
-          opponentId={h2hOpponentId}
-          opponentName={h2hOpponentName}
-          onBack={handleBackFromH2H}
-        />
-      )}
+      <ErrorBoundary name="lobby" onReset={() => setPage('lobby')}>
+        {page === 'lobby' && (
+          <LobbyPage
+            userId={userId!}
+            firstName={firstName}
+            onMatchSelect={handleMatchSelect}
+          />
+        )}
+      </ErrorBoundary>
+
+      <ErrorBoundary name="shop" onReset={handleBackToLobby}>
+        {page === 'shop' && (
+          isValidShopState ? (
+            <ShopPage
+              match={activeMatch!}
+              userId={userId!}
+              onBack={handleBackToLobby}
+              onBattleStart={() => setPage('battle')}
+            />
+          ) : (
+            <InvalidStateFallback onReset={handleBackToLobby} />
+          )
+        )}
+      </ErrorBoundary>
+
+      <ErrorBoundary name="battle" onReset={handleBackToLobby}>
+        {page === 'battle' && (
+          isValidBattleState ? (
+            <BattlePage
+              match={activeMatch!}
+              userId={userId!}
+              onBack={handleBackToLobby}
+            />
+          ) : (
+            <InvalidStateFallback onReset={handleBackToLobby} />
+          )
+        )}
+      </ErrorBoundary>
+
+      <ErrorBoundary name="leaderboard" onReset={() => setPage('leaderboard')}>
+        {page === 'leaderboard' && (
+          <LeaderboardPage
+            userId={userId!}
+            onViewH2H={handleViewH2H}
+          />
+        )}
+      </ErrorBoundary>
+
+      <ErrorBoundary name="history" onReset={() => setPage('history')}>
+        {page === 'history' && (
+          <HistoryPage
+            userId={userId!}
+          />
+        )}
+      </ErrorBoundary>
+
+      <ErrorBoundary name="h2h" onReset={handleBackFromH2H}>
+        {page === 'h2h' && (
+          isValidH2HState ? (
+            <H2HPage
+              opponentId={h2hOpponentId!}
+              opponentName={h2hOpponentName}
+              onBack={handleBackFromH2H}
+            />
+          ) : (
+            <InvalidStateFallback onReset={handleBackFromH2H} />
+          )
+        )}
+      </ErrorBoundary>
 
       {showNavigation && (
         <Navigation

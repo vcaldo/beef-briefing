@@ -26,10 +26,10 @@ const EVENT_TIMING: Record<string, number> = {
  */
 function isCardAttacker(
   event: BattleEvent | null | undefined,
-  card: GameCard,
+  card: GameCard | null | undefined,
   teamOwnerId: number
 ): boolean {
-  if (!event) return false;
+  if (!event || !card) return false;
   return (
     event.attacker_card_id === card.card_id &&
     event.attacker_team_owner_id === teamOwnerId
@@ -41,10 +41,10 @@ function isCardAttacker(
  */
 function isCardDefender(
   event: BattleEvent | null | undefined,
-  card: GameCard,
+  card: GameCard | null | undefined,
   teamOwnerId: number
 ): boolean {
-  if (!event) return false;
+  if (!event || !card) return false;
   return (
     event.defender_card_id === card.card_id &&
     event.defender_team_owner_id === teamOwnerId
@@ -99,6 +99,20 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   const fetchBattle = useCallback(async () => {
     try {
       const result = await apiClient.getBattle(match.id);
+
+      // Validate battle data integrity
+      const hasInvalidTeams = result.rounds.some(round =>
+        !round.player_a_team.every(c => c !== null && c !== undefined) ||
+        !round.player_b_team.every(c => c !== null && c !== undefined)
+      );
+
+      if (hasInvalidTeams) {
+        console.error('Battle has null cards in teams', result);
+        setError('Battle data is corrupted. Please try refreshing or contact support.');
+        setLoading(false);
+        return;
+      }
+
       setBattle(result);
       if (!result.is_complete) {
         // Keep polling until complete
@@ -302,19 +316,21 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
             {isUserPlayerA && ' (You)'}
           </div>
           <div className="team-cards">
-            {currentRound.player_a_team.map((card, i) => (
-              <BattleCard
-                key={card.card_id}
-                card={card}
-                position={i}
-                isActive={i === 0}
-                currentEvent={currentEvent}
-                isAttacker={isCardAttacker(currentEvent, card, currentRound.player_a_id)}
-                isDefender={isCardDefender(currentEvent, card, currentRound.player_a_id)}
-                side="left"
-                teamOwnerId={currentRound.player_a_id}
-              />
-            ))}
+            {currentRound.player_a_team
+              .filter((card): card is GameCard => card !== null && card !== undefined)
+              .map((card, i) => (
+                <BattleCard
+                  key={card.card_id}
+                  card={card}
+                  position={i}
+                  isActive={i === 0}
+                  currentEvent={currentEvent}
+                  isAttacker={isCardAttacker(currentEvent, card, currentRound.player_a_id)}
+                  isDefender={isCardDefender(currentEvent, card, currentRound.player_a_id)}
+                  side="left"
+                  teamOwnerId={currentRound.player_a_id}
+                />
+              ))}
           </div>
         </div>
 
@@ -359,19 +375,21 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
             {!isUserPlayerA && ' (You)'}
           </div>
           <div className="team-cards">
-            {currentRound.player_b_team.map((card, i) => (
-              <BattleCard
-                key={card.card_id}
-                card={card}
-                position={i}
-                isActive={i === 0}
-                currentEvent={currentEvent}
-                isAttacker={isCardAttacker(currentEvent, card, currentRound.player_b_id)}
-                isDefender={isCardDefender(currentEvent, card, currentRound.player_b_id)}
-                side="right"
-                teamOwnerId={currentRound.player_b_id}
-              />
-            ))}
+            {currentRound.player_b_team
+              .filter((card): card is GameCard => card !== null && card !== undefined)
+              .map((card, i) => (
+                <BattleCard
+                  key={card.card_id}
+                  card={card}
+                  position={i}
+                  isActive={i === 0}
+                  currentEvent={currentEvent}
+                  isAttacker={isCardAttacker(currentEvent, card, currentRound.player_b_id)}
+                  isDefender={isCardDefender(currentEvent, card, currentRound.player_b_id)}
+                  side="right"
+                  teamOwnerId={currentRound.player_b_id}
+                />
+              ))}
           </div>
         </div>
       </div>

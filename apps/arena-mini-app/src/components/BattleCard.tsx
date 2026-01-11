@@ -3,7 +3,7 @@ import type { GameCard, BattleEvent } from '../types';
 import './BattleCard.css';
 
 export interface BattleCardProps {
-  card: GameCard;
+  card: GameCard | null;
   position: number;
   isActive: boolean;
   currentEvent: BattleEvent | null;
@@ -73,6 +73,11 @@ export function BattleCard({
   side,
   teamOwnerId,
 }: BattleCardProps) {
+  // Guard against null cards (defensive programming)
+  if (!card) {
+    return null;
+  }
+
   // Calculate current HP based on event
   let hp = card.hp;
   if (

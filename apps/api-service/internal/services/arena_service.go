@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"beef-briefing/apps/api-service/internal/game/battle"
@@ -805,6 +806,21 @@ func (s *ArenaService) StartBattle(ctx context.Context, matchID string) (*Battle
 	return s.runArena(ctx, matchID, participants)
 }
 
+// normalizeTeamOrder ensures the team order array matches the team size.
+// If lengths don't match, returns a sequential order [0, 1, 2, ...]
+func normalizeTeamOrder(order []int64, teamSize int) []int64 {
+	if len(order) == teamSize {
+		return order
+	}
+
+	// Build valid sequential order
+	normalized := make([]int64, teamSize)
+	for i := 0; i < teamSize; i++ {
+		normalized[i] = int64(i)
+	}
+	return normalized
+}
+
 // runBattle executes a single battle between two participants
 func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *repository.ParticipantWithUser, roundNumber int) (*BattleResponse, error) {
 	// Parse teams
@@ -816,18 +832,58 @@ func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *re
 		return nil, fmt.Errorf("failed to parse team B: %w", err)
 	}
 
-	// Apply team order
-	orderedA := make([]*battle.Card, len(teamACards))
-	orderedB := make([]*battle.Card, len(teamBCards))
+	// Validate team order lengths match team sizes, log warnings if mismatched
+	if len(pA.TeamOrder) != len(teamACards) {
+		slog.Warn("team order length mismatch for player A",
+			"user_id", pA.UserID,
+			"match_id", matchID,
+			"order_len", len(pA.TeamOrder),
+			"team_len", len(teamACards))
+		pA.TeamOrder = normalizeTeamOrder(pA.TeamOrder, len(teamACards))
+	}
+	if len(pB.TeamOrder) != len(teamBCards) {
+		slog.Warn("team order length mismatch for player B",
+			"user_id", pB.UserID,
+			"match_id", matchID,
+			"order_len", len(pB.TeamOrder),
+			"team_len", len(teamBCards))
+		pB.TeamOrder = normalizeTeamOrder(pB.TeamOrder, len(teamBCards))
+	}
+
+	// Apply team order, filtering out invalid indices
+	orderedA := make([]*battle.Card, 0, len(teamACards))
+	orderedB := make([]*battle.Card, 0, len(teamBCards))
+
 	for i, idx := range pA.TeamOrder {
 		if idx >= 0 && idx < int64(len(teamACards)) {
-			orderedA[i] = teamACards[idx]
+			orderedA = append(orderedA, teamACards[idx])
+		} else {
+			slog.Warn("invalid team order index for player A",
+				"user_id", pA.UserID,
+				"match_id", matchID,
+				"position", i,
+				"index", idx,
+				"team_size", len(teamACards))
 		}
 	}
+
 	for i, idx := range pB.TeamOrder {
 		if idx >= 0 && idx < int64(len(teamBCards)) {
-			orderedB[i] = teamBCards[idx]
+			orderedB = append(orderedB, teamBCards[idx])
+		} else {
+			slog.Warn("invalid team order index for player B",
+				"user_id", pB.UserID,
+				"match_id", matchID,
+				"position", i,
+				"index", idx,
+				"team_size", len(teamBCards))
 		}
+	}
+
+	// Validate teams have valid cards after ordering
+	if len(orderedA) == 0 || len(orderedB) == 0 {
+		return nil, fmt.Errorf("invalid team composition after ordering: playerA=%d cards, playerB=%d cards",
+			len(orderedA), len(orderedB))
 	}
 
 	teamA := battle.NewTeam(pA.UserID, orderedA)

@@ -25,19 +25,20 @@ const (
 
 // ArenaService errors
 var (
-	ErrNotEnoughCards       = errors.New("not enough cards in group (minimum 10 required)")
-	ErrMatchNotFound        = errors.New("match not found")
-	ErrMatchNotOpen         = errors.New("match is not open for joining")
-	ErrAlreadyJoined        = errors.New("already joined this match")
-	ErrNotParticipant       = errors.New("not a participant in this match")
-	ErrNotCreator           = errors.New("only the match creator can perform this action")
-	ErrMatchNotInShopPhase  = errors.New("match is not in shop phase")
-	ErrShopPhaseExpired     = errors.New("shop phase has expired")
-	ErrTeamAlreadySubmitted = errors.New("team already submitted")
-	ErrInvalidCardIndex     = errors.New("invalid card index")
-	ErrNotEnoughCoins       = errors.New("not enough coins")
-	ErrTeamFull             = errors.New("team is full (max 3 cards)")
-	ErrCardAlreadyPurchased = errors.New("card already purchased")
+	ErrNotEnoughCards        = errors.New("not enough cards in group (minimum 10 required)")
+	ErrMatchNotFound         = errors.New("match not found")
+	ErrMatchNotOpen          = errors.New("match is not open for joining")
+	ErrAlreadyJoined         = errors.New("already joined this match")
+	ErrNotParticipant        = errors.New("not a participant in this match")
+	ErrNotCreator            = errors.New("only the match creator can perform this action")
+	ErrMatchNotInShopPhase   = errors.New("match is not in shop phase")
+	ErrShopPhaseExpired      = errors.New("shop phase has expired")
+	ErrTeamAlreadySubmitted  = errors.New("team already submitted")
+	ErrInvalidCardIndex      = errors.New("invalid card index")
+	ErrNotEnoughCoins        = errors.New("not enough coins")
+	ErrTeamFull              = errors.New("team is full (max 3 cards)")
+	ErrCardAlreadyPurchased  = errors.New("card already purchased")
+	ErrActiveMatchExists     = errors.New("an active unranked match already exists")
 )
 
 // ArenaService handles arena game logic
@@ -132,6 +133,19 @@ func (s *ArenaService) CreateMatch(ctx context.Context, chatID int64, creatorUse
 	if txn != nil {
 		segment := txn.StartSegment("service:arena:CreateMatch")
 		defer segment.End()
+	}
+
+	// Check for existing active regular match
+	activeMatches, err := s.gameRepo.GetActiveMatches(ctx, chatID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check active matches: %w", err)
+	}
+
+	// Only allow one active regular match at a time
+	for _, match := range activeMatches {
+		if match.MatchType == repository.MatchTypeRegular && match.Status == repository.MatchStatusOpen {
+			return nil, ErrActiveMatchExists
+		}
 	}
 
 	// Check minimum cards

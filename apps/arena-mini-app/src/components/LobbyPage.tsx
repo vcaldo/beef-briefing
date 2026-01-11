@@ -120,7 +120,7 @@ export function LobbyPage({ userId, firstName, onMatchSelect }: LobbyPageProps) 
   return (
     <div className="lobby-page">
       <header className="lobby-header">
-        <h1>BEEF ARENA</h1>
+        <h1>⚔️ BEEF ARENA 🛡</h1>
         <p>Welcome, {firstName}!</p>
       </header>
 

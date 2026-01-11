@@ -31,9 +31,8 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   const [currentEventIndex, setCurrentEventIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Share state
-  const [sharing, setSharing] = useState(false);
-  const [shareSuccess, setShareSuccess] = useState(false);
+  // Result badge state - show only when animation reaches the end
+  const [showResultBadge, setShowResultBadge] = useState(false);
 
   // Audio
   const { play, muted, toggleMuted } = useAudio();
@@ -118,6 +117,19 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
     }
   }, [battle, currentRoundIndex, currentEventIndex, play]);
 
+  // Show result badge only when animation reaches the end
+  useEffect(() => {
+    if (!battle || !battle.is_complete) return;
+
+    const isAtEnd =
+      currentRoundIndex === battle.rounds.length - 1 &&
+      currentEventIndex === battle.rounds[battle.rounds.length - 1]?.battle_log.length - 1;
+
+    if (isAtEnd && !showResultBadge) {
+      setShowResultBadge(true);
+    }
+  }, [battle, currentRoundIndex, currentEventIndex, showResultBadge]);
+
   // Play/pause toggle
   const handlePlayPause = () => {
     if (!isPlaying) {
@@ -135,29 +147,21 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
 
   // Skip to end
   const handleSkipToEnd = () => {
-    if (battle && battle.rounds.length > 0) {
-      setCurrentRoundIndex(battle.rounds.length - 1);
-      const lastRound = battle.rounds[battle.rounds.length - 1];
-      setCurrentEventIndex(lastRound.battle_log.length - 1);
-      setIsPlaying(false);
-    }
-  };
+    if (!battle || battle.rounds.length === 0) return;
 
-  // Share to group
-  const handleShare = async () => {
-    if (!battle || sharing || shareSuccess) return;
+    // Stop playback first
+    setIsPlaying(false);
 
-    setSharing(true);
-    try {
-      await apiClient.shareResult(match.id);
-      setShareSuccess(true);
-      // Reset after showing success
-      setTimeout(() => setShareSuccess(false), 3000);
-    } catch (err) {
-      console.error('Failed to share:', err);
-    } finally {
-      setSharing(false);
-    }
+    // Use setTimeout to ensure state updates are processed
+    // This avoids race conditions with the auto-play useEffect
+    setTimeout(() => {
+      const lastRoundIndex = battle.rounds.length - 1;
+      const lastRound = battle.rounds[lastRoundIndex];
+      const lastEventIndex = lastRound.battle_log.length - 1;
+
+      setCurrentRoundIndex(lastRoundIndex);
+      setCurrentEventIndex(lastEventIndex);
+    }, 50); // Small delay to let isPlaying update propagate
   };
 
   if (loading) {
@@ -221,7 +225,7 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
           Round {currentRoundIndex + 1}/{battle.rounds.length}
         </div>
         <div className="battle-status">
-          {battle.is_complete && (
+          {battle.is_complete && showResultBadge && (
             <span className={`result-badge ${isWinner ? 'win' : 'loss'}`}>
               {isWinner ? 'Victory!' : 'Defeat'}
             </span>
@@ -340,15 +344,6 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
         >
           Skip to End
         </button>
-        {battle.is_complete && (
-          <button
-            className={`btn share-btn ${shareSuccess ? 'btn-success' : 'btn-secondary'}`}
-            onClick={handleShare}
-            disabled={sharing || shareSuccess}
-          >
-            {sharing ? 'Sharing...' : shareSuccess ? 'Shared!' : 'Share to Group'}
-          </button>
-        )}
       </div>
     </div>
   );

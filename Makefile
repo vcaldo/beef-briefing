@@ -156,6 +156,15 @@ pg-tunnel: ## Open SSH tunnel to production PostgreSQL (localhost:5433 -> prod p
 	@echo "Press Ctrl+C to close the tunnel"
 	@ssh -L 5433:localhost:5432 $$($(MAKE) -s tf-ssh-user-host) -N
 
+pg-dev: ## Connect to development PostgreSQL using psql
+	@echo "Connecting to development PostgreSQL..."
+	@$(DC) exec $(POSTGRES_SERVICE) psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing}
+
+pg-prod: ## Connect to production PostgreSQL using psql (requires pg-tunnel running)
+	@echo "Connecting to production PostgreSQL..."
+	@echo "Note: Requires 'make pg-tunnel' running in another terminal"
+	@psql -h localhost -p 5433 -U postgres -d beef_briefing
+
 # =============================================================================
 # DOCKER BUILD (docker-build-*)
 # =============================================================================
@@ -706,7 +715,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	up build deploy \
 	dev-up dev-up-build dev-up-logs dev-down dev-restart dev-ps dev-clean dev-prune \
 	prod-deploy prod-deploy-skip-build prod-deploy-skip-cleanup prod-deploy-regenerate-certs \
-	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik prod-update-ip pg-tunnel \
+	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik prod-update-ip pg-tunnel pg-dev pg-prod \
 	docker-build docker-build-api docker-build-bot \
 	docker-logs docker-logs-api docker-logs-bot docker-logs-postgres docker-logs-minio \
 	docker-logs-newrelic \

@@ -13,6 +13,112 @@ Additionally, this PR adds **Ranked Tournament Configuration** - a two-layer ena
 - 2 database migrations: 10+ new tables for game state management
 - 12 Makefile targets: Ranked tournament management with dev/prod split
 - 1 database migration: Ranked tournament per-group configuration
+- 3 cleanup scripts: Production deployment automation for migration consolidation
+
+---
+
+## 🗃️ Database Migration Consolidation
+
+### Summary
+
+Consolidated migrations 009-012 into a single `009_game_arena.sql` file to simplify deployment, reduce migration tracking overhead, and provide a single source of truth for the entire game arena feature.
+
+### What Changed
+
+**Consolidation Details**:
+- **Removed**: 3 separate migration files (279 lines total)
+  - `010_ranked_tournaments.sql` (162 lines)
+  - `011_ranked_tournaments_config.sql` (21 lines)
+  - `012_fix_leaderboard_matches_played.sql` (96 lines)
+
+- **Created**: Single consolidated migration (444 lines)
+  - `009_game_arena.sql` - Complete game arena schema
+
+- **Added**: 3 production deployment cleanup scripts (294 lines total)
+  - `infrastructure/scripts/CLEANUP_README.md` (142 lines) - Deployment guide
+  - `infrastructure/scripts/cleanup_game_arena_data.sh` (79 lines) - Interactive cleanup script
+  - `infrastructure/scripts/cleanup_game_arena_data.sql` (73 lines) - Raw SQL cleanup
+
+### What's Consolidated into 009_game_arena.sql
+
+The consolidated migration includes:
+
+1. **Core Game Tables** - Match creation, participant tracking, shop state, team composition
+   - `game_matches`, `game_participants`, `game_shop_states`, `game_teams`
+
+2. **Battle System** - Battle execution, event logging, results tracking
+   - `game_battles`, `game_events`, `game_cards`, `game_upgrades`
+
+3. **Ranked Tournaments** - Tournament scheduling, registration, lifecycle
+   - `game_ranked_tournaments`, `game_tournament_participants`
+
+4. **Leaderboard** - Persistent ELO-style rankings with stats
+   - `game_leaderboard` (with fixes from old migration 012)
+
+5. **Per-Group Configuration** - Tournament enable/disable per group
+   - `chats.ranked_tournaments_enabled` column
+
+6. **Helper Functions** - Timezone-aware scheduling and tournament utilities
+   - `get_tournaments_needing_announcement()`
+   - `get_tournaments_needing_close()`
+   - `get_tournaments_needing_battle_start()`
+   - `get_or_create_tournament()`
+
+7. **Enums & Indexes** - Type definitions and performance indexes
+
+### Production Deployment Flow
+
+**IMPORTANT**: Before deploying to production, the database must be cleaned to remove old migration records:
+
+1. **Ensure pg-tunnel is running** (in separate terminal)
+   ```bash
+   make pg-tunnel
+   ```
+
+2. **Run cleanup** (in another terminal)
+   ```bash
+   ./infrastructure/scripts/cleanup_game_arena_data.sh
+   ```
+   - Interactive script with confirmation
+   - Safe: displays what will be deleted before proceeding
+   - Removes: old migration 009-012 records, game data, and old schema
+
+3. **Deploy** (after cleanup completes)
+   ```bash
+   make deploy
+   ```
+
+4. **Verify** (check logs)
+   ```bash
+   make logs-api COMPOSE_FILE=infrastructure/docker-compose.prod.yml
+   # Look for: "Applied migration 009_game_arena.sql"
+   ```
+
+**See**: [infrastructure/scripts/CLEANUP_README.md](infrastructure/scripts/CLEANUP_README.md) for detailed deployment instructions.
+
+### Benefits
+
+- ✅ **Single Source of Truth** - All game arena schema in one file
+- ✅ **Simplified Deployment** - No need to manage 4 separate migrations
+- ✅ **Cleaner Migration Tracking** - Reduces schema_migrations table entries
+- ✅ **Easier Maintenance** - Related tables grouped together
+- ✅ **Production Safety** - Cleanup scripts ensure safe deployment
+- ✅ **Better Debugging** - All game tables/functions in one place for reference
+
+### Migration Consolidation Stats
+
+| Metric | Value |
+|--------|-------|
+| Old migrations consolidated | 4 (009, 010, 011, 012) |
+| Lines removed | 279 |
+| Lines in consolidated migration | 444 |
+| Net change | +165 lines (cleaner structure) |
+| Cleanup scripts added | 3 |
+| Tables consolidated | 10 game tables + 2 ranked tables |
+| Functions consolidated | 4 helper functions |
+| Enums consolidated | 5 (game types, statuses) |
+
+---
 
 ## 🔒 Security Fix: Chat Access Control Bypass (CRITICAL)
 
@@ -1618,7 +1724,10 @@ Root cause: Combination of three issues:
 | Page Component Updates | 4 | 180 | Enhanced error handling |
 | Global Styles (Errors) | 3 | 130 | New styles |
 | State Validation & Logging | 1 | 80 | Arena App enhancements |
-| **TOTAL** | **~78** | **~17,920+** | **New Features + Security + Bugfixes** |
+| **🗃️ Database Migration Consolidation** | **3** | **~294** | **Infrastructure improvement** |
+| Migration Consolidation (009-012→009) | 1 | 444 | Consolidated schema |
+| Cleanup Scripts (prod deployment) | 2 | 152 | Deployment automation |
+| **TOTAL** | **~84** | **~18,208+** | **New Features + Security + Bugfixes + Infrastructure** |
 
 ### Security Fix Details
 
@@ -1641,13 +1750,15 @@ Two-layer enable/disable system for ranked tournaments:
 
 ## Review Notes
 
-This PR represents a complete, production-ready implementation of the Beef Arena card game system with enhanced tournament management **and critical UX improvements**. All components have been tested locally and are ready for integration into the main branch. The implementation follows existing patterns in the codebase and maintains backward compatibility with all other systems.
+This PR represents a complete, production-ready implementation of the Beef Arena card game system with enhanced tournament management, **critical UX improvements**, and **infrastructure optimization**. All components have been tested locally and are ready for integration into the main branch. The implementation follows existing patterns in the codebase and maintains backward compatibility with all other systems.
 
 **⚠️ CRITICAL SECURITY FIX INCLUDED**: This PR includes a fix for a critical authentication bypass vulnerability that allowed unauthorized access to any chat's data through null `chat_id` JWT claims. The fix has been thoroughly verified with zero breaking changes for legitimate users.
 
 **🎛️ RANKED TOURNAMENT CONFIGURATION**: Added comprehensive two-layer enable/disable system with global kill switch and per-group toggles, following existing Makefile patterns (`dev` vs `-prod` targets).
 
 **🐛 CRITICAL UX BUGFIX**: Black screen issues in all three mini apps have been fixed with React Error Boundaries, state validation, proper error handling, and CSS fallbacks. Users will now see helpful error messages and recovery options instead of blank screens.
+
+**🗃️ INFRASTRUCTURE OPTIMIZATION**: Consolidated migrations 009-012 into a single `009_game_arena.sql` file with cleanup scripts for safe production deployment. This reduces migration tracking overhead and provides a single source of truth for all game arena schema.
 
 Key strengths:
 - ✅ Robust battle engine with comprehensive event logging
@@ -1658,16 +1769,18 @@ Key strengths:
 - ✅ Production-ready deployment configuration
 - ✅ Makefile automation for tournament management (12 targets, dev/prod split)
 - ✅ Opt-in tournament model (groups must explicitly enable)
+- ✅ Migration consolidation with safe cleanup scripts (3 files, ready for production)
 - 🔒 **Critical security vulnerability fixed** (16 endpoints patched)
 - 🐛 **Black screen issues eliminated** (React error boundaries + state validation across all 3 apps)
 
-**Deployment Priority**: HIGH (includes critical security fix + black screen bugfixes + tournament management)
+**Deployment Priority**: HIGH (includes critical security fix + black screen bugfixes + tournament management + infrastructure optimization)
 - Verify security fix per checklist before deploying to production
 - Black screen fixes are immediately beneficial - no configuration needed
 - Tournament configuration will default to opt-in (no immediate impact on existing groups)
 - Enable tournaments per-group using `make ranked-enable CHAT_ID=...` as needed
-- Zero performance impact from security changes, bugfixes, and tournament configuration
+- Migration consolidation requires cleanup script execution before deployment (see Database Migration Consolidation section)
+- Zero performance impact from security changes, bugfixes, tournament configuration, and migration consolidation
 - No breaking changes for legitimate users
 - Monitor NewRelic for `invalid_state_*` and `error_boundary_triggered` events post-deployment
 
-🎮 **Ready to ship with security hardening, UX improvements, and tournament controls!**
+🎮 **Ready to ship with security hardening, UX improvements, infrastructure optimization, and tournament controls!**

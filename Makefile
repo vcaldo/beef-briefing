@@ -158,12 +158,12 @@ pg-tunnel: ## Open SSH tunnel to production PostgreSQL (localhost:5433 -> prod p
 
 pg-dev: ## Connect to development PostgreSQL using psql
 	@echo "Connecting to development PostgreSQL..."
-	@$(DC) exec $(POSTGRES_SERVICE) psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing}
+	@PGPASSWORD=$${DB_PASSWORD} $(DC) exec $(POSTGRES_SERVICE) psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing}
 
 pg-prod: ## Connect to production PostgreSQL using psql (requires pg-tunnel running)
 	@echo "Connecting to production PostgreSQL..."
 	@echo "Note: Requires 'make pg-tunnel' running in another terminal"
-	@psql -h localhost -p 5433 -U postgres -d beef_briefing
+	@PGPASSWORD=$$(grep DB_PASSWORD $(PROD_ENV_FILE) | cut -d= -f2) psql -h localhost -p 5433 -U postgres -d beef_briefing
 
 # =============================================================================
 # DOCKER BUILD (docker-build-*)

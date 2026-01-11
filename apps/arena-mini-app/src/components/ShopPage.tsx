@@ -6,6 +6,20 @@ import { useAudio } from '../hooks/useAudio';
 import type { Match, ShopState, ShopCard, GameCard } from '../types';
 import './ShopPage.css';
 
+/**
+ * Applies team order to get cards in battle position order.
+ * team_order contains indices into the team array.
+ * Example: team_order [2, 0, 1] means position 0 gets team[2], position 1 gets team[0], etc.
+ */
+function applyTeamOrder(team: GameCard[], teamOrder: number[]): GameCard[] {
+  if (teamOrder.length !== team.length) {
+    // Fallback to original team if lengths don't match
+    console.warn('Team order length mismatch', { teamLen: team.length, orderLen: teamOrder.length });
+    return team;
+  }
+  return teamOrder.map(index => team[index]);
+}
+
 interface ShopPageProps {
   match: Match;
   userId: number;
@@ -143,18 +157,22 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
   const handleReorder = async (newOrder: GameCard[]) => {
     if (!shopState) return;
 
-    // Optimistic update
-    setShopState({ ...shopState, team: newOrder });
+    // Calculate new team_order based on where each card in newOrder came from in the original team
+    const newTeamOrder = newOrder.map(card =>
+      shopState.team.findIndex(originalCard => originalCard.card_id === card.card_id)
+    );
+
+    // Optimistic update - update team_order, not team
+    setShopState({
+      ...shopState,
+      team_order: newTeamOrder
+    });
     play('place');
     setIsDragging(false);
 
     // Persist to API
     try {
-      // Convert new order to indices based on original team positions
-      const indices = newOrder.map(card =>
-        shopState.team.findIndex(originalCard => originalCard.card_id === card.card_id)
-      );
-      const state = await apiClient.setTeamOrder(match.id, indices);
+      const state = await apiClient.setTeamOrder(match.id, newTeamOrder);
       setShopState(state);
       addPageAction('team_reordered', {
         match_id: match.id,
@@ -261,42 +279,53 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
                 <span className="drag-hint">Drag to reorder</span>
               )}
             </div>
-            <Reorder.Group
-              axis="x"
-              values={shopState.team}
-              onReorder={handleReorder}
-              className={`team-slots ${isDragging ? 'dragging-active' : ''}`}
-            >
-              {shopState.team.map((card, index) => {
-                const slotLabel = index === 0 ? 'Front' : index === 1 ? 'Mid' : 'Back';
-                return (
-                  <div key={card.card_id} className="team-slot-wrapper">
-                    <div className="slot-label">{slotLabel}</div>
-                    <TeamCard
-                      card={card}
-                      canUpgrade={canUpgrade}
-                      onUpgradeAtk={() => handleUpgrade(index, 'atk')}
-                      onUpgradeHp={() => handleUpgrade(index, 'hp')}
-                      onDragStart={handleDragStart}
-                    />
-                  </div>
-                );
-              })}
 
-              {/* Empty slots for remaining positions */}
-              {[...Array(3 - shopState.team.length)].map((_, i) => {
-                const slotIndex = shopState.team.length + i;
-                const slotLabel = slotIndex === 0 ? 'Front' : slotIndex === 1 ? 'Mid' : 'Back';
-                return (
-                  <div key={`empty-${slotIndex}`} className="team-slot-wrapper">
-                    <div className="slot-label">{slotLabel}</div>
-                    <div className="empty-slot">
-                      <span>Empty</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </Reorder.Group>
+            {/* Apply team order for display */}
+            {(() => {
+              const orderedTeam = applyTeamOrder(shopState.team, shopState.team_order);
+
+              return (
+                <Reorder.Group
+                  axis="x"
+                  values={orderedTeam}
+                  onReorder={handleReorder}
+                  className={`team-slots ${isDragging ? 'dragging-active' : ''}`}
+                >
+                  {orderedTeam.map((card, visualIndex) => {
+                    const slotLabel = visualIndex === 0 ? 'Front' : visualIndex === 1 ? 'Mid' : 'Back';
+                    // Translate visual position to team array index for upgrade handlers
+                    const teamArrayIndex = shopState.team_order[visualIndex];
+
+                    return (
+                      <div key={card.card_id} className="team-slot-wrapper">
+                        <div className="slot-label">{slotLabel}</div>
+                        <TeamCard
+                          card={card}
+                          canUpgrade={canUpgrade}
+                          onUpgradeAtk={() => handleUpgrade(teamArrayIndex, 'atk')}
+                          onUpgradeHp={() => handleUpgrade(teamArrayIndex, 'hp')}
+                          onDragStart={handleDragStart}
+                        />
+                      </div>
+                    );
+                  })}
+
+                  {/* Empty slots for remaining positions */}
+                  {[...Array(3 - shopState.team.length)].map((_, i) => {
+                    const slotIndex = shopState.team.length + i;
+                    const slotLabel = slotIndex === 0 ? 'Front' : slotIndex === 1 ? 'Mid' : 'Back';
+                    return (
+                      <div key={`empty-${slotIndex}`} className="team-slot-wrapper">
+                        <div className="slot-label">{slotLabel}</div>
+                        <div className="empty-slot">
+                          <span>Empty</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </Reorder.Group>
+              );
+            })()}
           </section>
 
           {/* Submit */}

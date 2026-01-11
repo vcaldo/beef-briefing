@@ -280,7 +280,7 @@ function App() {
   if (appState === 'loading' || (appState === 'authenticated' && !splashMinTimeElapsed)) {
     return (
       <div className="splash">
-        <div className="splash-title">🥩 BEEF ARENA</div>
+        <div className="splash-title">⚔️ BEEF ARENA 🥩</div>
         <div className="spinner" />
       </div>
     );

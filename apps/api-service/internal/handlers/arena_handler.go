@@ -59,7 +59,10 @@ func parseChatIDWithAuth(r *http.Request, allowFallback bool) (*middleware.MiniA
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		return nil, 0, &chatAccessError{"chat context required", http.StatusForbidden}
+	}
+	if *claims.ChatID != chatID {
 		return nil, 0, &chatAccessError{"access denied to this chat", http.StatusForbidden}
 	}
 
@@ -162,7 +165,11 @@ func (h *ArenaHandler) HandleCreateMatch(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != req.ChatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != req.ChatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -230,7 +237,11 @@ func (h *ArenaHandler) HandleGetMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != match.ChatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != match.ChatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}

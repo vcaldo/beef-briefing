@@ -48,6 +48,7 @@ type ArenaService struct {
 	gameRepo      *repository.GameRepository
 	dealer        *shop.Dealer
 	storageClient *storage.MinIOClient
+	cardService   *CardService
 	nrApp         *newrelic.Application
 }
 
@@ -88,13 +89,15 @@ func NewArenaService(
 	db *sql.DB,
 	gameRepo *repository.GameRepository,
 	storageClient *storage.MinIOClient,
+	cardService *CardService,
 	nrApp *newrelic.Application,
 ) *ArenaService {
 	return &ArenaService{
 		db:            db,
 		gameRepo:      gameRepo,
-		dealer:        shop.NewDealer(db, nrApp, storageClient),
+		dealer:        shop.NewDealer(db, nrApp, storageClient, cardService),
 		storageClient: storageClient,
+		cardService:   cardService,
 		nrApp:         nrApp,
 	}
 }

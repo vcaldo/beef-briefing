@@ -5,6 +5,7 @@ export interface GameCard {
   name: string;
   username?: string;
   photo_url?: string;
+  card_image_url?: string;
   atk: number;
   def: number;
   hp: number;

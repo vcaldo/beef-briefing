@@ -243,7 +243,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 
 		// Arena game service and handler
 		gameRepo := repository.NewGameRepository(db, nrApp)
-		arenaService := services.NewArenaService(db, gameRepo, minioClient, nrApp)
+		arenaService := services.NewArenaService(db, gameRepo, minioClient, cardService, nrApp)
 		arenaHandler = handlers.NewArenaHandler(arenaService, cfg)
 
 		slog.Info("Mini App endpoints enabled")

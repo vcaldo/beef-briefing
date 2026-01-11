@@ -166,6 +166,9 @@ type ShopCard struct {
 	Username string `json:"username,omitempty"`
 	PhotoURL string `json:"photo_url,omitempty"`
 
+	// Card image URL for shop display (overrides PhotoURL for shop phase)
+	CardImageURL string `json:"card_image_url,omitempty"`
+
 	// Base stats from ml_user_cards
 	ATK int `json:"atk"`
 	DEF int `json:"def"`

@@ -120,12 +120,16 @@ type BattleEvent struct {
 	Round   int       `json:"round"`
 	Message string    `json:"message,omitempty"`
 
-	// Attack details
-	AttackerID int64 `json:"attacker_id,omitempty"`
-	DefenderID int64 `json:"defender_id,omitempty"`
-	Damage     int   `json:"damage,omitempty"`
-	HPBefore   int   `json:"hp_before,omitempty"`
-	HPAfter    int   `json:"hp_after,omitempty"`
+	// Card-specific identifiers - uniquely identify which card instance participated
+	AttackerCardID      int64 `json:"attacker_card_id,omitempty"`
+	DefenderCardID      int64 `json:"defender_card_id,omitempty"`
+	AttackerTeamOwnerID int64 `json:"attacker_team_owner_id,omitempty"`
+	DefenderTeamOwnerID int64 `json:"defender_team_owner_id,omitempty"`
+
+	// Combat stats
+	Damage   int `json:"damage,omitempty"`
+	HPBefore int `json:"hp_before,omitempty"`
+	HPAfter  int `json:"hp_after,omitempty"`
 }
 
 // Result represents the outcome of a battle

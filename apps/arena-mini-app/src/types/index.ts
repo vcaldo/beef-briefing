@@ -77,8 +77,10 @@ export interface BattleEvent {
   type: EventType;
   round: number;
   message?: string;
-  attacker_id?: number;
-  defender_id?: number;
+  attacker_card_id?: number;
+  defender_card_id?: number;
+  attacker_team_owner_id?: number;
+  defender_team_owner_id?: number;
   damage?: number;
   hp_before?: number;
   hp_after?: number;

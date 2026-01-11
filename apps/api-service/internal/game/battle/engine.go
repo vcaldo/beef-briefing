@@ -80,26 +80,30 @@ func Simulate(teamA, teamB *Team) *Result {
 
 		// Record attack from A to B
 		events = append(events, BattleEvent{
-			Type:       EventAttack,
-			Round:      round,
-			AttackerID: frontA.UserID,
-			DefenderID: frontB.UserID,
-			Damage:     damageToB,
-			HPBefore:   frontB.HP,
-			HPAfter:    frontB.HP - damageToB,
-			Message:    fmt.Sprintf("%s attacks %s for %d damage", frontA.Name, frontB.Name, damageToB),
+			Type:                EventAttack,
+			Round:               round,
+			AttackerCardID:      frontA.CardID,
+			DefenderCardID:      frontB.CardID,
+			AttackerTeamOwnerID: a.OwnerID,
+			DefenderTeamOwnerID: b.OwnerID,
+			Damage:              damageToB,
+			HPBefore:            frontB.HP,
+			HPAfter:             frontB.HP - damageToB,
+			Message:             fmt.Sprintf("%s attacks %s for %d damage", frontA.Name, frontB.Name, damageToB),
 		})
 
 		// Record attack from B to A
 		events = append(events, BattleEvent{
-			Type:       EventAttack,
-			Round:      round,
-			AttackerID: frontB.UserID,
-			DefenderID: frontA.UserID,
-			Damage:     damageToA,
-			HPBefore:   frontA.HP,
-			HPAfter:    frontA.HP - damageToA,
-			Message:    fmt.Sprintf("%s attacks %s for %d damage", frontB.Name, frontA.Name, damageToA),
+			Type:                EventAttack,
+			Round:               round,
+			AttackerCardID:      frontB.CardID,
+			DefenderCardID:      frontA.CardID,
+			AttackerTeamOwnerID: b.OwnerID,
+			DefenderTeamOwnerID: a.OwnerID,
+			Damage:              damageToA,
+			HPBefore:            frontA.HP,
+			HPAfter:             frontA.HP - damageToA,
+			Message:             fmt.Sprintf("%s attacks %s for %d damage", frontB.Name, frontA.Name, damageToA),
 		})
 
 		// Apply damage
@@ -114,19 +118,21 @@ func Simulate(teamA, teamB *Team) *Result {
 
 		if aDied {
 			events = append(events, BattleEvent{
-				Type:       EventDeath,
-				Round:      round,
-				DefenderID: frontA.UserID,
-				Message:    fmt.Sprintf("%s has been defeated!", frontA.Name),
+				Type:                EventDeath,
+				Round:               round,
+				DefenderCardID:      frontA.CardID,
+				DefenderTeamOwnerID: a.OwnerID,
+				Message:             fmt.Sprintf("%s has been defeated!", frontA.Name),
 			})
 		}
 
 		if bDied {
 			events = append(events, BattleEvent{
-				Type:       EventDeath,
-				Round:      round,
-				DefenderID: frontB.UserID,
-				Message:    fmt.Sprintf("%s has been defeated!", frontB.Name),
+				Type:                EventDeath,
+				Round:               round,
+				DefenderCardID:      frontB.CardID,
+				DefenderTeamOwnerID: b.OwnerID,
+				Message:             fmt.Sprintf("%s has been defeated!", frontB.Name),
 			})
 		}
 

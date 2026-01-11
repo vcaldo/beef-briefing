@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../api/client';
 import { useAudio } from '../hooks/useAudio';
 import { BattleCard } from './BattleCard';
-import type { Match, BattleResult, BattleEvent } from '../types';
+import type { Match, BattleResult, BattleEvent, GameCard } from '../types';
 import './BattlePage.css';
 
 interface BattlePageProps {
@@ -20,6 +20,36 @@ const EVENT_TIMING: Record<string, number> = {
   advance: 600,
   victory: 2500,
 };
+
+/**
+ * Determines if a card is the attacker in the current event.
+ */
+function isCardAttacker(
+  event: BattleEvent | null | undefined,
+  card: GameCard,
+  teamOwnerId: number
+): boolean {
+  if (!event) return false;
+  return (
+    event.attacker_card_id === card.card_id &&
+    event.attacker_team_owner_id === teamOwnerId
+  );
+}
+
+/**
+ * Determines if a card is the defender in the current event.
+ */
+function isCardDefender(
+  event: BattleEvent | null | undefined,
+  card: GameCard,
+  teamOwnerId: number
+): boolean {
+  if (!event) return false;
+  return (
+    event.defender_card_id === card.card_id &&
+    event.defender_team_owner_id === teamOwnerId
+  );
+}
 
 export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   const [battle, setBattle] = useState<BattleResult | null>(null);
@@ -248,9 +278,10 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
                 position={i}
                 isActive={i === 0}
                 currentEvent={currentEvent}
-                isAttacker={currentEvent?.attacker_id === card.user_id}
-                isDefender={currentEvent?.defender_id === card.user_id}
+                isAttacker={isCardAttacker(currentEvent, card, currentRound.player_a_id)}
+                isDefender={isCardDefender(currentEvent, card, currentRound.player_a_id)}
                 side="left"
+                teamOwnerId={currentRound.player_a_id}
               />
             ))}
           </div>
@@ -301,9 +332,10 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
                 position={i}
                 isActive={i === 0}
                 currentEvent={currentEvent}
-                isAttacker={currentEvent?.attacker_id === card.user_id}
-                isDefender={currentEvent?.defender_id === card.user_id}
+                isAttacker={isCardAttacker(currentEvent, card, currentRound.player_b_id)}
+                isDefender={isCardDefender(currentEvent, card, currentRound.player_b_id)}
                 side="right"
+                teamOwnerId={currentRound.player_b_id}
               />
             ))}
           </div>

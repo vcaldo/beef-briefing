@@ -10,6 +10,7 @@ export interface BattleCardProps {
   isAttacker: boolean;
   isDefender: boolean;
   side: 'left' | 'right';
+  teamOwnerId: number;
 }
 
 // Animation variants
@@ -70,12 +71,17 @@ export function BattleCard({
   isAttacker,
   isDefender,
   side,
+  teamOwnerId,
 }: BattleCardProps) {
   // Calculate current HP based on event
-  const hp =
-    currentEvent?.defender_id === card.user_id && currentEvent?.hp_after !== undefined
-      ? currentEvent.hp_after
-      : card.hp;
+  let hp = card.hp;
+  if (
+    currentEvent?.hp_after !== undefined &&
+    currentEvent.defender_card_id === card.card_id &&
+    currentEvent.defender_team_owner_id === teamOwnerId
+  ) {
+    hp = currentEvent.hp_after;
+  }
   const isDead = hp <= 0;
   const hpPercent = Math.max(0, (hp / card.max_hp) * 100);
 

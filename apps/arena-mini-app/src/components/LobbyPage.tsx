@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { apiClient } from '../api/client';
-import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring';
+import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring';
 import type { Match } from '../types';
 import { ErrorDisplay } from '@beef-briefing/shared-mini-app/components';
+import { usePolling } from '../hooks/usePolling';
+import { useApiCall } from '../hooks/useApiCall';
+import { POLLING_INTERVALS } from '../config/constants';
 import './LobbyPage.css';
 
 interface LobbyPageProps {
@@ -12,101 +15,78 @@ interface LobbyPageProps {
 }
 
 export function LobbyPage({ userId, firstName, onMatchSelect }: LobbyPageProps) {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch active matches
-  useEffect(() => {
-    async function fetchMatches() {
-      try {
-        const { matches } = await apiClient.getActiveMatches();
-        setMatches(matches);
-        setError(null);
-      } catch (err) {
-        console.error('Failed to fetch matches:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load active matches';
-        setError(errorMessage);
-        noticeError(err instanceof Error ? err : new Error(errorMessage), {
-          context: 'fetch_active_matches',
+  // Poll active matches
+  const { data: matchesResponse, loading } = usePolling(
+    async () => {
+      const response = await apiClient.getActiveMatches();
+      return response;
+    },
+    POLLING_INTERVALS.LOBBY,
+  );
+
+  const matches = matchesResponse?.matches ?? [];
+
+  // Handle create match
+  const createMatchApi = useApiCall({
+    context: 'create_match',
+    onError: (err) => {
+      setError(err);
+      addPageAction('match_create_error', { error: err });
+    },
+  });
+
+  const handleCreateMatch = useCallback(async () => {
+    const match = await createMatchApi.execute(() => apiClient.createMatch());
+    if (match) {
+      addPageAction('match_created', { match_id: match.id });
+      onMatchSelect(match);
+    }
+  }, [createMatchApi, onMatchSelect]);
+
+  // Handle join match
+  const joinMatchApi = useApiCall({
+    context: 'join_match',
+    onError: (err) => {
+      setError(err);
+      addPageAction('match_join_error', { error: err });
+    },
+  });
+
+  const handleJoinMatch = useCallback(
+    async (matchId: string) => {
+      const match = await joinMatchApi.execute(() => apiClient.joinMatch(matchId));
+      if (match) {
+        addPageAction('match_joined', { match_id: matchId });
+        onMatchSelect(match);
+      }
+    },
+    [joinMatchApi, onMatchSelect],
+  );
+
+  // Handle start match
+  const startMatchApi = useApiCall({
+    context: 'start_match',
+    onError: (err) => {
+      setError(err);
+      addPageAction('match_start_error', { error: err });
+    },
+  });
+
+  const handleStartMatch = useCallback(
+    async (matchId: string) => {
+      const match = await startMatchApi.execute(() => apiClient.startMatch(matchId));
+      if (match) {
+        addPageAction('match_started', {
+          match_id: matchId,
+          participant_count: match.participants.length,
         });
-      } finally {
-        setLoading(false);
+        onMatchSelect(match);
       }
-    }
-
-    fetchMatches();
-    const interval = setInterval(fetchMatches, 5000); // Poll every 5s
-    return () => clearInterval(interval);
-  }, []);
-
-  // Create new match
-  const handleCreateMatch = async () => {
-    setCreating(true);
-    setError(null);
-    try {
-      const match = await apiClient.createMatch();
-      setMatches(prev => [match, ...prev]);
-      addPageAction('match_created', {
-        match_id: match.id,
-      });
-      onMatchSelect(match);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create match');
-      if (err instanceof Error) {
-        noticeError(err, { context: 'create_match' });
-      }
-      addPageAction('match_create_error', {
-        error: err instanceof Error ? err.message : 'unknown',
-      });
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  // Join match
-  const handleJoinMatch = async (matchId: string) => {
-    setError(null);
-    try {
-      const match = await apiClient.joinMatch(matchId);
-      addPageAction('match_joined', {
-        match_id: matchId,
-      });
-      onMatchSelect(match);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join match');
-      if (err instanceof Error) {
-        noticeError(err, { context: 'join_match', match_id: matchId });
-      }
-      addPageAction('match_join_error', {
-        match_id: matchId,
-        error: err instanceof Error ? err.message : 'unknown',
-      });
-    }
-  };
-
-  // Start match (creator only)
-  const handleStartMatch = async (matchId: string) => {
-    setError(null);
-    try {
-      const match = await apiClient.startMatch(matchId);
-      addPageAction('match_started', {
-        match_id: matchId,
-        participant_count: match.participants.length,
-      });
-      onMatchSelect(match);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start match');
-      if (err instanceof Error) {
-        noticeError(err, { context: 'start_match', match_id: matchId });
-      }
-      addPageAction('match_start_error', {
-        match_id: matchId,
-        error: err instanceof Error ? err.message : 'unknown',
-      });
-    }
-  };
+    },
+    [startMatchApi, onMatchSelect],
+  );
 
   // Check if user is in match
   const isInMatch = (match: Match) =>
@@ -145,9 +125,9 @@ export function LobbyPage({ userId, firstName, onMatchSelect }: LobbyPageProps) 
             <button
               className="btn btn-primary create-match-btn"
               onClick={handleCreateMatch}
-              disabled={creating}
+              disabled={createMatchApi.loading}
             >
-              {creating ? 'Creating...' : 'Create Match'}
+              {createMatchApi.loading ? 'Creating...' : 'Create Match'}
             </button>
           </section>
 

@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Reorder } from 'framer-motion';
 import { apiClient } from '../api/client';
-import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring';
+import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring';
 import { useAudio } from '../hooks/useAudio';
+import { usePolling } from '../hooks/usePolling';
+import { useApiCall } from '../hooks/useApiCall';
+import { POLLING_INTERVALS, SHOP_COSTS, TEAM } from '../config/constants';
 import type { Match, ShopState, ShopCard, GameCard } from '../types';
 import { ShopCardImage } from './ShopCardImage';
 import './ShopPage.css';
@@ -29,36 +32,26 @@ interface ShopPageProps {
 }
 
 export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: ShopPageProps) {
-  const [shopState, setShopState] = useState<ShopState | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const { play } = useAudio();
 
-  // Fetch shop state
-  const fetchShop = useCallback(async () => {
-    try {
+  // Poll shop state
+  const { data: shopState, loading } = usePolling(
+    async () => {
       const state = await apiClient.getShop(match.id);
-      setShopState(state);
       setTimeRemaining(state.time_remaining_seconds);
 
-      // If match moved to battle phase, trigger callback
+      // Trigger battle start if phase changed
       if (state.status === 'battle_phase' || state.status === 'completed') {
         onBattleStart();
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load shop');
-    } finally {
-      setLoading(false);
-    }
-  }, [match.id, onBattleStart]);
 
-  useEffect(() => {
-    fetchShop();
-    const interval = setInterval(fetchShop, 3000); // Poll every 3s
-    return () => clearInterval(interval);
-  }, [fetchShop]);
+      return state;
+    },
+    POLLING_INTERVALS.SHOP,
+  );
 
   // Countdown timer
   useEffect(() => {
@@ -70,81 +63,81 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
   }, [timeRemaining]);
 
   // Buy card
-  const handleBuyCard = async (cardIndex: number) => {
-    setError(null);
-    try {
-      const state = await apiClient.buyCard(match.id, cardIndex);
-      setShopState(state);
-      addPageAction('card_purchased', {
-        match_id: match.id,
-        card_index: cardIndex,
-        coins_remaining: state.coins,
-        team_size: state.team.length,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to buy card');
-      if (err instanceof Error) {
-        noticeError(err, { context: 'buy_card', match_id: match.id, card_index: cardIndex });
+  const buyCardApi = useApiCall({
+    context: 'buy_card',
+    onError: (err) => setError(err),
+  });
+
+  const handleBuyCard = useCallback(
+    async (cardIndex: number) => {
+      const state = await buyCardApi.execute(() => apiClient.buyCard(match.id, cardIndex));
+      if (state) {
+        addPageAction('card_purchased', {
+          match_id: match.id,
+          card_index: cardIndex,
+          coins_remaining: state.coins,
+          team_size: state.team.length,
+        });
       }
-    }
-  };
+    },
+    [buyCardApi, match.id],
+  );
 
   // Reroll
-  const handleReroll = async () => {
-    setError(null);
-    try {
-      const state = await apiClient.reroll(match.id);
-      setShopState(state);
+  const rerollApi = useApiCall({
+    context: 'reroll',
+    onError: (err) => setError(err),
+  });
+
+  const handleReroll = useCallback(async () => {
+    const state = await rerollApi.execute(() => apiClient.reroll(match.id));
+    if (state) {
       addPageAction('shop_rerolled', {
         match_id: match.id,
         coins_remaining: state.coins,
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reroll');
-      if (err instanceof Error) {
-        noticeError(err, { context: 'reroll', match_id: match.id });
-      }
     }
-  };
+  }, [rerollApi, match.id]);
 
   // Upgrade card
-  const handleUpgrade = async (teamSlot: number, upgradeType: 'atk' | 'hp') => {
-    setError(null);
-    try {
-      const state = await apiClient.upgradeCard(match.id, teamSlot, upgradeType);
-      setShopState(state);
-      addPageAction('card_upgraded', {
-        match_id: match.id,
-        team_slot: teamSlot,
-        upgrade_type: upgradeType,
-        coins_remaining: state.coins,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upgrade');
-      if (err instanceof Error) {
-        noticeError(err, { context: 'upgrade', match_id: match.id, team_slot: teamSlot, upgrade_type: upgradeType });
+  const upgradeApi = useApiCall({
+    context: 'upgrade',
+    onError: (err) => setError(err),
+  });
+
+  const handleUpgrade = useCallback(
+    async (teamSlot: number, upgradeType: 'atk' | 'hp') => {
+      const state = await upgradeApi.execute(() =>
+        apiClient.upgradeCard(match.id, teamSlot, upgradeType),
+      );
+      if (state) {
+        addPageAction('card_upgraded', {
+          match_id: match.id,
+          team_slot: teamSlot,
+          upgrade_type: upgradeType,
+          coins_remaining: state.coins,
+        });
       }
-    }
-  };
+    },
+    [upgradeApi, match.id],
+  );
 
   // Submit team
-  const handleSubmit = async () => {
-    setError(null);
-    try {
-      const state = await apiClient.submitTeam(match.id);
-      setShopState(state);
+  const submitApi = useApiCall({
+    context: 'submit_team',
+    onError: (err) => setError(err),
+  });
+
+  const handleSubmit = useCallback(async () => {
+    const state = await submitApi.execute(() => apiClient.submitTeam(match.id));
+    if (state) {
       addPageAction('team_submitted', {
         match_id: match.id,
         team_size: state.team.length,
         coins_remaining: state.coins,
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit team');
-      if (err instanceof Error) {
-        noticeError(err, { context: 'submit_team', match_id: match.id });
-      }
     }
-  };
+  }, [submitApi, match.id]);
 
   // Handle drag start - haptic feedback
   const handleDragStart = () => {
@@ -154,39 +147,37 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
     }
   };
 
-  // Handle reorder with optimistic updates
-  const handleReorder = async (newOrder: GameCard[]) => {
-    if (!shopState) return;
+  // Reorder team
+  const reorderApi = useApiCall({
+    context: 'reorder_team',
+    onError: (err) => setError(err),
+  });
 
-    // Calculate new team_order based on where each card in newOrder came from in the original team
-    const newTeamOrder = newOrder.map(card =>
-      shopState.team.findIndex(originalCard => originalCard.card_id === card.card_id)
-    );
+  // Handle reorder - persist to API
+  const handleReorder = useCallback(
+    async (newOrder: GameCard[]) => {
+      if (!shopState) return;
 
-    // Optimistic update - update team_order, not team
-    setShopState({
-      ...shopState,
-      team_order: newTeamOrder
-    });
-    play('place');
-    setIsDragging(false);
+      // Calculate new team_order based on where each card in newOrder came from in the original team
+      const newTeamOrder = newOrder.map(card =>
+        shopState.team.findIndex(originalCard => originalCard.card_id === card.card_id),
+      );
 
-    // Persist to API
-    try {
-      const state = await apiClient.setTeamOrder(match.id, newTeamOrder);
-      setShopState(state);
-      addPageAction('team_reordered', {
-        match_id: match.id,
-      });
-    } catch (err) {
-      // Revert on error
-      setShopState(shopState);
-      setError(err instanceof Error ? err.message : 'Failed to reorder team');
-      if (err instanceof Error) {
-        noticeError(err, { context: 'reorder_team', match_id: match.id });
+      play('place');
+      setIsDragging(false);
+
+      // Persist to API
+      const state = await reorderApi.execute(() =>
+        apiClient.setTeamOrder(match.id, newTeamOrder),
+      );
+      if (state) {
+        addPageAction('team_reordered', {
+          match_id: match.id,
+        });
       }
-    }
-  };
+    },
+    [shopState, reorderApi, match.id, play],
+  );
 
   // Format time
   const formatTime = (seconds: number) => {
@@ -214,12 +205,12 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
     );
   }
 
-  const remainingCardsNeeded = 3 - shopState.team.length;
-  const coinsNeededForCards = remainingCardsNeeded * 2; // CardCost = 2
-  const canBuy = shopState.coins >= 2 && shopState.team.length < 3;
-  const canReroll = shopState.coins >= (1 + coinsNeededForCards); // RerollCost = 1
-  const canUpgrade = shopState.coins >= (2 + coinsNeededForCards); // UpgradeCost = 2
-  const canSubmit = shopState.team.length === 3 && !shopState.is_ready;
+  const remainingCardsNeeded = TEAM.MAX_SIZE - shopState.team.length;
+  const coinsNeededForCards = remainingCardsNeeded * SHOP_COSTS.CARD;
+  const canBuy = shopState.coins >= SHOP_COSTS.CARD && shopState.team.length < TEAM.MAX_SIZE;
+  const canReroll = shopState.coins >= (SHOP_COSTS.REROLL + coinsNeededForCards);
+  const canUpgrade = shopState.coins >= (SHOP_COSTS.UPGRADE + coinsNeededForCards);
+  const canSubmit = shopState.team.length === TEAM.MAX_SIZE && !shopState.is_ready;
 
   return (
     <div className="shop-page">
@@ -257,7 +248,7 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
                 onClick={handleReroll}
                 disabled={!canReroll}
               >
-                Reroll (1)
+                Reroll ({SHOP_COSTS.REROLL})
               </button>
             </div>
             <div className="shop-cards">
@@ -377,7 +368,7 @@ function ShopCardComponent({ card, onBuy, canBuy }: ShopCardComponentProps) {
             onClick={onBuy}
             disabled={!canBuy}
           >
-            Buy (2)
+            Buy ({SHOP_COSTS.CARD})
           </button>
         ) : (
           <div className="purchased-badge">Purchased</div>

@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLaunchParams } from '@telegram-apps/sdk-react';
 import { apiClient } from './api/client';
 import { setCustomAttribute, addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring';
+import { TIMERS } from './config/constants';
 import type { AppState, AppPage, Match } from './types';
 import { LobbyPage } from './components/LobbyPage';
 import { ShopPage } from './components/ShopPage';
@@ -47,7 +48,7 @@ function App() {
 
   // Minimum splash time for smooth UX
   useEffect(() => {
-    const timer = setTimeout(() => setSplashMinTimeElapsed(true), 1500);
+    const timer = setTimeout(() => setSplashMinTimeElapsed(true), TIMERS.SPLASH_SCREEN_MIN);
     return () => clearTimeout(timer);
   }, []);
 
@@ -140,7 +141,7 @@ function App() {
   }, [launchParams?.initDataRaw]);
 
   // Handle match selection
-  const handleMatchSelect = (match: Match) => {
+  const handleMatchSelect = useCallback((match: Match) => {
     setActiveMatch(match);
     const targetPage = match.status === 'shop_phase' ? 'shop' : 'battle';
     addPageAction('match_selected', {
@@ -153,20 +154,20 @@ function App() {
     } else if (match.status === 'battle_phase' || match.status === 'completed') {
       setPage('battle');
     }
-  };
+  }, []);
 
   // Handle back to lobby
-  const handleBackToLobby = () => {
+  const handleBackToLobby = useCallback(() => {
     addPageAction('back_to_lobby', {
       from_page: page,
       match_id: activeMatch?.id,
     });
     setActiveMatch(null);
     setPage('lobby');
-  };
+  }, [page, activeMatch?.id]);
 
   // Handle game launch - auto-join or show lobby
-  const handleGameLaunch = async (chatId: number) => {
+  const handleGameLaunch = useCallback(async (chatId: number) => {
     try {
       // Check for active matches in this chat
       const { matches } = await apiClient.getActiveMatches();
@@ -190,17 +191,16 @@ function App() {
         });
       }
     } catch (err) {
-      console.error('Game launch error:', err);
       // Fail gracefully - show lobby
       setPage('lobby');
       addPageAction('game_launch_error', {
         error: err instanceof Error ? err.message : 'unknown',
       });
     }
-  };
+  }, [handleMatchSelect]);
 
   // Handle navigation
-  const handleNavigate = (newPage: AppPage) => {
+  const handleNavigate = useCallback((newPage: AppPage) => {
     addPageAction('tab_change', {
       tab: newPage,
       previous_tab: page,
@@ -208,10 +208,10 @@ function App() {
     setActiveMatch(null);
     setH2hOpponentId(null);
     setPage(newPage);
-  };
+  }, [page]);
 
   // Handle H2H view
-  const handleViewH2H = (opponentId: number, opponentName: string) => {
+  const handleViewH2H = useCallback((opponentId: number, opponentName: string) => {
     addPageAction('h2h_view', {
       opponent_id: opponentId,
       opponent_name: opponentName,
@@ -219,30 +219,30 @@ function App() {
     setH2hOpponentId(opponentId);
     setH2hOpponentName(opponentName);
     setPage('h2h');
-  };
+  }, []);
 
   // Handle back from H2H
-  const handleBackFromH2H = () => {
+  const handleBackFromH2H = useCallback(() => {
     addPageAction('back_from_h2h', {
       opponent_id: h2hOpponentId,
     });
     setH2hOpponentId(null);
     setPage('leaderboard');
-  };
+  }, [h2hOpponentId]);
 
   // Handle view profile
-  const handleViewProfile = () => {
+  const handleViewProfile = useCallback(() => {
     addPageAction('profile_view', {
       user_id: userId,
     });
     setPage('profile');
-  };
+  }, [userId]);
 
   // Handle back from profile
-  const handleBackFromProfile = () => {
+  const handleBackFromProfile = useCallback(() => {
     addPageAction('back_from_profile', {});
     setPage('leaderboard');
-  };
+  }, []);
 
   // State validation - check if page and dependencies are consistent
   const isValidShopState = page === 'shop' && activeMatch;

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../api/client';
 import { useAudio } from '../hooks/useAudio';
+import { usePolling } from '../hooks/usePolling';
+import { EVENT_TIMING, POLLING_INTERVALS, TIMERS } from '../config/constants';
 import { BattleCard } from './BattleCard';
 import { BattleLog } from './BattleLog';
 import type { Match, BattleResult, BattleEvent, GameCard } from '../types';
@@ -12,15 +14,6 @@ interface BattlePageProps {
   userId: number;
   onBack: () => void;
 }
-
-// Event timing in ms based on event type
-const EVENT_TIMING: Record<string, number> = {
-  attack: 1200,
-  damage: 800,
-  death: 1000,
-  advance: 600,
-  victory: 2500,
-};
 
 /**
  * Determines if a card is the attacker in the current event.
@@ -62,10 +55,6 @@ function getPlayerName(userId: number, participants: any[]): string {
 }
 
 export function BattlePage({ match, userId, onBack }: BattlePageProps) {
-  const [battle, setBattle] = useState<BattleResult | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // Replay state
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const [currentEventIndex, setCurrentEventIndex] = useState(-1);
@@ -78,9 +67,9 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   const { play, muted, toggleMuted } = useAudio();
   const lastEventRef = useRef<BattleEvent | null>(null);
 
-  // Fetch battle results
-  const fetchBattle = useCallback(async () => {
-    try {
+  // Poll battle results, stop when complete
+  const { data: battle, loading, error } = usePolling(
+    async () => {
       const result = await apiClient.getBattle(match.id);
 
       // Validate battle data integrity
@@ -90,27 +79,14 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
       );
 
       if (hasInvalidTeams) {
-        console.error('Battle has null cards in teams', result);
-        setError('Battle data is corrupted. Please try refreshing or contact support.');
-        setLoading(false);
-        return;
+        throw new Error('Battle data is corrupted. Please try refreshing or contact support.');
       }
 
-      setBattle(result);
-      if (!result.is_complete) {
-        // Keep polling until complete
-        setTimeout(fetchBattle, 2000);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load battle');
-    } finally {
-      setLoading(false);
-    }
-  }, [match.id]);
-
-  useEffect(() => {
-    fetchBattle();
-  }, [fetchBattle]);
+      return result;
+    },
+    POLLING_INTERVALS.BATTLE,
+    { stopWhen: (result) => result.is_complete },
+  );
 
   // Auto-play when battle is loaded and complete (with delay)
   useEffect(() => {
@@ -154,6 +130,9 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   }, [isPlaying, battle, currentRoundIndex, currentEventIndex]);
 
   // Play sounds on event change
+  const isWinner = battle && battle.winner_id === userId;
+  const isDraw = !battle || battle.winner_id === null || battle.winner_id === undefined;
+
   useEffect(() => {
     if (!battle || currentEventIndex < 0) return;
 
@@ -182,7 +161,7 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
         }
         break;
     }
-  }, [battle, currentRoundIndex, currentEventIndex, play]);
+  }, [battle, currentRoundIndex, currentEventIndex, play, isWinner]);
 
   // Show result badge only when animation reaches the end
   useEffect(() => {
@@ -198,7 +177,7 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   }, [battle, currentRoundIndex, currentEventIndex, showResultBadge]);
 
   // Play/pause toggle
-  const handlePlayPause = () => {
+  const handlePlayPause = useCallback(() => {
     if (!isPlaying) {
       // Start from beginning if at end
       if (battle && currentRoundIndex >= battle.rounds.length - 1) {
@@ -210,10 +189,10 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
       }
     }
     setIsPlaying(prev => !prev);
-  };
+  }, [isPlaying, battle, currentRoundIndex, currentEventIndex]);
 
   // Skip to end
-  const handleSkipToEnd = () => {
+  const handleSkipToEnd = useCallback(() => {
     if (!battle || battle.rounds.length === 0) return;
 
     // Stop playback first
@@ -229,7 +208,7 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
       setCurrentRoundIndex(lastRoundIndex);
       setCurrentEventIndex(lastEventIndex);
     }, 50); // Small delay to let isPlaying update propagate
-  };
+  }, [battle]);
 
   if (loading) {
     return (
@@ -278,8 +257,6 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
 
   const currentRound = battle.rounds[currentRoundIndex];
   const isUserPlayerA = currentRound.player_a_id === userId;
-  const isWinner = battle.winner_id === userId;
-  const isDraw = battle.winner_id === null || battle.winner_id === undefined;
   const currentEvent = currentEventIndex >= 0 ? currentRound.battle_log[currentEventIndex] : null;
 
   // Check if animation is at the end

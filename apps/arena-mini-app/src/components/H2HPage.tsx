@@ -3,6 +3,8 @@ import { apiClient } from '../api/client';
 import { noticeError } from '@beef-briefing/shared-mini-app/monitoring';
 import type { H2HRecord, MatchHistoryEntry } from '../types';
 import { ErrorDisplay } from '@beef-briefing/shared-mini-app/components';
+import { formatDate } from '../utils/date';
+import { calculateWinRate } from '../utils/stats';
 import './H2HPage.css';
 
 interface H2HPageProps {
@@ -44,14 +46,7 @@ export function H2HPage({ opponentId, opponentName, onBack }: H2HPageProps) {
 
   const getWinRate = () => {
     if (!record) return 0;
-    const total = record.wins + record.losses;
-    if (total === 0) return 0;
-    return Math.round((record.wins / total) * 100);
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString();
+    return calculateWinRate(record.wins, record.losses);
   };
 
   return (

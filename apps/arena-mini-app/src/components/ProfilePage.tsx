@@ -1,60 +1,17 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { noticeError } from '@beef-briefing/shared-mini-app/monitoring';
-import type { ArenaProfile, MatchHistoryEntry, GameCard, BattleResult, BattleEvent } from '../types';
+import type { ArenaProfile, MatchHistoryEntry, MatchRound, BattleEvent } from '../types';
 import { Avatar } from '@beef-briefing/shared-mini-app/components';
 import { ErrorDisplay } from '@beef-briefing/shared-mini-app/components';
+import { formatDate, formatRelativeDate } from '../utils/date';
+import { calculateWinRate, getResultClass, getResultText } from '../utils/stats';
+import { formatBattleEvent, getEventIcon } from '../utils/battle';
 import './ProfilePage.css';
 
 interface ProfilePageProps {
   onBack: () => void;
 }
-
-// Helper to find a card by ID across both teams
-const findCard = (cardId: number, yourTeam: GameCard[], opponentTeam: GameCard[]): GameCard | null => {
-  return yourTeam.find(c => c.card_id === cardId) || opponentTeam.find(c => c.card_id === cardId) || null;
-};
-
-// Get event icon
-const getEventIcon = (type: string): string => {
-  switch (type) {
-    case 'attack': return '\u2694\uFE0F';
-    case 'death': return '\uD83D\uDC80';
-    case 'victory': return '\uD83D\uDC51';
-    case 'advance': return '\u27A1\uFE0F';
-    default: return '';
-  }
-};
-
-// Format battle event for compact display
-const formatBattleEvent = (
-  event: BattleEvent,
-  yourTeam: GameCard[],
-  opponentTeam: GameCard[],
-  isWinner: boolean
-): string | null => {
-  const attacker = event.attacker_card_id ? findCard(event.attacker_card_id, yourTeam, opponentTeam) : null;
-  const defender = event.defender_card_id ? findCard(event.defender_card_id, yourTeam, opponentTeam) : null;
-
-  switch (event.type) {
-    case 'attack':
-      if (attacker && defender && event.damage) {
-        return `${attacker.name} (${attacker.atk}) \u2192 ${defender.name} (${event.hp_before}) = ${event.damage} dmg`;
-      }
-      return event.message || 'Attack';
-    case 'death':
-      if (defender) {
-        return `${defender.name} defeated`;
-      }
-      return event.message || 'Defeated';
-    case 'victory':
-      return isWinner ? 'Victory!' : 'Defeat';
-    case 'advance':
-      return null; // Skip advance events for compact view
-    default:
-      return event.message || null;
-  }
-};
 
 export function ProfilePage({ onBack }: ProfilePageProps) {
   const [profile, setProfile] = useState<ArenaProfile | null>(null);
@@ -62,9 +19,9 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Expanded match state
+  // Battle data state
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
-  const [battleData, setBattleData] = useState<BattleResult | null>(null);
+  const [battleData, setBattleData] = useState<any>(null);
   const [loadingBattle, setLoadingBattle] = useState(false);
 
   useEffect(() => {
@@ -118,33 +75,12 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
 
   const getRankedWinRate = () => {
     if (!profile) return 0;
-    const total = profile.ranked_wins + profile.ranked_losses;
-    if (total === 0) return 0;
-    return Math.round((profile.ranked_wins / total) * 100);
+    return calculateWinRate(profile.ranked_wins, profile.ranked_losses);
   };
 
   const getCasualWinRate = () => {
     if (!profile) return 0;
-    const total = profile.regular_wins + profile.regular_losses;
-    if (total === 0) return 0;
-    return Math.round((profile.regular_wins / total) * 100);
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString();
-  };
-
-  const formatRelativeDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return formatDate(dateStr);
+    return calculateWinRate(profile.regular_wins, profile.regular_losses);
   };
 
   const getCurrentStreak = () => {
@@ -155,22 +91,6 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
   const getBestStreak = () => {
     if (!profile) return 0;
     return Math.max(profile.ranked_best_streak, profile.regular_best_streak);
-  };
-
-  const getResultClass = (result: string) => {
-    switch (result) {
-      case 'win': return 'result-win';
-      case 'loss': return 'result-loss';
-      default: return 'result-draw';
-    }
-  };
-
-  const getResultText = (result: string) => {
-    switch (result) {
-      case 'win': return 'W';
-      case 'loss': return 'L';
-      default: return 'D';
-    }
   };
 
   return (
@@ -324,9 +244,9 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                           ) : battleData && battleData.rounds.length > 0 ? (
                             <div className="battle-log">
                               <div className="battle-log-header">Battle Log</div>
-                              {battleData.rounds.map((round, roundIndex) => (
+                              {battleData.rounds.map((round: MatchRound, roundIndex: number) => (
                                 <div key={roundIndex} className="battle-round">
-                                  {round.battle_log.map((event, eventIndex) => {
+                                  {round.battle_log.map((event: BattleEvent, eventIndex: number) => {
                                     const message = formatBattleEvent(
                                       event,
                                       match.your_team,

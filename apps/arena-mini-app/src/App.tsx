@@ -365,9 +365,7 @@ function App() {
 
       <ErrorBoundary name="history" onReset={() => setPage('history')}>
         {page === 'history' && (
-          <HistoryPage
-            userId={userId!}
-          />
+          <HistoryPage />
         )}
       </ErrorBoundary>
 

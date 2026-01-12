@@ -1,5 +1,7 @@
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import type { GameCard, BattleEvent } from '../types';
+import { HP_HIGH_PERCENT, HP_MEDIUM_PERCENT } from '../constants/game';
+import { truncateName } from '../utils/battle';
 import './BattleCard.css';
 
 export interface BattleCardProps {
@@ -100,7 +102,7 @@ export function BattleCard({
   };
 
   // Truncate name to fit
-  const displayName = card.name.length > 10 ? card.name.slice(0, 9) + '...' : card.name;
+  const displayName = truncateName(card.name);
 
   return (
     <motion.div
@@ -139,9 +141,9 @@ export function BattleCard({
           animate={{ width: `${hpPercent}%` }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
           style={{
-            background: hpPercent > 50
+            background: hpPercent > HP_HIGH_PERCENT
               ? 'linear-gradient(90deg, #22c55e, #51cf66)'
-              : hpPercent > 25
+              : hpPercent > HP_MEDIUM_PERCENT
               ? 'linear-gradient(90deg, #eab308, #facc15)'
               : 'linear-gradient(90deg, #dc2626, #ef4444)',
           }}

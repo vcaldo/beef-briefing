@@ -314,73 +314,9 @@ html, body {
   font-size: 20px;
 }
 
-/* Error Boundary Fallback */
-.error-boundary-fallback {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: var(--spacing-lg);
-  text-align: center;
-  gap: var(--spacing-md);
-  background: var(--bg-primary);
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-.error-boundary-fallback .fallback-icon {
-  font-size: 64px;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-.error-boundary-fallback .fallback-title {
-  color: var(--text-primary);
-  font-size: var(--font-size-lg);
-  font-weight: 700;
-}
-
-.error-boundary-fallback .fallback-message {
-  color: var(--text-secondary);
-  font-size: var(--font-size-md);
-  max-width: 300px;
-  line-height: 1.5;
-}
-
-/* Invalid State Fallback */
-.invalid-state-fallback {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: var(--spacing-lg);
-  text-align: center;
-  gap: var(--spacing-md);
-  background: var(--bg-primary);
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-.invalid-state-fallback .fallback-icon {
-  font-size: 64px;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-.invalid-state-fallback .fallback-title {
-  color: var(--text-primary);
-  font-size: var(--font-size-lg);
-  font-weight: 700;
-}
-
-.invalid-state-fallback .fallback-message {
-  color: var(--text-secondary);
-  font-size: var(--font-size-md);
-  max-width: 300px;
-  line-height: 1.5;
-}
-
-/* Error Display Component */
+/* Fallback State Container (reusable for errors, invalid states, etc.) */
+.error-boundary-fallback,
+.invalid-state-fallback,
 .error-display {
   display: flex;
   flex-direction: column;
@@ -395,17 +331,26 @@ html, body {
   visibility: visible !important;
 }
 
+/* Fallback icon (used in error boundaries and fallback states) */
+.error-boundary-fallback .fallback-icon,
+.invalid-state-fallback .fallback-icon,
 .error-display-icon {
   font-size: 64px;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+/* Fallback title */
+.error-boundary-fallback .fallback-title,
+.invalid-state-fallback .fallback-title,
 .error-display-title {
   color: var(--text-primary);
   font-size: var(--font-size-lg);
   font-weight: 700;
 }
 
+/* Fallback message */
+.error-boundary-fallback .fallback-message,
+.invalid-state-fallback .fallback-message,
 .error-display-message {
   color: var(--text-secondary);
   font-size: var(--font-size-md);

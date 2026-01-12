@@ -388,6 +388,7 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
           className="btn btn-icon mute-btn"
           onClick={toggleMuted}
           title={muted ? 'Unmute' : 'Mute'}
+          aria-label={muted ? 'Unmute audio' : 'Mute audio'}
         >
           {muted ? (
             <span className="icon-muted">&#128264;</span>
@@ -399,6 +400,7 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
           className="btn btn-primary play-btn"
           onClick={handlePlayPause}
           title={isAtEnd ? 'Replay' : (isPlaying ? 'Pause' : 'Play')}
+          aria-label={isAtEnd ? 'Replay battle' : (isPlaying ? 'Pause battle' : 'Play battle')}
         >
           {isAtEnd ? '↻' : (isPlaying ? '⏸' : '▶')}
         </button>
@@ -406,6 +408,7 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
           className="btn btn-secondary skip-btn"
           onClick={handleSkipToEnd}
           title="Skip to End"
+          aria-label="Skip to end of battle"
         >
           ⏭
         </button>

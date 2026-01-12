@@ -18,7 +18,9 @@ import './ShopPage.css';
 function applyTeamOrder(team: GameCard[], teamOrder: number[]): GameCard[] {
   if (teamOrder.length !== team.length) {
     // Fallback to original team if lengths don't match
-    console.warn('Team order length mismatch', { teamLen: team.length, orderLen: teamOrder.length });
+    if (import.meta.env.DEV) {
+      console.warn('Team order length mismatch', { teamLen: team.length, orderLen: teamOrder.length });
+    }
     return team;
   }
   return teamOrder.map(index => team[index]);
@@ -439,6 +441,7 @@ function TeamCard({
                   onUpgradeAtk();
                 }}
                 title="Upgrade ATK (+1)"
+                aria-label={`Upgrade ${card.name} ATK by 1 for ${SHOP_COSTS.UPGRADE} coins`}
               >
                 +
               </button>
@@ -458,6 +461,7 @@ function TeamCard({
                   onUpgradeHp();
                 }}
                 title="Upgrade HP (+3)"
+                aria-label={`Upgrade ${card.name} HP by 3 for ${SHOP_COSTS.UPGRADE} coins`}
               >
                 +
               </button>

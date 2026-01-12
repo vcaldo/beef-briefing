@@ -5,6 +5,7 @@ export interface GameCard {
   name: string;
   username?: string;
   photo_url?: string;
+  card_image_url?: string;
   atk: number;
   def: number;
   hp: number;
@@ -146,10 +147,12 @@ export interface AuthResponse {
 export interface MatchHistoryEntry {
   match_id: string;
   match_type: MatchType;
+  your_photo_url?: string;
   opponent: {
     user_id: number;
     first_name: string;
     username?: string;
+    photo_url?: string;
   };
   result: 'win' | 'loss' | 'draw';
   your_team: GameCard[];
@@ -169,6 +172,28 @@ export interface H2HRecord {
   last_match_at?: string;
 }
 
+// Profile types
+export interface ArenaProfile {
+  user_id: number;
+  first_name: string;
+  username?: string;
+  ranked_wins: number;
+  ranked_losses: number;
+  ranked_tournaments_played: number;
+  ranked_tournaments_won: number;
+  ranked_current_streak: number;
+  ranked_best_streak: number;
+  ranked_rank: number;
+  regular_wins: number;
+  regular_losses: number;
+  regular_matches_played: number;
+  regular_current_streak: number;
+  regular_best_streak: number;
+  regular_rank: number;
+  first_match_at?: string;
+  last_match_at?: string;
+}
+
 // App state
-export type AppPage = 'lobby' | 'shop' | 'battle' | 'results' | 'leaderboard' | 'history' | 'h2h';
+export type AppPage = 'lobby' | 'shop' | 'battle' | 'results' | 'leaderboard' | 'history' | 'h2h' | 'profile';
 export type AppState = 'loading' | 'authenticated' | 'error';

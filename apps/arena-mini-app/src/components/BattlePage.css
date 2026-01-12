@@ -34,6 +34,11 @@
   color: var(--accent-danger);
 }
 
+.result-badge.draw {
+  background: rgba(255, 212, 59, 0.2);
+  color: var(--accent-gold);
+}
+
 .battle-loading,
 .battle-error,
 .battle-waiting {
@@ -335,6 +340,13 @@
 
 .event-victory .victory-text.loss {
   background: linear-gradient(135deg, #ff6b6b, #ff4444, #ff6b6b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.event-victory .victory-text.draw {
+  background: linear-gradient(135deg, #ffd43b, #fab005, #ffd43b);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

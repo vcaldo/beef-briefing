@@ -286,6 +286,7 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   const currentRound = battle.rounds[currentRoundIndex];
   const isUserPlayerA = currentRound.player_a_id === userId;
   const isWinner = battle.winner_id === userId;
+  const isDraw = battle.winner_id === null || battle.winner_id === undefined;
   const currentEvent = currentEventIndex >= 0 ? currentRound.battle_log[currentEventIndex] : null;
 
   return (
@@ -300,8 +301,8 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
         </div>
         <div className="battle-status">
           {battle.is_complete && showResultBadge && (
-            <span className={`result-badge ${isWinner ? 'win' : 'loss'}`}>
-              {isWinner ? 'Victory!' : 'Defeat'}
+            <span className={`result-badge ${isDraw ? 'draw' : isWinner ? 'win' : 'loss'}`}>
+              {isDraw ? 'Draw!' : isWinner ? 'Victory!' : 'Defeat'}
             </span>
           )}
         </div>
@@ -358,8 +359,8 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
                 )}
                 {currentEvent.type === 'victory' && (
                   <div className="victory-display">
-                    <span className={`victory-text ${isWinner ? 'win' : 'loss'}`}>
-                      {isWinner ? 'Victory!' : 'Defeat!'}
+                    <span className={`victory-text ${isDraw ? 'draw' : isWinner ? 'win' : 'loss'}`}>
+                      {isDraw ? 'Draw!' : isWinner ? 'Victory!' : 'Defeat!'}
                     </span>
                   </div>
                 )}

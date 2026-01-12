@@ -12,6 +12,11 @@ import (
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
+// CardService interface for fetching card images
+type CardService interface {
+	GetCardImageURLString(ctx context.Context, userID, chatID int64, weekStart *time.Time, theme string, expirySeconds int) (string, error)
+}
+
 // Dealer handles card dealing from the database
 type Dealer struct {
 	db            *sql.DB
@@ -19,13 +24,14 @@ type Dealer struct {
 	storageClient interface {
 		GetPresignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error)
 	}
+	cardService CardService
 }
 
 // NewDealer creates a new card dealer
 func NewDealer(db *sql.DB, nrApp *newrelic.Application, storageClient interface {
 	GetPresignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error)
-}) *Dealer {
-	return &Dealer{db: db, nrApp: nrApp, storageClient: storageClient}
+}, cardService CardService) *Dealer {
+	return &Dealer{db: db, nrApp: nrApp, storageClient: storageClient, cardService: cardService}
 }
 
 // CombatStats represents the combat section of card stats
@@ -112,9 +118,14 @@ func (d *Dealer) DealCards(ctx context.Context, chatID int64, count int) ([]*bat
 			Index:       index,
 		}
 
-		// Try to get photo URL
+		// Try to get photo URL (for battle phase)
 		photoURL, _ := d.getUserPhotoURL(ctx, userID)
 		card.PhotoURL = photoURL
+
+		// Try to get card image URL (for shop phase)
+		theme := "neon_arcade"
+		cardImageURL := d.getCardImageURL(ctx, userID, chatID, theme)
+		card.CardImageURL = cardImageURL
 
 		cards = append(cards, card)
 		index++
@@ -216,6 +227,11 @@ func (d *Dealer) DealRerollCards(ctx context.Context, chatID int64, count int, e
 		photoURL, _ := d.getUserPhotoURL(ctx, userID)
 		card.PhotoURL = photoURL
 
+		// Try to get card image URL (for shop phase)
+		theme := "neon_arcade"
+		cardImageURL := d.getCardImageURL(ctx, userID, chatID, theme)
+		card.CardImageURL = cardImageURL
+
 		cards = append(cards, card)
 	}
 
@@ -285,4 +301,21 @@ func (d *Dealer) getUserPhotoURL(ctx context.Context, userID int64) (string, err
 	}
 
 	return url, nil
+}
+
+// getCardImageURL fetches the user's card image URL for shop display
+func (d *Dealer) getCardImageURL(ctx context.Context, userID, chatID int64, theme string) string {
+	if d.cardService == nil {
+		return ""
+	}
+
+	// Fetch card image for current week (nil weekStart = latest)
+	result, err := d.cardService.GetCardImageURLString(ctx, userID, chatID, nil, theme, 3600)
+	if err != nil {
+		// Log but don't fail - graceful degradation
+		// Card image not found is expected for some users
+		return ""
+	}
+
+	return result
 }

@@ -791,12 +791,14 @@ func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) 
 
 	// Transform entries for response
 	type MatchHistoryResponse struct {
-		MatchID   string `json:"match_id"`
-		MatchType string `json:"match_type"`
-		Opponent  struct {
-			UserID    int64  `json:"user_id"`
-			FirstName string `json:"first_name"`
-			Username  string `json:"username,omitempty"`
+		MatchID      string  `json:"match_id"`
+		MatchType    string  `json:"match_type"`
+		YourPhotoURL *string `json:"your_photo_url,omitempty"`
+		Opponent     struct {
+			UserID    int64   `json:"user_id"`
+			FirstName string  `json:"first_name"`
+			Username  string  `json:"username,omitempty"`
+			PhotoURL  *string `json:"photo_url,omitempty"`
 		} `json:"opponent"`
 		Result       string          `json:"result"`
 		YourTeam     json.RawMessage `json:"your_team"`
@@ -817,6 +819,19 @@ func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) 
 		m.Opponent.UserID = e.OpponentID
 		m.Opponent.FirstName = e.OpponentName
 		m.Opponent.Username = e.OpponentUser
+
+		// Generate presigned URLs for photos
+		if e.YourPhotoKey != nil && *e.YourPhotoKey != "" {
+			if url, err := h.service.GetPhotoPresignedURL(ctx, *e.YourPhotoKey); err == nil && url != "" {
+				m.YourPhotoURL = &url
+			}
+		}
+		if e.OpponentPhotoKey != nil && *e.OpponentPhotoKey != "" {
+			if url, err := h.service.GetPhotoPresignedURL(ctx, *e.OpponentPhotoKey); err == nil && url != "" {
+				m.Opponent.PhotoURL = &url
+			}
+		}
+
 		matches = append(matches, m)
 	}
 
@@ -932,6 +947,131 @@ func (h *ArenaHandler) HandleGetH2H(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.RespondJSON(w, response, http.StatusOK)
+}
+
+// HandleGetProfile retrieves the current user's profile with stats and recent matches.
+// GET /api/v1/mini-app/arena/profile?chat_id=X
+func (h *ArenaHandler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:profile")
+	}
+
+	claims, chatID, err := parseChatIDWithAuth(r, true)
+	if err != nil {
+		handleChatAccessError(w, err)
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("user_id", claims.UserID)
+	}
+
+	profile, err := h.service.GetProfile(ctx, chatID, claims.UserID)
+	if err != nil {
+		slog.Error("failed to get profile", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "failed to get profile", http.StatusInternalServerError)
+		return
+	}
+
+	if profile == nil {
+		// User has no arena data yet
+		httputil.RespondJSON(w, map[string]interface{}{
+			"profile":        nil,
+			"recent_matches": []interface{}{},
+		}, http.StatusOK)
+		return
+	}
+
+	// Transform recent matches for response
+	type MatchResponse struct {
+		MatchID   string `json:"match_id"`
+		MatchType string `json:"match_type"`
+		Opponent  struct {
+			UserID    int64  `json:"user_id"`
+			FirstName string `json:"first_name"`
+			Username  string `json:"username,omitempty"`
+		} `json:"opponent"`
+		Result       string          `json:"result"`
+		YourTeam     json.RawMessage `json:"your_team"`
+		OpponentTeam json.RawMessage `json:"opponent_team"`
+		CompletedAt  string          `json:"completed_at"`
+	}
+
+	matches := make([]MatchResponse, 0, len(profile.RecentMatches))
+	for _, e := range profile.RecentMatches {
+		m := MatchResponse{
+			MatchID:      e.MatchID,
+			MatchType:    string(e.MatchType),
+			Result:       e.Result,
+			YourTeam:     e.YourTeam,
+			OpponentTeam: e.OpponentTeam,
+			CompletedAt:  e.CompletedAt.Format(time.RFC3339),
+		}
+		m.Opponent.UserID = e.OpponentID
+		m.Opponent.FirstName = e.OpponentName
+		m.Opponent.Username = e.OpponentUser
+		matches = append(matches, m)
+	}
+
+	// Build profile response
+	type ProfileStatsResponse struct {
+		UserID                  int64   `json:"user_id"`
+		FirstName               string  `json:"first_name"`
+		Username                string  `json:"username,omitempty"`
+		RankedWins              int     `json:"ranked_wins"`
+		RankedLosses            int     `json:"ranked_losses"`
+		RankedTournamentsPlayed int     `json:"ranked_tournaments_played"`
+		RankedTournamentsWon    int     `json:"ranked_tournaments_won"`
+		RankedCurrentStreak     int     `json:"ranked_current_streak"`
+		RankedBestStreak        int     `json:"ranked_best_streak"`
+		RankedRank              int     `json:"ranked_rank"`
+		RegularWins             int     `json:"regular_wins"`
+		RegularLosses           int     `json:"regular_losses"`
+		RegularMatchesPlayed    int     `json:"regular_matches_played"`
+		RegularCurrentStreak    int     `json:"regular_current_streak"`
+		RegularBestStreak       int     `json:"regular_best_streak"`
+		RegularRank             int     `json:"regular_rank"`
+		FirstMatchAt            *string `json:"first_match_at,omitempty"`
+		LastMatchAt             *string `json:"last_match_at,omitempty"`
+	}
+
+	profileResp := ProfileStatsResponse{
+		UserID:                  profile.UserID,
+		FirstName:               profile.FirstName,
+		Username:                profile.Username,
+		RankedWins:              profile.RankedWins,
+		RankedLosses:            profile.RankedLosses,
+		RankedTournamentsPlayed: profile.RankedTournamentsPlayed,
+		RankedTournamentsWon:    profile.RankedTournamentsWon,
+		RankedCurrentStreak:     profile.RankedCurrentStreak,
+		RankedBestStreak:        profile.RankedBestStreak,
+		RankedRank:              profile.RankedRank,
+		RegularWins:             profile.RegularWins,
+		RegularLosses:           profile.RegularLosses,
+		RegularMatchesPlayed:    profile.RegularMatchesPlayed,
+		RegularCurrentStreak:    profile.RegularCurrentStreak,
+		RegularBestStreak:       profile.RegularBestStreak,
+		RegularRank:             profile.RegularRank,
+	}
+	if profile.FirstMatchAt != nil {
+		t := profile.FirstMatchAt.Format(time.RFC3339)
+		profileResp.FirstMatchAt = &t
+	}
+	if profile.LastMatchAt != nil {
+		t := profile.LastMatchAt.Format(time.RFC3339)
+		profileResp.LastMatchAt = &t
+	}
+
+	httputil.RespondJSON(w, map[string]interface{}{
+		"profile":        profileResp,
+		"recent_matches": matches,
+	}, http.StatusOK)
 }
 
 // HandleShareResult allows sharing a match result to the group.

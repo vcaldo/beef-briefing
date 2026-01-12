@@ -48,6 +48,7 @@ type ArenaService struct {
 	gameRepo      *repository.GameRepository
 	dealer        *shop.Dealer
 	storageClient *storage.MinIOClient
+	cardService   *CardService
 	nrApp         *newrelic.Application
 }
 
@@ -88,13 +89,15 @@ func NewArenaService(
 	db *sql.DB,
 	gameRepo *repository.GameRepository,
 	storageClient *storage.MinIOClient,
+	cardService *CardService,
 	nrApp *newrelic.Application,
 ) *ArenaService {
 	return &ArenaService{
 		db:            db,
 		gameRepo:      gameRepo,
-		dealer:        shop.NewDealer(db, nrApp, storageClient),
+		dealer:        shop.NewDealer(db, nrApp, storageClient, cardService),
 		storageClient: storageClient,
+		cardService:   cardService,
 		nrApp:         nrApp,
 	}
 }
@@ -1750,4 +1753,47 @@ func (s *ArenaService) GetRecentMatchesVsOpponent(ctx context.Context, chatID, u
 	}
 
 	return s.gameRepo.GetRecentMatchesVsOpponent(ctx, chatID, userID, opponentID, limit)
+}
+
+// ArenaProfileResponse represents a user's arena profile
+type ArenaProfileResponse struct {
+	*repository.UserProfile
+	RecentMatches []*repository.MatchHistoryEntry `json:"recent_matches"`
+}
+
+// GetProfile retrieves a user's profile with stats, ranks, and recent matches
+func (s *ArenaService) GetProfile(ctx context.Context, chatID, userID int64) (*ArenaProfileResponse, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:GetProfile")
+		defer segment.End()
+	}
+
+	// Get user profile with rank positions
+	profile, err := s.gameRepo.GetUserProfile(ctx, chatID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user profile: %w", err)
+	}
+	if profile == nil {
+		return nil, nil
+	}
+
+	// Get recent matches (limit to 10)
+	matches, _, err := s.gameRepo.GetMatchHistory(ctx, chatID, userID, 10, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get recent matches: %w", err)
+	}
+
+	return &ArenaProfileResponse{
+		UserProfile:   profile,
+		RecentMatches: matches,
+	}, nil
+}
+
+// GetPhotoPresignedURL generates a presigned URL for a photo object key
+func (s *ArenaService) GetPhotoPresignedURL(ctx context.Context, objectKey string) (string, error) {
+	if objectKey == "" {
+		return "", nil
+	}
+	return s.storageClient.GetPresignedURL(ctx, objectKey, 24*time.Hour)
 }

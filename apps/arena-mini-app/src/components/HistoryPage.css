@@ -40,74 +40,83 @@
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.history-entry {
-  background: var(--bg-card);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-color);
-  padding: var(--spacing-md);
-}
-
-.entry-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-sm);
-}
-
-.match-type {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-}
-
-.match-type.ranked {
-  background: rgba(255, 215, 0, 0.2);
-  color: var(--accent-gold);
-}
-
-.match-type.regular {
-  background: rgba(78, 205, 196, 0.2);
-  color: var(--accent-secondary);
-}
-
-.match-date {
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
-}
-
-.entry-body {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-md);
-}
-
-.opponent-info {
-  display: flex;
-  align-items: center;
   gap: var(--spacing-sm);
 }
 
-.vs-label {
-  font-size: var(--font-size-sm);
+/* Compact entry style */
+.history-entry {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.history-entry:active {
+  transform: scale(0.98);
+}
+
+.history-entry.expanded {
+  border-color: var(--accent-primary);
+}
+
+.entry-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  gap: var(--spacing-md);
+}
+
+/* Players section with avatars */
+.players-section {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+.player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.player-name {
+  font-size: 10px;
   color: var(--text-muted);
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.opponent-name {
+.vs-badge {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
   font-weight: 600;
-  font-size: var(--font-size-md);
 }
 
-.match-result {
-  font-weight: 700;
-  font-size: var(--font-size-md);
-  padding: var(--spacing-xs) var(--spacing-sm);
+/* Meta section - result, type, date */
+.meta-section {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.result-badge {
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: var(--font-size-sm);
 }
 
 .result-win {
@@ -125,39 +134,118 @@
   color: var(--text-secondary);
 }
 
-.entry-teams {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-md);
-}
-
-.team-preview {
-  display: flex;
-  gap: var(--spacing-xs);
-}
-
-.team-card-mini {
-  width: 32px;
-  height: 40px;
-  background: var(--bg-highlight);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border-color);
-}
-
-.card-atk {
-  font-size: var(--font-size-sm);
+.match-type {
+  font-size: 10px;
   font-weight: 700;
-  color: var(--atk-color);
+  padding: 2px 4px;
+  border-radius: 3px;
 }
 
-.vs-divider {
+.match-type.ranked {
+  background: rgba(255, 215, 0, 0.2);
+  color: var(--accent-gold);
+}
+
+.match-type.regular {
+  background: rgba(78, 205, 196, 0.2);
+  color: var(--accent-secondary);
+}
+
+.match-date {
   font-size: var(--font-size-xs);
   color: var(--text-muted);
+  min-width: 48px;
+  text-align: right;
+}
+
+/* Battle log section (expandable) */
+.battle-log-section {
+  border-top: 1px solid var(--border-color);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-secondary);
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
+}
+
+.battle-log-loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-sm);
+}
+
+.spinner-sm {
+  width: 20px;
+  height: 20px;
+}
+
+.battle-log-header {
+  font-size: var(--font-size-xs);
   font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.battle-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.battle-round {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.log-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 2px 0;
+  font-size: var(--font-size-xs);
+}
+
+.log-icon {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+}
+
+.log-message {
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.log-attack .log-message {
+  color: var(--text-primary);
+}
+
+.log-death .log-message {
+  color: var(--accent-danger);
+}
+
+.log-victory .log-message {
+  color: var(--accent-success);
+  font-weight: 600;
+}
+
+.battle-log-empty {
+  text-align: center;
+  padding: var(--spacing-sm);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
 }
 
 .load-more-btn {

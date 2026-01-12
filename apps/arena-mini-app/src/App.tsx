@@ -9,6 +9,7 @@ import { BattlePage } from './components/BattlePage';
 import { LeaderboardPage } from './components/LeaderboardPage';
 import { HistoryPage } from './components/HistoryPage';
 import { H2HPage } from './components/H2HPage';
+import { ProfilePage } from './components/ProfilePage';
 import { Navigation } from './components/Navigation';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -229,6 +230,20 @@ function App() {
     setPage('leaderboard');
   };
 
+  // Handle view profile
+  const handleViewProfile = () => {
+    addPageAction('profile_view', {
+      user_id: userId,
+    });
+    setPage('profile');
+  };
+
+  // Handle back from profile
+  const handleBackFromProfile = () => {
+    addPageAction('back_from_profile', {});
+    setPage('leaderboard');
+  };
+
   // State validation - check if page and dependencies are consistent
   const isValidShopState = page === 'shop' && activeMatch;
   const isValidBattleState = page === 'battle' && activeMatch;
@@ -343,6 +358,7 @@ function App() {
           <LeaderboardPage
             userId={userId!}
             onViewH2H={handleViewH2H}
+            onViewProfile={handleViewProfile}
           />
         )}
       </ErrorBoundary>
@@ -366,6 +382,12 @@ function App() {
           ) : (
             <InvalidStateFallback onReset={handleBackFromH2H} />
           )
+        )}
+      </ErrorBoundary>
+
+      <ErrorBoundary name="profile" onReset={handleBackFromProfile}>
+        {page === 'profile' && (
+          <ProfilePage onBack={handleBackFromProfile} />
         )}
       </ErrorBoundary>
 

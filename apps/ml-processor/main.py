@@ -249,6 +249,7 @@ def run_generate_cards(args, config):
         timezone=args.timezone,
         tiers=config.tiers,
         window_days=args.window_days,
+        source_chat_id=getattr(args, 'source_chat_id', None),
     )
     result = generator.generate_cards(
         chat_id=args.chat_id,
@@ -563,6 +564,14 @@ def main():
         type=str,
         required=True,
         help="IANA timezone for week boundaries and chronotype (e.g., America/Sao_Paulo)",
+    )
+    generate_cards_parser.add_argument(
+        "--source-chat-id",
+        type=int,
+        default=None,
+        help="Source chat ID to read messages from (enables impersonation mode). "
+             "When provided, messages are read from source-chat-id but cards are "
+             "stored for --chat-id. Useful for testing with dev data.",
     )
 
     # render-cards command

@@ -81,6 +81,12 @@ make ml-run-cards ML_ARGS="--timezone America/Sao_Paulo"
 
 # With custom parameters
 make ml-run-cards ML_ARGS="--week 2024-12-16 --timezone America/Sao_Paulo --window-days 30 --min-messages 10"
+
+# Using impersonation mode (read messages from one group, store cards for another)
+make ml-cards-impersonate \
+  SOURCE_CHAT_ID=-1001234567 \
+  TARGET_CHAT_ID=-1009876543 \
+  ML_ARGS="--week 2024-12-16 --timezone America/Sao_Paulo"
 ```
 
 Parameters:
@@ -88,6 +94,7 @@ Parameters:
 - `--timezone`: IANA timezone for week boundaries (required)
 - `--window-days`: Rolling window for stats calculation (default: 30)
 - `--min-messages`: Minimum messages required for card generation (default: 10)
+- `--source-chat-id`: (Optional) Read messages from this chat, store cards for `--chat-id`. Useful for testing with dev data
 
 ## Step 6: Render Card Images
 
@@ -175,6 +182,8 @@ make ml-clean-cards-dev ML_ARGS="--force"
 | `make ml-run` | Process messages through ML pipeline |
 | `make ml-run-once` | Process single batch (for testing) |
 | `make ml-run-cards` | Generate weekly user cards |
+| `make ml-cards-impersonate` | Generate cards with impersonation mode (dev) |
+| `make ml-cards-impersonate-prod` | Generate cards with impersonation mode (prod) |
 | `make ml-run-render` | Render card images |
 | `make ml-clean-dev` | Clean all ML data |
 | `make ml-clean-cards-dev` | Clean specific cards |
@@ -190,6 +199,44 @@ make ml-run ML_ARGS="--chat-id -1003280306634 --limit 100"
 make ml-run-cards ML_ARGS="--chat-id -1003280306634 --week 2024-12-16 --timezone America/Sao_Paulo"
 make ml-run-render ML_ARGS="--chat-id -1003280306634 --week 2024-12-16"
 ```
+
+## Testing with Group Impersonation Mode
+
+Group impersonation mode allows you to generate cards by reading messages from one group (source) but storing them as if they belong to another group (target). This is useful for testing the card generation system with real message data without affecting the target group's data.
+
+### Use Case
+
+You have a dev group with real messages and want to test card generation as if those messages were from a production group:
+
+```bash
+# Dev environment - read from dev group, store as prod group
+make ml-cards-impersonate \
+  SOURCE_CHAT_ID=-1001234567 \
+  TARGET_CHAT_ID=-1009876543 \
+  ML_ARGS="--week 2024-12-16 --timezone America/Sao_Paulo"
+
+# Production environment (via SSH tunnel)
+make ml-cards-impersonate-prod \
+  SOURCE_CHAT_ID=-1001234567 \
+  TARGET_CHAT_ID=-1009876543 \
+  ML_ARGS="--timezone America/Sao_Paulo"
+```
+
+### How It Works
+
+| Operation | Uses | Description |
+|-----------|------|-------------|
+| Read messages | Source chat | Messages fetched from SOURCE_CHAT_ID |
+| Find active users | Source chat | Users with messages in source chat |
+| Compute stats | Source chat | All metrics calculated from source messages |
+| Store cards | Target chat | Cards written to TARGET_CHAT_ID |
+| Compare trends | Target chat | Trends compare to target chat's previous weeks |
+
+### Requirements
+
+- Both source and target chats must exist in the database
+- Source and target chats should have the same user IDs
+- This is a development/testing feature, not for production use
 
 ## Troubleshooting
 

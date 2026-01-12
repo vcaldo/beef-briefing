@@ -80,6 +80,7 @@ class CardGenerator:
         timezone: str,
         tiers: list[tuple[str, int]],
         window_days: int = 30,
+        source_chat_id: int | None = None,
     ):
         """
         Initialize the card generator.
@@ -89,12 +90,36 @@ class CardGenerator:
             timezone: IANA timezone identifier (e.g., 'America/Sao_Paulo')
             tiers: List of (name, min_score) tuples for tier classification
             window_days: Rolling window size for stats (default: 30)
+            source_chat_id: Optional source chat ID for impersonation mode.
+                           When set, messages are read from source_chat_id
+                           but cards are stored for the target chat_id.
         """
         self._engine = engine
         self._timezone = timezone
         self._tz = ZoneInfo(timezone)
         self._tiers = tiers
         self._window_days = window_days
+        self._source_chat_id = source_chat_id
+
+    def _validate_chats_exist(self, source_chat_id: int, target_chat_id: int) -> None:
+        """
+        Validate that both source and target chats exist in the database.
+
+        Raises:
+            ValueError: If either chat ID is not found in the database.
+        """
+        query = "SELECT id FROM chats WHERE id IN (:source_id, :target_id)"
+        with self._engine.connect() as conn:
+            result = conn.execute(
+                text(query),
+                {"source_id": source_chat_id, "target_id": target_chat_id},
+            )
+            ids = {row[0] for row in result.fetchall()}
+
+            if source_chat_id not in ids:
+                raise ValueError(f"Source chat {source_chat_id} not found in database")
+            if target_chat_id not in ids:
+                raise ValueError(f"Target chat {target_chat_id} not found in database")
 
     def _get_week_bounds(self, week_start: datetime) -> tuple[datetime, datetime]:
         """Get week start (Monday 00:00) and end (Sunday 23:59:59) in configured timezone."""
@@ -489,7 +514,7 @@ class CardGenerator:
         Generate cards for all active users in a chat.
 
         Args:
-            chat_id: Target chat ID
+            chat_id: Target chat ID (where cards will be stored)
             week_start: Week to generate cards for (default: current week)
             min_messages: Minimum messages required for card generation
             from_date: Explicit stats window start (overrides window_days)
@@ -498,6 +523,17 @@ class CardGenerator:
         Returns:
             Dict with generation stats
         """
+        # Determine which chat to read messages from (impersonation mode)
+        messages_chat_id = self._source_chat_id if self._source_chat_id else chat_id
+
+        # Validate both chats exist if in impersonation mode
+        if self._source_chat_id:
+            self._validate_chats_exist(self._source_chat_id, chat_id)
+            logger.info(
+                f"Impersonation mode: reading messages from chat {messages_chat_id}, "
+                f"storing cards for chat {chat_id}"
+            )
+
         # Calculate week bounds
         if week_start is None:
             # Use current week (Monday) in configured timezone
@@ -526,8 +562,8 @@ class CardGenerator:
         logger.info(f"Week: {week_start.date()} - {week_end.date()}")
         logger.info(f"Stats window: {window_start.date()} - {window_end.date()}")
 
-        # Get active users
-        active_users = self._get_active_users(chat_id, window_start, window_end)
+        # Get active users from SOURCE chat (or target if not in impersonation mode)
+        active_users = self._get_active_users(messages_chat_id, window_start, window_end)
         logger.info(f"Found {len(active_users)} active users")
 
         # Calculate previous week for trends
@@ -538,9 +574,9 @@ class CardGenerator:
         skipped = 0
 
         for user_id in active_users:
-            # Check message count
+            # Check message count from SOURCE chat
             msg_count = self._get_user_message_count(
-                user_id, chat_id, window_start, window_end
+                user_id, messages_chat_id, window_start, window_end
             )
             if msg_count < min_messages:
                 logger.debug(
@@ -550,8 +586,8 @@ class CardGenerator:
                 skipped += 1
                 continue
 
-            # Compute stats
-            stats = self._compute_stats(user_id, chat_id, window_start, window_end)
+            # Compute stats from SOURCE chat
+            stats = self._compute_stats(user_id, messages_chat_id, window_start, window_end)
             if not stats:
                 logger.debug(f"Skipping user {user_id}: no stats computed")
                 skipped += 1

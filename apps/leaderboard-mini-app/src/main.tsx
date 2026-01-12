@@ -13,6 +13,7 @@ import {
 } from '@telegram-apps/sdk-react'
 
 import App from './App'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import './styles/global.css'
 
 // Initialize Telegram Mini App SDK
@@ -49,7 +50,9 @@ async function initApp() {
   // Render app
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <ErrorBoundary name="root" onReset={() => window.location.reload()}>
+        <App />
+      </ErrorBoundary>
     </StrictMode>
   )
 }

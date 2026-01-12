@@ -896,10 +896,10 @@ type MediaUserWithPhoto struct {
 
 // MediaOverviewResponse represents media statistics response
 type MediaOverviewResponse struct {
-	Stats        *repository.MediaOverviewStats        `json:"stats"`
-	Distribution []repository.MediaTypeDistribution    `json:"distribution"`
-	Activity     []repository.MediaActivity            `json:"activity"`
-	TopSenders   []MediaUserWithPhoto                  `json:"top_senders"`
+	Stats        *repository.MediaOverviewStats     `json:"stats"`
+	Distribution []repository.MediaTypeDistribution `json:"distribution"`
+	Activity     []repository.MediaActivity         `json:"activity"`
+	TopSenders   []MediaUserWithPhoto               `json:"top_senders"`
 }
 
 // GetMediaOverview returns comprehensive media statistics for a chat

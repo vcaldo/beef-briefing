@@ -31,6 +31,12 @@ make ml-run-cards ML_ARGS="--timezone America/Sao_Paulo"
 
 # Run with specific week
 make ml-run-cards ML_ARGS="--timezone America/Sao_Paulo --week 2025-01-06"
+
+# Generate cards using messages from one group, storing as another (impersonation mode - for testing)
+make ml-cards-impersonate \
+  SOURCE_CHAT_ID=-1001234567 \
+  TARGET_CHAT_ID=-1009876543 \
+  ML_ARGS="--timezone America/Sao_Paulo"
 ```
 
 ## Configuration
@@ -97,17 +103,18 @@ Each analysis type can use a different provider:
 
 ```bash
 # Process options
---chat-id ID        # Target chat ID
---limit N           # Max messages to process
---batch-size N      # Messages per batch
---from-date D       # Process from date (YYYY-MM-DD)
---to-date D         # Process until date (YYYY-MM-DD)
+--chat-id ID              # Target chat ID
+--limit N                 # Max messages to process
+--batch-size N            # Messages per batch
+--from-date D             # Process from date (YYYY-MM-DD)
+--to-date D               # Process until date (YYYY-MM-DD)
 
 # Cards options
---timezone TZ       # IANA timezone (REQUIRED)
---week D            # Week start date (YYYY-MM-DD, Monday)
---window-days N     # Rolling window (default: 30)
---min-messages N    # Minimum messages (default: 10)
+--timezone TZ             # IANA timezone (REQUIRED)
+--week D                  # Week start date (YYYY-MM-DD, Monday)
+--window-days N           # Rolling window (default: 30)
+--min-messages N          # Minimum messages (default: 10)
+--source-chat-id ID       # Source chat ID (impersonation mode - read from this chat, write to --chat-id)
 ```
 
 ### Examples
@@ -121,7 +128,58 @@ make ml-run ML_ARGS="--from-date 2025-01-01 --to-date 2025-01-07"
 
 # Generate cards for specific week
 make ml-run-cards ML_ARGS="--timezone America/Sao_Paulo --week 2025-01-06"
+
+# Impersonation mode: read messages from dev group (-1001234567),
+# generate cards for production group (-1009876543)
+make ml-cards-impersonate \
+  SOURCE_CHAT_ID=-1001234567 \
+  TARGET_CHAT_ID=-1009876543 \
+  ML_ARGS="--timezone America/Sao_Paulo --week 2025-01-06"
+
+# Impersonation mode (production database via SSH tunnel)
+make ml-cards-impersonate-prod \
+  SOURCE_CHAT_ID=-1001234567 \
+  TARGET_CHAT_ID=-1009876543 \
+  ML_ARGS="--timezone America/Sao_Paulo"
 ```
+
+## Group Impersonation Mode (Testing)
+
+The impersonation mode allows you to generate cards by reading messages from one group (source) but storing cards as if they belong to another group (target). This is useful for testing the card generation system with real message data without affecting production.
+
+### Use Case
+
+You have a dev group with real messages, and you want to test card generation as if those messages were from a production group:
+
+```bash
+make ml-cards-impersonate \
+  SOURCE_CHAT_ID=-1001234567 \
+  TARGET_CHAT_ID=-1009876543 \
+  ML_ARGS="--timezone America/Sao_Paulo --week 2025-01-06"
+```
+
+### How It Works
+
+| Operation | Uses | Description |
+|-----------|------|-------------|
+| Read messages | Source chat | Messages are fetched from `SOURCE_CHAT_ID` |
+| Find active users | Source chat | Users with messages in source chat |
+| Compute stats | Source chat | All metrics calculated from source messages |
+| Store cards | Target chat | Cards are written to `TARGET_CHAT_ID` |
+| Compare trends | Target chat | Trends compare to target chat's previous weeks |
+
+### Requirements
+
+- Both source and target chats must exist in the database
+- Source and target chats should have compatible user IDs (same users in both groups)
+- This is a development/testing feature, not for production use
+
+### Available Make Targets
+
+| Command | Environment |
+|---------|------------|
+| `make ml-cards-impersonate SOURCE_CHAT_ID=X TARGET_CHAT_ID=Y ML_ARGS="..."` | Development (local database) |
+| `make ml-cards-impersonate-prod SOURCE_CHAT_ID=X TARGET_CHAT_ID=Y ML_ARGS="..."` | Production (via SSH tunnel) |
 
 ## Analysis Types
 

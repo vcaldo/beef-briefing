@@ -6,11 +6,13 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"beef-briefing/apps/telegram-bot/internal/client"
 	"beef-briefing/apps/telegram-bot/internal/handlers"
+	"beef-briefing/apps/telegram-bot/internal/scheduler"
 	"beef-briefing/pkg/config"
 
 	"github.com/go-telegram/bot"
@@ -70,6 +72,9 @@ func main() {
 	technicalHandler := handlers.NewTechnicalHandler(nrApp)
 	deckHandler := handlers.NewDeckHandler(nrApp)
 	rankingHandler := handlers.NewRankingHandler(nrApp)
+	matchHandler := handlers.NewMatchHandler(apiClient, nrApp)
+	callbackHandler := handlers.NewCallbackHandler(apiClient, nrApp)
+	rankedHandler := handlers.NewRankedHandler(apiClient, nrApp)
 
 	// Create bot instance with allowed updates including reactions
 	opts := []bot.Option{
@@ -111,8 +116,25 @@ func main() {
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/technical", bot.MatchTypePrefix, technicalHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/deck", bot.MatchTypePrefix, deckHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/ranking", bot.MatchTypePrefix, rankingHandler.Handle)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/match", bot.MatchTypePrefix, matchHandler.Handle)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/ranked", bot.MatchTypePrefix, rankedHandler.Handle)
+
+	// Register callback query handler for inline buttons
+	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, "", bot.MatchTypePrefix, callbackHandler.Handle)
 
 	slog.Info("bot initialized successfully, starting long polling...")
+
+	// Start match scheduler in background
+	matchScheduler := scheduler.NewMatchScheduler(apiClient, b, nrApp)
+	go matchScheduler.Start(ctx)
+
+	// Start tournament scheduler in background
+	rankedEnabled := getEnvBool("RANKED_TOURNAMENTS_ENABLED", true)
+	if !rankedEnabled {
+		slog.Warn("ranked tournaments are globally disabled")
+	}
+	tournamentScheduler := scheduler.NewTournamentScheduler(apiClient, b, nrApp, rankedEnabled)
+	go tournamentScheduler.Start(ctx)
 
 	// Start bot with graceful shutdown
 	b.Start(ctx)
@@ -187,4 +209,18 @@ func parseLogLevel(level string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+// getEnvBool reads a boolean environment variable with a default value
+func getEnvBool(name string, defaultVal bool) bool {
+	val := os.Getenv(name)
+	if val == "" {
+		return defaultVal
+	}
+	b, err := strconv.ParseBool(val)
+	if err != nil {
+		slog.Warn("failed to parse boolean env var", "name", name, "value", val, "error", err)
+		return defaultVal
+	}
+	return b
 }

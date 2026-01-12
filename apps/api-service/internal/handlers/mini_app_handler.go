@@ -112,7 +112,11 @@ func (h *MiniAppHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -172,7 +176,11 @@ func (h *MiniAppHandler) HandleActivity(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -241,7 +249,11 @@ func (h *MiniAppHandler) HandleLeaderboard(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -345,7 +357,11 @@ func (h *MiniAppHandler) HandleGalleryWeeks(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -395,7 +411,11 @@ func (h *MiniAppHandler) HandleGalleryImages(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -535,7 +555,11 @@ func (h *MiniAppHandler) HandleReactionsOverview(w http.ResponseWriter, r *http.
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -603,7 +627,11 @@ func (h *MiniAppHandler) HandleRepliesOverview(w http.ResponseWriter, r *http.Re
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -680,7 +708,11 @@ func (h *MiniAppHandler) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -781,7 +813,11 @@ func (h *MiniAppHandler) HandleHeatmap(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -856,7 +892,11 @@ func (h *MiniAppHandler) HandleUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -915,7 +955,11 @@ func (h *MiniAppHandler) HandleMediaOverview(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -980,7 +1024,11 @@ func (h *MiniAppHandler) HandleGetTimezone(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}
@@ -1039,7 +1087,11 @@ func (h *MiniAppHandler) HandleSetTimezone(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Verify chat access
-	if claims.ChatID != nil && *claims.ChatID != chatID {
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != chatID {
 		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
 		return
 	}

@@ -396,6 +396,25 @@ func (s *CardService) GetCardImageURL(
 	}, nil
 }
 
+// GetCardImageURLString retrieves just the presigned URL for a user's card image (for shop dealer).
+func (s *CardService) GetCardImageURLString(
+	ctx context.Context,
+	userID int64,
+	chatID int64,
+	weekStart *time.Time,
+	theme string,
+	expirySeconds int,
+) (string, error) {
+	resp, err := s.GetCardImageURL(ctx, userID, chatID, weekStart, theme, expirySeconds)
+	if err != nil {
+		return "", err
+	}
+	if resp == nil {
+		return "", nil
+	}
+	return resp.URL, nil
+}
+
 // GalleryWeeksResponse is the response for GetGalleryWeeks.
 type GalleryWeeksResponse struct {
 	Weeks []string `json:"weeks"`

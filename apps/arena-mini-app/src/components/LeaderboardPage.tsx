@@ -3,6 +3,7 @@ import { apiClient } from '../api/client';
 import { noticeError } from '@beef-briefing/shared-mini-app/monitoring';
 import type { LeaderboardEntry } from '../types';
 import { ErrorDisplay } from '@beef-briefing/shared-mini-app/components';
+import { calculateWinRate } from '../utils/stats';
 import './LeaderboardPage.css';
 
 interface LeaderboardPageProps {
@@ -40,15 +41,11 @@ export function LeaderboardPage({ userId, onViewH2H, onViewProfile }: Leaderboar
   }, []);
 
   const getCasualWinRate = (entry: LeaderboardEntry) => {
-    const total = entry.regular_wins + entry.regular_losses;
-    if (total === 0) return 0;
-    return Math.round((entry.regular_wins / total) * 100);
+    return calculateWinRate(entry.regular_wins, entry.regular_losses);
   };
 
   const getRankedWinRate = (entry: LeaderboardEntry) => {
-    const total = entry.ranked_wins + entry.ranked_losses;
-    if (total === 0) return 0;
-    return Math.round((entry.ranked_wins / total) * 100);
+    return calculateWinRate(entry.ranked_wins, entry.ranked_losses);
   };
 
   return (

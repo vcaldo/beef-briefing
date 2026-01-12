@@ -5,13 +5,11 @@ import type { MatchHistoryEntry, BattleResult } from '../types';
 import { Avatar } from '@beef-briefing/shared-mini-app/components';
 import { ErrorDisplay } from '@beef-briefing/shared-mini-app/components';
 import { BattleLog } from './BattleLog';
+import { formatRelativeDate } from '../utils/date';
+import { getResultClass, getResultText } from '../utils/stats';
 import './HistoryPage.css';
 
-interface HistoryPageProps {
-  userId?: number;
-}
-
-export function HistoryPage(_props: HistoryPageProps) {
+export function HistoryPage() {
   const [matches, setMatches] = useState<MatchHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,37 +91,6 @@ export function HistoryPage(_props: HistoryPageProps) {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) {
-      return 'Today';
-    } else if (diffDays === 1) {
-      return 'Yesterday';
-    } else if (diffDays < 7) {
-      return `${diffDays}d ago`;
-    } else {
-      return date.toLocaleDateString();
-    }
-  };
-
-  const getResultClass = (result: string) => {
-    switch (result) {
-      case 'win': return 'result-win';
-      case 'loss': return 'result-loss';
-      default: return 'result-draw';
-    }
-  };
-
-  const getResultText = (result: string) => {
-    switch (result) {
-      case 'win': return 'W';
-      case 'loss': return 'L';
-      default: return 'D';
-    }
-  };
 
   return (
     <div className="history-page">
@@ -182,7 +149,7 @@ export function HistoryPage(_props: HistoryPageProps) {
                       <span className={`match-type ${match.match_type}`}>
                         {match.match_type === 'ranked' ? 'R' : 'C'}
                       </span>
-                      <span className="match-date">{formatDate(match.completed_at)}</span>
+                      <span className="match-date">{formatRelativeDate(match.completed_at)}</span>
                     </div>
                   </div>
 

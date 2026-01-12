@@ -29,7 +29,7 @@ export function LobbyPage({ userId, firstName, onMatchSelect }: LobbyPageProps) 
   const matches = matchesResponse?.matches ?? [];
 
   // Handle create match
-  const createMatchApi = useApiCall({
+  const createMatchApi = useApiCall<Match>({
     context: 'create_match',
     onError: (err) => {
       setError(err);
@@ -46,7 +46,7 @@ export function LobbyPage({ userId, firstName, onMatchSelect }: LobbyPageProps) 
   }, [createMatchApi, onMatchSelect]);
 
   // Handle join match
-  const joinMatchApi = useApiCall({
+  const joinMatchApi = useApiCall<Match>({
     context: 'join_match',
     onError: (err) => {
       setError(err);
@@ -66,7 +66,7 @@ export function LobbyPage({ userId, firstName, onMatchSelect }: LobbyPageProps) 
   );
 
   // Handle start match
-  const startMatchApi = useApiCall({
+  const startMatchApi = useApiCall<Match>({
     context: 'start_match',
     onError: (err) => {
       setError(err);

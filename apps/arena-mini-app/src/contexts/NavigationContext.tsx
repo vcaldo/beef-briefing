@@ -145,9 +145,9 @@ export function NavigationProvider({ children, userId }: NavigationProviderProps
   }, []);
 
   // State validation
-  const isValidShopState = page === 'shop' && activeMatch;
-  const isValidBattleState = page === 'battle' && activeMatch;
-  const isValidH2HState = page === 'h2h' && h2hOpponentId;
+  const isValidShopState = page === 'shop' && activeMatch !== null;
+  const isValidBattleState = page === 'battle' && activeMatch !== null;
+  const isValidH2HState = page === 'h2h' && h2hOpponentId !== null;
   const showNavigation = !activeMatch && (page === 'lobby' || page === 'leaderboard' || page === 'history');
 
   const value: NavigationContextType = {

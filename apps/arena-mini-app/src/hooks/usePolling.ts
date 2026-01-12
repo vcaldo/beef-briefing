@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { POLLING_INTERVALS } from '../config/constants';
 
 interface UsePollingOptions<T> {
   enabled?: boolean;
@@ -40,7 +39,7 @@ export function usePolling<T>(
 
   const enabled = options?.enabled ?? true;
   const stopWhen = options?.stopWhen;
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const performFetch = async () => {
     try {

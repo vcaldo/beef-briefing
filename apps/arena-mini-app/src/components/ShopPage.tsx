@@ -65,7 +65,7 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
   }, [timeRemaining]);
 
   // Buy card
-  const buyCardApi = useApiCall({
+  const buyCardApi = useApiCall<ShopState>({
     context: 'buy_card',
     onError: (err) => setError(err),
   });
@@ -86,7 +86,7 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
   );
 
   // Reroll
-  const rerollApi = useApiCall({
+  const rerollApi = useApiCall<ShopState>({
     context: 'reroll',
     onError: (err) => setError(err),
   });
@@ -102,7 +102,7 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
   }, [rerollApi, match.id]);
 
   // Upgrade card
-  const upgradeApi = useApiCall({
+  const upgradeApi = useApiCall<ShopState>({
     context: 'upgrade',
     onError: (err) => setError(err),
   });
@@ -125,7 +125,7 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
   );
 
   // Submit team
-  const submitApi = useApiCall({
+  const submitApi = useApiCall<ShopState>({
     context: 'submit_team',
     onError: (err) => setError(err),
   });
@@ -150,7 +150,7 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
   };
 
   // Reorder team
-  const reorderApi = useApiCall({
+  const reorderApi = useApiCall<ShopState>({
     context: 'reorder_team',
     onError: (err) => setError(err),
   });

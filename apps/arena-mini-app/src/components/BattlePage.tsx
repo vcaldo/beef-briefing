@@ -3,10 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../api/client';
 import { useAudio } from '../hooks/useAudio';
 import { usePolling } from '../hooks/usePolling';
-import { EVENT_TIMING, POLLING_INTERVALS, TIMERS } from '../config/constants';
+import { EVENT_TIMING, POLLING_INTERVALS } from '../config/constants';
 import { BattleCard } from './BattleCard';
 import { BattleLog } from './BattleLog';
-import type { Match, BattleResult, BattleEvent, GameCard } from '../types';
+import type { Match, BattleEvent, GameCard } from '../types';
 import './BattlePage.css';
 
 interface BattlePageProps {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import './BattleLog.css';
 
 interface BattleEvent {
@@ -54,30 +54,6 @@ function getHealthBarInfo(message: string): { bar: string; percentage: number } 
   const percentage = (filledBlocks / 10) * 100;
 
   return { bar, percentage };
-}
-
-// Group events by summary (for history mode, group attack/death events between summaries)
-function groupEventsBySummary(events: BattleEvent[]): (BattleEvent | BattleEvent[])[] {
-  const grouped: (BattleEvent | BattleEvent[])[] = [];
-  let currentGroup: BattleEvent[] = [];
-
-  for (const event of events) {
-    if (event.is_summary) {
-      if (currentGroup.length > 0) {
-        grouped.push(...currentGroup);
-        currentGroup = [];
-      }
-      grouped.push(event);
-    } else {
-      currentGroup.push(event);
-    }
-  }
-
-  if (currentGroup.length > 0) {
-    grouped.push(...currentGroup);
-  }
-
-  return grouped;
 }
 
 export function BattleLog({

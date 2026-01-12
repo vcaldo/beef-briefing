@@ -61,24 +61,6 @@ function getPlayerName(userId: number, participants: any[]): string {
   return participant.username || participant.first_name;
 }
 
-/**
- * Gets an emoji icon for a battle event type.
- */
-function getEventIcon(type: string): string {
-  switch (type) {
-    case 'attack':
-      return '⚔️';
-    case 'death':
-      return '💀';
-    case 'victory':
-      return '👑';
-    case 'advance':
-      return '➡️';
-    default:
-      return '';
-  }
-}
-
 export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   const [battle, setBattle] = useState<BattleResult | null>(null);
   const [loading, setLoading] = useState(true);

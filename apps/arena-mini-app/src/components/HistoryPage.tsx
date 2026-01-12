@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { noticeError } from '@beef-briefing/shared-mini-app/monitoring';
-import type { MatchHistoryEntry, GameCard, BattleResult, BattleEvent } from '../types';
+import type { MatchHistoryEntry, BattleResult } from '../types';
 import { Avatar } from '@beef-briefing/shared-mini-app/components';
 import { ErrorDisplay } from '@beef-briefing/shared-mini-app/components';
 import { BattleLog } from './BattleLog';
@@ -10,52 +10,6 @@ import './HistoryPage.css';
 interface HistoryPageProps {
   userId?: number;
 }
-
-// Helper to find a card by ID across both teams
-const findCard = (cardId: number, yourTeam: GameCard[], opponentTeam: GameCard[]): GameCard | null => {
-  return yourTeam.find(c => c.card_id === cardId) || opponentTeam.find(c => c.card_id === cardId) || null;
-};
-
-// Get event icon
-const getEventIcon = (type: string): string => {
-  switch (type) {
-    case 'attack': return '\u2694\uFE0F';
-    case 'death': return '\uD83D\uDC80';
-    case 'victory': return '\uD83D\uDC51';
-    case 'advance': return '\u27A1\uFE0F';
-    default: return '';
-  }
-};
-
-// Format battle event for compact display
-const formatBattleEvent = (
-  event: BattleEvent,
-  yourTeam: GameCard[],
-  opponentTeam: GameCard[],
-  isWinner: boolean
-): string | null => {
-  const attacker = event.attacker_card_id ? findCard(event.attacker_card_id, yourTeam, opponentTeam) : null;
-  const defender = event.defender_card_id ? findCard(event.defender_card_id, yourTeam, opponentTeam) : null;
-
-  switch (event.type) {
-    case 'attack':
-      if (attacker && defender && event.damage) {
-        return `${attacker.name} (${attacker.atk}) \u2192 ${defender.name} (${event.hp_before}) = ${event.damage} dmg`;
-      }
-      return event.message || 'Attack';
-    case 'death':
-      if (defender) {
-        return `${defender.name} defeated`;
-      }
-      return event.message || 'Defeated';
-    case 'victory':
-      return isWinner ? 'Victory!' : 'Defeat';
-    case 'advance':
-      return null; // Skip advance events for compact view
-    default:
-      return event.message || null;
-  }
-};
 
 export function HistoryPage(_props: HistoryPageProps) {
   const [matches, setMatches] = useState<MatchHistoryEntry[]>([]);
@@ -201,7 +155,6 @@ export function HistoryPage(_props: HistoryPageProps) {
               const isExpanded = expandedMatchId === match.match_id;
               const yourPhoto = match.your_photo_url || null;
               const opponentPhoto = match.opponent.photo_url || null;
-              const isWinner = match.result === 'win';
 
               return (
                 <div

@@ -86,7 +86,7 @@
   background: var(--bg-card);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
-  padding: var(--spacing-md) var(--spacing-md) var(--spacing-lg) var(--spacing-md);
+  padding: var(--spacing-md);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
@@ -97,52 +97,90 @@
   opacity: 0.5;
 }
 
-.card-photo {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
+/* Shop Card Image - 2:3 aspect ratio like deck mini app */
+.shop-card-image-container {
+  position: relative;
+  aspect-ratio: 2/3;
+  width: 100%;
   overflow: hidden;
+  border-radius: var(--radius-md);
   background: var(--bg-highlight);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
-  border: 2px solid var(--accent-primary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  flex-shrink: 0;
 }
 
-.card-photo img {
+.shop-card-image-container img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.no-photo {
-  font-size: 28px;
+/* Loading skeleton with shimmer animation */
+.shop-card-skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    var(--bg-highlight) 25%,
+    var(--bg-secondary) 50%,
+    var(--bg-highlight) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-effect 1.5s infinite;
+}
+
+@keyframes shimmer-effect {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Fallback avatar for cards without images */
+.shop-card-avatar {
+  width: 100%;
+  aspect-ratio: 2/3;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-highlight);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--accent-primary);
+}
+
+.shop-card-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shop-card-avatar-fallback {
+  font-size: 64px;
   font-weight: 700;
   color: var(--text-muted);
 }
 
-.card-info {
+/* Footer section below card image */
+.shop-card-footer {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
 }
 
-.card-name {
+.shop-card-name {
   font-weight: 600;
   font-size: 20px;
-  margin-bottom: var(--spacing-sm);
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.card-stats {
+.shop-card-stats-row {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   font-size: 16px;
 }
@@ -170,13 +208,32 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
-  padding: 0 var(--spacing-md);
+  padding: 0 var(--spacing-md) var(--spacing-md) var(--spacing-md);
   margin: 0 calc(-1 * var(--spacing-md));
-  scrollbar-width: none; /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-primary) var(--bg-secondary);
 }
 
+/* Visible scrollbar for team slots - mobile friendly */
 .team-slots::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Edge */
+  height: 10px;
+}
+
+.team-slots::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  margin: 0 var(--spacing-md);
+}
+
+.team-slots::-webkit-scrollbar-thumb {
+  background: var(--accent-primary);
+  border-radius: var(--radius-sm);
+  opacity: 0.7;
+}
+
+.team-slots::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+  opacity: 1;
 }
 
 .team-slot-wrapper {
@@ -186,7 +243,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
-  scroll-snap-align: center;
+  scroll-snap-align: start;
 }
 
 .slot-label {
@@ -218,8 +275,17 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
-  min-height: 180px;
+  min-height: 200px;
   height: 100%;
+  position: relative;
+  touch-action: manipulation;
+  user-select: none;
+  cursor: grab;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.team-card:active {
+  cursor: grabbing;
 }
 
 /* Team Avatar - Circular design */
@@ -255,24 +321,89 @@
   font-weight: 700;
 }
 
-.team-card .card-stats {
-  justify-content: center;
+/* Team Card Info - Container for name and stats */
+.team-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1;
+}
+
+.team-card-name {
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Vertical stats layout to prevent wrapping */
+.team-card-stats-column {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+}
+
+/* Stat badge with optional upgrade button */
+.stat-badge-with-upgrade {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  gap: var(--spacing-xs);
+  /* Inherit background and color from stat class (stat-atk, stat-hp, etc.) */
+}
+
+/* Stat content wrapper - keeps stat text and upgrade count together */
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
 }
 
 .upgrade-count {
-  margin-left: 2px;
+  margin-left: auto;
   color: var(--accent-success);
+  font-weight: 600;
 }
 
-.upgrade-buttons {
+/* Small circular upgrade button - only visible when canUpgrade is true */
+.stat-upgrade-btn {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  opacity: 0.8;
+  border: 1px solid transparent;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
   display: flex;
-  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
-.upgrade-btn {
-  flex: 1;
-  padding: 4px;
-  font-size: var(--font-size-xs);
+.stat-upgrade-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.stat-upgrade-btn:active {
+  transform: scale(0.95);
 }
 
 /* Drag Hint */
@@ -283,19 +414,7 @@
 }
 
 /* Dragging States */
-.team-card {
-  position: relative;
-  touch-action: manipulation;
-  user-select: none;
-  cursor: grab;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.team-card:active {
-  cursor: grabbing;
-}
-
-.team-slots.dragging-active .team-slot {
+.team-slots.dragging-active .team-slot-wrapper {
   transition: transform 0.2s ease;
 }
 

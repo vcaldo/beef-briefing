@@ -4,6 +4,7 @@ import { apiClient } from '../api/client';
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring';
 import { useAudio } from '../hooks/useAudio';
 import type { Match, ShopState, ShopCard, GameCard } from '../types';
+import { ShopCardImage } from './ShopCardImage';
 import './ShopPage.css';
 
 /**
@@ -352,38 +353,36 @@ interface ShopCardComponentProps {
 }
 
 function ShopCardComponent({ card, onBuy, canBuy }: ShopCardComponentProps) {
-  // Prefer card image over avatar photo
-  const imageUrl = card.card_image_url || card.photo_url;
-
   return (
     <div className={`shop-card ${card.is_purchased ? 'purchased' : ''}`}>
-      <div className="card-photo">
-        {imageUrl ? (
-          <img src={imageUrl} alt={card.name} />
-        ) : (
-          <div className="no-photo">{card.name[0]}</div>
-        )}
-      </div>
-      <div className="card-info">
-        <div className="card-name">{card.name}</div>
-        <div className="card-stats">
+      {/* Full card image with 2:3 aspect ratio */}
+      <ShopCardImage
+        imageUrl={card.card_image_url}
+        name={card.name}
+        fallbackPhotoUrl={card.photo_url}
+      />
+
+      {/* Info below card */}
+      <div className="shop-card-footer">
+        <div className="shop-card-name">{card.name}</div>
+        <div className="shop-card-stats-row">
           <span className="stat-badge stat-atk">ATK {card.atk}</span>
           <span className="stat-badge stat-def">DEF {card.def}</span>
           <span className="stat-badge stat-hp">HP {card.hp}</span>
         </div>
+
+        {!card.is_purchased ? (
+          <button
+            className="btn btn-primary buy-btn"
+            onClick={onBuy}
+            disabled={!canBuy}
+          >
+            Buy (2)
+          </button>
+        ) : (
+          <div className="purchased-badge">Purchased</div>
+        )}
       </div>
-      {!card.is_purchased && (
-        <button
-          className="btn btn-primary buy-btn"
-          onClick={onBuy}
-          disabled={!canBuy}
-        >
-          Buy (2)
-        </button>
-      )}
-      {card.is_purchased && (
-        <div className="purchased-badge">Purchased</div>
-      )}
     </div>
   );
 }
@@ -432,42 +431,48 @@ function TeamCard({
           <div className="team-avatar-fallback">{card.name[0]}</div>
         )}
       </div>
-      <div className="card-info">
-        <div className="card-name">{card.name}</div>
-        <div className="card-stats">
-          <span className="stat-badge stat-atk">
-            ATK {card.atk}
-            {card.atk_upgrades > 0 && <span className="upgrade-count">+{card.atk_upgrades}</span>}
-          </span>
-          <span className="stat-badge stat-hp">
-            HP {card.hp}
-            {card.hp_upgrades > 0 && <span className="upgrade-count">+{card.hp_upgrades * 3}</span>}
-          </span>
+      <div className="team-card-info">
+        <div className="team-card-name">{card.name}</div>
+        <div className="team-card-stats-column">
+          <div className="stat-badge-with-upgrade stat-atk">
+            <span className="stat-content">
+              ATK {card.atk}
+              {card.atk_upgrades > 0 && <span className="upgrade-count">+{card.atk_upgrades}</span>}
+            </span>
+            {canUpgrade && (
+              <button
+                className="stat-upgrade-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onUpgradeAtk();
+                }}
+                title="Upgrade ATK (+1)"
+              >
+                +
+              </button>
+            )}
+          </div>
+          <div className="stat-badge-with-upgrade stat-hp">
+            <span className="stat-content">
+              HP {card.hp}
+              {card.hp_upgrades > 0 && <span className="upgrade-count">+{card.hp_upgrades * 3}</span>}
+            </span>
+            {canUpgrade && (
+              <button
+                className="stat-upgrade-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onUpgradeHp();
+                }}
+                title="Upgrade HP (+3)"
+              >
+                +
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="upgrade-buttons">
-        <button
-          className="btn btn-secondary upgrade-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onUpgradeAtk();
-          }}
-          disabled={!canUpgrade}
-          title="Upgrade ATK (+1)"
-        >
-          +ATK
-        </button>
-        <button
-          className="btn btn-secondary upgrade-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onUpgradeHp();
-          }}
-          disabled={!canUpgrade}
-          title="Upgrade HP (+3)"
-        >
-          +HP
-        </button>
       </div>
     </Reorder.Item>
   );

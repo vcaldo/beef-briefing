@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import './Avatar.css'
 
 interface AvatarProps {
   photoUrl?: string | null

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"beef-briefing/apps/api-service/internal/game/battle"
@@ -50,6 +51,7 @@ type ArenaService struct {
 	storageClient *storage.MinIOClient
 	cardService   *CardService
 	nrApp         *newrelic.Application
+	matchMutexes  sync.Map // map[string]*sync.Mutex for per-match locking
 }
 
 // validateShopPhaseAccess validates that a user can access the shop for a match.
@@ -771,6 +773,14 @@ func (s *ArenaService) SubmitTeam(ctx context.Context, matchID string, userID in
 
 // checkAndStartBattle checks if all participants are ready and starts battle
 func (s *ArenaService) checkAndStartBattle(ctx context.Context, matchID string) {
+	// Get or create mutex for this match to prevent race condition
+	mutexInterface, _ := s.matchMutexes.LoadOrStore(matchID, &sync.Mutex{})
+	mutex := mutexInterface.(*sync.Mutex)
+
+	mutex.Lock()
+	defer mutex.Unlock()
+	defer s.matchMutexes.Delete(matchID) // Cleanup after
+
 	total, _ := s.gameRepo.GetParticipantCount(ctx, matchID)
 	ready, _ := s.gameRepo.GetReadyParticipantCount(ctx, matchID)
 
@@ -929,12 +939,16 @@ func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *re
 
 	if result.WinnerID != nil {
 		if *result.WinnerID == pA.UserID {
-			s.gameRepo.UpdateLeaderboard(ctx, pA.UserID, match.ChatID, match.MatchType, true, &pB.UserID, false)
-			s.gameRepo.UpdateLeaderboard(ctx, pB.UserID, match.ChatID, match.MatchType, false, &pA.UserID, false)
+			s.gameRepo.UpdateLeaderboard(ctx, pA.UserID, match.ChatID, match.MatchType, true, &pB.UserID, false, false)
+			s.gameRepo.UpdateLeaderboard(ctx, pB.UserID, match.ChatID, match.MatchType, false, &pA.UserID, false, false)
 		} else {
-			s.gameRepo.UpdateLeaderboard(ctx, pB.UserID, match.ChatID, match.MatchType, true, &pA.UserID, false)
-			s.gameRepo.UpdateLeaderboard(ctx, pA.UserID, match.ChatID, match.MatchType, false, &pB.UserID, false)
+			s.gameRepo.UpdateLeaderboard(ctx, pB.UserID, match.ChatID, match.MatchType, true, &pA.UserID, false, false)
+			s.gameRepo.UpdateLeaderboard(ctx, pA.UserID, match.ChatID, match.MatchType, false, &pB.UserID, false, false)
 		}
+	} else if result.IsDraw {
+		// Handle draws: update both players with no win, but increment match count
+		s.gameRepo.UpdateLeaderboard(ctx, pA.UserID, match.ChatID, match.MatchType, false, &pB.UserID, false, true)
+		s.gameRepo.UpdateLeaderboard(ctx, pB.UserID, match.ChatID, match.MatchType, false, &pA.UserID, false, true)
 	}
 
 	// Complete match for 1v1
@@ -966,13 +980,33 @@ func (s *ArenaService) runArena(ctx context.Context, matchID string, participant
 		}
 	}
 
-	// Determine winner by most wins
+	// Determine winner by most wins, then total damage, then user_id (deterministic tiebreaker)
 	participants, _ = s.gameRepo.GetMatchParticipants(ctx, matchID)
 	var winner *repository.ParticipantWithUser
 	maxWins := -1
+	var maxDamage int
+	var tieBreakID int64 = 9223372036854775807 // math.MaxInt64
+
 	for _, p := range participants {
+		isNewLeader := false
+
 		if p.Wins > maxWins {
+			// More wins always takes priority
+			isNewLeader = true
+		} else if p.Wins == maxWins {
+			// If tied on wins, check total damage
+			if p.TotalDamageDealt > maxDamage {
+				isNewLeader = true
+			} else if p.TotalDamageDealt == maxDamage && p.UserID < tieBreakID {
+				// If still tied on damage, use lower user_id (deterministic)
+				isNewLeader = true
+			}
+		}
+
+		if isNewLeader {
 			maxWins = p.Wins
+			maxDamage = p.TotalDamageDealt
+			tieBreakID = p.UserID
 			winner = p
 		}
 	}

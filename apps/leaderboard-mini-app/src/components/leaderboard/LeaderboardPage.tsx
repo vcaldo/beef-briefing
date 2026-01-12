@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
 import { apiClient } from '../../api/client'
-import { setCustomAttribute, addPageAction, noticeError } from '../../newrelic'
+import { setCustomAttribute, addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { PeriodSelector } from '../PeriodSelector'
 import { LeaderboardTable } from '../LeaderboardTable'
 

@@ -1,16 +1,21 @@
 # Build stage
 FROM node:22-alpine AS builder
 
+# Install pnpm which properly supports workspace: protocol
+RUN npm install -g pnpm
+
 WORKDIR /app
 
-# Copy package files
-COPY apps/deck-mini-app/package*.json ./
+# Copy root and workspace package files
+COPY package*.json pnpm-workspace.yaml ./
+COPY apps/deck-mini-app/ ./apps/deck-mini-app/
+COPY apps/shared-mini-app/ ./apps/shared-mini-app/
 
 # Install dependencies
-RUN npm ci
+RUN pnpm install --frozen-lockfile || pnpm install
 
-# Copy source code
-COPY apps/deck-mini-app/ .
+# Change to deck-mini-app directory for build
+WORKDIR /app/apps/deck-mini-app
 
 # Build arguments for API URLs and New Relic Browser monitoring
 ARG VITE_API_URL
@@ -32,7 +37,7 @@ ARG VITE_ENVIRONMENT
 ENV VITE_ENVIRONMENT=$VITE_ENVIRONMENT
 
 # Build the application
-RUN npm run build
+RUN pnpm run build
 
 # Production stage
 FROM nginx:alpine
@@ -41,7 +46,7 @@ FROM nginx:alpine
 COPY apps/deck-mini-app/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy built assets
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/apps/deck-mini-app/dist /usr/share/nginx/html
 
 # Expose port
 EXPOSE 80

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLaunchParams, backButton, shareStory, cloudStorage, openLink } from '@telegram-apps/sdk-react'
 
 import { apiClient, CardImageWithUrl } from './api/client'
-import { setCustomAttribute, addPageAction, noticeError } from './newrelic'
+import { setCustomAttribute, addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { WeekSelector } from './components/WeekSelector'
 import { CardGallery } from './components/CardGallery'
 import { InfoModal } from './components/InfoModal'

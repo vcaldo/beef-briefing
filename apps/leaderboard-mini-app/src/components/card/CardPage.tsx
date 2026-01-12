@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 
 import { apiClient } from '../../api/client'
-import { addPageAction, noticeError } from '../../newrelic'
+import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import type { CardImageWithUrl } from '../../types'
 
 interface CardPageProps {

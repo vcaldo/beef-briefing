@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { noticeError } from '../newrelic';
+import { noticeError } from '@beef-briefing/shared-mini-app/monitoring';
 import type { MatchHistoryEntry, GameCard, BattleResult, BattleEvent } from '../types';
-import { Avatar } from './Avatar';
-import { ErrorDisplay } from './ErrorDisplay';
+import { Avatar } from '@beef-briefing/shared-mini-app/components';
+import { ErrorDisplay } from '@beef-briefing/shared-mini-app/components';
 import './HistoryPage.css';
 
 interface HistoryPageProps {
@@ -211,12 +211,12 @@ export function HistoryPage(_props: HistoryPageProps) {
                   <div className="entry-compact">
                     <div className="players-section">
                       <div className="player you">
-                        <Avatar src={yourPhoto} name="You" size="md" />
+                        <Avatar photoUrl={yourPhoto} firstName="You" size="medium" />
                         <span className="player-name">You</span>
                       </div>
                       <span className="vs-badge">vs</span>
                       <div className="player opponent">
-                        <Avatar src={opponentPhoto} name={match.opponent.first_name} size="md" />
+                        <Avatar photoUrl={opponentPhoto} firstName={match.opponent.first_name} size="medium" />
                         <span className="player-name">{match.opponent.first_name}</span>
                       </div>
                     </div>

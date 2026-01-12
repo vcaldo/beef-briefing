@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { noticeError } from '../newrelic';
+import { noticeError } from '@beef-briefing/shared-mini-app/monitoring';
 import type { H2HRecord, MatchHistoryEntry } from '../types';
-import { ErrorDisplay } from './ErrorDisplay';
+import { ErrorDisplay } from '@beef-briefing/shared-mini-app/components';
 import './H2HPage.css';
 
 interface H2HPageProps {

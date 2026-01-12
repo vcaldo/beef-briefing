@@ -13,7 +13,7 @@ import {
 } from 'recharts'
 
 import { apiClient } from '../../api/client'
-import { addPageAction, noticeError } from '../../newrelic'
+import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { PeriodSelector } from '../PeriodSelector'
 import { Avatar, TrendIndicator } from '../common'
 

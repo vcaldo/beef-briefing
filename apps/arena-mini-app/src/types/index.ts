@@ -131,17 +131,8 @@ export interface LeaderboardEntry {
   username?: string;
 }
 
-// Auth types
-export interface AuthResponse {
-  token: string;
-  user_id: number;
-  chat_id?: number;
-  chat_title?: string;
-  first_name: string;
-  username?: string;
-  is_admin: boolean;
-  chat_timezone?: string;
-}
+// Auth types (shared with other mini apps)
+export type { AuthResponse } from '@beef-briefing/shared-mini-app/types';
 
 // Match history types
 export interface MatchHistoryEntry {

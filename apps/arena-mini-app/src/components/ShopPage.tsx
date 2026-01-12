@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Reorder } from 'framer-motion';
 import { apiClient } from '../api/client';
-import { addPageAction, noticeError } from '../newrelic';
+import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring';
 import { useAudio } from '../hooks/useAudio';
 import type { Match, ShopState, ShopCard, GameCard } from '../types';
 import './ShopPage.css';

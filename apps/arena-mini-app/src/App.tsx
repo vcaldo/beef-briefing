@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLaunchParams } from '@telegram-apps/sdk-react';
 import { apiClient } from './api/client';
-import { setCustomAttribute, addPageAction, noticeError } from './newrelic';
+import { setCustomAttribute, addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring';
 import type { AppState, AppPage, Match } from './types';
 import { LobbyPage } from './components/LobbyPage';
 import { ShopPage } from './components/ShopPage';
@@ -11,7 +11,7 @@ import { HistoryPage } from './components/HistoryPage';
 import { H2HPage } from './components/H2HPage';
 import { ProfilePage } from './components/ProfilePage';
 import { Navigation } from './components/Navigation';
-import { ErrorBoundary } from './components/ErrorBoundary';
+import { ErrorBoundary } from '@beef-briefing/shared-mini-app/components';
 
 // Fallback component for invalid state combinations
 function InvalidStateFallback({ onReset }: { onReset: () => void }) {

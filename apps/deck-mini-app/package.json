@@ -10,6 +10,7 @@
     "lint": "eslint . --ext ts,tsx"
   },
   "dependencies": {
+    "@beef-briefing/shared-mini-app": "workspace:*",
     "@newrelic/browser-agent": "^1.306.0",
     "@telegram-apps/sdk-react": "^2.0.6",
     "react": "^18.3.1",

@@ -1,11 +1,11 @@
-import { Component, type ReactNode } from 'react'
-
-import { noticeError, addPageAction } from '../../newrelic'
+import { Component, ReactNode } from 'react'
+import { noticeError, addPageAction } from '../monitoring'
 
 interface Props {
   children: ReactNode
   fallback?: ReactNode
   onReset?: () => void
+  name?: string
 }
 
 interface State {
@@ -24,16 +24,15 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo)
-
-    // Report to New Relic
+    console.error('ErrorBoundary caught error:', error, errorInfo)
     noticeError(error, {
       context: 'error_boundary',
+      boundary_name: this.props.name || 'unknown',
       componentStack: errorInfo.componentStack,
     })
-    addPageAction('error_boundary_caught', {
+    addPageAction('error_boundary_triggered', {
+      boundary_name: this.props.name || 'unknown',
       error_message: error.message,
-      error_name: error.name,
     })
   }
 
@@ -49,17 +48,15 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="error-boundary">
-          <div className="error-boundary-content">
-            <div className="error-boundary-icon">!</div>
-            <h2 className="error-boundary-title">Something went wrong</h2>
-            <p className="error-boundary-message">
-              {this.state.error?.message || 'An unexpected error occurred'}
-            </p>
-            <button className="error-boundary-btn" onClick={this.handleReset}>
-              Try Again
-            </button>
+        <div className="error-boundary-fallback">
+          <div className="fallback-icon">⚠️</div>
+          <div className="fallback-title">Something went wrong</div>
+          <div className="fallback-message">
+            {this.state.error?.message || 'An unexpected error occurred'}
           </div>
+          <button className="btn btn-primary" onClick={this.handleReset}>
+            Try Again
+          </button>
         </div>
       )
     }

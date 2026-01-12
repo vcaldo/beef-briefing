@@ -2,16 +2,8 @@
  * Types for the Leaderboard Mini App.
  */
 
-export interface AuthResponse {
-  token: string
-  user_id: number
-  chat_id: number | null
-  chat_title: string | null
-  first_name: string
-  username: string | null
-  is_admin: boolean
-  chat_timezone?: string | null
-}
+// Auth types (shared with other mini apps)
+export type { AuthResponse } from '@beef-briefing/shared-mini-app/types'
 
 export interface StatsResponse {
   total_messages: number

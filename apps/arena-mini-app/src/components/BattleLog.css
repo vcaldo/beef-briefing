@@ -53,6 +53,22 @@
   word-break: break-word;
 }
 
+/* Text alignment based on team */
+.log-entry.align-left {
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.log-entry.align-right {
+  text-align: right;
+  justify-content: flex-end;
+}
+
+.log-entry.align-center {
+  text-align: center;
+  justify-content: center;
+}
+
 /* Health Bar Color Coding */
 .health-bar-high {
   color: #51cf66;
@@ -114,78 +130,14 @@
   border-radius: var(--border-radius-sm);
   padding: var(--spacing-sm);
   margin: var(--spacing-xs) 0;
-  cursor: pointer;
   font-weight: 600;
   color: var(--text-primary);
-  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  border: none;
   width: 100%;
-  text-align: left;
 }
 
-.log-entry-summary:hover {
-  background: var(--bg-hover);
-  transform: translateX(2px);
-}
-
-.log-entry-summary .log-icon {
-  color: #845ef7;
-  font-size: 16px;
-}
-
-.log-entry-summary .expand-icon {
-  margin-left: auto;
-  color: var(--text-secondary);
-  font-size: 12px;
-  transition: transform 0.2s ease;
-}
-
-.log-entry-summary.expanded .expand-icon {
-  transform: rotate(180deg);
-}
-
-/* Summary Group (contains summary + details) */
-.summary-group {
-  margin: var(--spacing-xs) 0;
-}
-
-/* Summary Details (expandable section) */
-.summary-details {
-  max-height: 500px;
-  overflow: hidden;
-  animation: expandDown 0.3s ease-out;
-  background: var(--bg-tertiary);
-  border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
-  padding: 0 var(--spacing-sm) var(--spacing-sm) var(--spacing-sm);
-  border-left: 2px solid #845ef7;
-}
-
-@keyframes expandDown {
-  from {
-    max-height: 0;
-    opacity: 0;
-  }
-  to {
-    max-height: 500px;
-    opacity: 1;
-  }
-}
-
-/* Nested log entries inside summary */
-.summary-details .log-entry {
-  padding: var(--spacing-xs) var(--spacing-xs);
-  margin-left: var(--spacing-md);
-  border-bottom: 1px solid var(--border-color-light);
-  background: transparent;
-  animation: none;
-}
-
-.summary-details .log-entry:last-child {
-  border-bottom: none;
-}
 
 /* Scrollbar styling */
 .battle-log::-webkit-scrollbar {

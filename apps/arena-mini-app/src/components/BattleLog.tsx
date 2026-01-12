@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import './BattleLog.css';
 
 interface BattleEvent {
@@ -22,26 +22,13 @@ interface BattleEvent {
 
 interface BattleLogProps {
   events: BattleEvent[];
+  playerAId?: number;
+  playerBId?: number;
+  playerATeam?: any[];
+  playerBTeam?: any[];
   currentEventIndex?: number;
   isLive?: boolean;
   autoScroll?: boolean;
-}
-
-function getEventIcon(type: string): string {
-  switch (type) {
-    case 'attack':
-      return '🗡️';
-    case 'death':
-      return '💀';
-    case 'victory':
-      return '🏆';
-    case 'advance':
-      return '➡️';
-    case 'summary':
-      return '⚔️';
-    default:
-      return '';
-  }
 }
 
 // Parse health bar from message and extract HP percentage
@@ -56,14 +43,62 @@ function getHealthBarInfo(message: string): { bar: string; percentage: number } 
   return { bar, percentage };
 }
 
+// Determine text alignment based on which team initiated the event
+function getEventTeamAlignment(
+  event: BattleEvent,
+  playerAId?: number,
+  playerBId?: number,
+  playerATeam?: any[],
+  playerBTeam?: any[],
+): 'left' | 'right' | 'center' {
+  // Require team info to be available
+  if (!playerAId || !playerBId || !playerATeam || !playerBTeam) {
+    return 'left';
+  }
+
+  switch (event.type) {
+    case 'attack':
+      // Align based on attacker
+      if (event.attacker_team_owner_id === playerAId) return 'left';
+      if (event.attacker_team_owner_id === playerBId) return 'right';
+      return 'center';
+
+    case 'death':
+      // Death message format: "X defeats Y" where Y is the defender
+      // Align based on the killer (opposite of defender's team)
+      if (event.defender_team_owner_id === playerAId) return 'right'; // B killed A
+      if (event.defender_team_owner_id === playerBId) return 'left';  // A killed B
+      return 'center';
+
+    case 'summary':
+      // Find which team the killer belongs to
+      if (event.killer_card_id) {
+        const isPlayerA = playerATeam.some((card: any) => card.card_id === event.killer_card_id);
+        const isPlayerB = playerBTeam.some((card: any) => card.card_id === event.killer_card_id);
+        if (isPlayerA) return 'left';
+        if (isPlayerB) return 'right';
+      }
+      return 'center';
+
+    case 'victory':
+    case 'advance':
+    default:
+      // Neutral events stay centered
+      return 'center';
+  }
+}
+
 export function BattleLog({
   events,
+  playerAId,
+  playerBId,
+  playerATeam,
+  playerBTeam,
   currentEventIndex = undefined,
   isLive = false,
   autoScroll = isLive,
 }: BattleLogProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
-  const [expandedSummaries, setExpandedSummaries] = useState<Set<number>>(new Set());
 
   // Auto-scroll when new events appear
   useEffect(() => {
@@ -80,17 +115,6 @@ export function BattleLog({
     return events;
   }, [events, currentEventIndex, isLive]);
 
-  // Toggle summary expansion
-  const toggleSummaryExpansion = (eventIndex: number) => {
-    const newExpanded = new Set(expandedSummaries);
-    if (newExpanded.has(eventIndex)) {
-      newExpanded.delete(eventIndex);
-    } else {
-      newExpanded.add(eventIndex);
-    }
-    setExpandedSummaries(newExpanded);
-  };
-
   // Render a single event
   const renderEvent = (event: BattleEvent, index: number) => {
     const healthBarInfo = getHealthBarInfo(event.message);
@@ -102,9 +126,11 @@ export function BattleLog({
           : 'health-bar-low'
       : '';
 
+    const alignment = getEventTeamAlignment(event, playerAId, playerBId, playerATeam, playerBTeam);
+    const alignmentClass = `align-${alignment}`;
+
     return (
-      <div key={index} className={`log-entry log-entry-${event.type} ${healthBarClass}`}>
-        <span className="log-icon">{getEventIcon(event.type)}</span>
+      <div key={index} className={`log-entry log-entry-${event.type} ${healthBarClass} ${alignmentClass}`}>
         <span className="log-message">{event.message}</span>
       </div>
     );
@@ -120,51 +146,21 @@ export function BattleLog({
     );
   }
 
-  // Render for history (with expandable summaries, collapsed by default)
-  // Find all summary events and their surrounding attack/death events
-  const summaryIndices = displayEvents
-    .map((event, index) => (event.is_summary ? index : -1))
-    .filter((index) => index !== -1);
-
+  // Render for history (show only summaries, no expansion)
   return (
     <div className="battle-log battle-log-history">
-      {displayEvents.map((event, index) => {
-        if (event.is_summary) {
-          // Find the next summary or end of events
-          const nextSummaryIndex = summaryIndices.find((si) => si > index) ?? displayEvents.length;
-
-          // Get events between this summary and the next
-          const endIndex = nextSummaryIndex - 1;
-          const groupedEvents = displayEvents.slice(index + 1, endIndex + 1);
-
-          const isExpanded = expandedSummaries.has(index);
+      {displayEvents
+        .filter((event) => event.is_summary)
+        .map((event, index) => {
+          const alignment = getEventTeamAlignment(event, playerAId, playerBId, playerATeam, playerBTeam);
+          const alignmentClass = `align-${alignment}`;
 
           return (
-            <div key={index} className="summary-group">
-              <button
-                className={`log-entry log-entry-summary ${isExpanded ? 'expanded' : 'collapsed'}`}
-                onClick={() => toggleSummaryExpansion(index)}
-              >
-                <span className="log-icon">{getEventIcon(event.type)}</span>
-                <span className="log-message">{event.message}</span>
-                <span className="expand-icon">{isExpanded ? '▲' : '▼'}</span>
-              </button>
-
-              {/* Expandable details */}
-              {isExpanded && groupedEvents.length > 0 && (
-                <div className="summary-details">
-                  {groupedEvents.map((detailEvent, detailIndex) =>
-                    renderEvent(detailEvent, detailIndex),
-                  )}
-                </div>
-              )}
+            <div key={index} className={`log-entry log-entry-summary ${alignmentClass}`}>
+              <span className="log-message">{event.message}</span>
             </div>
           );
-        }
-
-        // Skip non-summary events in history mode, they're rendered under summaries
-        return null;
-      })}
+        })}
     </div>
   );
 }

@@ -396,6 +396,10 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
       {/* Battle Log */}
       <BattleLog
         events={currentRound.battle_log}
+        playerAId={currentRound.player_a_id}
+        playerBId={currentRound.player_b_id}
+        playerATeam={currentRound.player_a_team}
+        playerBTeam={currentRound.player_b_team}
         currentEventIndex={currentEventIndex}
         isLive={true}
         autoScroll={true}

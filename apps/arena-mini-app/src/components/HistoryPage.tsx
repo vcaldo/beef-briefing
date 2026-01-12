@@ -200,6 +200,10 @@ export function HistoryPage(_props: HistoryPageProps) {
                               <div className="round-header">Round {roundIndex + 1}</div>
                               <BattleLog
                                 events={round.battle_log}
+                                playerAId={round.player_a_id}
+                                playerBId={round.player_b_id}
+                                playerATeam={round.player_a_team}
+                                playerBTeam={round.player_b_team}
                                 isLive={false}
                                 autoScroll={false}
                               />

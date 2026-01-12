@@ -165,12 +165,12 @@ export function HistoryPage(_props: HistoryPageProps) {
                   <div className="entry-compact">
                     <div className="players-section">
                       <div className="player you">
-                        <Avatar photoUrl={yourPhoto} firstName="You" size="medium" />
+                        <Avatar photoUrl={yourPhoto} firstName="You" size="small" />
                         <span className="player-name">You</span>
                       </div>
                       <span className="vs-badge">vs</span>
                       <div className="player opponent">
-                        <Avatar photoUrl={opponentPhoto} firstName={match.opponent.first_name} size="medium" />
+                        <Avatar photoUrl={opponentPhoto} firstName={match.opponent.first_name} size="small" />
                         <span className="player-name">{match.opponent.first_name}</span>
                       </div>
                     </div>

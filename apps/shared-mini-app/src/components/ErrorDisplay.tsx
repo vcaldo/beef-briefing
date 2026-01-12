@@ -1,8 +1,8 @@
 interface ErrorDisplayProps {
-  error: string;
-  onRetry?: () => void;
-  onBack?: () => void;
-  title?: string;
+  error: string
+  onRetry?: () => void
+  onBack?: () => void
+  title?: string
 }
 
 export function ErrorDisplay({
@@ -29,5 +29,5 @@ export function ErrorDisplay({
         )}
       </div>
     </div>
-  );
+  )
 }

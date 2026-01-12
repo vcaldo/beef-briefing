@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { noticeError } from '../newrelic';
+import { noticeError } from '@beef-briefing/shared-mini-app/monitoring';
 import type { ArenaProfile, MatchHistoryEntry, GameCard, BattleResult, BattleEvent } from '../types';
-import { Avatar } from './Avatar';
-import { ErrorDisplay } from './ErrorDisplay';
+import { Avatar } from '@beef-briefing/shared-mini-app/components';
+import { ErrorDisplay } from '@beef-briefing/shared-mini-app/components';
 import './ProfilePage.css';
 
 interface ProfilePageProps {
@@ -294,12 +294,12 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                       <div className="match-compact">
                         <div className="match-players">
                           <div className="match-player you">
-                            <Avatar src={yourPhoto} name="You" size="sm" />
+                            <Avatar photoUrl={yourPhoto} firstName="You" size="small" />
                             <span className="match-player-name">You</span>
                           </div>
                           <span className="match-vs">vs</span>
                           <div className="match-player opponent">
-                            <Avatar src={opponentPhoto} name={match.opponent.first_name} size="sm" />
+                            <Avatar photoUrl={opponentPhoto} firstName={match.opponent.first_name} size="small" />
                             <span className="match-player-name">{match.opponent.first_name}</span>
                           </div>
                         </div>

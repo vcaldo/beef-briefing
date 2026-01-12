@@ -1,54 +1,18 @@
 // Initialize New Relic Browser monitoring FIRST (must be early, before React)
-import './newrelic'
+import '@beef-briefing/shared-mini-app/monitoring'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import {
-  init,
-  miniApp,
-  themeParams,
-  viewport,
-  backButton,
-} from '@telegram-apps/sdk-react'
+import { initializeTelegramSDK } from '@beef-briefing/shared-mini-app/initialization'
 
 import App from './App'
-import { ErrorBoundary } from './components/ErrorBoundary'
+import { ErrorBoundary } from '@beef-briefing/shared-mini-app/components'
 import './styles/global.css'
 
-// Initialize Telegram Mini App SDK
+// Initialize app
 async function initApp() {
-  try {
-    // Initialize SDK
-    init()
-
-    // Mount Telegram components
-    if (miniApp.mount.isAvailable()) {
-      miniApp.mount()
-      miniApp.ready()
-    }
-
-    if (themeParams.mount.isAvailable()) {
-      themeParams.mount()
-    }
-
-    if (viewport.mount.isAvailable()) {
-      viewport.mount()
-      // Expand to full height
-      if (viewport.expand.isAvailable()) {
-        viewport.expand()
-      }
-    }
-
-    if (backButton.mount.isAvailable()) {
-      backButton.mount()
-    }
-
-    console.info('Telegram Mini App SDK initialized successfully')
-  } catch (error) {
-    console.error('Failed to initialize Telegram SDK:', error)
-    // SDK initialization failure is not critical - app can still work
-    // if opened directly with query parameters
-  }
+  // Initialize Telegram Mini App SDK
+  initializeTelegramSDK()
 
   // Render app
   try {

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 
 import { apiClient } from './api/client'
-import { setCustomAttribute, addPageAction, noticeError } from './newrelic'
+import { setCustomAttribute, addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { TabBar, ErrorBoundary } from './components/common'
 import { HomePage } from './components/home/HomePage'
 import { LeaderboardPage } from './components/leaderboard/LeaderboardPage'
@@ -157,15 +157,15 @@ function App() {
         setUserId(auth.user_id)
         setFirstName(auth.first_name)
         setUsername(auth.username)
-        setChatTitle(auth.chat_title)
-        setIsAdmin(auth.is_admin)
+        setChatTitle(auth.chat_title ?? null)
+        setIsAdmin(auth.is_admin ?? false)
 
         // Set New Relic custom attributes for this session
         setCustomAttribute('user_id', auth.user_id)
         setCustomAttribute('chat_id', auth.chat_id)
         setCustomAttribute('username', auth.username || '')
         setCustomAttribute('first_name', auth.first_name)
-        setCustomAttribute('is_admin', auth.is_admin)
+        setCustomAttribute('is_admin', auth.is_admin ?? false)
         setCustomAttribute('is_authenticated', true)
 
         addPageAction('auth_success', {

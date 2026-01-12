@@ -1,5 +1,5 @@
 /**
- * Timezone utilities for the leaderboard mini-app.
+ * Timezone utilities for Telegram Mini Apps.
  */
 
 /**

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
 import { apiClient } from '../../api/client'
-import { addPageAction, noticeError } from '../../newrelic'
+import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { PeriodSelector } from '../PeriodSelector'
 import { OverviewStats } from '../OverviewStats'
 import { ActivityChart } from '../ActivityChart'

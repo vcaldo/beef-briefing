@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { noticeError } from '../newrelic';
+import { noticeError } from '@beef-briefing/shared-mini-app/monitoring';
 import type { LeaderboardEntry } from '../types';
-import { ErrorDisplay } from './ErrorDisplay';
+import { ErrorDisplay } from '@beef-briefing/shared-mini-app/components';
 import './LeaderboardPage.css';
 
 interface LeaderboardPageProps {

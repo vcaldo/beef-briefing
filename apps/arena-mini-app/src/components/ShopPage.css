@@ -210,11 +210,30 @@
   scroll-snap-type: x mandatory;
   padding: 0 var(--spacing-md);
   margin: 0 calc(-1 * var(--spacing-md));
-  scrollbar-width: none; /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-primary) var(--bg-secondary);
 }
 
+/* Visible scrollbar for team slots - mobile friendly */
 .team-slots::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Edge */
+  height: 6px;
+}
+
+.team-slots::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  margin: 0 var(--spacing-md);
+}
+
+.team-slots::-webkit-scrollbar-thumb {
+  background: var(--accent-primary);
+  border-radius: var(--radius-sm);
+  opacity: 0.7;
+}
+
+.team-slots::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+  opacity: 1;
 }
 
 .team-slot-wrapper {

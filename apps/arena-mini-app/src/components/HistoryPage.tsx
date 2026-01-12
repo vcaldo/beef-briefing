@@ -193,23 +193,15 @@ export function HistoryPage(_props: HistoryPageProps) {
                           <div className="spinner spinner-sm" />
                         </div>
                       ) : battleData && battleData.rounds.length > 0 ? (
-                        <div className="battle-log">
-                          <div className="battle-log-header">Battle Log</div>
-                          {battleData.rounds.map((round, roundIndex) => (
-                            <div key={roundIndex} className="battle-round">
-                              <div className="round-header">Round {roundIndex + 1}</div>
-                              <BattleLog
-                                events={round.battle_log}
-                                playerAId={round.player_a_id}
-                                playerBId={round.player_b_id}
-                                playerATeam={round.player_a_team}
-                                playerBTeam={round.player_b_team}
-                                isLive={false}
-                                autoScroll={false}
-                              />
-                            </div>
-                          ))}
-                        </div>
+                        <BattleLog
+                          events={battleData.rounds.flatMap(round => round.battle_log)}
+                          playerAId={battleData.rounds[0]?.player_a_id}
+                          playerBId={battleData.rounds[0]?.player_b_id}
+                          playerATeam={battleData.rounds[0]?.player_a_team}
+                          playerBTeam={battleData.rounds[0]?.player_b_team}
+                          isLive={false}
+                          autoScroll={false}
+                        />
                       ) : (
                         <div className="battle-log-empty">
                           No battle data available

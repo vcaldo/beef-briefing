@@ -9,10 +9,12 @@
 
 .battle-log-live {
   /* Live battle shows all events in sequence */
+  max-height: 150px;
 }
 
 .battle-log-history {
-  /* History shows summaries with collapsible details */
+  /* History shows all summary events from multiple rounds */
+  max-height: 400px;
 }
 
 /* Log Entry Base Styles */

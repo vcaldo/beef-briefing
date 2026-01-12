@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import '../styles/shop-card-image.css';
 
 interface ShopCardImageProps {
   imageUrl: string | undefined;

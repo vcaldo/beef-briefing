@@ -181,8 +181,8 @@ func (s *ShopState) SetOrder(order []int) error {
 	return nil
 }
 
-// GetBattleTeam returns the team in battle order
-func (s *ShopState) GetBattleTeam() *battle.Team {
+// GetBattleTeam returns the team in battle order with the given owner name
+func (s *ShopState) GetBattleTeam(ownerName string) *battle.Team {
 	if len(s.Team) != TeamSize {
 		return nil
 	}
@@ -195,7 +195,7 @@ func (s *ShopState) GetBattleTeam() *battle.Team {
 		}
 	}
 
-	return battle.NewTeam(s.UserID, cards)
+	return battle.NewTeam(s.UserID, ownerName, cards)
 }
 
 // Submit marks the team as ready for battle

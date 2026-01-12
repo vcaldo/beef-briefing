@@ -6,11 +6,12 @@ import "encoding/json"
 type EventType string
 
 const (
-	EventAttack  EventType = "attack"
-	EventDamage  EventType = "damage"
-	EventDeath   EventType = "death"
-	EventAdvance EventType = "advance"
-	EventVictory EventType = "victory"
+	EventAttack   EventType = "attack"
+	EventDamage   EventType = "damage"
+	EventDeath    EventType = "death"
+	EventAdvance  EventType = "advance"
+	EventVictory  EventType = "victory"
+	EventSummary  EventType = "summary"
 )
 
 // Card represents a card in battle with current state
@@ -46,15 +47,17 @@ func (c *Card) Clone() *Card {
 
 // Team represents a player's 3-card lineup
 type Team struct {
-	OwnerID int64   `json:"owner_id"`
-	Cards   []*Card `json:"cards"` // Ordered: [0]=front, [1]=mid, [2]=back
+	OwnerID   int64   `json:"owner_id"`
+	OwnerName string  `json:"owner_name"` // Player name (first_name or username)
+	Cards     []*Card `json:"cards"`      // Ordered: [0]=front, [1]=mid, [2]=back
 }
 
 // NewTeam creates a team from cards
-func NewTeam(ownerID int64, cards []*Card) *Team {
+func NewTeam(ownerID int64, ownerName string, cards []*Card) *Team {
 	team := &Team{
-		OwnerID: ownerID,
-		Cards:   make([]*Card, len(cards)),
+		OwnerID:   ownerID,
+		OwnerName: ownerName,
+		Cards:     make([]*Card, len(cards)),
 	}
 	for i, c := range cards {
 		if c != nil {
@@ -69,8 +72,9 @@ func NewTeam(ownerID int64, cards []*Card) *Team {
 // Clone creates a deep copy of the team
 func (t *Team) Clone() *Team {
 	clone := &Team{
-		OwnerID: t.OwnerID,
-		Cards:   make([]*Card, len(t.Cards)),
+		OwnerID:   t.OwnerID,
+		OwnerName: t.OwnerName,
+		Cards:     make([]*Card, len(t.Cards)),
 	}
 	for i, c := range t.Cards {
 		clone.Cards[i] = c.Clone()
@@ -130,6 +134,14 @@ type BattleEvent struct {
 	Damage   int `json:"damage,omitempty"`
 	HPBefore int `json:"hp_before,omitempty"`
 	HPAfter  int `json:"hp_after,omitempty"`
+
+	// Summary event fields (for consolidated card duel outcomes)
+	IsSummary         bool  `json:"is_summary,omitempty"`
+	KillerCardID      *int64 `json:"killer_card_id,omitempty"`
+	TotalDamageDealt  int   `json:"total_damage_dealt,omitempty"`
+	TotalDamageTaken  int   `json:"total_damage_taken,omitempty"`
+	RoundsInDuel      int   `json:"rounds_in_duel,omitempty"`
+	KillStreak        int   `json:"kill_streak,omitempty"`
 }
 
 // Result represents the outcome of a battle

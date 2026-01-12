@@ -77,7 +77,7 @@ export type EventType = 'attack' | 'damage' | 'death' | 'advance' | 'victory';
 export interface BattleEvent {
   type: EventType;
   round: number;
-  message?: string;
+  message: string;
   attacker_card_id?: number;
   defender_card_id?: number;
   attacker_team_owner_id?: number;

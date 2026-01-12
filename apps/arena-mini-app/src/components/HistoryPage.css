@@ -188,45 +188,6 @@
   height: 20px;
 }
 
-.battle-log-header {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: var(--spacing-xs);
-}
-
-.battle-log {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.battle-round {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.log-entry {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  padding: 2px 0;
-  font-size: var(--font-size-xs);
-}
-
-.log-icon {
-  flex-shrink: 0;
-  width: 16px;
-  text-align: center;
-}
-
-.log-message {
-  color: var(--text-secondary);
-  line-height: 1.3;
-}
 
 .log-attack .log-message {
   color: var(--text-primary);

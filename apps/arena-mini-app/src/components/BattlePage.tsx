@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../api/client';
 import { useAudio } from '../hooks/useAudio';
 import { BattleCard } from './BattleCard';
+import { BattleLog } from './BattleLog';
 import type { Match, BattleResult, BattleEvent, GameCard } from '../types';
 import './BattlePage.css';
 
@@ -58,24 +59,6 @@ function getPlayerName(userId: number, participants: any[]): string {
   const participant = participants.find(p => p.user_id === userId);
   if (!participant) return 'Unknown';
   return participant.username || participant.first_name;
-}
-
-/**
- * Gets an emoji icon for a battle event type.
- */
-function getEventIcon(type: string): string {
-  switch (type) {
-    case 'attack':
-      return '⚔️';
-    case 'death':
-      return '💀';
-    case 'victory':
-      return '👑';
-    case 'advance':
-      return '➡️';
-    default:
-      return '';
-  }
 }
 
 export function BattlePage({ match, userId, onBack }: BattlePageProps) {
@@ -411,14 +394,16 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
       </div>
 
       {/* Battle Log */}
-      <div className="battle-log">
-        {currentRound.battle_log.slice(0, currentEventIndex + 1).map((event, i) => (
-          <div key={i} className={`log-entry log-entry-${event.type}`}>
-            <span className="log-icon">{getEventIcon(event.type)}</span>
-            <span className="log-message">{event.message}</span>
-          </div>
-        ))}
-      </div>
+      <BattleLog
+        events={currentRound.battle_log}
+        playerAId={currentRound.player_a_id}
+        playerBId={currentRound.player_b_id}
+        playerATeam={currentRound.player_a_team}
+        playerBTeam={currentRound.player_b_team}
+        currentEventIndex={currentEventIndex}
+        isLive={true}
+        autoScroll={true}
+      />
 
       {/* Controls */}
       <div className="battle-controls">

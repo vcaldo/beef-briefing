@@ -318,13 +318,25 @@
   align-items: stretch;
 }
 
-.team-card-stats-column .stat-badge {
+/* Stat badge with optional upgrade button */
+.stat-badge-with-upgrade {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  gap: var(--spacing-xs);
+  /* Inherit background and color from stat class (stat-atk, stat-hp, etc.) */
+}
+
+/* Stat content wrapper - keeps stat text and upgrade count together */
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
 }
 
 .upgrade-count {
@@ -333,15 +345,37 @@
   font-weight: 600;
 }
 
-.upgrade-buttons {
+/* Small circular upgrade button - only visible when canUpgrade is true */
+.stat-upgrade-btn {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  opacity: 0.8;
+  border: 1px solid transparent;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
   display: flex;
-  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
-.upgrade-btn {
-  flex: 1;
-  padding: 4px;
-  font-size: var(--font-size-xs);
+.stat-upgrade-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.stat-upgrade-btn:active {
+  transform: scale(0.95);
 }
 
 /* Drag Hint */

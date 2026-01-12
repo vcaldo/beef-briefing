@@ -434,39 +434,45 @@ function TeamCard({
       <div className="team-card-info">
         <div className="team-card-name">{card.name}</div>
         <div className="team-card-stats-column">
-          <span className="stat-badge stat-atk">
-            ATK {card.atk}
-            {card.atk_upgrades > 0 && <span className="upgrade-count">+{card.atk_upgrades}</span>}
-          </span>
-          <span className="stat-badge stat-hp">
-            HP {card.hp}
-            {card.hp_upgrades > 0 && <span className="upgrade-count">+{card.hp_upgrades * 3}</span>}
-          </span>
+          <div className="stat-badge-with-upgrade stat-atk">
+            <span className="stat-content">
+              ATK {card.atk}
+              {card.atk_upgrades > 0 && <span className="upgrade-count">+{card.atk_upgrades}</span>}
+            </span>
+            {canUpgrade && (
+              <button
+                className="stat-upgrade-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onUpgradeAtk();
+                }}
+                title="Upgrade ATK (+1)"
+              >
+                +
+              </button>
+            )}
+          </div>
+          <div className="stat-badge-with-upgrade stat-hp">
+            <span className="stat-content">
+              HP {card.hp}
+              {card.hp_upgrades > 0 && <span className="upgrade-count">+{card.hp_upgrades * 3}</span>}
+            </span>
+            {canUpgrade && (
+              <button
+                className="stat-upgrade-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onUpgradeHp();
+                }}
+                title="Upgrade HP (+3)"
+              >
+                +
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="upgrade-buttons">
-        <button
-          className="btn btn-secondary upgrade-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onUpgradeAtk();
-          }}
-          disabled={!canUpgrade}
-          title="Upgrade ATK (+1)"
-        >
-          +ATK
-        </button>
-        <button
-          className="btn btn-secondary upgrade-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onUpgradeHp();
-          }}
-          disabled={!canUpgrade}
-          title="Upgrade HP (+3)"
-        >
-          +HP
-        </button>
       </div>
     </Reorder.Item>
   );

@@ -236,12 +236,14 @@ type LeaderboardEntry struct {
 	ChatID                  int64           `json:"chat_id"`
 	RankedWins              int             `json:"ranked_wins"`
 	RankedLosses            int             `json:"ranked_losses"`
+	RankedDraws             int             `json:"ranked_draws"`
 	RankedTournamentsPlayed int             `json:"ranked_tournaments_played"`
 	RankedTournamentsWon    int             `json:"ranked_tournaments_won"`
 	RankedCurrentStreak     int             `json:"ranked_current_streak"`
 	RankedBestStreak        int             `json:"ranked_best_streak"`
 	RegularWins             int             `json:"regular_wins"`
 	RegularLosses           int             `json:"regular_losses"`
+	RegularDraws            int             `json:"regular_draws"`
 	RegularMatchesPlayed    int             `json:"regular_matches_played"`
 	RegularCurrentStreak    int             `json:"regular_current_streak"`
 	RegularBestStreak       int             `json:"regular_best_streak"`
@@ -615,9 +617,9 @@ func (r *GameRepository) GetLeaderboard(ctx context.Context, chatID int64, match
 
 	query := fmt.Sprintf(`
 		SELECT l.user_id, l.chat_id,
-		       l.ranked_wins, l.ranked_losses, l.ranked_tournaments_played, l.ranked_tournaments_won,
+		       l.ranked_wins, l.ranked_losses, l.ranked_draws, l.ranked_tournaments_played, l.ranked_tournaments_won,
 		       l.ranked_current_streak, l.ranked_best_streak,
-		       l.regular_wins, l.regular_losses, l.regular_matches_played,
+		       l.regular_wins, l.regular_losses, l.regular_draws, l.regular_matches_played,
 		       l.regular_current_streak, l.regular_best_streak,
 		       l.head_to_head, l.first_match_at, l.last_match_at,
 		       u.first_name, COALESCE(u.username, '')
@@ -639,9 +641,9 @@ func (r *GameRepository) GetLeaderboard(ctx context.Context, chatID int64, match
 		e := &LeaderboardEntry{}
 		err := rows.Scan(
 			&e.UserID, &e.ChatID,
-			&e.RankedWins, &e.RankedLosses, &e.RankedTournamentsPlayed, &e.RankedTournamentsWon,
+			&e.RankedWins, &e.RankedLosses, &e.RankedDraws, &e.RankedTournamentsPlayed, &e.RankedTournamentsWon,
 			&e.RankedCurrentStreak, &e.RankedBestStreak,
-			&e.RegularWins, &e.RegularLosses, &e.RegularMatchesPlayed,
+			&e.RegularWins, &e.RegularLosses, &e.RegularDraws, &e.RegularMatchesPlayed,
 			&e.RegularCurrentStreak, &e.RegularBestStreak,
 			&e.HeadToHead, &e.FirstMatchAt, &e.LastMatchAt,
 			&e.FirstName, &e.Username,
@@ -656,15 +658,15 @@ func (r *GameRepository) GetLeaderboard(ctx context.Context, chatID int64, match
 }
 
 // UpdateLeaderboard updates a user's leaderboard stats (calls DB function)
-func (r *GameRepository) UpdateLeaderboard(ctx context.Context, userID, chatID int64, matchType MatchType, isWin bool, opponentID *int64, isTournamentWin bool) error {
+func (r *GameRepository) UpdateLeaderboard(ctx context.Context, userID, chatID int64, matchType MatchType, isWin bool, opponentID *int64, isTournamentWin bool, isDraw bool) error {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("db:update-leaderboard")
 		defer segment.End()
 	}
 
-	query := `SELECT update_game_leaderboard($1, $2, $3, $4, $5, $6)`
-	_, err := r.db.ExecContext(ctx, query, userID, chatID, matchType, isWin, opponentID, isTournamentWin)
+	query := `SELECT update_game_leaderboard($1, $2, $3, $4, $5, $6, $7)`
+	_, err := r.db.ExecContext(ctx, query, userID, chatID, matchType, isWin, opponentID, isTournamentWin, isDraw)
 	return err
 }
 
@@ -1456,6 +1458,7 @@ type UserProfile struct {
 	Username                string     `json:"username,omitempty"`
 	RankedWins              int        `json:"ranked_wins"`
 	RankedLosses            int        `json:"ranked_losses"`
+	RankedDraws             int        `json:"ranked_draws"`
 	RankedTournamentsPlayed int        `json:"ranked_tournaments_played"`
 	RankedTournamentsWon    int        `json:"ranked_tournaments_won"`
 	RankedCurrentStreak     int        `json:"ranked_current_streak"`
@@ -1463,6 +1466,7 @@ type UserProfile struct {
 	RankedRank              int        `json:"ranked_rank"`
 	RegularWins             int        `json:"regular_wins"`
 	RegularLosses           int        `json:"regular_losses"`
+	RegularDraws            int        `json:"regular_draws"`
 	RegularMatchesPlayed    int        `json:"regular_matches_played"`
 	RegularCurrentStreak    int        `json:"regular_current_streak"`
 	RegularBestStreak       int        `json:"regular_best_streak"`
@@ -1493,11 +1497,11 @@ func (r *GameRepository) GetUserProfile(ctx context.Context, chatID, userID int6
 		SELECT
 			l.user_id,
 			u.first_name, COALESCE(u.username, ''),
-			l.ranked_wins, l.ranked_losses,
+			l.ranked_wins, l.ranked_losses, l.ranked_draws,
 			l.ranked_tournaments_played, l.ranked_tournaments_won,
 			l.ranked_current_streak, l.ranked_best_streak,
 			COALESCE(rl.rank, 0),
-			l.regular_wins, l.regular_losses, l.regular_matches_played,
+			l.regular_wins, l.regular_losses, l.regular_draws, l.regular_matches_played,
 			l.regular_current_streak, l.regular_best_streak,
 			COALESCE(rgl.rank, 0),
 			l.first_match_at, l.last_match_at
@@ -1512,11 +1516,11 @@ func (r *GameRepository) GetUserProfile(ctx context.Context, chatID, userID int6
 	err := r.db.QueryRowContext(ctx, query, chatID, userID).Scan(
 		&profile.UserID,
 		&profile.FirstName, &profile.Username,
-		&profile.RankedWins, &profile.RankedLosses,
+		&profile.RankedWins, &profile.RankedLosses, &profile.RankedDraws,
 		&profile.RankedTournamentsPlayed, &profile.RankedTournamentsWon,
 		&profile.RankedCurrentStreak, &profile.RankedBestStreak,
 		&profile.RankedRank,
-		&profile.RegularWins, &profile.RegularLosses, &profile.RegularMatchesPlayed,
+		&profile.RegularWins, &profile.RegularLosses, &profile.RegularDraws, &profile.RegularMatchesPlayed,
 		&profile.RegularCurrentStreak, &profile.RegularBestStreak,
 		&profile.RegularRank,
 		&profile.FirstMatchAt, &profile.LastMatchAt,

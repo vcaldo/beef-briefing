@@ -206,7 +206,16 @@
 .battle-round {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.round-header {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: var(--spacing-xs) 0;
+  border-bottom: 2px solid var(--border-color);
 }
 
 .log-entry {

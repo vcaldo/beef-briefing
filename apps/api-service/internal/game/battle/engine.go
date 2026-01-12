@@ -1,6 +1,9 @@
 package battle
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const (
 	// MaxRounds prevents infinite loops
@@ -41,7 +44,7 @@ func Simulate(teamA, teamB *Team) *Result {
 			events = append(events, BattleEvent{
 				Type:    EventVictory,
 				Round:   round,
-				Message: fmt.Sprintf("%s wins - opponent has no cards remaining", getTeamName(b)),
+				Message: fmt.Sprintf("🏆 %s wins!", getTeamName(b)),
 			})
 			winnerID := b.OwnerID
 			return &Result{
@@ -59,7 +62,7 @@ func Simulate(teamA, teamB *Team) *Result {
 			events = append(events, BattleEvent{
 				Type:    EventVictory,
 				Round:   round,
-				Message: fmt.Sprintf("%s wins - opponent has no cards remaining", getTeamName(a)),
+				Message: fmt.Sprintf("🏆 %s wins!", getTeamName(a)),
 			})
 			winnerID := a.OwnerID
 			return &Result{
@@ -89,7 +92,7 @@ func Simulate(teamA, teamB *Team) *Result {
 			Damage:              damageToB,
 			HPBefore:            frontB.HP,
 			HPAfter:             frontB.HP - damageToB,
-			Message:             fmt.Sprintf("%s attacks %s for %d damage", frontA.Name, frontB.Name, damageToB),
+			Message:             fmt.Sprintf("🗡️ %s attacks %s (%d ATK) → %s %d HP", frontA.Name, frontB.Name, damageToB, generateHealthBar(frontB.HP-damageToB, frontB.MaxHP), frontB.HP-damageToB),
 		})
 
 		// Record attack from B to A
@@ -103,7 +106,7 @@ func Simulate(teamA, teamB *Team) *Result {
 			Damage:              damageToA,
 			HPBefore:            frontA.HP,
 			HPAfter:             frontA.HP - damageToA,
-			Message:             fmt.Sprintf("%s attacks %s for %d damage", frontB.Name, frontA.Name, damageToA),
+			Message:             fmt.Sprintf("🗡️ %s attacks %s (%d ATK) → %s %d HP", frontB.Name, frontA.Name, damageToA, generateHealthBar(frontA.HP-damageToA, frontA.MaxHP), frontA.HP-damageToA),
 		})
 
 		// Apply damage
@@ -122,7 +125,7 @@ func Simulate(teamA, teamB *Team) *Result {
 				Round:               round,
 				DefenderCardID:      frontA.CardID,
 				DefenderTeamOwnerID: a.OwnerID,
-				Message:             fmt.Sprintf("%s has been defeated!", frontA.Name),
+				Message:             fmt.Sprintf("💀 %s defeats %s", frontB.Name, frontA.Name),
 			})
 		}
 
@@ -132,7 +135,7 @@ func Simulate(teamA, teamB *Team) *Result {
 				Round:               round,
 				DefenderCardID:      frontB.CardID,
 				DefenderTeamOwnerID: b.OwnerID,
-				Message:             fmt.Sprintf("%s has been defeated!", frontB.Name),
+				Message:             fmt.Sprintf("💀 %s defeats %s", frontA.Name, frontB.Name),
 			})
 		}
 
@@ -141,7 +144,7 @@ func Simulate(teamA, teamB *Team) *Result {
 			events = append(events, BattleEvent{
 				Type:    EventAdvance,
 				Round:   round,
-				Message: "Next cards advance to the front",
+				Message: "➡️ Next cards advance",
 			})
 		}
 	}
@@ -151,7 +154,7 @@ func Simulate(teamA, teamB *Team) *Result {
 		events = append(events, BattleEvent{
 			Type:    EventVictory,
 			Round:   round,
-			Message: fmt.Sprintf("%s wins by dealing more damage (%d vs %d)", getTeamName(a), totalDamageA, totalDamageB),
+			Message: fmt.Sprintf("🏆 %s wins!", getTeamName(a)),
 		})
 		winnerID := a.OwnerID
 		return &Result{
@@ -168,7 +171,7 @@ func Simulate(teamA, teamB *Team) *Result {
 		events = append(events, BattleEvent{
 			Type:    EventVictory,
 			Round:   round,
-			Message: fmt.Sprintf("%s wins by dealing more damage (%d vs %d)", getTeamName(b), totalDamageB, totalDamageA),
+			Message: fmt.Sprintf("🏆 %s wins!", getTeamName(b)),
 		})
 		winnerID := b.OwnerID
 		return &Result{
@@ -187,7 +190,7 @@ func Simulate(teamA, teamB *Team) *Result {
 	events = append(events, BattleEvent{
 		Type:    EventVictory,
 		Round:   round,
-		Message: fmt.Sprintf("Draw! Both teams dealt %d damage", totalDamageA),
+		Message: "🤝 Draw!",
 	})
 	return &Result{
 		WinnerID:    nil,
@@ -201,16 +204,43 @@ func Simulate(teamA, teamB *Team) *Result {
 	}
 }
 
+// generateHealthBar creates a visual health bar representation
+// Returns a 10-character unicode health bar (e.g., [████████░░])
+func generateHealthBar(currentHP, maxHP int) string {
+	if maxHP == 0 {
+		return "[░░░░░░░░░░]"
+	}
+
+	percentage := float64(currentHP) / float64(maxHP)
+	filledBlocks := int(percentage * 10)
+
+	if filledBlocks < 0 {
+		filledBlocks = 0
+	} else if filledBlocks > 10 {
+		filledBlocks = 10
+	}
+
+	emptyBlocks := 10 - filledBlocks
+	var bar strings.Builder
+	bar.WriteRune('[')
+	for range filledBlocks {
+		bar.WriteRune('█')
+	}
+	for range emptyBlocks {
+		bar.WriteRune('░')
+	}
+	bar.WriteRune(']')
+
+	return bar.String()
+}
+
 // getTeamName returns a display name for the team
 func getTeamName(t *Team) string {
-	if t == nil || len(t.Cards) == 0 {
+	if t == nil {
 		return "Team"
 	}
-	// Use first card's name as team identifier
-	for _, card := range t.Cards {
-		if card != nil {
-			return fmt.Sprintf("%s's team", card.Name)
-		}
+	if t.OwnerName != "" {
+		return t.OwnerName
 	}
 	return "Team"
 }

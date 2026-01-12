@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../api/client';
 import { useAudio } from '../hooks/useAudio';
 import { BattleCard } from './BattleCard';
+import { BattleLog } from './BattleLog';
 import type { Match, BattleResult, BattleEvent, GameCard } from '../types';
 import './BattlePage.css';
 
@@ -411,14 +412,12 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
       </div>
 
       {/* Battle Log */}
-      <div className="battle-log">
-        {currentRound.battle_log.slice(0, currentEventIndex + 1).map((event, i) => (
-          <div key={i} className={`log-entry log-entry-${event.type}`}>
-            <span className="log-icon">{getEventIcon(event.type)}</span>
-            <span className="log-message">{event.message}</span>
-          </div>
-        ))}
-      </div>
+      <BattleLog
+        events={currentRound.battle_log}
+        currentEventIndex={currentEventIndex}
+        isLive={true}
+        autoScroll={true}
+      />
 
       {/* Controls */}
       <div className="battle-controls">

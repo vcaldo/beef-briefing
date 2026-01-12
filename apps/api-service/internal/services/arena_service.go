@@ -899,8 +899,18 @@ func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *re
 			len(orderedA), len(orderedB))
 	}
 
-	teamA := battle.NewTeam(pA.UserID, orderedA)
-	teamB := battle.NewTeam(pB.UserID, orderedB)
+	// Prefer FirstName for display, fall back to Username if empty
+	ownerNameA := pA.FirstName
+	if ownerNameA == "" {
+		ownerNameA = pA.Username
+	}
+	ownerNameB := pB.FirstName
+	if ownerNameB == "" {
+		ownerNameB = pB.Username
+	}
+
+	teamA := battle.NewTeam(pA.UserID, ownerNameA, orderedA)
+	teamB := battle.NewTeam(pB.UserID, ownerNameB, orderedB)
 
 	// Run battle simulation
 	result := battle.Simulate(teamA, teamB)

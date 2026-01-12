@@ -4,6 +4,7 @@ import { noticeError } from '@beef-briefing/shared-mini-app/monitoring';
 import type { MatchHistoryEntry, GameCard, BattleResult, BattleEvent } from '../types';
 import { Avatar } from '@beef-briefing/shared-mini-app/components';
 import { ErrorDisplay } from '@beef-briefing/shared-mini-app/components';
+import { BattleLog } from './BattleLog';
 import './HistoryPage.css';
 
 interface HistoryPageProps {
@@ -243,25 +244,12 @@ export function HistoryPage(_props: HistoryPageProps) {
                           <div className="battle-log-header">Battle Log</div>
                           {battleData.rounds.map((round, roundIndex) => (
                             <div key={roundIndex} className="battle-round">
-                              {round.battle_log.map((event, eventIndex) => {
-                                const message = formatBattleEvent(
-                                  event,
-                                  match.your_team,
-                                  match.opponent_team,
-                                  isWinner
-                                );
-                                if (!message) return null;
-
-                                return (
-                                  <div
-                                    key={eventIndex}
-                                    className={`log-entry log-${event.type}`}
-                                  >
-                                    <span className="log-icon">{getEventIcon(event.type)}</span>
-                                    <span className="log-message">{message}</span>
-                                  </div>
-                                );
-                              })}
+                              <div className="round-header">Round {roundIndex + 1}</div>
+                              <BattleLog
+                                events={round.battle_log}
+                                isLive={false}
+                                autoScroll={false}
+                              />
                             </div>
                           ))}
                         </div>

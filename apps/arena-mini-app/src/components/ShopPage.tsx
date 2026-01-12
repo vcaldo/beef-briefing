@@ -354,17 +354,12 @@ interface ShopCardComponentProps {
 function ShopCardComponent({ card, onBuy, canBuy }: ShopCardComponentProps) {
   // Prefer card image over avatar photo
   const imageUrl = card.card_image_url || card.photo_url;
-  const hasCardImage = !!card.card_image_url;
 
   return (
     <div className={`shop-card ${card.is_purchased ? 'purchased' : ''}`}>
-      <div className={`card-photo ${hasCardImage ? 'card-image' : ''}`}>
+      <div className="card-photo">
         {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={card.name}
-            className={hasCardImage ? 'card-image-style' : ''}
-          />
+          <img src={imageUrl} alt={card.name} />
         ) : (
           <div className="no-photo">{card.name[0]}</div>
         )}
@@ -411,7 +406,6 @@ function TeamCard({
 }: TeamCardProps) {
   // Prefer card image over avatar photo
   const imageUrl = card.card_image_url || card.photo_url;
-  const hasCardImage = !!card.card_image_url;
 
   return (
     <Reorder.Item
@@ -431,16 +425,11 @@ function TeamCard({
         stiffness: 200
       }}
     >
-      <div className={`card-photo ${hasCardImage ? 'card-image' : ''}`}>
+      <div className="team-avatar">
         {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={card.name}
-            draggable={false}
-            className={hasCardImage ? 'card-image-style' : ''}
-          />
+          <img src={imageUrl} alt={card.name} draggable={false} />
         ) : (
-          <div className="no-photo">{card.name[0]}</div>
+          <div className="team-avatar-fallback">{card.name[0]}</div>
         )}
       </div>
       <div className="card-info">

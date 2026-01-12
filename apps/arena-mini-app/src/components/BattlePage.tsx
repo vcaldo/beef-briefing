@@ -129,6 +129,16 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
     fetchBattle();
   }, [fetchBattle]);
 
+  // Auto-play when battle is loaded and complete (with delay)
+  useEffect(() => {
+    if (battle?.is_complete && currentEventIndex === -1) {
+      // Only auto-play on initial load (currentEventIndex === -1)
+      // Add 500ms delay to give user a moment to see initial state
+      const timer = setTimeout(() => setIsPlaying(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [battle?.is_complete, currentEventIndex]);
+
   // Auto-play events with dynamic timing and audio
   useEffect(() => {
     if (!isPlaying || !battle || battle.rounds.length === 0) return;
@@ -289,6 +299,11 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
   const isDraw = battle.winner_id === null || battle.winner_id === undefined;
   const currentEvent = currentEventIndex >= 0 ? currentRound.battle_log[currentEventIndex] : null;
 
+  // Check if animation is at the end
+  const isAtEnd =
+    currentRoundIndex === battle.rounds.length - 1 &&
+    currentEventIndex === battle.rounds[battle.rounds.length - 1]?.battle_log.length - 1;
+
   return (
     <div className="battle-page">
       {/* Header */}
@@ -421,14 +436,16 @@ export function BattlePage({ match, userId, onBack }: BattlePageProps) {
         <button
           className="btn btn-primary play-btn"
           onClick={handlePlayPause}
+          title={isAtEnd ? 'Replay' : (isPlaying ? 'Pause' : 'Play')}
         >
-          {isPlaying ? 'Pause' : 'Play'}
+          {isAtEnd ? '↻' : (isPlaying ? '⏸' : '▶')}
         </button>
         <button
           className="btn btn-secondary skip-btn"
           onClick={handleSkipToEnd}
+          title="Skip to End"
         >
-          Skip to End
+          ⏭
         </button>
       </div>
     </div>

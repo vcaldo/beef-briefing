@@ -291,10 +291,14 @@
 
 .play-btn {
   flex: 2;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .skip-btn {
   flex: 1;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .share-btn {

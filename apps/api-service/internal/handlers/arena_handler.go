@@ -259,10 +259,7 @@ type SetOrderRequest struct {
 // GET /api/v1/mini-app/arena/matches?chat_id=X
 func (h *ArenaHandler) HandleListMatches(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:list-matches")
-	}
+	setTransactionName(ctx, "api:arena:list-matches")
 
 	_, chatID, err := parseChatIDWithAuth(r, false)
 	if err != nil {
@@ -270,16 +267,11 @@ func (h *ArenaHandler) HandleListMatches(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("chat_id", chatID)
-	}
+	addTransactionAttribute(ctx, "chat_id", chatID)
 
 	matches, err := h.service.GetActiveMatches(ctx, chatID)
 	if err != nil {
-		slog.Error("failed to list matches", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
+		logAndNoticeError(ctx, "failed to list matches", err)
 		httputil.RespondError(w, "failed to list matches", http.StatusInternalServerError)
 		return
 	}
@@ -696,10 +688,7 @@ func (h *ArenaHandler) HandleGetBattle(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/mini-app/arena/leaderboard?chat_id=X&type=ranked
 func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:leaderboard")
-	}
+	setTransactionName(ctx, "api:arena:leaderboard")
 
 	_, chatID, err := parseChatIDWithAuth(r, true)
 	if err != nil {
@@ -715,18 +704,13 @@ func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Reque
 	limit := httputil.ParseIntWithDefault(r, "limit", 50, 1, 100)
 	offset := httputil.ParseIntWithDefault(r, "offset", 0, 0, 10000)
 
-	if txn != nil {
-		txn.AddAttribute("chat_id", chatID)
-		txn.AddAttribute("match_type", matchType)
-		txn.AddAttribute("limit", limit)
-	}
+	addTransactionAttribute(ctx, "chat_id", chatID)
+	addTransactionAttribute(ctx, "match_type", matchType)
+	addTransactionAttribute(ctx, "limit", limit)
 
 	entries, err := h.service.GetLeaderboard(ctx, chatID, matchType, limit, offset)
 	if err != nil {
-		slog.Error("failed to get leaderboard", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
+		logAndNoticeError(ctx, "failed to get leaderboard", err)
 		httputil.RespondError(w, "failed to get leaderboard", http.StatusInternalServerError)
 		return
 	}
@@ -741,10 +725,7 @@ func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Reque
 // GET /api/v1/mini-app/arena/history?chat_id=X&limit=20&offset=0
 func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:history")
-	}
+	setTransactionName(ctx, "api:arena:history")
 
 	claims, chatID, err := parseChatIDWithAuth(r, true)
 	if err != nil {
@@ -755,18 +736,13 @@ func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) 
 	limit := httputil.ParseIntWithDefault(r, "limit", 20, 1, 50)
 	offset := httputil.ParseIntWithDefault(r, "offset", 0, 0, 10000)
 
-	if txn != nil {
-		txn.AddAttribute("chat_id", chatID)
-		txn.AddAttribute("user_id", claims.UserID)
-		txn.AddAttribute("limit", limit)
-	}
+	addTransactionAttribute(ctx, "chat_id", chatID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
+	addTransactionAttribute(ctx, "limit", limit)
 
 	entries, total, err := h.service.GetMatchHistory(ctx, chatID, claims.UserID, limit, offset)
 	if err != nil {
-		slog.Error("failed to get match history", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
+		logAndNoticeError(ctx, "failed to get match history", err)
 		httputil.RespondError(w, "failed to get match history", http.StatusInternalServerError)
 		return
 	}

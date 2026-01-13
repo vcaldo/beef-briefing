@@ -60,30 +60,72 @@ type ArenaService struct {
 func (s *ArenaService) validateShopPhaseAccess(ctx context.Context, matchID string, userID int64, checkDeadline bool) (*repository.Match, *repository.Participant, error) {
 	match, err := s.gameRepo.GetMatch(ctx, matchID)
 	if err != nil {
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
 		return nil, nil, fmt.Errorf("failed to get match: %w", err)
 	}
 	if match == nil {
-		return nil, nil, ErrMatchNotFound
+		err := ErrMatchNotFound
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
+		return nil, nil, err
 	}
 	if match.Status != repository.MatchStatusShopPhase {
-		return nil, nil, ErrMatchNotInShopPhase
+		err := ErrMatchNotInShopPhase
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
+		return nil, nil, err
 	}
 	if checkDeadline && match.ShopPhaseDeadline != nil && time.Now().After(*match.ShopPhaseDeadline) {
-		return nil, nil, ErrShopPhaseExpired
+		err := ErrShopPhaseExpired
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
+		return nil, nil, err
 	}
 
 	participant, err := s.gameRepo.GetParticipant(ctx, matchID, userID)
 	if err != nil {
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
 		return nil, nil, fmt.Errorf("failed to get participant: %w", err)
 	}
 	if participant == nil {
-		return nil, nil, ErrNotParticipant
+		err := ErrNotParticipant
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
+		return nil, nil, err
 	}
 	if participant.Status == repository.ParticipantStatusReady {
-		return nil, nil, ErrTeamAlreadySubmitted
+		err := ErrTeamAlreadySubmitted
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
+		return nil, nil, err
 	}
 
 	return match, participant, nil
+}
+
+// parseParticipantShopState extracts cards and team from participant JSON fields.
+// Returns empty slices if fields are nil (not an error condition).
+func parseParticipantShopState(participant *repository.Participant) (cards []*battle.ShopCard, team []*battle.Card, err error) {
+	if participant.ShopCards != nil {
+		if err := json.Unmarshal(*participant.ShopCards, &cards); err != nil {
+			return nil, nil, fmt.Errorf("failed to parse shop cards: %w", err)
+		}
+	}
+	if participant.Team != nil {
+		if err := json.Unmarshal(*participant.Team, &team); err != nil {
+			return nil, nil, fmt.Errorf("failed to parse team: %w", err)
+		}
+	}
+	return cards, team, nil
 }
 
 // NewArenaService creates a new arena service
@@ -182,7 +224,7 @@ type BattleResponse struct {
 func (s *ArenaService) CreateMatch(ctx context.Context, chatID int64, creatorUserID int64) (*MatchResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:CreateMatch")
+		segment := txn.StartSegment("service:arena:create-match")
 		defer segment.End()
 	}
 
@@ -240,7 +282,7 @@ func (s *ArenaService) CreateMatch(ctx context.Context, chatID int64, creatorUse
 func (s *ArenaService) GetMatch(ctx context.Context, matchID string) (*MatchResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetMatch")
+		segment := txn.StartSegment("service:arena:get-match")
 		defer segment.End()
 	}
 
@@ -270,7 +312,7 @@ func (s *ArenaService) GetMatch(ctx context.Context, matchID string) (*MatchResp
 func (s *ArenaService) GetActiveMatches(ctx context.Context, chatID int64) ([]*MatchResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetActiveMatches")
+		segment := txn.StartSegment("service:arena:get-active-matches")
 		defer segment.End()
 	}
 
@@ -298,7 +340,7 @@ func (s *ArenaService) GetActiveMatches(ctx context.Context, chatID int64) ([]*M
 func (s *ArenaService) JoinMatch(ctx context.Context, matchID string, userID int64) (*MatchResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:JoinMatch")
+		segment := txn.StartSegment("service:arena:join-match")
 		defer segment.End()
 	}
 
@@ -333,7 +375,7 @@ func (s *ArenaService) JoinMatch(ctx context.Context, matchID string, userID int
 func (s *ArenaService) LeaveMatch(ctx context.Context, matchID string, userID int64) error {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:LeaveMatch")
+		segment := txn.StartSegment("service:arena:leave-match")
 		defer segment.End()
 	}
 
@@ -357,7 +399,7 @@ func (s *ArenaService) LeaveMatch(ctx context.Context, matchID string, userID in
 func (s *ArenaService) StartMatch(ctx context.Context, matchID string, userID int64) (*MatchResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:StartMatch")
+		segment := txn.StartSegment("service:arena:start-match")
 		defer segment.End()
 	}
 
@@ -412,6 +454,12 @@ func (s *ArenaService) StartMatch(ctx context.Context, matchID string, userID in
 
 // dealCardsToParticipants deals initial shop cards to all participants
 func (s *ArenaService) dealCardsToParticipants(ctx context.Context, matchID string, chatID int64) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:deal-cards-to-participants")
+		defer segment.End()
+	}
+
 	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
 	if err != nil {
 		return err
@@ -548,40 +596,19 @@ func (s *ArenaService) enhanceTeamCards(team []*battle.Card, coins int, teamSize
 func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetShop")
+		segment := txn.StartSegment("service:arena:get-shop")
 		defer segment.End()
 	}
 
-	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	match, participant, err := s.validateShopPhaseAccess(ctx, matchID, userID, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get match: %w", err)
-	}
-	if match == nil {
-		return nil, ErrMatchNotFound
+		return nil, err
 	}
 
-	participant, err := s.gameRepo.GetParticipant(ctx, matchID, userID)
+	// Parse shop cards and team
+	cards, team, err := parseParticipantShopState(participant)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get participant: %w", err)
-	}
-	if participant == nil {
-		return nil, ErrNotParticipant
-	}
-
-	// Parse shop cards
-	var cards []*battle.ShopCard
-	if participant.ShopCards != nil {
-		if err := json.Unmarshal(*participant.ShopCards, &cards); err != nil {
-			return nil, fmt.Errorf("failed to parse shop cards: %w", err)
-		}
-	}
-
-	// Parse team
-	var team []*battle.Card
-	if participant.Team != nil {
-		if err := json.Unmarshal(*participant.Team, &team); err != nil {
-			return nil, fmt.Errorf("failed to parse team: %w", err)
-		}
+		return nil, err
 	}
 
 	// Calculate time remaining
@@ -624,7 +651,7 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64, cardIndex int) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:BuyCard")
+		segment := txn.StartSegment("service:arena:buy-card")
 		defer segment.End()
 	}
 
@@ -634,16 +661,9 @@ func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64
 	}
 
 	// Parse current state
-	var cards []*battle.ShopCard
-	if err := json.Unmarshal(*participant.ShopCards, &cards); err != nil {
-		return nil, fmt.Errorf("failed to parse shop cards: %w", err)
-	}
-
-	var team []*battle.Card
-	if participant.Team != nil {
-		if err := json.Unmarshal(*participant.Team, &team); err != nil {
-			return nil, fmt.Errorf("failed to parse team: %w", err)
-		}
+	cards, team, err := parseParticipantShopState(participant)
+	if err != nil {
+		return nil, err
 	}
 
 	// Validate purchase
@@ -687,7 +707,7 @@ func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64
 func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:Reroll")
+		segment := txn.StartSegment("service:arena:reroll")
 		defer segment.End()
 	}
 
@@ -775,7 +795,7 @@ func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64)
 func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID int64, teamSlot int, upgradeType shop.UpgradeType) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:UpgradeCard")
+		segment := txn.StartSegment("service:arena:upgrade-card")
 		defer segment.End()
 	}
 
@@ -848,7 +868,7 @@ func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID i
 func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID int64, order []int) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:SetTeamOrder")
+		segment := txn.StartSegment("service:arena:set-team-order")
 		defer segment.End()
 	}
 
@@ -899,7 +919,7 @@ func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID 
 func (s *ArenaService) SubmitTeam(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:SubmitTeam")
+		segment := txn.StartSegment("service:arena:submit-team")
 		defer segment.End()
 	}
 
@@ -925,7 +945,12 @@ func (s *ArenaService) SubmitTeam(ctx context.Context, matchID string, userID in
 	}
 
 	// Check if all participants are ready
-	go s.checkAndStartBattle(context.Background(), matchID)
+	// Create detached context for background battle check with timeout protection
+	asyncCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	go func() {
+		defer cancel()
+		s.checkAndStartBattle(asyncCtx, matchID)
+	}()
 
 	return s.GetShop(ctx, matchID, userID)
 }
@@ -950,6 +975,12 @@ func (s *ArenaService) checkAndStartBattle(ctx context.Context, matchID string) 
 
 // StartBattle initiates the battle phase
 func (s *ArenaService) StartBattle(ctx context.Context, matchID string) (*BattleResponse, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:start-battle")
+		defer segment.End()
+	}
+
 	match, err := s.gameRepo.GetMatch(ctx, matchID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match: %w", err)
@@ -995,6 +1026,12 @@ func normalizeTeamOrder(order []int64, teamSize int) []int64 {
 
 // runBattle executes a single battle between two participants
 func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *repository.ParticipantWithUser, roundNumber int) (*BattleResponse, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:run-battle")
+		defer segment.End()
+	}
+
 	// Parse teams
 	var teamACards, teamBCards []*battle.Card
 	if err := json.Unmarshal(*pA.Team, &teamACards); err != nil {
@@ -1136,6 +1173,12 @@ func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *re
 
 // runArena executes arena format (round-robin for now)
 func (s *ArenaService) runArena(ctx context.Context, matchID string, participants []*repository.ParticipantWithUser) (*BattleResponse, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:run-arena")
+		defer segment.End()
+	}
+
 	roundNumber := 0
 
 	// Round-robin: each player fights each other player
@@ -1202,7 +1245,7 @@ func (s *ArenaService) runArena(ctx context.Context, matchID string, participant
 func (s *ArenaService) GetBattle(ctx context.Context, matchID string, userID int64) (*BattleResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetBattle")
+		segment := txn.StartSegment("service:arena:get-battle")
 		defer segment.End()
 	}
 
@@ -1241,7 +1284,7 @@ func (s *ArenaService) GetBattle(ctx context.Context, matchID string, userID int
 func (s *ArenaService) GetLeaderboard(ctx context.Context, chatID int64, matchType string, limit, offset int) ([]*repository.LeaderboardEntry, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetLeaderboard")
+		segment := txn.StartSegment("service:arena:get-leaderboard")
 		defer segment.End()
 	}
 
@@ -1267,7 +1310,7 @@ type PendingMatch struct {
 func (s *ArenaService) GetPendingMatches(ctx context.Context) ([]*PendingMatch, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetPendingMatches")
+		segment := txn.StartSegment("service:arena:get-pending-matches")
 		defer segment.End()
 	}
 
@@ -1324,7 +1367,7 @@ type AutoStartResult struct {
 func (s *ArenaService) AutoStartMatch(ctx context.Context, matchID string) (*AutoStartResult, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:AutoStartMatch")
+		segment := txn.StartSegment("service:arena:auto-start-match")
 		defer segment.End()
 	}
 
@@ -1416,7 +1459,7 @@ type ForceSubmitResult struct {
 func (s *ArenaService) ForceSubmitTeams(ctx context.Context, matchID string) (*ForceSubmitResult, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:ForceSubmitTeams")
+		segment := txn.StartSegment("service:arena:force-submit-teams")
 		defer segment.End()
 	}
 
@@ -1466,6 +1509,12 @@ func (s *ArenaService) ForceSubmitTeams(ctx context.Context, matchID string) (*F
 
 // forceSubmitTeam auto-buys cards and submits team for a participant
 func (s *ArenaService) forceSubmitTeam(ctx context.Context, matchID string, p *repository.ParticipantWithUser) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:force-submit-team")
+		defer segment.End()
+	}
+
 	// Parse current shop state
 	var cards []*battle.ShopCard
 	if p.ShopCards != nil {
@@ -1596,7 +1645,7 @@ type TournamentStartResult struct {
 func (s *ArenaService) GetOrCreateTodayTournament(ctx context.Context, chatID int64, date string) (*TournamentResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetOrCreateTodayTournament")
+		segment := txn.StartSegment("service:arena:get-or-create-today-tournament")
 		defer segment.End()
 	}
 
@@ -1623,7 +1672,7 @@ func (s *ArenaService) GetOrCreateTodayTournament(ctx context.Context, chatID in
 func (s *ArenaService) GetTodayTournament(ctx context.Context, chatID int64, date string) (*TournamentResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetTodayTournament")
+		segment := txn.StartSegment("service:arena:get-today-tournament")
 		defer segment.End()
 	}
 
@@ -1653,7 +1702,7 @@ func (s *ArenaService) GetTodayTournament(ctx context.Context, chatID int64, dat
 func (s *ArenaService) GetTournamentByID(ctx context.Context, tournamentID int64) (*TournamentResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetTournamentByID")
+		segment := txn.StartSegment("service:arena:get-tournament-by-id")
 		defer segment.End()
 	}
 
@@ -1688,7 +1737,7 @@ func (s *ArenaService) SetTournamentAnnounced(ctx context.Context, tournamentID 
 func (s *ArenaService) JoinTournament(ctx context.Context, tournamentID int64, userID int64) (*TournamentResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:JoinTournament")
+		segment := txn.StartSegment("service:arena:join-tournament")
 		defer segment.End()
 	}
 
@@ -1731,7 +1780,7 @@ func (s *ArenaService) JoinTournament(ctx context.Context, tournamentID int64, u
 func (s *ArenaService) LeaveTournament(ctx context.Context, tournamentID int64, userID int64) (*TournamentResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:LeaveTournament")
+		segment := txn.StartSegment("service:arena:leave-tournament")
 		defer segment.End()
 	}
 
@@ -1781,7 +1830,7 @@ func (s *ArenaService) GetTournamentsNeedingClose(ctx context.Context, currentTi
 func (s *ArenaService) CloseAndStartTournament(ctx context.Context, tournamentID int64) (*TournamentStartResult, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:CloseAndStartTournament")
+		segment := txn.StartSegment("service:arena:close-and-start-tournament")
 		defer segment.End()
 	}
 
@@ -1883,6 +1932,12 @@ func (s *ArenaService) CloseAndStartTournament(ctx context.Context, tournamentID
 
 // dealCardsToAllParticipants deals shop cards to all match participants
 func (s *ArenaService) dealCardsToAllParticipants(ctx context.Context, matchID string, chatID int64) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:deal-cards-to-all-participants")
+		defer segment.End()
+	}
+
 	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
 	if err != nil {
 		return fmt.Errorf("failed to get participants: %w", err)
@@ -1929,7 +1984,7 @@ func (s *ArenaService) GetChatsWithTimezone(ctx context.Context) ([]*repository.
 func (s *ArenaService) GetMatchHistory(ctx context.Context, chatID, userID int64, limit, offset int) ([]*repository.MatchHistoryEntry, int, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetMatchHistory")
+		segment := txn.StartSegment("service:arena:get-matchHistory")
 		defer segment.End()
 	}
 
@@ -1940,7 +1995,7 @@ func (s *ArenaService) GetMatchHistory(ctx context.Context, chatID, userID int64
 func (s *ArenaService) GetH2HRecord(ctx context.Context, chatID, userID, opponentID int64) (*repository.H2HRecord, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetH2HRecord")
+		segment := txn.StartSegment("service:arena:get-h2h-record")
 		defer segment.End()
 	}
 
@@ -1951,7 +2006,7 @@ func (s *ArenaService) GetH2HRecord(ctx context.Context, chatID, userID, opponen
 func (s *ArenaService) GetRecentMatchesVsOpponent(ctx context.Context, chatID, userID, opponentID int64, limit int) ([]*repository.MatchHistoryEntry, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetRecentMatchesVsOpponent")
+		segment := txn.StartSegment("service:arena:get-recent-matches-vs-opponent")
 		defer segment.End()
 	}
 
@@ -1968,7 +2023,7 @@ type ArenaProfileResponse struct {
 func (s *ArenaService) GetProfile(ctx context.Context, chatID, userID int64) (*ArenaProfileResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetProfile")
+		segment := txn.StartSegment("service:arena:get-profile")
 		defer segment.End()
 	}
 

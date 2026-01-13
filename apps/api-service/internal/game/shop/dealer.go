@@ -272,6 +272,12 @@ func (d *Dealer) GetCardCount(ctx context.Context, chatID int64) (int, error) {
 
 // getUserPhotoURL fetches the user's profile photo URL as a presigned HTTPS URL
 func (d *Dealer) getUserPhotoURL(ctx context.Context, userID int64) (string, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:get-user-photo-url")
+		defer segment.End()
+	}
+
 	query := `
 		SELECT minio_object_key
 		FROM user_profile_photos
@@ -305,6 +311,12 @@ func (d *Dealer) getUserPhotoURL(ctx context.Context, userID int64) (string, err
 
 // getCardImageURL fetches the user's card image URL for shop display
 func (d *Dealer) getCardImageURL(ctx context.Context, userID, chatID int64, theme string) string {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:get-card-image-url")
+		defer segment.End()
+	}
+
 	if d.cardService == nil {
 		return ""
 	}

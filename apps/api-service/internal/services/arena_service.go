@@ -128,6 +128,88 @@ func parseParticipantShopState(participant *repository.Participant) (cards []*ba
 	return cards, team, nil
 }
 
+// recordBattleCompletion records a custom event for battle completion.
+// This tracks key metrics for business analytics and monitoring.
+func recordBattleCompletion(nrApp *newrelic.Application, matchID string, format string, winnerID *int64, isDraw bool, numRounds int, teamADamage, teamBDamage int) {
+	if nrApp == nil {
+		return
+	}
+
+	// Create custom event for battle completion
+	params := map[string]interface{}{
+		"match_id":       matchID,
+		"format":         format, // "1v1" or "arena"
+		"is_draw":        isDraw,
+		"num_rounds":     numRounds,
+		"team_a_damage":  teamADamage,
+		"team_b_damage":  teamBDamage,
+	}
+
+	if winnerID != nil {
+		params["winner_id"] = *winnerID
+	}
+
+	nrApp.RecordCustomEvent("arena.battle.completed", params)
+}
+
+// recordCardTransaction records a custom event for card purchases, rerolls, and upgrades.
+// eventType should be "buy", "reroll", or "upgrade".
+func recordCardTransaction(nrApp *newrelic.Application, eventType string, matchID string, userID int64, coinsSpent int, cardATK, cardHP int) {
+	if nrApp == nil {
+		return
+	}
+
+	params := map[string]interface{}{
+		"event_type":   eventType,
+		"match_id":     matchID,
+		"user_id":      userID,
+		"coins_spent":  coinsSpent,
+	}
+
+	if cardATK > 0 {
+		params["card_atk"] = cardATK
+	}
+	if cardHP > 0 {
+		params["card_hp"] = cardHP
+	}
+
+	nrApp.RecordCustomEvent("arena.card.transaction", params)
+}
+
+// recordMatchEvent records a custom event for match lifecycle events.
+// eventType should be "created", "started", "completed", etc.
+func recordMatchEvent(nrApp *newrelic.Application, eventType string, matchID string, chatID int64, creatorID int64, matchType string) {
+	if nrApp == nil {
+		return
+	}
+
+	params := map[string]interface{}{
+		"event_type":  eventType,
+		"match_id":    matchID,
+		"chat_id":     chatID,
+		"creator_id":  creatorID,
+		"match_type":  matchType,
+	}
+
+	nrApp.RecordCustomEvent("arena.match.event", params)
+}
+
+// recordTournamentEvent records a custom event for tournament lifecycle events.
+func recordTournamentEvent(nrApp *newrelic.Application, eventType string, tournamentID int64, chatID int64, participantCount int) {
+	if nrApp == nil {
+		return
+	}
+
+	params := map[string]interface{}{
+		"event_type":        eventType,
+		"tournament_id":     tournamentID,
+		"chat_id":           chatID,
+		"participant_count": participantCount,
+	}
+
+	nrApp.RecordCustomEvent("arena.tournament.event", params)
+}
+
 // NewArenaService creates a new arena service
 func NewArenaService(
 	db *sql.DB,
@@ -270,6 +352,9 @@ func (s *ArenaService) CreateMatch(ctx context.Context, chatID int64, creatorUse
 	if err != nil {
 		return nil, fmt.Errorf("failed to get participants: %w", err)
 	}
+
+	// Record match creation metric
+	recordMatchEvent(s.nrApp, "created", match.ID, chatID, creatorUserID, string(repository.MatchTypeRegular))
 
 	return &MatchResponse{
 		Match:        match,
@@ -489,7 +574,9 @@ func (s *ArenaService) dealCardsToParticipants(ctx context.Context, matchID stri
 	return nil
 }
 
-// computeShopAffordability computes what actions a player can afford
+// computeShopAffordability computes what actions a player can afford in the shop.
+// Considers coins available and coins needed to complete team (3 cards total).
+// Returns affordability status and disabled reasons for each action if not affordable.
 func (s *ArenaService) computeShopAffordability(coins int, teamSize int, isReady bool) ShopAffordability {
 	remainingCards := shop.TeamSize - teamSize
 	coinsNeededForCards := remainingCards * shop.CardCost
@@ -541,7 +628,8 @@ func (s *ArenaService) computeShopAffordability(coins int, teamSize int, isReady
 	return aff
 }
 
-// enhanceShopCards wraps shop cards with affordability info
+// enhanceShopCards wraps each shop card with affordability info for client display.
+// Each card shows whether it can be purchased and disabled reason if not affordable.
 func (s *ArenaService) enhanceShopCards(cards []*battle.ShopCard, coins int, teamSize int) []*EnhancedShopCard {
 	enhanced := make([]*EnhancedShopCard, len(cards))
 	for i, card := range cards {
@@ -566,7 +654,8 @@ func (s *ArenaService) enhanceShopCards(cards []*battle.ShopCard, coins int, tea
 	return enhanced
 }
 
-// enhanceTeamCards wraps team cards with upgrade preview info
+// enhanceTeamCards wraps each team card with upgrade preview information.
+// Shows whether upgrades (ATK/HP) are affordable and projected stats after upgrade.
 func (s *ArenaService) enhanceTeamCards(team []*battle.Card, coins int, teamSize int) []*EnhancedTeamCard {
 	remainingCards := shop.TeamSize - teamSize
 	coinsNeededForCards := remainingCards * shop.CardCost
@@ -700,6 +789,9 @@ func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64
 		return nil, fmt.Errorf("failed to save shop state: %w", err)
 	}
 
+	// Record card transaction metric
+	recordCardTransaction(s.nrApp, "buy", matchID, userID, shop.CardCost, newCard.ATK, newCard.HP)
+
 	return s.GetShop(ctx, matchID, userID)
 }
 
@@ -788,6 +880,9 @@ func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64)
 		return nil, fmt.Errorf("failed to save shop state: %w", err)
 	}
 
+	// Record card transaction metric
+	recordCardTransaction(s.nrApp, "reroll", matchID, userID, shop.RerollCost, 0, 0)
+
 	return s.GetShop(ctx, matchID, userID)
 }
 
@@ -860,6 +955,10 @@ func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID i
 	if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, userID, coins, shopCardsJSON, teamJSON, participant.TeamOrder); err != nil {
 		return nil, fmt.Errorf("failed to save shop state: %w", err)
 	}
+
+	// Record card transaction metric
+	upgradedCard := team[teamSlot]
+	recordCardTransaction(s.nrApp, "upgrade", matchID, userID, shop.UpgradeCost, upgradedCard.ATK, upgradedCard.HP)
 
 	return s.GetShop(ctx, matchID, userID)
 }
@@ -1024,7 +1123,10 @@ func normalizeTeamOrder(order []int64, teamSize int) []int64 {
 	return normalized
 }
 
-// runBattle executes a single battle between two participants
+// runBattle executes a single 1v1 battle between two participants and records the results.
+// It handles team parsing, team order normalization, battle simulation, round persistence,
+// and leaderboard updates. Returns a BattleResponse with the outcome and auto-completes
+// the match for 1v1 format battles.
 func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *repository.ParticipantWithUser, roundNumber int) (*BattleResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
@@ -1111,6 +1213,9 @@ func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *re
 	// Run battle simulation
 	result := battle.Simulate(teamA, teamB)
 
+	// Record battle completion metric
+	recordBattleCompletion(s.nrApp, matchID, "1v1", result.WinnerID, result.IsDraw, result.NumRounds, result.TeamADamage, result.TeamBDamage)
+
 	// Save round
 	teamAJSON, err := json.Marshal(orderedA)
 	if err != nil {
@@ -1171,7 +1276,12 @@ func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *re
 	}, nil
 }
 
-// runArena executes arena format (round-robin for now)
+// runArena executes arena format with round-robin tournament bracket.
+// Each participant faces every other participant. Winner is determined by:
+// 1. Most wins across all battles
+// 2. Total damage dealt (as tiebreaker if wins are equal)
+// 3. Lower user_id (deterministic tiebreaker if damage is tied)
+// Completes the match with the tournament winner.
 func (s *ArenaService) runArena(ctx context.Context, matchID string, participants []*repository.ParticipantWithUser) (*BattleResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
@@ -1229,6 +1339,9 @@ func (s *ArenaService) runArena(ctx context.Context, matchID string, participant
 	}
 
 	s.gameRepo.CompleteMatch(ctx, matchID, winnerID)
+
+	// Record arena completion metric
+	recordBattleCompletion(s.nrApp, matchID, "arena", winnerID, false, roundNumber, 0, 0)
 
 	rounds, _ := s.gameRepo.GetMatchRounds(ctx, matchID)
 
@@ -1455,7 +1568,10 @@ type ForceSubmitResult struct {
 	BattleStarted bool    `json:"battle_started"`
 }
 
-// ForceSubmitTeams auto-assigns teams for participants who haven't submitted
+// ForceSubmitTeams auto-assigns teams for participants who haven't submitted.
+// Uses a greedy strategy: auto-buys the 3 highest-ATK cards available.
+// Called when shop phase deadline expires. Starts battle immediately after all teams are ready.
+// Returns list of user IDs that were force-submitted and whether battle was started.
 func (s *ArenaService) ForceSubmitTeams(ctx context.Context, matchID string) (*ForceSubmitResult, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
@@ -1920,6 +2036,9 @@ func (s *ArenaService) CloseAndStartTournament(ctx context.Context, tournamentID
 	// Refetch updated data
 	tournament, _ = s.gameRepo.GetTournamentByID(ctx, tournamentID)
 	match, _ = s.gameRepo.GetMatch(ctx, match.ID)
+
+	// Record tournament start metric
+	recordTournamentEvent(s.nrApp, "started", tournamentID, tournament.ChatID, len(participants))
 
 	return &TournamentStartResult{
 		Tournament:       tournament,

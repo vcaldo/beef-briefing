@@ -11,6 +11,7 @@ import (
 	"beef-briefing/apps/api-service/internal/game/shop"
 	"beef-briefing/apps/api-service/internal/httputil"
 	"beef-briefing/apps/api-service/internal/middleware"
+	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
 
@@ -1084,7 +1085,7 @@ func (h *ArenaHandler) HandleShareResult(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Verify match is completed
-	if match.Status != "completed" {
+	if match.Status != repository.MatchStatusCompleted {
 		httputil.RespondError(w, "match not completed", http.StatusBadRequest)
 		return
 	}
@@ -1799,7 +1800,7 @@ func (h *ArenaHandler) HandleBotGetShareData(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if match.Status != "completed" {
+	if match.Status != repository.MatchStatusCompleted {
 		httputil.RespondError(w, "match not completed", http.StatusBadRequest)
 		return
 	}

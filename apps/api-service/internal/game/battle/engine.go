@@ -65,14 +65,26 @@ func captureCardStates(teamA, teamB *Team, attackerID, defenderID int64) []CardS
 	return states
 }
 
-// Simulate runs a battle between two teams and returns the result.
-// The battle follows SAP-style sequential combat:
-// 1. Front cards attack each other simultaneously
-// 2. Damage dealt = attacker's ATK
-// 3. Card dies when HP <= 0
-// 4. Next card advances to front
-// 5. Repeat until one team is empty
-// 6. If both teams empty simultaneously, winner is determined by total damage dealt
+// Simulate runs a deterministic battle between two teams and returns the full result.
+// The battle follows SAP-style sequential combat mechanics:
+//
+// Combat Flow:
+// 1. Front cards attack each other simultaneously (both deal damage in same round)
+// 2. Damage dealt equals attacker's ATK stat
+// 3. Card dies when HP <= 0 (no negative HP)
+// 4. Next alive card advances to front position
+// 5. Repeat until one or both teams are eliminated
+//
+// Duel Statistics:
+// Tracks detailed stats per card duel: damage dealt/taken, rounds fought, kill streaks.
+// Kill streak increments when a card defeats multiple opponents sequentially.
+//
+// Victory Conditions:
+// - One team eliminated first: other team wins
+// - Both teams eliminated same round: winner by total damage dealt
+// - Equal damage: Draw
+//
+// The function does NOT mutate input teams; uses internal clones for simulation.
 func Simulate(teamA, teamB *Team) *Result {
 	// Clone teams to avoid mutating originals
 	a := teamA.Clone()
@@ -386,8 +398,10 @@ func Simulate(teamA, teamB *Team) *Result {
 	}
 }
 
-// generateHealthBar creates a visual health bar representation
-// Returns a 10-character unicode health bar (e.g., [████████░░])
+// generateHealthBar creates a visual health bar representation.
+// Returns a 10-character unicode health bar showing remaining health percentage.
+// Example: [████████░░] = 80% health
+// Handles edge cases: negative HP clamped to 0%, zero maxHP returns empty bar [░░░░░░░░░░].
 func generateHealthBar(currentHP, maxHP int) string {
 	if maxHP == 0 {
 		return "[░░░░░░░░░░]"
@@ -425,10 +439,4 @@ func getTeamName(t *Team) string {
 		return t.OwnerName
 	}
 	return "Team"
-}
-
-// SimulateWithSeed runs a battle with a specific random seed (for testing)
-// Currently battles are deterministic, so this just calls Simulate
-func SimulateWithSeed(teamA, teamB *Team, seed int64) *Result {
-	return Simulate(teamA, teamB)
 }

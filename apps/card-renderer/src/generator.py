@@ -11,7 +11,7 @@ from minio.error import S3Error
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
-from ..config import CARD_SIZES
+from config import CARD_SIZES
 from .database import CardQueries, CardImageRepository
 from .instrumentation import (
     add_custom_attributes,

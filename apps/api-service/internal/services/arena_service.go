@@ -40,7 +40,7 @@ var (
 	ErrNotEnoughCoins        = errors.New("not enough coins")
 	ErrTeamFull              = errors.New("team is full (max 3 cards)")
 	ErrCardAlreadyPurchased  = errors.New("card already purchased")
-	ErrActiveMatchExists     = errors.New("an active unranked match already exists")
+	ErrActiveMatchExists     = errors.New("an active match already exists. Please wait for it to complete before creating a new one.")
 )
 
 // ArenaService handles arena game logic
@@ -194,7 +194,10 @@ func (s *ArenaService) CreateMatch(ctx context.Context, chatID int64, creatorUse
 
 	// Only allow one active regular match at a time
 	for _, match := range activeMatches {
-		if match.MatchType == repository.MatchTypeRegular && match.Status == repository.MatchStatusOpen {
+		if match.MatchType == repository.MatchTypeRegular &&
+			(match.Status == repository.MatchStatusOpen ||
+				match.Status == repository.MatchStatusShopPhase ||
+				match.Status == repository.MatchStatusBattlePhase) {
 			return nil, ErrActiveMatchExists
 		}
 	}

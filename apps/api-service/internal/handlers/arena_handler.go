@@ -180,7 +180,7 @@ func (h *ArenaHandler) HandleCreateMatch(w http.ResponseWriter, r *http.Request)
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		if err == services.ErrNotEnoughCards {
+		if err == services.ErrNotEnoughCards || err == services.ErrActiveMatchExists {
 			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -1180,7 +1180,7 @@ func (h *ArenaHandler) HandleBotCreateMatch(w http.ResponseWriter, r *http.Reque
 		if txn != nil {
 			txn.NoticeError(err)
 		}
-		if err == services.ErrNotEnoughCards {
+		if err == services.ErrNotEnoughCards || err == services.ErrActiveMatchExists {
 			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
 			return
 		}

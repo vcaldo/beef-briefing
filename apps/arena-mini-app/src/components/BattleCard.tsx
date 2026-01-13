@@ -90,7 +90,7 @@ export function BattleCard({
   }
 
   const hp = cardState?.hp ?? card.hp;
-  const isDead = !cardState?.is_alive ?? (hp <= 0);
+  const isDead = cardState ? !cardState.is_alive : hp <= 0;
   const hpPercent = Math.max(0, (hp / card.max_hp) * 100);
 
   // Determine animation state

@@ -216,13 +216,8 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
 
   // Get affordability flags from API (all calculations are server-side)
   const {
-    can_buy: canBuyOverall,
     can_reroll: canReroll,
-    can_upgrade: canUpgradeOverall,
     can_submit: canSubmit,
-    reroll_disabled_reason: rerollDisabledReason,
-    upgrade_disabled_reason: upgradeDisabledReason,
-    submit_disabled_reason: submitDisabledReason,
   } = shopState.affordability;
 
   return (
@@ -357,7 +352,7 @@ interface ShopCardComponentProps {
   buyDisabledReason?: string;
 }
 
-function ShopCardComponent({ card, onBuy, canBuy, buyDisabledReason }: ShopCardComponentProps) {
+function ShopCardComponent({ card, onBuy, canBuy }: ShopCardComponentProps) {
   return (
     <div className={`shop-card ${card.is_purchased ? 'purchased' : ''}`}>
       {/* Full card image with 2:3 aspect ratio */}

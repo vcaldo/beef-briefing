@@ -47,7 +47,7 @@ The game supports two modes:
 | Casual | `regular` | Instant 1v1 matches | One active casual match per chat |
 | Ranked | `ranked` | Daily tournaments with brackets | Separate lock from casual |
 
-**Lock System**: Users cannot create a new casual match if they have an active casual match in `open`, `shop_phase`, or `battle_phase` status. Ranked matches use a separate lock system. *(Configured in [arena_service.go:189-201](../services/arena_service.go#L189-L201))*
+**Lock System**: Users cannot create a new casual match if they have an active casual match in `open`, `shop_phase`, or `battle_phase` status. Ranked matches use a separate lock system. *(Configured in [arena_service.go:314-328](../services/arena_service.go#L314-L328))*
 
 ### Match Lifecycle
 
@@ -78,6 +78,10 @@ The game supports two modes:
 
 #### Phase 2: Shop Phase (MatchStatusShopPhase)
 - **Duration**: 3 minutes *(ShopPhaseDuration in [arena_service.go:24](../services/arena_service.go#L24))*
+- **Features**:
+  - After team submission, GetShop returns read-only state with `team_submitted: true` and `cards: null`
+  - Frontend can continue polling to detect when battle starts
+  - No errors returned for post-submission requests
 - **Actions**:
   - Buy cards from shop (6 cards available)
   - Reroll shop for new cards
@@ -138,7 +142,7 @@ The game supports two modes:
   - Card image (from card renderer service)
   - Base stats: ATK, DEF, HP
 
-*Card dealing logic in [shop/dealer.go:52-144](shop/dealer.go#L52-L144)*
+*Card dealing logic in [shop/dealer.go:53-146](shop/dealer.go#L53-L146)*
 
 #### Building Your Team
 
@@ -198,7 +202,7 @@ Round N:
 2. **Damage tiebreaker**: If both teams eliminated in same round, most total damage wins
 3. **True draw**: Equal damage dealt by both teams
 
-*Full combat logic in [battle/engine.go:68-387](battle/engine.go#L68-L387)*
+*Full combat logic in [battle/engine.go:88-403](battle/engine.go#L88-L403)*
 
 #### Battle Events
 
@@ -269,7 +273,7 @@ GET /api/v1/mini-app/arena/matches?chat_id=<chat_id>
 }
 ```
 
-*Handler: [arena_handler.go:102-134](../handlers/arena_handler.go#L102-L134)*
+*Handler: [arena_handler.go:269-293](../handlers/arena_handler.go#L269-L293)*
 
 #### Create Match
 ```http
@@ -287,7 +291,7 @@ Content-Type: application/json
 - `400 Bad Request`: Not enough cards available (< 12 for 6 shop slots)
 - `400 Bad Request`: Active match already exists (see Lock System)
 
-*Handler: [arena_handler.go:136-196](../handlers/arena_handler.go#L136-L196)*
+*Handler: [arena_handler.go:295-340](../handlers/arena_handler.go#L295-L340)*
 
 #### Get Match Details
 ```http
@@ -296,7 +300,7 @@ GET /api/v1/mini-app/arena/match/<match_id>
 
 **Response**: Full match object with participants, timestamps, and status
 
-*Handler: [arena_handler.go:198-250](../handlers/arena_handler.go#L198-L250)*
+*Handler: [arena_handler.go:342-379](../handlers/arena_handler.go#L342-L379)*
 
 #### Join Match
 ```http
@@ -309,7 +313,7 @@ POST /api/v1/mini-app/arena/match/<match_id>/join
 
 **Response**: Updated match object
 
-*Handler: [arena_handler.go:252-293](../handlers/arena_handler.go#L252-L293)*
+*Handler: [arena_handler.go:381-408](../handlers/arena_handler.go#L381-L408)*
 
 #### Leave Match
 ```http
@@ -321,7 +325,7 @@ POST /api/v1/mini-app/arena/match/<match_id>/leave
 
 **Response**: `200 OK`
 
-*Handler: [arena_handler.go:295-336](../handlers/arena_handler.go#L295-L336)*
+*Handler: [arena_handler.go:410-437](../handlers/arena_handler.go#L410-L437)*
 
 #### Start Match (Creator Only)
 ```http
@@ -335,7 +339,7 @@ POST /api/v1/mini-app/arena/match/<match_id>/start
 
 **Response**: Updated match object in `shop_phase` status
 
-*Handler: [arena_handler.go:338-381](../handlers/arena_handler.go#L338-L381)*
+*Handler: [arena_handler.go:439-466](../handlers/arena_handler.go#L439-L466)*
 
 ---
 
@@ -350,7 +354,7 @@ GET /api/v1/mini-app/arena/match/<match_id>/shop
 ```json
 {
   "match_id": "01J9XYZ...",
-  "user_id": 123456,
+  "status": "shop_phase",
   "coins": 10,
   "cards": [
     {
@@ -372,11 +376,32 @@ GET /api/v1/mini-app/arena/match/<match_id>/shop
   "team": [],
   "team_order": [0, 1, 2],
   "is_ready": false,
-  "rerolls_used": 0
+  "team_submitted": false,
+  "deadline": "2024-01-15T10:08:00Z",
+  "time_remaining_seconds": 180,
+  "affordability": {
+    "can_buy": true,
+    "can_reroll": true,
+    "can_upgrade": false,
+    "can_submit": false
+  }
 }
 ```
 
-*Handler: [arena_handler.go:383-424](../handlers/arena_handler.go#L383-L424)*
+**Behavior after Team Submission**:
+When you submit your team (`team_submitted: true`), subsequent calls to GetShop return a **read-only state**:
+- `cards` array is `null` (no shop interface)
+- `team` shows your submitted team
+- All affordability flags are `false` with reason "team already submitted"
+- You can continue polling - no errors returned
+- Useful for detecting when match transitions to `battle_phase`
+
+**Phase Transitions**:
+- If match transitions to `battle_phase` or `completed`, returns graceful read-only state
+- Use `status` field to detect phase changes
+- Safe to continue polling during transition
+
+*Handler: [arena_handler.go:468-496](../handlers/arena_handler.go#L468-L496)*
 
 #### Buy Card
 ```http
@@ -396,7 +421,7 @@ Content-Type: application/json
 
 **Response**: Updated shop state with card added to team
 
-*Handler: [arena_handler.go:426-478](../handlers/arena_handler.go#L426-L478)*
+*Handler: [arena_handler.go:497-531](../handlers/arena_handler.go#L497-L531)*
 
 #### Reroll Shop
 ```http
@@ -409,7 +434,7 @@ POST /api/v1/mini-app/arena/match/<match_id>/reroll
 
 **Response**: Updated shop state with new unpurchased cards
 
-*Handler: [arena_handler.go:480-523](../handlers/arena_handler.go#L480-L523)*
+*Handler: [arena_handler.go:533-560](../handlers/arena_handler.go#L533-L560)*
 
 #### Upgrade Card
 ```http
@@ -435,7 +460,7 @@ Content-Type: application/json
 
 **Response**: Updated shop state with card stats modified
 
-*Handler: [arena_handler.go:525-581](../handlers/arena_handler.go#L525-L581)*
+*Handler: [arena_handler.go:562-602](../handlers/arena_handler.go#L562-L602)*
 
 #### Set Team Order
 ```http
@@ -458,7 +483,7 @@ Content-Type: application/json
 
 **Response**: Updated shop state
 
-*Handler: [arena_handler.go:583-623](../handlers/arena_handler.go#L583-L623)*
+*Handler: [arena_handler.go:604-638](../handlers/arena_handler.go#L604-L638)*
 
 #### Submit Team
 ```http
@@ -475,7 +500,7 @@ POST /api/v1/mini-app/arena/match/<match_id>/team
 - When all participants ready → battle starts immediately
 - Otherwise → battle starts at shop deadline
 
-*Handler: [arena_handler.go:625-668](../handlers/arena_handler.go#L625-L668)*
+*Handler: [arena_handler.go:640-667](../handlers/arena_handler.go#L640-L667)*
 
 ---
 
@@ -577,7 +602,7 @@ GET /api/v1/mini-app/arena/match/<match_id>/battle
 - Alive status
 - Who's attacking/defending this turn
 
-*Handler: [arena_handler.go:670-711](../handlers/arena_handler.go#L670-L711)*
+*Handler: [arena_handler.go:669-696](../handlers/arena_handler.go#L669-L696)*
 
 ---
 
@@ -616,7 +641,7 @@ GET /api/v1/mini-app/arena/leaderboard?chat_id=<id>&type=ranked&limit=50&offset=
 }
 ```
 
-*Handler: [arena_handler.go:713-756](../handlers/arena_handler.go#L713-L756)*
+*Handler: [arena_handler.go:698-733](../handlers/arena_handler.go#L698-L733)*
 
 #### Get Match History
 ```http
@@ -650,7 +675,7 @@ GET /api/v1/mini-app/arena/history?chat_id=<id>&limit=20&offset=0
 
 **Result values**: `"win"`, `"loss"`, `"draw"`
 
-*Handler: [arena_handler.go:758-843](../handlers/arena_handler.go#L758-L843)*
+*Handler: [arena_handler.go:735-812](../handlers/arena_handler.go#L735-L812)*
 
 #### Get Head-to-Head Record
 ```http
@@ -684,7 +709,7 @@ GET /api/v1/mini-app/arena/h2h?chat_id=<id>&opponent_id=<user_id>
 }
 ```
 
-*Handler: [arena_handler.go:845-950](../handlers/arena_handler.go#L845-L950)*
+*Handler: [arena_handler.go:814-919](../handlers/arena_handler.go#L814-L919)*
 
 #### Get User Profile
 ```http
@@ -720,7 +745,7 @@ GET /api/v1/mini-app/arena/profile?chat_id=<id>
 }
 ```
 
-*Handler: [arena_handler.go:952-1075](../handlers/arena_handler.go#L952-L1075)*
+*Handler: [arena_handler.go:921-1044](../handlers/arena_handler.go#L921-L1044)*
 
 ---
 
@@ -755,7 +780,7 @@ Frontend users interact with tournaments through:
 - Creating bracket matches
 - Progressing rounds
 
-*Tournament handlers: [arena_handler.go:1480-1857](../handlers/arena_handler.go#L1480-L1857) (Bot API Key auth only)*
+*Tournament handlers: [arena_handler.go:1396-1780](../handlers/arena_handler.go#L1396-L1780) (Bot API Key auth only)*
 
 ---
 
@@ -788,7 +813,7 @@ GET /api/v1/mini-app/arena/constants
 }
 ```
 
-*Handler: [arena_handler.go:1956-1987](../handlers/arena_handler.go#L1956-L1987)*
+*Handler: [arena_handler.go:1855-1889](../handlers/arena_handler.go#L1855-L1889)*
 
 ---
 
@@ -871,17 +896,56 @@ interface ShopCard {
 }
 ```
 
-### ShopState
+### EnhancedShopResponse
 ```typescript
-interface ShopState {
+interface EnhancedShopResponse {
   match_id: string;
-  user_id: number;
+  status: string;                 // "open" | "shop_phase" | "battle_phase" | "completed"
   coins: number;
-  cards: ShopCard[];             // Length 6
-  team: Card[];                  // Length 0-3
-  team_order: number[];          // [0, 1, 2]
+  cards: EnhancedShopCard[] | null;  // null after team submission or phase transition
+  team: EnhancedTeamCard[];        // Length 0-3
+  team_order: number[];           // [0, 1, 2]
   is_ready: boolean;
-  rerolls_used: number;
+  team_submitted: boolean;        // true after calling submit endpoint
+  deadline?: string;              // ISO 8601 deadline
+  time_remaining_seconds: number; // Seconds until deadline
+  affordability: ShopAffordability;
+}
+
+### ShopAffordability
+```typescript
+interface ShopAffordability {
+  can_buy: boolean;
+  can_reroll: boolean;
+  can_upgrade: boolean;
+  can_submit: boolean;
+  buy_disabled_reason?: string;
+  reroll_disabled_reason?: string;
+  upgrade_disabled_reason?: string;
+  submit_disabled_reason?: string;
+}
+```
+
+### EnhancedShopCard (extends ShopCard)
+```typescript
+interface EnhancedShopCard extends ShopCard {
+  // All ShopCard fields plus:
+  can_afford: boolean;           // Whether you have 2+ coins to buy
+  preview_cost: number;          // Cost of this specific action
+}
+```
+
+### EnhancedTeamCard (extends Card)
+```typescript
+interface EnhancedTeamCard extends Card {
+  // All Card fields plus:
+  can_upgrade_atk: boolean;              // Whether ATK upgrade is affordable
+  can_upgrade_hp: boolean;               // Whether HP upgrade is affordable
+  upgrade_atk_disabled_reason?: string;  // Reason if ATK upgrade not available
+  upgrade_hp_disabled_reason?: string;   // Reason if HP upgrade not available
+  atk_if_upgraded: number;               // ATK value if upgraded once more
+  hp_if_upgraded: number;                // HP value if upgraded once more
+  max_hp_if_upgraded: number;            // MaxHP value if upgraded once more
 }
 ```
 
@@ -1033,8 +1097,12 @@ setInterval(async () => {
 // Load shop state
 const shop = await GET(`/api/v1/mini-app/arena/match/${matchId}/shop`);
 
-// Display 6 shop cards + purchased team
-renderShop(shop.cards, shop.team);
+// Display 6 shop cards + purchased team (or read-only team if submitted)
+if (shop.cards) {
+  renderShop(shop.cards, shop.team);  // Interactive mode
+} else {
+  renderReadOnlyTeam(shop.team);      // Submitted state
+}
 updateCoins(shop.coins);
 
 // Buy card
@@ -1059,17 +1127,30 @@ const updatedShop = await POST(`/api/v1/mini-app/arena/match/${matchId}/order`, 
 // Submit team (requires 3 cards)
 if (shop.team.length === 3) {
   const updatedShop = await POST(`/api/v1/mini-app/arena/match/${matchId}/team`);
-  // updatedShop.is_ready === true
+  // updatedShop.team_submitted === true
 }
 
-// Poll for battle start
+// Poll for battle start - CONTINUE POLLING EVEN AFTER TEAM SUBMISSION
+// This allows the UI to respond immediately when battle starts
 setInterval(async () => {
-  const match = await GET(`/api/v1/mini-app/arena/match/${matchId}`);
-  if (match.status === 'battle_phase') {
+  const shop = await GET(`/api/v1/mini-app/arena/match/${matchId}/shop`);
+
+  // Only stop polling when match exits shop phase entirely
+  if (shop.status === 'battle_phase') {
     navigateToBattle();
+    clearInterval();
   }
-}, 2000);
+  // If team_submitted, render read-only state while waiting
+  if (shop.team_submitted && !shop.cards) {
+    renderReadOnlyTeam(shop.team);
+  }
+}, 3000); // Poll every 3s (reduced from 2s for efficiency)
 ```
+
+**Important**: Continue polling GetShop even after team submission. The endpoint handles all phases gracefully:
+- Returns `team_submitted: true` and `cards: null` while waiting
+- No errors on phase transitions
+- Safe for frontend to poll continuously during shop phase
 
 #### 5. Battle Phase UI
 ```typescript
@@ -1169,9 +1250,16 @@ Since this is a REST API, implement polling for live updates:
 - Watch for `status` changes and participant updates
 
 **During shop phase**:
-- Poll `/api/v1/mini-app/arena/match/{id}` every 2-3 seconds
-- Watch for `status` change to `battle_phase`
-- Shop state doesn't need polling (only changes on your actions)
+- Poll `/api/v1/mini-app/arena/match/{id}/shop` every 3 seconds
+- Continue polling even after team submission (endpoint returns read-only state)
+- Watch for `status` change to `battle_phase` to trigger battle view
+- Endpoint gracefully handles all phase transitions without errors
+
+**After team submission**:
+- GetShop returns `team_submitted: true` and `cards: null`
+- Affordability flags all false with reason "team already submitted"
+- Continue polling to detect when other players finish and battle starts
+- No need to poll match endpoint simultaneously
 
 **During battle**:
 - No polling needed - battle results are static
@@ -1189,15 +1277,15 @@ Since this is a REST API, implement polling for live updates:
 ## Code References
 
 ### Core Game Logic
-- **Battle Engine**: [battle/engine.go:68-387](battle/engine.go#L68-L387) - SAP-style combat simulation
+- **Battle Engine**: [battle/engine.go:88-403](battle/engine.go#L88-L403) - SAP-style combat simulation
 - **Shop State**: [shop/types.go:22-224](shop/types.go#L22-L224) - Economy & team building logic
-- **Card Dealer**: [shop/dealer.go:52-243](shop/dealer.go#L52-L243) - Random card selection
+- **Card Dealer**: [shop/dealer.go:53-245](shop/dealer.go#L53-L245) - Random card selection
 
 ### API Layer
-- **Match Handlers**: [arena_handler.go:102-381](../handlers/arena_handler.go#L102-L381) - Match lifecycle endpoints
-- **Shop Handlers**: [arena_handler.go:383-668](../handlers/arena_handler.go#L383-L668) - Shop & team building
-- **Battle Handlers**: [arena_handler.go:670-711](../handlers/arena_handler.go#L670-L711) - Battle results
-- **Stats Handlers**: [arena_handler.go:713-1075](../handlers/arena_handler.go#L713-L1075) - Leaderboards & profiles
+- **Match Handlers**: [arena_handler.go:269-466](../handlers/arena_handler.go#L269-L466) - Match lifecycle endpoints
+- **Shop Handlers**: [arena_handler.go:468-667](../handlers/arena_handler.go#L468-L667) - Shop & team building
+- **Battle Handlers**: [arena_handler.go:669-696](../handlers/arena_handler.go#L669-L696) - Battle results
+- **Stats Handlers**: [arena_handler.go:698-1044](../handlers/arena_handler.go#L698-L1044) - Leaderboards & profiles
 
 ### Configuration
 - **Economy Constants**: [shop/types.go:10-18](shop/types.go#L10-L18)

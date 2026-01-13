@@ -124,6 +124,51 @@ type ShopResponse struct {
 	TimeRemaining int                `json:"time_remaining_seconds"`
 }
 
+// ShopAffordability represents what actions a player can afford
+type ShopAffordability struct {
+	CanBuy               bool    `json:"can_buy"`
+	CanReroll            bool    `json:"can_reroll"`
+	CanUpgrade           bool    `json:"can_upgrade"`
+	CanSubmit            bool    `json:"can_submit"`
+	BuyDisabledReason    *string `json:"buy_disabled_reason"`
+	RerollDisabledReason *string `json:"reroll_disabled_reason"`
+	UpgradeDisabledReason *string `json:"upgrade_disabled_reason"`
+	SubmitDisabledReason *string `json:"submit_disabled_reason"`
+}
+
+// EnhancedShopCard wraps ShopCard with affordability info
+type EnhancedShopCard struct {
+	*battle.ShopCard
+	CanBuy            bool    `json:"can_buy"`
+	BuyDisabledReason *string `json:"buy_disabled_reason"`
+}
+
+// EnhancedTeamCard wraps Card with upgrade preview info
+type EnhancedTeamCard struct {
+	*battle.Card
+	CanUpgradeATK         bool    `json:"can_upgrade_atk"`
+	CanUpgradeHP          bool    `json:"can_upgrade_hp"`
+	UpgradeATKDisabledReason *string `json:"upgrade_atk_disabled_reason"`
+	UpgradeHPDisabledReason  *string `json:"upgrade_hp_disabled_reason"`
+	ATKIfUpgraded         int     `json:"atk_if_upgraded"`
+	HPIfUpgraded          int     `json:"hp_if_upgraded"`
+	MaxHPIfUpgraded       int     `json:"max_hp_if_upgraded"`
+}
+
+// EnhancedShopResponse is the full shop response with affordability and upgrade previews
+type EnhancedShopResponse struct {
+	MatchID              string                `json:"match_id"`
+	Status               string                `json:"status"`
+	Coins                int                   `json:"coins"`
+	Cards                []*EnhancedShopCard   `json:"cards"`
+	Team                 []*EnhancedTeamCard   `json:"team"`
+	TeamOrder            []int                 `json:"team_order"`
+	IsReady              bool                  `json:"is_ready"`
+	Deadline             *time.Time            `json:"deadline,omitempty"`
+	TimeRemaining        int                   `json:"time_remaining_seconds"`
+	Affordability        ShopAffordability     `json:"affordability"`
+}
+
 // BattleResponse represents battle results
 type BattleResponse struct {
 	MatchID    string                   `json:"match_id"`
@@ -393,8 +438,111 @@ func (s *ArenaService) dealCardsToParticipants(ctx context.Context, matchID stri
 	return nil
 }
 
-// GetShop retrieves the shop state for a player
-func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64) (*ShopResponse, error) {
+// computeShopAffordability computes what actions a player can afford
+func (s *ArenaService) computeShopAffordability(coins int, teamSize int, isReady bool) ShopAffordability {
+	remainingCards := shop.TeamSize - teamSize
+	coinsNeededForCards := remainingCards * shop.CardCost
+
+	canBuy := coins >= shop.CardCost && teamSize < shop.TeamSize
+	canReroll := coins >= (shop.RerollCost + coinsNeededForCards)
+	canUpgrade := coins >= (shop.UpgradeCost + coinsNeededForCards)
+	canSubmit := teamSize == shop.TeamSize && !isReady
+
+	aff := ShopAffordability{
+		CanBuy:     canBuy,
+		CanReroll:  canReroll,
+		CanUpgrade: canUpgrade,
+		CanSubmit:  canSubmit,
+	}
+
+	if !canBuy {
+		if teamSize >= shop.TeamSize {
+			reason := "team is full"
+			aff.BuyDisabledReason = &reason
+		} else {
+			reason := fmt.Sprintf("need %d coins", shop.CardCost)
+			aff.BuyDisabledReason = &reason
+		}
+	}
+
+	if !canReroll {
+		reason := fmt.Sprintf("need %d coins (%d reroll + %d to complete team)",
+			shop.RerollCost+coinsNeededForCards, shop.RerollCost, coinsNeededForCards)
+		aff.RerollDisabledReason = &reason
+	}
+
+	if !canUpgrade {
+		reason := fmt.Sprintf("need %d coins (%d upgrade + %d to complete team)",
+			shop.UpgradeCost+coinsNeededForCards, shop.UpgradeCost, coinsNeededForCards)
+		aff.UpgradeDisabledReason = &reason
+	}
+
+	if !canSubmit {
+		if teamSize < shop.TeamSize {
+			reason := fmt.Sprintf("team incomplete (%d/%d cards)", teamSize, shop.TeamSize)
+			aff.SubmitDisabledReason = &reason
+		} else if isReady {
+			reason := "already submitted"
+			aff.SubmitDisabledReason = &reason
+		}
+	}
+
+	return aff
+}
+
+// enhanceShopCards wraps shop cards with affordability info
+func (s *ArenaService) enhanceShopCards(cards []*battle.ShopCard, coins int, teamSize int) []*EnhancedShopCard {
+	enhanced := make([]*EnhancedShopCard, len(cards))
+	for i, card := range cards {
+		canBuy := !card.IsPurchased && coins >= shop.CardCost && teamSize < shop.TeamSize
+		enhanced[i] = &EnhancedShopCard{
+			ShopCard: card,
+			CanBuy:   canBuy,
+		}
+		if !canBuy {
+			if card.IsPurchased {
+				reason := "already purchased"
+				enhanced[i].BuyDisabledReason = &reason
+			} else if teamSize >= shop.TeamSize {
+				reason := "team is full"
+				enhanced[i].BuyDisabledReason = &reason
+			} else {
+				reason := fmt.Sprintf("need %d coins", shop.CardCost)
+				enhanced[i].BuyDisabledReason = &reason
+			}
+		}
+	}
+	return enhanced
+}
+
+// enhanceTeamCards wraps team cards with upgrade preview info
+func (s *ArenaService) enhanceTeamCards(team []*battle.Card, coins int, teamSize int) []*EnhancedTeamCard {
+	remainingCards := shop.TeamSize - teamSize
+	coinsNeededForCards := remainingCards * shop.CardCost
+	canAffordUpgrade := coins >= (shop.UpgradeCost + coinsNeededForCards)
+
+	enhanced := make([]*EnhancedTeamCard, len(team))
+	for i, card := range team {
+		enhanced[i] = &EnhancedTeamCard{
+			Card:                card,
+			CanUpgradeATK:       canAffordUpgrade,
+			CanUpgradeHP:        canAffordUpgrade,
+			ATKIfUpgraded:       card.ATK + shop.ATKUpgradeAmount,
+			HPIfUpgraded:        card.HP + shop.HPUpgradeAmount,
+			MaxHPIfUpgraded:     card.MaxHP + shop.HPUpgradeAmount,
+		}
+		if !canAffordUpgrade {
+			reason := fmt.Sprintf("need %d coins (%d upgrade + %d to complete team)",
+				shop.UpgradeCost+coinsNeededForCards, shop.UpgradeCost, coinsNeededForCards)
+			enhanced[i].UpgradeATKDisabledReason = &reason
+			enhanced[i].UpgradeHPDisabledReason = &reason
+		}
+	}
+	return enhanced
+}
+
+// GetShop retrieves the enhanced shop state for a player (includes affordability and upgrade previews)
+func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("service:arena:GetShop")
@@ -448,21 +596,29 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 		teamOrder[i] = int(v)
 	}
 
-	return &ShopResponse{
+	isReady := participant.Status == repository.ParticipantStatusReady
+
+	// Build enhanced response with affordability and upgrade previews
+	enhancedCards := s.enhanceShopCards(cards, participant.CoinsRemaining, len(team))
+	enhancedTeam := s.enhanceTeamCards(team, participant.CoinsRemaining, len(team))
+	affordability := s.computeShopAffordability(participant.CoinsRemaining, len(team), isReady)
+
+	return &EnhancedShopResponse{
 		MatchID:       matchID,
 		Status:        string(match.Status),
 		Coins:         participant.CoinsRemaining,
-		Cards:         cards,
-		Team:          team,
+		Cards:         enhancedCards,
+		Team:          enhancedTeam,
 		TeamOrder:     teamOrder,
-		IsReady:       participant.Status == repository.ParticipantStatusReady,
+		IsReady:       isReady,
 		Deadline:      match.ShopPhaseDeadline,
 		TimeRemaining: timeRemaining,
+		Affordability: affordability,
 	}, nil
 }
 
 // BuyCard purchases a card from the shop
-func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64, cardIndex int) (*ShopResponse, error) {
+func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64, cardIndex int) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("service:arena:BuyCard")
@@ -525,7 +681,7 @@ func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64
 }
 
 // Reroll replaces unpurchased cards with new ones
-func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64) (*ShopResponse, error) {
+func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("service:arena:Reroll")
@@ -613,7 +769,7 @@ func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64)
 }
 
 // UpgradeCard applies an upgrade to a team card
-func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID int64, teamSlot int, upgradeType shop.UpgradeType) (*ShopResponse, error) {
+func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID int64, teamSlot int, upgradeType shop.UpgradeType) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("service:arena:UpgradeCard")
@@ -686,7 +842,7 @@ func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID i
 }
 
 // SetTeamOrder sets the battle order for a player's team
-func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID int64, order []int) (*ShopResponse, error) {
+func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID int64, order []int) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("service:arena:SetTeamOrder")
@@ -737,7 +893,7 @@ func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID 
 }
 
 // SubmitTeam submits the team for battle
-func (s *ArenaService) SubmitTeam(ctx context.Context, matchID string, userID int64) (*ShopResponse, error) {
+func (s *ArenaService) SubmitTeam(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
 		segment := txn.StartSegment("service:arena:SubmitTeam")

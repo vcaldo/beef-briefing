@@ -21,6 +21,50 @@ type duelStats struct {
 	roundsCount int    // Number of rounds in duel
 }
 
+// captureCardStates captures the current state of all cards from both teams.
+// attackerID and defenderID are used to mark which cards are attacking/defending in this event.
+func captureCardStates(teamA, teamB *Team, attackerID, defenderID int64) []CardSnapshot {
+	states := make([]CardSnapshot, 0, len(teamA.Cards)+len(teamB.Cards))
+
+	// Capture Team A
+	for _, card := range teamA.Cards {
+		if card != nil {
+			states = append(states, CardSnapshot{
+				CardID:      card.CardID,
+				UserID:      card.UserID,
+				Name:        card.Name,
+				HP:          card.HP,
+				MaxHP:       card.MaxHP,
+				ATK:         card.ATK,
+				Position:    card.Position,
+				IsAlive:     card.HP > 0,
+				IsAttacking: card.CardID == attackerID,
+				IsDefending: card.CardID == defenderID,
+			})
+		}
+	}
+
+	// Capture Team B
+	for _, card := range teamB.Cards {
+		if card != nil {
+			states = append(states, CardSnapshot{
+				CardID:      card.CardID,
+				UserID:      card.UserID,
+				Name:        card.Name,
+				HP:          card.HP,
+				MaxHP:       card.MaxHP,
+				ATK:         card.ATK,
+				Position:    card.Position,
+				IsAlive:     card.HP > 0,
+				IsAttacking: card.CardID == attackerID,
+				IsDefending: card.CardID == defenderID,
+			})
+		}
+	}
+
+	return states
+}
+
 // Simulate runs a battle between two teams and returns the result.
 // The battle follows SAP-style sequential combat:
 // 1. Front cards attack each other simultaneously

@@ -1953,6 +1953,39 @@ func (h *ArenaHandler) HandleBotGetShareData(w http.ResponseWriter, r *http.Requ
 	}, http.StatusOK)
 }
 
+// HandleGetConstants returns game configuration constants.
+// GET /api/v1/mini-app/arena/constants
+func (h *ArenaHandler) HandleGetConstants(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:constants")
+	}
+
+	// Just return the constants - no auth validation needed beyond JWT which is enforced by middleware
+	constants := map[string]interface{}{
+		"costs": map[string]int{
+			"card":    shop.CardCost,
+			"reroll":  shop.RerollCost,
+			"upgrade": shop.UpgradeCost,
+		},
+		"sizes": map[string]int{
+			"shop": shop.ShopSize,
+			"team": shop.TeamSize,
+		},
+		"upgrades": map[string]int{
+			"atk_amount": shop.ATKUpgradeAmount,
+			"hp_amount":  shop.HPUpgradeAmount,
+		},
+		"timings": map[string]int{
+			"shop_phase_duration":  180,
+			"join_window_duration": 300,
+		},
+	}
+
+	httputil.RespondJSON(w, constants, http.StatusOK)
+}
+
 // timeNow is a function variable for testing purposes
 var timeNow = func() time.Time {
 	return time.Now()

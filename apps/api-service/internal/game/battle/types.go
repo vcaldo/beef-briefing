@@ -118,6 +118,20 @@ func (t *Team) IsEmpty() bool {
 	return t.RemainingCards() == 0
 }
 
+// CardSnapshot represents the state of a card at a point in time during battle
+type CardSnapshot struct {
+	CardID      int64  `json:"card_id"`
+	UserID      int64  `json:"user_id"`
+	Name        string `json:"name"`
+	HP          int    `json:"hp"`
+	MaxHP       int    `json:"max_hp"`
+	ATK         int    `json:"atk"`
+	Position    int    `json:"position"` // 0=front, 1=mid, 2=back
+	IsAlive     bool   `json:"is_alive"`
+	IsAttacking bool   `json:"is_attacking"`
+	IsDefending bool   `json:"is_defending"`
+}
+
 // BattleEvent represents a single action in battle replay
 type BattleEvent struct {
 	Type    EventType `json:"type"`
@@ -142,6 +156,9 @@ type BattleEvent struct {
 	TotalDamageTaken  int   `json:"total_damage_taken,omitempty"`
 	RoundsInDuel      int   `json:"rounds_in_duel,omitempty"`
 	KillStreak        int   `json:"kill_streak,omitempty"`
+
+	// Card states snapshot - shows all cards' states after this event
+	CardStates []CardSnapshot `json:"card_states,omitempty"`
 }
 
 // Result represents the outcome of a battle

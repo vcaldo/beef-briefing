@@ -19,6 +19,16 @@ class ArenaApiClient extends BaseApiClient {
     super(baseUrl || import.meta.env.VITE_API_URL || '')
   }
 
+  // Game configuration
+  async getConstants(): Promise<{
+    costs: { card: number; reroll: number; upgrade: number }
+    sizes: { shop: number; team: number }
+    upgrades: { atk_amount: number; hp_amount: number }
+    timings: { shop_phase_duration: number; join_window_duration: number }
+  }> {
+    return this.request('/api/v1/mini-app/arena/constants')
+  }
+
   // Match endpoints
   async getActiveMatches(): Promise<{ matches: Match[] }> {
     const chatIdParam = this.getChatId() ? `chat_id=${this.getChatId()}` : ''

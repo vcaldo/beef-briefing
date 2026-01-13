@@ -1,5 +1,5 @@
 import { motion, AnimatePresence, Variants } from 'framer-motion';
-import type { GameCard, BattleEvent } from '../types';
+import type { GameCard, BattleEvent, CardSnapshot } from '../types';
 import { HP_HIGH_PERCENT, HP_MEDIUM_PERCENT } from '../constants/game';
 import { truncateName } from '../utils/battle';
 import './BattleCard.css';
@@ -80,16 +80,17 @@ export function BattleCard({
     return null;
   }
 
-  // Calculate current HP based on event
-  let hp = card.hp;
-  if (
-    currentEvent?.hp_after !== undefined &&
-    currentEvent.defender_card_id === card.card_id &&
-    currentEvent.defender_team_owner_id === teamOwnerId
-  ) {
-    hp = currentEvent.hp_after;
+  // Get current card state from card_states snapshot if available (preferred),
+  // otherwise fall back to hp_after from event (for backward compatibility)
+  let cardState: CardSnapshot | undefined;
+  if (currentEvent?.card_states) {
+    cardState = currentEvent.card_states.find(
+      s => s.card_id === card.card_id && s.user_id === teamOwnerId
+    );
   }
-  const isDead = hp <= 0;
+
+  const hp = cardState?.hp ?? card.hp;
+  const isDead = !cardState?.is_alive ?? (hp <= 0);
   const hpPercent = Math.max(0, (hp / card.max_hp) * 100);
 
   // Determine animation state

@@ -351,6 +351,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 
 		// Arena game endpoints
 		if arenaHandler != nil {
+			protected.HandleFunc("/arena/constants", arenaHandler.HandleGetConstants).Methods("GET", "OPTIONS")
 			protected.HandleFunc("/arena/matches", arenaHandler.HandleListMatches).Methods("GET", "OPTIONS")
 			protected.HandleFunc("/arena/match", arenaHandler.HandleCreateMatch).Methods("POST", "OPTIONS")
 			protected.HandleFunc("/arena/match/{id}", arenaHandler.HandleGetMatch).Methods("GET", "OPTIONS")

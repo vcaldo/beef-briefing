@@ -214,12 +214,16 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
     );
   }
 
-  const remainingCardsNeeded = 3 - shopState.team.length;
-  const coinsNeededForCards = remainingCardsNeeded * 2; // CardCost = 2
-  const canBuy = shopState.coins >= 2 && shopState.team.length < 3;
-  const canReroll = shopState.coins >= (1 + coinsNeededForCards); // RerollCost = 1
-  const canUpgrade = shopState.coins >= (2 + coinsNeededForCards); // UpgradeCost = 2
-  const canSubmit = shopState.team.length === 3 && !shopState.is_ready;
+  // Get affordability flags from API (all calculations are server-side)
+  const {
+    can_buy: canBuyOverall,
+    can_reroll: canReroll,
+    can_upgrade: canUpgradeOverall,
+    can_submit: canSubmit,
+    reroll_disabled_reason: rerollDisabledReason,
+    upgrade_disabled_reason: upgradeDisabledReason,
+    submit_disabled_reason: submitDisabledReason,
+  } = shopState.affordability;
 
   return (
     <div className="shop-page">
@@ -266,7 +270,8 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
                   key={card.card_id}
                   card={card}
                   onBuy={() => handleBuyCard(index)}
-                  canBuy={canBuy && !card.is_purchased}
+                  canBuy={card.can_buy}
+                  buyDisabledReason={card.buy_disabled_reason}
                 />
               ))}
             </div>
@@ -302,7 +307,6 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
                         <div className="slot-label">{slotLabel}</div>
                         <TeamCard
                           card={card}
-                          canUpgrade={canUpgrade}
                           onUpgradeAtk={() => handleUpgrade(teamArrayIndex, 'atk')}
                           onUpgradeHp={() => handleUpgrade(teamArrayIndex, 'hp')}
                           onDragStart={handleDragStart}
@@ -350,9 +354,10 @@ interface ShopCardComponentProps {
   card: ShopCard;
   onBuy: () => void;
   canBuy: boolean;
+  buyDisabledReason?: string;
 }
 
-function ShopCardComponent({ card, onBuy, canBuy }: ShopCardComponentProps) {
+function ShopCardComponent({ card, onBuy, canBuy, buyDisabledReason }: ShopCardComponentProps) {
   return (
     <div className={`shop-card ${card.is_purchased ? 'purchased' : ''}`}>
       {/* Full card image with 2:3 aspect ratio */}
@@ -390,7 +395,6 @@ function ShopCardComponent({ card, onBuy, canBuy }: ShopCardComponentProps) {
 // Team Card Component (with framer-motion drag)
 interface TeamCardProps {
   card: GameCard;
-  canUpgrade: boolean;
   onUpgradeAtk: () => void;
   onUpgradeHp: () => void;
   onDragStart: () => void;
@@ -398,7 +402,6 @@ interface TeamCardProps {
 
 function TeamCard({
   card,
-  canUpgrade,
   onUpgradeAtk,
   onUpgradeHp,
   onDragStart
@@ -439,7 +442,7 @@ function TeamCard({
               ATK {card.atk}
               {card.atk_upgrades > 0 && <span className="upgrade-count">+{card.atk_upgrades}</span>}
             </span>
-            {canUpgrade && (
+            {(card as any).can_upgrade_atk && (
               <button
                 className="stat-upgrade-btn"
                 onClick={(e) => {
@@ -458,7 +461,7 @@ function TeamCard({
               HP {card.hp}
               {card.hp_upgrades > 0 && <span className="upgrade-count">+{card.hp_upgrades * 3}</span>}
             </span>
-            {canUpgrade && (
+            {(card as any).can_upgrade_hp && (
               <button
                 className="stat-upgrade-btn"
                 onClick={(e) => {

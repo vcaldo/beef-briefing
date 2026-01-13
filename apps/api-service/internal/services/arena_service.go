@@ -288,6 +288,7 @@ type EnhancedShopResponse struct {
 	Team                 []*EnhancedTeamCard   `json:"team"`
 	TeamOrder            []int                 `json:"team_order"`
 	IsReady              bool                  `json:"is_ready"`
+	TeamSubmitted        bool                  `json:"team_submitted"`
 	Deadline             *time.Time            `json:"deadline,omitempty"`
 	TimeRemaining        int                   `json:"time_remaining_seconds"`
 	Affordability        ShopAffordability     `json:"affordability"`
@@ -681,7 +682,8 @@ func (s *ArenaService) enhanceTeamCards(team []*battle.Card, coins int, teamSize
 	return enhanced
 }
 
-// GetShop retrieves the enhanced shop state for a player (includes affordability and upgrade previews)
+// GetShop retrieves the enhanced shop state for a player (includes affordability and upgrade previews).
+// Returns gracefully after team submission or phase transition instead of errors.
 func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
@@ -689,9 +691,67 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 		defer segment.End()
 	}
 
-	match, participant, err := s.validateShopPhaseAccess(ctx, matchID, userID, false)
+	// Get match and participant without strict phase validation
+	match, err := s.gameRepo.GetMatch(ctx, matchID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get match: %w", err)
+	}
+	if match == nil {
+		return nil, ErrMatchNotFound
+	}
+
+	participant, err := s.gameRepo.GetParticipant(ctx, matchID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participant: %w", err)
+	}
+	if participant == nil {
+		return nil, ErrNotParticipant
+	}
+
+	isReady := participant.Status == repository.ParticipantStatusReady
+
+	// If match moved to battle or completed phase, return status-only response
+	if match.Status == repository.MatchStatusBattlePhase || match.Status == repository.MatchStatusCompleted {
+		// Convert TeamOrder from int64 to int for API response
+		teamOrder := make([]int, len(participant.TeamOrder))
+		for i, v := range participant.TeamOrder {
+			teamOrder[i] = int(v)
+		}
+
+		// Return read-only state showing battle/completed phase
+		msg := "match has moved to battle phase"
+		return &EnhancedShopResponse{
+			MatchID:       matchID,
+			Status:        string(match.Status),
+			Coins:         participant.CoinsRemaining,
+			Cards:         nil, // No shop cards when not in shop phase
+			Team:          nil, // Will be populated in battle view
+			TeamOrder:     teamOrder,
+			IsReady:       isReady,
+			TeamSubmitted: isReady,
+			Deadline:      match.ShopPhaseDeadline,
+			TimeRemaining: 0,
+			Affordability: ShopAffordability{
+				CanBuy:                 false,
+				CanReroll:              false,
+				CanUpgrade:             false,
+				CanSubmit:              false,
+				BuyDisabledReason:      &msg,
+				RerollDisabledReason:   &msg,
+				UpgradeDisabledReason:  &msg,
+				SubmitDisabledReason:   &msg,
+			},
+		}, nil
+	}
+
+	// Check if we're in shop phase
+	if match.Status != repository.MatchStatusShopPhase {
+		return nil, fmt.Errorf("failed to get shop: %w", ErrMatchNotInShopPhase)
+	}
+
+	// If user already submitted, return read-only state
+	if isReady {
+		return s.buildReadOnlyShopState(ctx, match, participant)
 	}
 
 	// Parse shop cards and team
@@ -715,12 +775,10 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 		teamOrder[i] = int(v)
 	}
 
-	isReady := participant.Status == repository.ParticipantStatusReady
-
 	// Build enhanced response with affordability and upgrade previews
 	enhancedCards := s.enhanceShopCards(cards, participant.CoinsRemaining, len(team))
 	enhancedTeam := s.enhanceTeamCards(team, participant.CoinsRemaining, len(team))
-	affordability := s.computeShopAffordability(participant.CoinsRemaining, len(team), isReady)
+	affordability := s.computeShopAffordability(participant.CoinsRemaining, len(team), false)
 
 	return &EnhancedShopResponse{
 		MatchID:       matchID,
@@ -729,10 +787,52 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 		Cards:         enhancedCards,
 		Team:          enhancedTeam,
 		TeamOrder:     teamOrder,
-		IsReady:       isReady,
+		IsReady:       false,
+		TeamSubmitted: false,
 		Deadline:      match.ShopPhaseDeadline,
 		TimeRemaining: timeRemaining,
 		Affordability: affordability,
+	}, nil
+}
+
+// buildReadOnlyShopState builds a read-only shop state for a user who already submitted their team.
+// Returns the user's team and order but no shop cards, with all affordability flags set to false.
+func (s *ArenaService) buildReadOnlyShopState(ctx context.Context, match *repository.Match, participant *repository.Participant) (*EnhancedShopResponse, error) {
+	// Parse team (cards not needed for submitted state)
+	_, team, err := parseParticipantShopState(participant)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert TeamOrder from int64 to int for API response
+	teamOrder := make([]int, len(participant.TeamOrder))
+	for i, v := range participant.TeamOrder {
+		teamOrder[i] = int(v)
+	}
+
+	// Build read-only response with submitted team
+	msg := "team already submitted"
+	return &EnhancedShopResponse{
+		MatchID:       match.ID,
+		Status:        string(match.Status),
+		Coins:         participant.CoinsRemaining,
+		Cards:         nil, // No shop cards for submitted players
+		Team:          s.enhanceTeamCards(team, participant.CoinsRemaining, len(team)),
+		TeamOrder:     teamOrder,
+		IsReady:       true,
+		TeamSubmitted: true,
+		Deadline:      match.ShopPhaseDeadline,
+		TimeRemaining: 0, // Submitted players don't need timer
+		Affordability: ShopAffordability{
+			CanBuy:                 false,
+			CanReroll:              false,
+			CanUpgrade:             false,
+			CanSubmit:              false,
+			BuyDisabledReason:      &msg,
+			RerollDisabledReason:   &msg,
+			UpgradeDisabledReason:  &msg,
+			SubmitDisabledReason:   &msg,
+		},
 	}, nil
 }
 

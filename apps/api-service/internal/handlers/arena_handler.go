@@ -104,8 +104,16 @@ func extractTournamentIDFromURL(r *http.Request) (string, error) {
 
 // logAndNoticeError logs an error and notifies New Relic of the error.
 // This consolidates the error logging and New Relic tracking pattern that appears throughout handlers.
+// For expected shop-phase errors (team submitted, match not in shop), logs at DEBUG level to reduce log noise.
 func logAndNoticeError(ctx context.Context, msg string, err error) {
-	slog.Error(msg, "error", err)
+	// Log expected errors at DEBUG to reduce noise; unexpected errors at ERROR level
+	isExpectedError := err == services.ErrTeamAlreadySubmitted || err == services.ErrMatchNotInShopPhase
+	if isExpectedError {
+		slog.Debug(msg, "error", err)
+	} else {
+		slog.Error(msg, "error", err)
+	}
+	// Still notify New Relic for visibility in APM
 	if txn := newrelic.FromContext(ctx); txn != nil {
 		txn.NoticeError(err)
 	}

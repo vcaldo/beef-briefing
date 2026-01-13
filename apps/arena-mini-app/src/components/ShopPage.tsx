@@ -56,9 +56,15 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
 
   useEffect(() => {
     fetchShop();
+
+    // Stop polling if team submitted or match moved out of shop phase
+    if (shopState?.team_submitted || shopState?.status === 'battle_phase' || shopState?.status === 'completed') {
+      return;
+    }
+
     const interval = setInterval(fetchShop, 3000); // Poll every 3s
     return () => clearInterval(interval);
-  }, [fetchShop]);
+  }, [fetchShop, shopState?.team_submitted, shopState?.status]);
 
   // Countdown timer
   useEffect(() => {
@@ -239,10 +245,26 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
         <div className="shop-error-banner">{error}</div>
       )}
 
-      {shopState.is_ready ? (
+      {shopState.team_submitted || shopState.is_ready ? (
         <div className="shop-waiting">
-          <h2>Team Submitted!</h2>
-          <p>Waiting for other players...</p>
+          <h2>✅ Team Submitted!</h2>
+          <p>Waiting for other players to finish shopping...</p>
+          {shopState.team && shopState.team.length > 0 && (
+            <div className="submitted-team-preview">
+              <h3>Your Team</h3>
+              <div className="team-preview-list">
+                {shopState.team.map((card) => (
+                  <div key={card.card_id} className="team-preview-card">
+                    <div className="card-name">{card.name}</div>
+                    <div className="card-stats">
+                      <span className="stat">ATK: {card.atk}</span>
+                      <span className="stat">HP: {card.hp}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="spinner" />
         </div>
       ) : (

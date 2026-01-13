@@ -93,6 +93,7 @@ export interface ShopState {
   team: EnhancedGameCard[];
   team_order: number[];
   is_ready: boolean;
+  team_submitted: boolean;
   deadline?: string;
   time_remaining_seconds: number;
   affordability: ShopAffordability;

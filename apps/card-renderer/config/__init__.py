@@ -9,6 +9,15 @@ from functools import cached_property
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
+# Card size variants configuration
+# Each size specifies: width (viewport), height (viewport), and scale (device pixel ratio)
+# Output dimensions are calculated as: width*scale x height*scale
+CARD_SIZES = {
+    'large': {'width': 400, 'height': 600, 'scale': 2},    # Output: 800x1200px
+    'medium': {'width': 400, 'height': 600, 'scale': 1},   # Output: 400x600px
+    'small': {'width': 200, 'height': 300, 'scale': 1},    # Output: 200x300px
+}
+
 
 class Config(BaseSettings):
     """Configuration loaded from environment variables."""

@@ -54,13 +54,21 @@ class CardStorageClient:
         week_start: str,
         user_id: int,
         theme: str = "gaming",
+        size: str = "large",
     ) -> str:
         """
         Generate storage path for a card image.
 
-        Format: cards/{chat_id}/{week_start}/{theme}/{user_id}.png
+        Format: cards/{chat_id}/{week_start}/{theme}/{user_id}_{size}.png
+
+        Args:
+            chat_id: Chat ID
+            week_start: Week start date
+            user_id: User ID
+            theme: Theme name
+            size: Image size variant (large, medium, small)
         """
-        return f"cards/{chat_id}/{week_start}/{theme}/{user_id}.png"
+        return f"cards/{chat_id}/{week_start}/{theme}/{user_id}_{size}.png"
 
     def upload_card_image(
         self,
@@ -69,6 +77,7 @@ class CardStorageClient:
         user_id: int,
         image_data: bytes,
         theme: str = "gaming",
+        size: str = "large",
     ) -> tuple[str, str, int]:
         """
         Upload card image to MinIO.
@@ -79,12 +88,13 @@ class CardStorageClient:
             user_id: User ID
             image_data: PNG image bytes
             theme: Theme name for storage path
+            size: Image size variant (large, medium, small)
 
         Returns:
             Tuple of (storage_path, file_hash, file_size)
         """
         file_hash = self.compute_hash(image_data)
-        storage_path = self.generate_storage_path(chat_id, week_start, user_id, theme)
+        storage_path = self.generate_storage_path(chat_id, week_start, user_id, theme, size)
         file_size = len(image_data)
 
         # Check if identical file already exists

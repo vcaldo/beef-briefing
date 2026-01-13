@@ -1,5 +1,6 @@
 """Main card generation orchestrator."""
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import date
@@ -10,6 +11,7 @@ from minio.error import S3Error
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
+from ..config import CARD_SIZES
 from .database import CardQueries, CardImageRepository
 from .instrumentation import (
     add_custom_attributes,
@@ -202,6 +204,44 @@ class CardGenerator:
             results=results,
         )
 
+    async def _render_card_all_sizes(
+        self,
+        html_content: str,
+        base_url: str,
+    ) -> dict[str, bytes]:
+        """
+        Render card in all sizes in parallel.
+
+        Args:
+            html_content: Rendered HTML content for the card
+            base_url: Base URL for template assets (file:// path)
+
+        Returns:
+            Dictionary mapping size name ('large', 'medium', 'small') to PNG bytes
+        """
+        async def render_size(size_name: str, dimensions: dict[str, int]) -> tuple[str, bytes]:
+            """Render a single size variant."""
+            renderer = PlaywrightRenderer(
+                width=dimensions['width'],
+                height=dimensions['height'],
+                scale=dimensions['scale'],
+            )
+            await renderer.start()
+            try:
+                image_data = await renderer.render_html(html_content, base_url)
+                return size_name, image_data
+            finally:
+                await renderer.stop()
+
+        # Create tasks for all sizes
+        tasks = [render_size(name, dims) for name, dims in CARD_SIZES.items()]
+
+        # Render all sizes in parallel
+        results = await asyncio.gather(*tasks)
+
+        # Convert to dictionary
+        return {size_name: image_data for size_name, image_data in results}
+
     @function_trace_async(name="render_single_card", group="CardGenerator")
     async def _render_single_card(
         self,
@@ -246,44 +286,60 @@ class CardGenerator:
         # Render HTML
         html_content = self.template_loader.render(theme, context)
 
-        # Render to PNG
-        image_data = await self.renderer.render_html(html_content, base_url)
+        # Render all sizes in parallel
+        size_images = await self._render_card_all_sizes(html_content, base_url)
 
-        # Upload to storage
-        storage_path, file_hash, file_size = self.storage.upload_card_image(
-            chat_id=chat_id,
-            week_start=week_start.isoformat(),
-            user_id=user_id,
-            image_data=image_data,
-            theme=theme,
-        )
+        # Upload all sizes to storage and save to database
+        image_ids = {}
+        storage_path_large = None
 
-        # Save reference to database
-        image_id = self.repository.upsert_card_image(
-            card_id=card_id,
-            user_id=user_id,
-            chat_id=chat_id,
-            week_start=week_start,
-            storage_path=storage_path,
-            file_hash=file_hash,
-            file_size=file_size,
-            width=self.card_width * self.renderer.scale,
-            height=self.card_height * self.renderer.scale,
-            theme=theme,
-            template_version=template_version,
-            card_data_version=card_version,
-        )
+        for size_name, image_data in size_images.items():
+            # Upload to storage
+            storage_path, file_hash, file_size = self.storage.upload_card_image(
+                chat_id=chat_id,
+                week_start=week_start.isoformat(),
+                user_id=user_id,
+                image_data=image_data,
+                theme=theme,
+                size=size_name,
+            )
 
-        logger.info(
-            f"Generated card image for user {user_id}: {storage_path} "
-            f"({file_size} bytes)"
-        )
+            # Save reference to database
+            dimensions = CARD_SIZES[size_name]
+            width = dimensions['width'] * dimensions['scale']
+            height = dimensions['height'] * dimensions['scale']
+
+            image_id = self.repository.upsert_card_image(
+                card_id=card_id,
+                user_id=user_id,
+                chat_id=chat_id,
+                week_start=week_start,
+                storage_path=storage_path,
+                file_hash=file_hash,
+                file_size=file_size,
+                width=width,
+                height=height,
+                theme=theme,
+                template_version=template_version,
+                card_data_version=card_version,
+                size=size_name,
+            )
+
+            image_ids[size_name] = image_id
+
+            if size_name == 'large':
+                storage_path_large = storage_path
+
+            logger.info(
+                f"Generated {size_name} card image for user {user_id}: {storage_path} "
+                f"({file_size} bytes, {width}x{height}px)"
+            )
 
         return RenderResult(
             user_id=user_id,
             status="generated",
-            image_id=image_id,
-            storage_path=storage_path,
+            image_id=image_ids.get('large'),  # Return large ID for backward compatibility
+            storage_path=storage_path_large,
         )
 
     def get_image_url(

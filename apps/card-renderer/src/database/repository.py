@@ -29,23 +29,42 @@ class CardImageRepository:
         theme: str,
         template_version: int,
         card_data_version: int,
+        size: str = "large",
     ) -> int:
         """
         Insert or update a card image reference.
 
-        Returns the image ID.
+        Args:
+            card_id: Card ID
+            user_id: User ID
+            chat_id: Chat ID
+            week_start: Week start date
+            storage_path: Path to image in storage
+            file_hash: SHA256 hash of image data
+            file_size: Size of image in bytes
+            width: Image width in pixels
+            height: Image height in pixels
+            theme: Card theme name
+            template_version: Template version number
+            card_data_version: Card data version
+            size: Image size variant ('large', 'medium', 'small')
+
+        Returns:
+            The image ID.
         """
         query = text("""
             INSERT INTO ml_user_card_images (
                 card_id, user_id, chat_id, week_start,
                 storage_path, file_hash, file_size,
-                width, height, theme, template_version, card_data_version
+                width, height, theme, template_version, card_data_version,
+                size
             ) VALUES (
                 :card_id, :user_id, :chat_id, :week_start,
                 :storage_path, :file_hash, :file_size,
-                :width, :height, :theme, :template_version, :card_data_version
+                :width, :height, :theme, :template_version, :card_data_version,
+                :size
             )
-            ON CONFLICT (card_id, theme) DO UPDATE SET
+            ON CONFLICT (card_id, theme, size) DO UPDATE SET
                 storage_path = EXCLUDED.storage_path,
                 file_hash = EXCLUDED.file_hash,
                 file_size = EXCLUDED.file_size,
@@ -73,6 +92,7 @@ class CardImageRepository:
                     "theme": theme,
                     "template_version": template_version,
                     "card_data_version": card_data_version,
+                    "size": size,
                 },
             )
             return result.scalar()
@@ -129,3 +149,35 @@ class CardImageRepository:
                 },
             )
             return rows_to_dicts(result)
+
+    def get_card_images_all_sizes(
+        self,
+        card_id: int,
+        theme: str,
+    ) -> dict[str, dict[str, Any]]:
+        """
+        Get all size variants for a card+theme combination.
+
+        Args:
+            card_id: Card ID
+            theme: Theme name
+
+        Returns:
+            Dictionary mapping size name ('large', 'medium', 'small') to image data dict
+        """
+        query = text("""
+            SELECT
+                id, size, storage_path, width, height,
+                file_hash, file_size, generated_at
+            FROM ml_user_card_images
+            WHERE card_id = :card_id AND theme = :theme
+            ORDER BY size
+        """)
+
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                query,
+                {"card_id": card_id, "theme": theme},
+            )
+            rows = rows_to_dicts(result)
+            return {row["size"]: row for row in rows}

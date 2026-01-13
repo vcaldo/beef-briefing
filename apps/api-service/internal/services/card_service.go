@@ -334,19 +334,29 @@ func extractMoodScore(statsJSON json.RawMessage) float64 {
 	return score
 }
 
-// CardImageURLResponse is the response for GetCardImageURL.
-type CardImageURLResponse struct {
-	ImageID     int64  `json:"image_id"`
-	URL         string `json:"url"`
-	ExpiresIn   int    `json:"expires_in"`
-	Width       int    `json:"width"`
-	Height      int    `json:"height"`
-	Theme       string `json:"theme"`
-	WeekStart   string `json:"week_start"`
-	GeneratedAt string `json:"generated_at"`
+// CardImageSizeURL represents a presigned URL for a specific image size.
+type CardImageSizeURL struct {
+	URL    string `json:"url"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
 }
 
-// GetCardImageURL retrieves a presigned URL for a user's card image.
+// CardImageURLResponse is the response for GetCardImageURL.
+type CardImageURLResponse struct {
+	ImageID     int64                      `json:"image_id"`
+	Sizes       map[string]CardImageSizeURL `json:"sizes"`  // 'large', 'medium', 'small'
+	ExpiresIn   int                        `json:"expires_in"`
+	Theme       string                     `json:"theme"`
+	WeekStart   string                     `json:"week_start"`
+	GeneratedAt string                     `json:"generated_at"`
+
+	// Deprecated fields for backward compatibility
+	URL    string `json:"url,omitempty"`     // Will contain large URL
+	Width  int    `json:"width,omitempty"`   // Will contain large width
+	Height int    `json:"height,omitempty"`  // Will contain large height
+}
+
+// GetCardImageURL retrieves presigned URLs for all sizes of a user's card image.
 func (s *CardService) GetCardImageURL(
 	ctx context.Context,
 	userID int64,
@@ -365,7 +375,7 @@ func (s *CardService) GetCardImageURL(
 		expirySeconds = 3600 // Default 1 hour
 	}
 
-	// Get card image from repository
+	// Get large card image from repository (for metadata and to find card_id)
 	cardImage, err := s.cardRepo.GetCardImage(ctx, userID, chatID, weekStart, theme)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -374,25 +384,56 @@ func (s *CardService) GetCardImageURL(
 		return nil, err
 	}
 
-	// Generate presigned URL
-	if s.minioClient == nil {
-		return nil, errors.New("storage client not configured")
-	}
-
-	url, err := s.minioClient.GetPresignedURLSeconds(ctx, cardImage.StoragePath, expirySeconds)
+	// Get all sizes for this card+theme
+	allSizes, err := s.cardRepo.GetCardImagesAllSizes(ctx, cardImage.CardID, theme)
 	if err != nil {
 		return nil, err
 	}
 
+	if len(allSizes) == 0 {
+		return nil, ErrCardImageNotFound
+	}
+
+	// Check if storage client is configured
+	if s.minioClient == nil {
+		return nil, errors.New("storage client not configured")
+	}
+
+	// Generate presigned URLs for all sizes
+	sizeURLs := make(map[string]CardImageSizeURL)
+	var largeURL string
+	var largeWidth, largeHeight int
+
+	for sizeName, sizeImage := range allSizes {
+		url, err := s.minioClient.GetPresignedURLSeconds(ctx, sizeImage.StoragePath, expirySeconds)
+		if err != nil {
+			return nil, err
+		}
+
+		sizeURLs[sizeName] = CardImageSizeURL{
+			URL:    url,
+			Width:  sizeImage.Width,
+			Height: sizeImage.Height,
+		}
+
+		if sizeName == "large" {
+			largeURL = url
+			largeWidth = sizeImage.Width
+			largeHeight = sizeImage.Height
+		}
+	}
+
 	return &CardImageURLResponse{
 		ImageID:     cardImage.ID,
-		URL:         url,
+		Sizes:       sizeURLs,
 		ExpiresIn:   expirySeconds,
-		Width:       cardImage.Width,
-		Height:      cardImage.Height,
 		Theme:       cardImage.Theme,
 		WeekStart:   cardImage.WeekStart,
 		GeneratedAt: cardImage.GeneratedAt.Format(time.RFC3339),
+		// Deprecated fields for backward compatibility
+		URL:    largeURL,
+		Width:  largeWidth,
+		Height: largeHeight,
 	}, nil
 }
 

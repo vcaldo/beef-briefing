@@ -384,6 +384,7 @@ type CardImage struct {
 	WeekStart       string    `json:"week_start"`
 	StoragePath     string    `json:"storage_path"`
 	Theme           string    `json:"theme"`
+	Size            string    `json:"size"`  // 'large', 'medium', 'small'
 	Width           int       `json:"width"`
 	Height          int       `json:"height"`
 	CardDataVersion int       `json:"card_data_version"`
@@ -414,19 +415,19 @@ func (r *CardRepository) GetCardImage(
 	if weekStart != nil {
 		query = `
 			SELECT id, card_id, user_id, chat_id, week_start,
-			       storage_path, theme, width, height,
+			       storage_path, theme, size, width, height,
 			       card_data_version, generated_at
 			FROM ml_user_card_images
-			WHERE user_id = $1 AND chat_id = $2 AND week_start = $3 AND theme = $4
+			WHERE user_id = $1 AND chat_id = $2 AND week_start = $3 AND theme = $4 AND size = 'large'
 		`
 		args = []interface{}{userID, chatID, weekStart, theme}
 	} else {
 		query = `
 			SELECT id, card_id, user_id, chat_id, week_start,
-			       storage_path, theme, width, height,
+			       storage_path, theme, size, width, height,
 			       card_data_version, generated_at
 			FROM ml_user_card_images
-			WHERE user_id = $1 AND chat_id = $2 AND theme = $3
+			WHERE user_id = $1 AND chat_id = $2 AND theme = $3 AND size = 'large'
 			ORDER BY week_start DESC
 			LIMIT 1
 		`
@@ -436,7 +437,7 @@ func (r *CardRepository) GetCardImage(
 	var img CardImage
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&img.ID, &img.CardID, &img.UserID, &img.ChatID, &img.WeekStart,
-		&img.StoragePath, &img.Theme, &img.Width, &img.Height,
+		&img.StoragePath, &img.Theme, &img.Size, &img.Width, &img.Height,
 		&img.CardDataVersion, &img.GeneratedAt,
 	)
 	if err != nil {
@@ -444,6 +445,58 @@ func (r *CardRepository) GetCardImage(
 	}
 
 	return &img, nil
+}
+
+// GetCardImagesAllSizes retrieves all size variants for a card+theme combination.
+func (r *CardRepository) GetCardImagesAllSizes(
+	ctx context.Context,
+	cardID int64,
+	theme string,
+) (map[string]*CardImage, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("db:card-get-images-all-sizes")
+		defer segment.End()
+	}
+
+	if theme == "" {
+		theme = "gaming"
+	}
+
+	query := `
+		SELECT id, card_id, user_id, chat_id, week_start,
+		       storage_path, theme, size, width, height,
+		       card_data_version, generated_at
+		FROM ml_user_card_images
+		WHERE card_id = $1 AND theme = $2
+		ORDER BY size
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, cardID, theme)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query card images: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]*CardImage)
+	for rows.Next() {
+		var img CardImage
+		err := rows.Scan(
+			&img.ID, &img.CardID, &img.UserID, &img.ChatID, &img.WeekStart,
+			&img.StoragePath, &img.Theme, &img.Size, &img.Width, &img.Height,
+			&img.CardDataVersion, &img.GeneratedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan card image: %w", err)
+		}
+		result[img.Size] = &img
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %w", err)
+	}
+
+	return result, nil
 }
 
 // GalleryImage represents a card image for the gallery with user info.

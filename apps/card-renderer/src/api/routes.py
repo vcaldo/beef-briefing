@@ -113,12 +113,25 @@ class ImageListResponse(BaseModel):
     images: list[ImageInfo]
 
 
+class ImageSizeUrl(BaseModel):
+    """Presigned URL for a specific image size."""
+
+    url: str
+    width: int
+    height: int
+
+
 class ImageUrlResponse(BaseModel):
-    """Response with presigned URL."""
+    """Response with presigned URLs for all image sizes."""
 
     image_id: int
-    url: str
+    sizes: dict[str, ImageSizeUrl]  # 'large', 'medium', 'small'
     expires_in: int
+
+    # Deprecated fields for backward compatibility
+    url: str | None = None  # Will contain large URL
+    width: int | None = None  # Will contain large width
+    height: int | None = None  # Will contain large height
 
 
 class WeekListResponse(BaseModel):
@@ -274,19 +287,56 @@ async def get_image_url(
     generator: CardGenerator = Depends(get_generator),
 ):
     """
-    Get presigned URL for a specific card image.
+    Get presigned URLs for a specific card image (all sizes).
 
-    The URL expires after the specified duration (default 1 hour).
+    Returns presigned URLs for large, medium, and small variants.
+    The URLs expire after the specified duration (default 1 hour).
     Public endpoint for Mini App gallery.
     """
-    url = generator.get_image_url(image_id, expires_seconds=expires)
-    if url is None:
+    # Get image details
+    image = generator.repository.get_image_by_id(image_id)
+    if not image:
         raise HTTPException(status_code=404, detail="Image not found")
+
+    # Get all sizes for this card+theme
+    all_sizes = generator.repository.get_card_images_all_sizes(
+        image["card_id"],
+        image["theme"],
+    )
+
+    if not all_sizes:
+        raise HTTPException(status_code=404, detail="No image sizes found")
+
+    # Generate presigned URLs for each size
+    size_urls = {}
+    large_url = None
+    large_width = None
+    large_height = None
+
+    for size_name, size_image in all_sizes.items():
+        url = generator.storage.get_presigned_url(
+            size_image["storage_path"],
+            expires_seconds=expires,
+        )
+        size_urls[size_name] = ImageSizeUrl(
+            url=url,
+            width=size_image["width"],
+            height=size_image["height"],
+        )
+
+        if size_name == "large":
+            large_url = url
+            large_width = size_image["width"]
+            large_height = size_image["height"]
 
     return ImageUrlResponse(
         image_id=image_id,
-        url=url,
+        sizes=size_urls,
         expires_in=expires,
+        # Deprecated fields for backward compatibility
+        url=large_url,
+        width=large_width,
+        height=large_height,
     )
 
 

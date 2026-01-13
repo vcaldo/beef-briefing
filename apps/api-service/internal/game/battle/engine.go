@@ -124,11 +124,13 @@ func Simulate(teamA, teamB *Team) *Result {
 
 		// One team empty = other wins
 		if frontA == nil {
-			events = append(events, BattleEvent{
-				Type:    EventVictory,
-				Round:   round,
-				Message: fmt.Sprintf("🏆 %s wins!", getTeamName(b)),
-			})
+			victoryEventB := BattleEvent{
+				Type:       EventVictory,
+				Round:      round,
+				Message:    fmt.Sprintf("🏆 %s wins!", getTeamName(b)),
+				CardStates: captureCardStates(a, b, 0, 0),
+			}
+			events = append(events, victoryEventB)
 			winnerID := b.OwnerID
 			return &Result{
 				WinnerID:    &winnerID,
@@ -142,11 +144,13 @@ func Simulate(teamA, teamB *Team) *Result {
 			}
 		}
 		if frontB == nil {
-			events = append(events, BattleEvent{
-				Type:    EventVictory,
-				Round:   round,
-				Message: fmt.Sprintf("🏆 %s wins!", getTeamName(a)),
-			})
+			victoryEventA := BattleEvent{
+				Type:       EventVictory,
+				Round:      round,
+				Message:    fmt.Sprintf("🏆 %s wins!", getTeamName(a)),
+				CardStates: captureCardStates(a, b, 0, 0),
+			}
+			events = append(events, victoryEventA)
 			winnerID := a.OwnerID
 			return &Result{
 				WinnerID:    &winnerID,
@@ -211,14 +215,22 @@ func Simulate(teamA, teamB *Team) *Result {
 		aDied := frontA.HP <= 0
 		bDied := frontB.HP <= 0
 
+	// Add card states to attack events (after damage is applied)
+	if len(events) >= 2 {
+		events[len(events)-2].CardStates = captureCardStates(a, b, frontA.CardID, frontB.CardID)
+		events[len(events)-1].CardStates = captureCardStates(a, b, frontB.CardID, frontA.CardID)
+	}
+
 	if aDied {
-		events = append(events, BattleEvent{
+		deathEventA := BattleEvent{
 			Type:                EventDeath,
 			Round:               round,
 			DefenderCardID:      frontA.CardID,
 			DefenderTeamOwnerID: a.OwnerID,
 			Message:             fmt.Sprintf("💀 %s defeats %s", frontB.Name, frontA.Name),
-		})
+			CardStates:          captureCardStates(a, b, frontB.CardID, frontA.CardID),
+		}
+		events = append(events, deathEventA)
 
 		// Generate summary for the winner (frontB defeated frontA)
 		if currentDuelB != nil {
@@ -236,7 +248,7 @@ func Simulate(teamA, teamB *Team) *Result {
 				streakMsg = fmt.Sprintf(" 🔥 x%d", streak)
 			}
 
-			events = append(events, BattleEvent{
+			summaryEventB := BattleEvent{
 				Type:             EventSummary,
 				Round:            round,
 				IsSummary:        true,
@@ -249,18 +261,22 @@ func Simulate(teamA, teamB *Team) *Result {
 					frontB.Name, frontA.Name, currentDuelB.roundsCount,
 					currentDuelB.damageDealt, currentDuelB.damageTaken,
 					frontB.HP, streakMsg),
-			})
+				CardStates:       captureCardStates(a, b, frontB.CardID, frontA.CardID),
+			}
+			events = append(events, summaryEventB)
 		}
 	}
 
 	if bDied {
-		events = append(events, BattleEvent{
+		deathEventB := BattleEvent{
 			Type:                EventDeath,
 			Round:               round,
 			DefenderCardID:      frontB.CardID,
 			DefenderTeamOwnerID: b.OwnerID,
 			Message:             fmt.Sprintf("💀 %s defeats %s", frontA.Name, frontB.Name),
-		})
+			CardStates:          captureCardStates(a, b, frontA.CardID, frontB.CardID),
+		}
+		events = append(events, deathEventB)
 
 		// Generate summary for the winner (frontA defeated frontB)
 		if currentDuelA != nil {
@@ -278,7 +294,7 @@ func Simulate(teamA, teamB *Team) *Result {
 				streakMsg = fmt.Sprintf(" 🔥 x%d", streak)
 			}
 
-			events = append(events, BattleEvent{
+			summaryEventA := BattleEvent{
 				Type:             EventSummary,
 				Round:            round,
 				IsSummary:        true,
@@ -291,27 +307,33 @@ func Simulate(teamA, teamB *Team) *Result {
 					frontA.Name, frontB.Name, currentDuelA.roundsCount,
 					currentDuelA.damageDealt, currentDuelA.damageTaken,
 					frontA.HP, streakMsg),
-			})
+				CardStates:       captureCardStates(a, b, frontA.CardID, frontB.CardID),
+			}
+			events = append(events, summaryEventA)
 		}
 	}
 
 	// Advance if cards died
 	if aDied || bDied {
-		events = append(events, BattleEvent{
-			Type:    EventAdvance,
-			Round:   round,
-			Message: "➡️ Next cards advance",
-		})
+		advanceEvent := BattleEvent{
+			Type:       EventAdvance,
+			Round:      round,
+			Message:    "➡️ Next cards advance",
+			CardStates: captureCardStates(a, b, 0, 0),
+		}
+		events = append(events, advanceEvent)
 	}
 	}
 
 	// Determine winner by damage if both teams exhausted
 	if totalDamageA > totalDamageB {
-		events = append(events, BattleEvent{
-			Type:    EventVictory,
-			Round:   round,
-			Message: fmt.Sprintf("🏆 %s wins!", getTeamName(a)),
-		})
+		damageVictoryA := BattleEvent{
+			Type:       EventVictory,
+			Round:      round,
+			Message:    fmt.Sprintf("🏆 %s wins!", getTeamName(a)),
+			CardStates: captureCardStates(a, b, 0, 0),
+		}
+		events = append(events, damageVictoryA)
 		winnerID := a.OwnerID
 		return &Result{
 			WinnerID:    &winnerID,
@@ -324,11 +346,13 @@ func Simulate(teamA, teamB *Team) *Result {
 			TeamBFinal:  b,
 		}
 	} else if totalDamageB > totalDamageA {
-		events = append(events, BattleEvent{
-			Type:    EventVictory,
-			Round:   round,
-			Message: fmt.Sprintf("🏆 %s wins!", getTeamName(b)),
-		})
+		damageVictoryB := BattleEvent{
+			Type:       EventVictory,
+			Round:      round,
+			Message:    fmt.Sprintf("🏆 %s wins!", getTeamName(b)),
+			CardStates: captureCardStates(a, b, 0, 0),
+		}
+		events = append(events, damageVictoryB)
 		winnerID := b.OwnerID
 		return &Result{
 			WinnerID:    &winnerID,
@@ -343,11 +367,13 @@ func Simulate(teamA, teamB *Team) *Result {
 	}
 
 	// True draw - equal damage
-	events = append(events, BattleEvent{
-		Type:    EventVictory,
-		Round:   round,
-		Message: "🤝 Draw!",
-	})
+	drawEvent := BattleEvent{
+		Type:       EventVictory,
+		Round:      round,
+		Message:    "🤝 Draw!",
+		CardStates: captureCardStates(a, b, 0, 0),
+	}
+	events = append(events, drawEvent)
 	return &Result{
 		WinnerID:    nil,
 		IsDraw:      true,

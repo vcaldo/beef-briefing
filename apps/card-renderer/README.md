@@ -8,11 +8,12 @@ The Card Renderer generates weekly stats cards from user data in the `ml_user_ca
 
 ## Features
 
+- **Multi-Size Variants**: Automatically generates 3 responsive sizes (large, medium, small)
 - **HTML/CSS Templates**: Customizable card designs with Jinja2 templating
 - **Theme System**: 9+ built-in themes with JSON configuration
-- **Retina Quality**: 2x scale rendering for crisp images
+- **Retina Quality**: 2x scale rendering for crisp images on large variant
 - **Badge System**: Automatically derived badges based on user stats
-- **Presigned URLs**: Secure, time-limited image access
+- **Presigned URLs**: Secure, time-limited image access for all size variants
 
 ## Quick Start
 
@@ -47,10 +48,9 @@ curl -X POST http://localhost:8051/api/v1/render \
 | `MINIO_BUCKET` | `telegram-media` | Storage bucket |
 | `TEMPLATES_DIR` | `/app/templates` | Templates directory |
 | `DEFAULT_THEME` | `gaming` | Default theme name |
-| `CARD_WIDTH` | `400` | Card width (pixels) |
-| `CARD_HEIGHT` | `600` | Card height (pixels) |
-| `CARD_SCALE` | `2` | Render scale (2 = retina) |
 | `APP_KEYS_DIR` | `/app/secrets/app_keys` | API keys directory |
+
+**Note**: Card dimensions are now configured via `CARD_SIZES` in `config/__init__.py` (see Size Variants section below).
 
 ## API Reference
 
@@ -78,9 +78,39 @@ List card images for a chat/week.
 
 ### GET `/api/v1/image/{id}`
 
-Get presigned URL for a specific image.
+Get presigned URLs for all size variants of a specific image.
 
 **Parameters:** `expires` (60-86400 seconds, default: 3600)
+
+**Response**:
+```json
+{
+  "image_id": 12345,
+  "sizes": {
+    "large": {
+      "url": "https://s3.../cards/-100123/2025-01-06/gaming/456_large.png?X-Amz...",
+      "width": 800,
+      "height": 1200
+    },
+    "medium": {
+      "url": "https://s3.../cards/-100123/2025-01-06/gaming/456_medium.png?X-Amz...",
+      "width": 400,
+      "height": 600
+    },
+    "small": {
+      "url": "https://s3.../cards/-100123/2025-01-06/gaming/456_small.png?X-Amz...",
+      "width": 200,
+      "height": 300
+    }
+  },
+  "expires_in": 3600,
+  "theme": "gaming",
+  "week_start": "2025-01-06",
+  "generated_at": "2025-01-13T10:00:00Z"
+}
+```
+
+**Legacy Fields** (deprecated, use `sizes` object): `url`, `width`, `height` (pointing to large variant)
 
 ### GET `/health`
 
@@ -196,10 +226,83 @@ Badges are automatically derived from stats:
 
 Images are stored with the path pattern:
 ```
-cards/{chat_id}/{week_start}/{user_id}.png
+cards/{chat_id}/{week_start}/{theme}/{user_id}_{size}.png
 ```
 
-Example: `cards/-1003280306634/2025-01-06/123456789.png`
+Each card generates 3 size variants:
+- **Large**: `{user_id}_large.png` (800×1200px, rendered at 2x scale)
+- **Medium**: `{user_id}_medium.png` (400×600px, rendered at 1x scale)
+- **Small**: `{user_id}_small.png` (200×300px, rendered at 1x scale)
+
+Example:
+```
+cards/-1003280306634/2025-01-06/gaming/123456789_large.png
+cards/-1003280306634/2025-01-06/gaming/123456789_medium.png
+cards/-1003280306634/2025-01-06/gaming/123456789_small.png
+```
+
+All 3 variants are stored in the database with separate rows (one per size).
+
+## Size Variants
+
+The Card Renderer automatically generates responsive image variants optimized for different use cases.
+
+### Size Configuration
+
+Sizes are defined in `config/__init__.py`:
+
+```python
+CARD_SIZES = {
+    'large': {'width': 400, 'height': 600, 'scale': 2},    # Output: 800x1200px
+    'medium': {'width': 400, 'height': 600, 'scale': 1},   # Output: 400x600px
+    'small': {'width': 200, 'height': 300, 'scale': 1},    # Output: 200x300px
+}
+```
+
+- **viewport width/height**: Chromium viewport dimensions
+- **scale**: Device pixel ratio (DPR), affects output dimensions
+- **output size**: viewport × scale = actual image dimensions
+
+### Use Cases
+
+| Size | Dimensions | Use Case |
+|------|-----------|----------|
+| Large | 800×1200px | Detail view, full-screen display, printing |
+| Medium | 400×600px | Card list, gallery, previews |
+| Small | 200×300px | Thumbnails, social sharing, mini-cards |
+
+### Rendering Process
+
+All 3 sizes are rendered in parallel using async Playwright contexts:
+1. One context per size with its specific viewport dimensions
+2. Each renders the HTML template independently (no downscaling)
+3. Results are uploaded to MinIO with size suffixes
+4. All 3 rows inserted into database in a single transaction
+
+**Performance**: ~2.5-4s per card (vs ~2-3s previously, ~30-50% increase acceptable)
+
+### Frontend Usage
+
+```typescript
+// Recommended: Use size-specific URLs
+const { large, medium, small } = response.sizes;
+
+// Thumbnail
+<img src={small.url} width={small.width} height={small.height} alt="thumbnail" />
+
+// Detail view
+<img src={large.url} width={large.width} height={large.height} alt="full card" />
+
+// Responsive
+<picture>
+  <source media="(min-width: 768px)" srcSet={large.url} />
+  <source media="(min-width: 400px)" srcSet={medium.url} />
+  <img src={small.url} alt="card" />
+</picture>
+
+// Legacy (still works, uses large)
+<img src={response.url} width={response.width} height={response.height} />
+```
 
 ## Architecture
 
@@ -231,6 +334,33 @@ SELECT * FROM ml_user_cards WHERE week_start = '2025-01-06';
 make ml-run-cards ML_ARGS="--week 2025-01-06 --timezone America/Sao_Paulo"
 ```
 
+### Missing size variants
+
+If only some size variants are generated, check:
+
+1. Verify all 3 files exist in MinIO:
+```bash
+# Via minio client or dashboard
+# Should see:
+# - {user_id}_large.png
+# - {user_id}_medium.png
+# - {user_id}_small.png
+```
+
+2. Verify 3 rows per user in database:
+```sql
+SELECT user_id, size, width, height, storage_path
+FROM ml_user_card_images
+WHERE chat_id = -1003280306634 AND week_start = '2025-01-06'
+ORDER BY user_id, size;
+-- Should show 3 rows per user_id
+```
+
+3. Check render logs for size-specific errors:
+```bash
+make logs-card-renderer
+```
+
 ### Theme not found
 
 - Check theme directory exists: `templates/themes/{name}/`
@@ -238,5 +368,7 @@ make ml-run-cards ML_ARGS="--week 2025-01-06 --timezone America/Sao_Paulo"
 
 ### Image quality issues
 
-- Check `CARD_SCALE` is set to 2 for retina
-- Verify fonts are loading (check Google Fonts imports in theme)
+- **Large size blurry**: Verify scale=2 in CARD_SIZES['large']
+- **Medium/Small size blurry**: Check that downsampling isn't being applied (should render native dimensions)
+- **Fonts not loading**: Verify Google Fonts imports in theme CSS
+- **3x render time slow**: Expected 30-50% increase; check system resources

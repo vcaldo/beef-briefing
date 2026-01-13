@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"beef-briefing/apps/api-service/internal/game/shop"
 	"beef-briefing/apps/api-service/internal/httputil"
 	"beef-briefing/apps/api-service/internal/middleware"
+	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
 
@@ -78,6 +80,169 @@ func handleChatAccessError(w http.ResponseWriter, err error) {
 	}
 }
 
+// extractMatchIDFromURL extracts the match ID from URL parameters.
+// Returns a string error if the ID is missing or invalid.
+func extractMatchIDFromURL(r *http.Request) (string, error) {
+	vars := mux.Vars(r)
+	matchID := vars["id"]
+	if matchID == "" {
+		return "", fmt.Errorf("match id is required")
+	}
+	return matchID, nil
+}
+
+// extractTournamentIDFromURL extracts the tournament ID from URL parameters.
+// Returns a string error if the ID is missing or invalid.
+func extractTournamentIDFromURL(r *http.Request) (string, error) {
+	vars := mux.Vars(r)
+	tournamentID := vars["tournament_id"]
+	if tournamentID == "" {
+		return "", fmt.Errorf("tournament id is required")
+	}
+	return tournamentID, nil
+}
+
+// logAndNoticeError logs an error and notifies New Relic of the error.
+// This consolidates the error logging and New Relic tracking pattern that appears throughout handlers.
+// For expected shop-phase errors (team submitted, match not in shop), logs at DEBUG level to reduce log noise.
+func logAndNoticeError(ctx context.Context, msg string, err error) {
+	// Log expected errors at DEBUG to reduce noise; unexpected errors at ERROR level
+	isExpectedError := err == services.ErrTeamAlreadySubmitted || err == services.ErrMatchNotInShopPhase
+	if isExpectedError {
+		slog.Debug(msg, "error", err)
+	} else {
+		slog.Error(msg, "error", err)
+	}
+	// Still notify New Relic for visibility in APM
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		txn.NoticeError(err)
+	}
+}
+
+// handleServiceError maps ArenaService errors to appropriate HTTP responses.
+// It logs the error and responds with the appropriate HTTP status code.
+// The errOperationName is used in the default error message (e.g., "buy card").
+func handleServiceError(ctx context.Context, w http.ResponseWriter, err error, errOperationName string) {
+	logAndNoticeError(ctx, fmt.Sprintf("failed to %s", errOperationName), err)
+
+	switch err {
+	// Match/participant errors
+	case services.ErrMatchNotFound:
+		httputil.RespondError(w, "match not found", http.StatusNotFound)
+	case services.ErrNotParticipant:
+		httputil.RespondError(w, "not a participant in this match", http.StatusForbidden)
+	case services.ErrNotCreator:
+		httputil.RespondError(w, "only the match creator can perform this action", http.StatusForbidden)
+	case services.ErrAlreadyJoined:
+		httputil.RespondError(w, "already joined this match", http.StatusBadRequest)
+
+	// Match state errors
+	case services.ErrMatchNotInShopPhase:
+		httputil.RespondError(w, "match is not in shop phase", http.StatusBadRequest)
+	case services.ErrShopPhaseExpired:
+		httputil.RespondError(w, "shop phase has expired", http.StatusBadRequest)
+	case services.ErrMatchNotOpen:
+		httputil.RespondError(w, "match is not open for joining", http.StatusBadRequest)
+
+	// Shop/team errors
+	case services.ErrTeamAlreadySubmitted:
+		httputil.RespondError(w, "team already submitted", http.StatusBadRequest)
+	case services.ErrTeamFull:
+		httputil.RespondError(w, "team is full (max 3 cards)", http.StatusBadRequest)
+	case services.ErrInvalidCardIndex:
+		httputil.RespondError(w, "invalid card index", http.StatusBadRequest)
+
+	// Card/coin errors
+	case services.ErrCardAlreadyPurchased:
+		httputil.RespondError(w, "card already purchased", http.StatusBadRequest)
+	case services.ErrNotEnoughCoins:
+		httputil.RespondError(w, "not enough coins", http.StatusBadRequest)
+	case services.ErrNotEnoughCards:
+		httputil.RespondError(w, "not enough cards in group (minimum 10 required)", http.StatusBadRequest)
+	case services.ErrActiveMatchExists:
+		httputil.RespondError(w, "an active match already exists. Please wait for it to complete before creating a new one.", http.StatusBadRequest)
+
+	// Default: unknown error
+	default:
+		httputil.RespondError(w, fmt.Sprintf("failed to %s", errOperationName), http.StatusInternalServerError)
+	}
+}
+
+// requireJWTClaims extracts JWT claims from the request context and returns them.
+// If no claims are found, it responds with an unauthorized error and returns nil.
+func requireJWTClaims(ctx context.Context, w http.ResponseWriter) *middleware.MiniAppClaims {
+	claims := middleware.GetClaimsFromContext(ctx)
+	if claims == nil {
+		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
+		return nil
+	}
+	return claims
+}
+
+// setTransactionName sets the New Relic transaction name if a transaction exists.
+func setTransactionName(ctx context.Context, name string) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		txn.SetName(name)
+	}
+}
+
+// addTransactionAttribute adds an attribute to the New Relic transaction if one exists.
+func addTransactionAttribute(ctx context.Context, key string, value interface{}) {
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		txn.AddAttribute(key, value)
+	}
+}
+
+// =============================================================================
+// INTERNAL METHODS - Consolidate duplicate bot vs mini-app handler logic
+// =============================================================================
+
+// createMatchInternal creates a new match with the given chat ID and creator user ID.
+// This is the shared business logic called by both mini-app (JWT) and bot (API key) handlers.
+func (h *ArenaHandler) createMatchInternal(ctx context.Context, chatID, creatorUserID int64) (*services.MatchResponse, error) {
+	return h.service.CreateMatch(ctx, chatID, creatorUserID)
+}
+
+// getMatchInternal retrieves a match and verifies the user has access to the match's chat.
+// The claims parameter is used to verify chat access (for mini-app endpoints).
+// If claims is nil, no chat verification is performed (for bot endpoints).
+func (h *ArenaHandler) getMatchInternal(ctx context.Context, matchID string, claims *middleware.MiniAppClaims) (*services.MatchResponse, error) {
+	match, err := h.service.GetMatch(ctx, matchID)
+	if err != nil {
+		return nil, err
+	}
+
+	// If claims are provided (mini-app endpoint), verify chat access
+	if claims != nil {
+		if claims.ChatID == nil {
+			return nil, fmt.Errorf("chat context required")
+		}
+		if *claims.ChatID != match.ChatID {
+			return nil, fmt.Errorf("access denied to this chat")
+		}
+	}
+
+	return match, nil
+}
+
+// joinMatchInternal joins a user to a match.
+// This is the shared business logic called by both handlers.
+func (h *ArenaHandler) joinMatchInternal(ctx context.Context, matchID string, userID int64) (*services.MatchResponse, error) {
+	return h.service.JoinMatch(ctx, matchID, userID)
+}
+
+// leaveMatchInternal removes a user from a match.
+// This is the shared business logic called by both handlers.
+func (h *ArenaHandler) leaveMatchInternal(ctx context.Context, matchID string, userID int64) error {
+	return h.service.LeaveMatch(ctx, matchID, userID)
+}
+
+// startMatchInternal starts a match early (creator only).
+// This is the shared business logic called by both handlers.
+func (h *ArenaHandler) startMatchInternal(ctx context.Context, matchID string, userID int64) (*services.MatchResponse, error) {
+	return h.service.StartMatch(ctx, matchID, userID)
+}
+
 // CreateMatchRequest represents the request to create a match
 type CreateMatchRequest struct {
 	ChatID int64 `json:"chat_id"`
@@ -103,10 +268,7 @@ type SetOrderRequest struct {
 // GET /api/v1/mini-app/arena/matches?chat_id=X
 func (h *ArenaHandler) HandleListMatches(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:list-matches")
-	}
+	setTransactionName(ctx, "api:arena:list-matches")
 
 	_, chatID, err := parseChatIDWithAuth(r, false)
 	if err != nil {
@@ -114,16 +276,11 @@ func (h *ArenaHandler) HandleListMatches(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("chat_id", chatID)
-	}
+	addTransactionAttribute(ctx, "chat_id", chatID)
 
 	matches, err := h.service.GetActiveMatches(ctx, chatID)
 	if err != nil {
-		slog.Error("failed to list matches", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
+		logAndNoticeError(ctx, "failed to list matches", err)
 		httputil.RespondError(w, "failed to list matches", http.StatusInternalServerError)
 		return
 	}
@@ -137,14 +294,10 @@ func (h *ArenaHandler) HandleListMatches(w http.ResponseWriter, r *http.Request)
 // POST /api/v1/mini-app/arena/match
 func (h *ArenaHandler) HandleCreateMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:create-match")
-	}
+	setTransactionName(ctx, "api:arena:create-match")
 
-	claims := middleware.GetClaimsFromContext(ctx)
+	claims := requireJWTClaims(ctx, w)
 	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -174,24 +327,13 @@ func (h *ArenaHandler) HandleCreateMatch(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	match, err := h.service.CreateMatch(ctx, req.ChatID, claims.UserID)
+	match, err := h.createMatchInternal(ctx, req.ChatID, claims.UserID)
 	if err != nil {
-		slog.Error("failed to create match", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		if err == services.ErrNotEnoughCards {
-			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		httputil.RespondError(w, "failed to create match", http.StatusInternalServerError)
+		handleServiceError(ctx, w, err, "create match")
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", match.ID)
-	}
-
+	addTransactionAttribute(ctx, "match_id", match.ID)
 	httputil.RespondJSON(w, match, http.StatusCreated)
 }
 
@@ -199,40 +341,25 @@ func (h *ArenaHandler) HandleCreateMatch(w http.ResponseWriter, r *http.Request)
 // GET /api/v1/mini-app/arena/match/{id}
 func (h *ArenaHandler) HandleGetMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:get-match")
-	}
+	setTransactionName(ctx, "api:arena:get-match")
 
-	claims := middleware.GetClaimsFromContext(ctx)
+	claims := requireJWTClaims(ctx, w)
 	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
-	if matchID == "" {
-		httputil.RespondError(w, "match id is required", http.StatusBadRequest)
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", claims.UserID)
-	}
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
 
 	match, err := h.service.GetMatch(ctx, matchID)
 	if err != nil {
-		slog.Error("failed to get match", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		if err == services.ErrMatchNotFound {
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-			return
-		}
-		httputil.RespondError(w, "failed to get match", http.StatusInternalServerError)
+		handleServiceError(ctx, w, err, "get match")
 		return
 	}
 
@@ -253,39 +380,25 @@ func (h *ArenaHandler) HandleGetMatch(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/mini-app/arena/match/{id}/join
 func (h *ArenaHandler) HandleJoinMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:join-match")
-	}
+	setTransactionName(ctx, "api:arena:join-match")
 
-	claims := middleware.GetClaimsFromContext(ctx)
+	claims := requireJWTClaims(ctx, w)
 	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
-
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", claims.UserID)
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
 
 	match, err := h.service.JoinMatch(ctx, matchID, claims.UserID)
 	if err != nil {
-		slog.Error("failed to join match", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrMatchNotOpen:
-			httputil.RespondError(w, "match is not open for joining", http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, "failed to join match", http.StatusInternalServerError)
-		}
+		handleServiceError(ctx, w, err, "join match")
 		return
 	}
 
@@ -296,39 +409,25 @@ func (h *ArenaHandler) HandleJoinMatch(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/mini-app/arena/match/{id}/leave
 func (h *ArenaHandler) HandleLeaveMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:leave-match")
-	}
+	setTransactionName(ctx, "api:arena:leave-match")
 
-	claims := middleware.GetClaimsFromContext(ctx)
+	claims := requireJWTClaims(ctx, w)
 	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
-
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", claims.UserID)
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	err := h.service.LeaveMatch(ctx, matchID, claims.UserID)
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
+
+	err = h.service.LeaveMatch(ctx, matchID, claims.UserID)
 	if err != nil {
-		slog.Error("failed to leave match", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrMatchNotOpen:
-			httputil.RespondError(w, "cannot leave after match has started", http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, "failed to leave match", http.StatusInternalServerError)
-		}
+		handleServiceError(ctx, w, err, "leave match")
 		return
 	}
 
@@ -339,41 +438,25 @@ func (h *ArenaHandler) HandleLeaveMatch(w http.ResponseWriter, r *http.Request) 
 // POST /api/v1/mini-app/arena/match/{id}/start
 func (h *ArenaHandler) HandleStartMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:start-match")
-	}
+	setTransactionName(ctx, "api:arena:start-match")
 
-	claims := middleware.GetClaimsFromContext(ctx)
+	claims := requireJWTClaims(ctx, w)
 	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
-
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", claims.UserID)
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	match, err := h.service.StartMatch(ctx, matchID, claims.UserID)
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
+
+	match, err := h.startMatchInternal(ctx, matchID, claims.UserID)
 	if err != nil {
-		slog.Error("failed to start match", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrNotCreator:
-			httputil.RespondError(w, "only the match creator can start the match", http.StatusForbidden)
-		case services.ErrMatchNotOpen:
-			httputil.RespondError(w, "match has already started", http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
-		}
+		handleServiceError(ctx, w, err, "start match")
 		return
 	}
 
@@ -384,39 +467,25 @@ func (h *ArenaHandler) HandleStartMatch(w http.ResponseWriter, r *http.Request) 
 // GET /api/v1/mini-app/arena/match/{id}/shop
 func (h *ArenaHandler) HandleGetShop(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:get-shop")
-	}
+	setTransactionName(ctx, "api:arena:get-shop")
 
-	claims := middleware.GetClaimsFromContext(ctx)
+	claims := requireJWTClaims(ctx, w)
 	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
-
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", claims.UserID)
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
 
 	shop, err := h.service.GetShop(ctx, matchID, claims.UserID)
 	if err != nil {
-		slog.Error("failed to get shop", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrNotParticipant:
-			httputil.RespondError(w, "not a participant in this match", http.StatusForbidden)
-		default:
-			httputil.RespondError(w, "failed to get shop", http.StatusInternalServerError)
-		}
+		handleServiceError(ctx, w, err, "get shop")
 		return
 	}
 
@@ -427,19 +496,18 @@ func (h *ArenaHandler) HandleGetShop(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/mini-app/arena/match/{id}/buy
 func (h *ArenaHandler) HandleBuyCard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:buy-card")
-	}
+	setTransactionName(ctx, "api:arena:buy-card")
 
-	claims := middleware.GetClaimsFromContext(ctx)
+	claims := requireJWTClaims(ctx, w)
 	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var req BuyCardRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -447,30 +515,13 @@ func (h *ArenaHandler) HandleBuyCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", claims.UserID)
-		txn.AddAttribute("card_index", req.CardIndex)
-	}
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
+	addTransactionAttribute(ctx, "card_index", req.CardIndex)
 
 	shopState, err := h.service.BuyCard(ctx, matchID, claims.UserID, req.CardIndex)
 	if err != nil {
-		slog.Error("failed to buy card", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrNotParticipant:
-			httputil.RespondError(w, "not a participant in this match", http.StatusForbidden)
-		case services.ErrMatchNotInShopPhase, services.ErrShopPhaseExpired:
-			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
-		case services.ErrNotEnoughCoins, services.ErrTeamFull, services.ErrCardAlreadyPurchased, services.ErrInvalidCardIndex:
-			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, "failed to buy card", http.StatusInternalServerError)
-		}
+		handleServiceError(ctx, w, err, "buy card")
 		return
 	}
 
@@ -481,41 +532,25 @@ func (h *ArenaHandler) HandleBuyCard(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/mini-app/arena/match/{id}/reroll
 func (h *ArenaHandler) HandleReroll(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:reroll")
-	}
+	setTransactionName(ctx, "api:arena:reroll")
 
-	claims := middleware.GetClaimsFromContext(ctx)
+	claims := requireJWTClaims(ctx, w)
 	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
-
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", claims.UserID)
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
 
 	shopState, err := h.service.Reroll(ctx, matchID, claims.UserID)
 	if err != nil {
-		slog.Error("failed to reroll", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrNotParticipant:
-			httputil.RespondError(w, "not a participant in this match", http.StatusForbidden)
-		case services.ErrNotEnoughCoins:
-			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, "failed to reroll", http.StatusInternalServerError)
-		}
+		handleServiceError(ctx, w, err, "reroll")
 		return
 	}
 
@@ -526,19 +561,18 @@ func (h *ArenaHandler) HandleReroll(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/mini-app/arena/match/{id}/upgrade
 func (h *ArenaHandler) HandleUpgrade(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:upgrade")
-	}
+	setTransactionName(ctx, "api:arena:upgrade")
 
-	claims := middleware.GetClaimsFromContext(ctx)
+	claims := requireJWTClaims(ctx, w)
 	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var req UpgradeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -546,12 +580,10 @@ func (h *ArenaHandler) HandleUpgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", claims.UserID)
-		txn.AddAttribute("team_slot", req.TeamSlot)
-		txn.AddAttribute("upgrade_type", req.UpgradeType)
-	}
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
+	addTransactionAttribute(ctx, "team_slot", req.TeamSlot)
+	addTransactionAttribute(ctx, "upgrade_type", req.UpgradeType)
 
 	upgradeType := shop.UpgradeATK
 	if req.UpgradeType == "hp" {
@@ -560,20 +592,7 @@ func (h *ArenaHandler) HandleUpgrade(w http.ResponseWriter, r *http.Request) {
 
 	shopState, err := h.service.UpgradeCard(ctx, matchID, claims.UserID, req.TeamSlot, upgradeType)
 	if err != nil {
-		slog.Error("failed to upgrade card", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrNotParticipant:
-			httputil.RespondError(w, "not a participant in this match", http.StatusForbidden)
-		case services.ErrNotEnoughCoins, services.ErrInvalidCardIndex:
-			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, "failed to upgrade card", http.StatusInternalServerError)
-		}
+		handleServiceError(ctx, w, err, "upgrade card")
 		return
 	}
 
@@ -584,19 +603,18 @@ func (h *ArenaHandler) HandleUpgrade(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/mini-app/arena/match/{id}/order
 func (h *ArenaHandler) HandleSetOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:set-order")
-	}
+	setTransactionName(ctx, "api:arena:set-order")
 
-	claims := middleware.GetClaimsFromContext(ctx)
+	claims := requireJWTClaims(ctx, w)
 	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var req SetOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -604,17 +622,12 @@ func (h *ArenaHandler) HandleSetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", claims.UserID)
-	}
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
 
 	shopState, err := h.service.SetTeamOrder(ctx, matchID, claims.UserID, req.Order)
 	if err != nil {
-		slog.Error("failed to set order", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
+		logAndNoticeError(ctx, "failed to set order", err)
 		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -626,41 +639,25 @@ func (h *ArenaHandler) HandleSetOrder(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/mini-app/arena/match/{id}/team
 func (h *ArenaHandler) HandleSubmitTeam(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:submit-team")
-	}
+	setTransactionName(ctx, "api:arena:submit-team")
 
-	claims := middleware.GetClaimsFromContext(ctx)
+	claims := requireJWTClaims(ctx, w)
 	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
-
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", claims.UserID)
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
 
 	shopState, err := h.service.SubmitTeam(ctx, matchID, claims.UserID)
 	if err != nil {
-		slog.Error("failed to submit team", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrNotParticipant:
-			httputil.RespondError(w, "not a participant in this match", http.StatusForbidden)
-		case services.ErrTeamAlreadySubmitted:
-			httputil.RespondError(w, "team already submitted", http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
-		}
+		handleServiceError(ctx, w, err, "submit team")
 		return
 	}
 
@@ -671,39 +668,25 @@ func (h *ArenaHandler) HandleSubmitTeam(w http.ResponseWriter, r *http.Request) 
 // GET /api/v1/mini-app/arena/match/{id}/battle
 func (h *ArenaHandler) HandleGetBattle(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:get-battle")
-	}
+	setTransactionName(ctx, "api:arena:get-battle")
 
-	claims := middleware.GetClaimsFromContext(ctx)
+	claims := requireJWTClaims(ctx, w)
 	if claims == nil {
-		httputil.RespondError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
-
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", claims.UserID)
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
 
 	battle, err := h.service.GetBattle(ctx, matchID, claims.UserID)
 	if err != nil {
-		slog.Error("failed to get battle", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrNotParticipant:
-			httputil.RespondError(w, "not a participant in this match", http.StatusForbidden)
-		default:
-			httputil.RespondError(w, "failed to get battle", http.StatusInternalServerError)
-		}
+		handleServiceError(ctx, w, err, "get battle")
 		return
 	}
 
@@ -714,10 +697,7 @@ func (h *ArenaHandler) HandleGetBattle(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/mini-app/arena/leaderboard?chat_id=X&type=ranked
 func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:leaderboard")
-	}
+	setTransactionName(ctx, "api:arena:leaderboard")
 
 	_, chatID, err := parseChatIDWithAuth(r, true)
 	if err != nil {
@@ -733,18 +713,13 @@ func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Reque
 	limit := httputil.ParseIntWithDefault(r, "limit", 50, 1, 100)
 	offset := httputil.ParseIntWithDefault(r, "offset", 0, 0, 10000)
 
-	if txn != nil {
-		txn.AddAttribute("chat_id", chatID)
-		txn.AddAttribute("match_type", matchType)
-		txn.AddAttribute("limit", limit)
-	}
+	addTransactionAttribute(ctx, "chat_id", chatID)
+	addTransactionAttribute(ctx, "match_type", matchType)
+	addTransactionAttribute(ctx, "limit", limit)
 
 	entries, err := h.service.GetLeaderboard(ctx, chatID, matchType, limit, offset)
 	if err != nil {
-		slog.Error("failed to get leaderboard", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
+		logAndNoticeError(ctx, "failed to get leaderboard", err)
 		httputil.RespondError(w, "failed to get leaderboard", http.StatusInternalServerError)
 		return
 	}
@@ -759,10 +734,7 @@ func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Reque
 // GET /api/v1/mini-app/arena/history?chat_id=X&limit=20&offset=0
 func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:history")
-	}
+	setTransactionName(ctx, "api:arena:history")
 
 	claims, chatID, err := parseChatIDWithAuth(r, true)
 	if err != nil {
@@ -773,18 +745,13 @@ func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) 
 	limit := httputil.ParseIntWithDefault(r, "limit", 20, 1, 50)
 	offset := httputil.ParseIntWithDefault(r, "offset", 0, 0, 10000)
 
-	if txn != nil {
-		txn.AddAttribute("chat_id", chatID)
-		txn.AddAttribute("user_id", claims.UserID)
-		txn.AddAttribute("limit", limit)
-	}
+	addTransactionAttribute(ctx, "chat_id", chatID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
+	addTransactionAttribute(ctx, "limit", limit)
 
 	entries, total, err := h.service.GetMatchHistory(ctx, chatID, claims.UserID, limit, offset)
 	if err != nil {
-		slog.Error("failed to get match history", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
+		logAndNoticeError(ctx, "failed to get match history", err)
 		httputil.RespondError(w, "failed to get match history", http.StatusInternalServerError)
 		return
 	}
@@ -1126,7 +1093,7 @@ func (h *ArenaHandler) HandleShareResult(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Verify match is completed
-	if match.Status != "completed" {
+	if match.Status != repository.MatchStatusCompleted {
 		httputil.RespondError(w, "match not completed", http.StatusBadRequest)
 		return
 	}
@@ -1158,10 +1125,7 @@ type BotJoinMatchRequest struct {
 // POST /api/v1/arena/match
 func (h *ArenaHandler) HandleBotCreateMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:bot-create-match")
-	}
+	setTransactionName(ctx, "api:arena:bot-create-match")
 
 	var req BotCreateMatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1174,24 +1138,14 @@ func (h *ArenaHandler) HandleBotCreateMatch(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	match, err := h.service.CreateMatch(ctx, req.ChatID, req.CreatorUserID)
+	match, err := h.createMatchInternal(ctx, req.ChatID, req.CreatorUserID)
 	if err != nil {
-		slog.Error("failed to create match", "error", err, "chat_id", req.ChatID)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		if err == services.ErrNotEnoughCards {
-			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		httputil.RespondError(w, "failed to create match", http.StatusInternalServerError)
+		handleServiceError(ctx, w, err, "create match")
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", match.ID)
-		txn.AddAttribute("chat_id", req.ChatID)
-	}
+	addTransactionAttribute(ctx, "match_id", match.ID)
+	addTransactionAttribute(ctx, "chat_id", req.ChatID)
 
 	httputil.RespondJSON(w, match, http.StatusCreated)
 }
@@ -1200,33 +1154,19 @@ func (h *ArenaHandler) HandleBotCreateMatch(w http.ResponseWriter, r *http.Reque
 // GET /api/v1/arena/match/{id}
 func (h *ArenaHandler) HandleBotGetMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:bot-get-match")
-	}
+	setTransactionName(ctx, "api:arena:bot-get-match")
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
-	if matchID == "" {
-		httputil.RespondError(w, "match id is required", http.StatusBadRequest)
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-	}
+	addTransactionAttribute(ctx, "match_id", matchID)
 
-	match, err := h.service.GetMatch(ctx, matchID)
+	match, err := h.getMatchInternal(ctx, matchID, nil)
 	if err != nil {
-		slog.Error("failed to get match", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		if err == services.ErrMatchNotFound {
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-			return
-		}
-		httputil.RespondError(w, "failed to get match", http.StatusInternalServerError)
+		handleServiceError(ctx, w, err, "get match")
 		return
 	}
 
@@ -1237,13 +1177,13 @@ func (h *ArenaHandler) HandleBotGetMatch(w http.ResponseWriter, r *http.Request)
 // POST /api/v1/arena/match/{id}/join
 func (h *ArenaHandler) HandleBotJoinMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:bot-join-match")
-	}
+	setTransactionName(ctx, "api:arena:bot-join-match")
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var req BotJoinMatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1256,27 +1196,12 @@ func (h *ArenaHandler) HandleBotJoinMatch(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", req.UserID)
-	}
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", req.UserID)
 
-	match, err := h.service.JoinMatch(ctx, matchID, req.UserID)
+	match, err := h.joinMatchInternal(ctx, matchID, req.UserID)
 	if err != nil {
-		slog.Error("failed to join match", "error", err, "user_id", req.UserID)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrMatchNotOpen:
-			httputil.RespondError(w, "match is not open for joining", http.StatusBadRequest)
-		case services.ErrAlreadyJoined:
-			httputil.RespondError(w, "already joined this match", http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, "failed to join match", http.StatusInternalServerError)
-		}
+		handleServiceError(ctx, w, err, "join match")
 		return
 	}
 
@@ -1287,13 +1212,13 @@ func (h *ArenaHandler) HandleBotJoinMatch(w http.ResponseWriter, r *http.Request
 // POST /api/v1/arena/match/{id}/leave
 func (h *ArenaHandler) HandleBotLeaveMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:bot-leave-match")
-	}
+	setTransactionName(ctx, "api:arena:bot-leave-match")
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var req BotJoinMatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1306,25 +1231,12 @@ func (h *ArenaHandler) HandleBotLeaveMatch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", req.UserID)
-	}
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", req.UserID)
 
-	err := h.service.LeaveMatch(ctx, matchID, req.UserID)
+	err = h.leaveMatchInternal(ctx, matchID, req.UserID)
 	if err != nil {
-		slog.Error("failed to leave match", "error", err, "user_id", req.UserID)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrMatchNotOpen:
-			httputil.RespondError(w, "cannot leave after match has started", http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, "failed to leave match", http.StatusInternalServerError)
-		}
+		handleServiceError(ctx, w, err, "leave match")
 		return
 	}
 
@@ -1335,13 +1247,13 @@ func (h *ArenaHandler) HandleBotLeaveMatch(w http.ResponseWriter, r *http.Reques
 // POST /api/v1/arena/match/{id}/start
 func (h *ArenaHandler) HandleBotStartMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:bot-start-match")
-	}
+	setTransactionName(ctx, "api:arena:bot-start-match")
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var req BotJoinMatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1354,27 +1266,12 @@ func (h *ArenaHandler) HandleBotStartMatch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", req.UserID)
-	}
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", req.UserID)
 
-	match, err := h.service.StartMatch(ctx, matchID, req.UserID)
+	match, err := h.startMatchInternal(ctx, matchID, req.UserID)
 	if err != nil {
-		slog.Error("failed to start match", "error", err, "user_id", req.UserID)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrNotCreator:
-			httputil.RespondError(w, "only the match creator can start the match", http.StatusForbidden)
-		case services.ErrMatchNotOpen:
-			httputil.RespondError(w, "match has already started", http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
-		}
+		handleServiceError(ctx, w, err, "start match")
 		return
 	}
 
@@ -1911,7 +1808,7 @@ func (h *ArenaHandler) HandleBotGetShareData(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if match.Status != "completed" {
+	if match.Status != repository.MatchStatusCompleted {
 		httputil.RespondError(w, "match not completed", http.StatusBadRequest)
 		return
 	}
@@ -1951,6 +1848,39 @@ func (h *ArenaHandler) HandleBotGetShareData(w http.ResponseWriter, r *http.Requ
 		"winner_id":  match.WinnerUserID,
 		"match_type": match.MatchType,
 	}, http.StatusOK)
+}
+
+// HandleGetConstants returns game configuration constants.
+// GET /api/v1/mini-app/arena/constants
+func (h *ArenaHandler) HandleGetConstants(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:constants")
+	}
+
+	// Just return the constants - no auth validation needed beyond JWT which is enforced by middleware
+	constants := map[string]interface{}{
+		"costs": map[string]int{
+			"card":    shop.CardCost,
+			"reroll":  shop.RerollCost,
+			"upgrade": shop.UpgradeCost,
+		},
+		"sizes": map[string]int{
+			"shop": shop.ShopSize,
+			"team": shop.TeamSize,
+		},
+		"upgrades": map[string]int{
+			"atk_amount": shop.ATKUpgradeAmount,
+			"hp_amount":  shop.HPUpgradeAmount,
+		},
+		"timings": map[string]int{
+			"shop_phase_duration":  180,
+			"join_window_duration": 300,
+		},
+	}
+
+	httputil.RespondJSON(w, constants, http.StatusOK)
 }
 
 // timeNow is a function variable for testing purposes

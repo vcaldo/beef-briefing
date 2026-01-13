@@ -56,9 +56,16 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
 
   useEffect(() => {
     fetchShop();
+
+    // Stop polling only when match exits shop phase (transitions to battle/completed)
+    // Continue polling even after team submission to detect when battle starts
+    if (shopState?.status === 'battle_phase' || shopState?.status === 'completed') {
+      return;
+    }
+
     const interval = setInterval(fetchShop, 3000); // Poll every 3s
     return () => clearInterval(interval);
-  }, [fetchShop]);
+  }, [fetchShop, shopState?.status]);
 
   // Countdown timer
   useEffect(() => {
@@ -214,12 +221,11 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
     );
   }
 
-  const remainingCardsNeeded = 3 - shopState.team.length;
-  const coinsNeededForCards = remainingCardsNeeded * 2; // CardCost = 2
-  const canBuy = shopState.coins >= 2 && shopState.team.length < 3;
-  const canReroll = shopState.coins >= (1 + coinsNeededForCards); // RerollCost = 1
-  const canUpgrade = shopState.coins >= (2 + coinsNeededForCards); // UpgradeCost = 2
-  const canSubmit = shopState.team.length === 3 && !shopState.is_ready;
+  // Get affordability flags from API (all calculations are server-side)
+  const {
+    can_reroll: canReroll,
+    can_submit: canSubmit,
+  } = shopState.affordability;
 
   return (
     <div className="shop-page">
@@ -240,10 +246,26 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
         <div className="shop-error-banner">{error}</div>
       )}
 
-      {shopState.is_ready ? (
+      {shopState.team_submitted || shopState.is_ready ? (
         <div className="shop-waiting">
-          <h2>Team Submitted!</h2>
-          <p>Waiting for other players...</p>
+          <h2>✅ Team Submitted!</h2>
+          <p>Waiting for other players to finish shopping...</p>
+          {shopState.team && shopState.team.length > 0 && (
+            <div className="submitted-team-preview">
+              <h3>Your Team</h3>
+              <div className="team-preview-list">
+                {shopState.team.map((card) => (
+                  <div key={card.card_id} className="team-preview-card">
+                    <div className="card-name">{card.name}</div>
+                    <div className="card-stats">
+                      <span className="stat">ATK: {card.atk}</span>
+                      <span className="stat">HP: {card.hp}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="spinner" />
         </div>
       ) : (
@@ -266,7 +288,8 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
                   key={card.card_id}
                   card={card}
                   onBuy={() => handleBuyCard(index)}
-                  canBuy={canBuy && !card.is_purchased}
+                  canBuy={card.can_buy}
+                  buyDisabledReason={card.buy_disabled_reason}
                 />
               ))}
             </div>
@@ -302,7 +325,6 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
                         <div className="slot-label">{slotLabel}</div>
                         <TeamCard
                           card={card}
-                          canUpgrade={canUpgrade}
                           onUpgradeAtk={() => handleUpgrade(teamArrayIndex, 'atk')}
                           onUpgradeHp={() => handleUpgrade(teamArrayIndex, 'hp')}
                           onDragStart={handleDragStart}
@@ -350,6 +372,7 @@ interface ShopCardComponentProps {
   card: ShopCard;
   onBuy: () => void;
   canBuy: boolean;
+  buyDisabledReason?: string;
 }
 
 function ShopCardComponent({ card, onBuy, canBuy }: ShopCardComponentProps) {
@@ -390,7 +413,6 @@ function ShopCardComponent({ card, onBuy, canBuy }: ShopCardComponentProps) {
 // Team Card Component (with framer-motion drag)
 interface TeamCardProps {
   card: GameCard;
-  canUpgrade: boolean;
   onUpgradeAtk: () => void;
   onUpgradeHp: () => void;
   onDragStart: () => void;
@@ -398,7 +420,6 @@ interface TeamCardProps {
 
 function TeamCard({
   card,
-  canUpgrade,
   onUpgradeAtk,
   onUpgradeHp,
   onDragStart
@@ -439,7 +460,7 @@ function TeamCard({
               ATK {card.atk}
               {card.atk_upgrades > 0 && <span className="upgrade-count">+{card.atk_upgrades}</span>}
             </span>
-            {canUpgrade && (
+            {(card as any).can_upgrade_atk && (
               <button
                 className="stat-upgrade-btn"
                 onClick={(e) => {
@@ -458,7 +479,7 @@ function TeamCard({
               HP {card.hp}
               {card.hp_upgrades > 0 && <span className="upgrade-count">+{card.hp_upgrades * 3}</span>}
             </span>
-            {canUpgrade && (
+            {(card as any).can_upgrade_hp && (
               <button
                 className="stat-upgrade-btn"
                 onClick={(e) => {

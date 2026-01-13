@@ -59,20 +59,61 @@ export interface Match {
 }
 
 // Shop types
+export interface ShopAffordability {
+  can_buy: boolean;
+  can_reroll: boolean;
+  can_upgrade: boolean;
+  can_submit: boolean;
+  buy_disabled_reason?: string;
+  reroll_disabled_reason?: string;
+  upgrade_disabled_reason?: string;
+  submit_disabled_reason?: string;
+}
+
+export interface EnhancedShopCard extends ShopCard {
+  can_buy: boolean;
+  buy_disabled_reason?: string;
+}
+
+export interface EnhancedGameCard extends GameCard {
+  can_upgrade_atk: boolean;
+  can_upgrade_hp: boolean;
+  upgrade_atk_disabled_reason?: string;
+  upgrade_hp_disabled_reason?: string;
+  atk_if_upgraded: number;
+  hp_if_upgraded: number;
+  max_hp_if_upgraded: number;
+}
+
 export interface ShopState {
   match_id: string;
   status: string;
   coins: number;
-  cards: ShopCard[];
-  team: GameCard[];
+  cards: EnhancedShopCard[];
+  team: EnhancedGameCard[];
   team_order: number[];
   is_ready: boolean;
+  team_submitted: boolean;
   deadline?: string;
   time_remaining_seconds: number;
+  affordability: ShopAffordability;
 }
 
 // Battle types
 export type EventType = 'attack' | 'damage' | 'death' | 'advance' | 'victory';
+
+export interface CardSnapshot {
+  card_id: number;
+  user_id: number;
+  name: string;
+  hp: number;
+  max_hp: number;
+  atk: number;
+  position: number;
+  is_alive: boolean;
+  is_attacking: boolean;
+  is_defending: boolean;
+}
 
 export interface BattleEvent {
   type: EventType;
@@ -85,6 +126,7 @@ export interface BattleEvent {
   damage?: number;
   hp_before?: number;
   hp_after?: number;
+  card_states?: CardSnapshot[];
 }
 
 export interface MatchRound {

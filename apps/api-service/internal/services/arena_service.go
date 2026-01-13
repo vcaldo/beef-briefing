@@ -40,7 +40,7 @@ var (
 	ErrNotEnoughCoins        = errors.New("not enough coins")
 	ErrTeamFull              = errors.New("team is full (max 3 cards)")
 	ErrCardAlreadyPurchased  = errors.New("card already purchased")
-	ErrActiveMatchExists     = errors.New("an active unranked match already exists")
+	ErrActiveMatchExists     = errors.New("an active match already exists. Please wait for it to complete before creating a new one.")
 )
 
 // ArenaService handles arena game logic
@@ -60,30 +60,154 @@ type ArenaService struct {
 func (s *ArenaService) validateShopPhaseAccess(ctx context.Context, matchID string, userID int64, checkDeadline bool) (*repository.Match, *repository.Participant, error) {
 	match, err := s.gameRepo.GetMatch(ctx, matchID)
 	if err != nil {
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
 		return nil, nil, fmt.Errorf("failed to get match: %w", err)
 	}
 	if match == nil {
-		return nil, nil, ErrMatchNotFound
+		err := ErrMatchNotFound
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
+		return nil, nil, err
 	}
 	if match.Status != repository.MatchStatusShopPhase {
-		return nil, nil, ErrMatchNotInShopPhase
+		err := ErrMatchNotInShopPhase
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
+		return nil, nil, err
 	}
 	if checkDeadline && match.ShopPhaseDeadline != nil && time.Now().After(*match.ShopPhaseDeadline) {
-		return nil, nil, ErrShopPhaseExpired
+		err := ErrShopPhaseExpired
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
+		return nil, nil, err
 	}
 
 	participant, err := s.gameRepo.GetParticipant(ctx, matchID, userID)
 	if err != nil {
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
 		return nil, nil, fmt.Errorf("failed to get participant: %w", err)
 	}
 	if participant == nil {
-		return nil, nil, ErrNotParticipant
+		err := ErrNotParticipant
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
+		return nil, nil, err
 	}
 	if participant.Status == repository.ParticipantStatusReady {
-		return nil, nil, ErrTeamAlreadySubmitted
+		err := ErrTeamAlreadySubmitted
+		if txn := newrelic.FromContext(ctx); txn != nil {
+			txn.NoticeError(err)
+		}
+		return nil, nil, err
 	}
 
 	return match, participant, nil
+}
+
+// parseParticipantShopState extracts cards and team from participant JSON fields.
+// Returns empty slices if fields are nil (not an error condition).
+func parseParticipantShopState(participant *repository.Participant) (cards []*battle.ShopCard, team []*battle.Card, err error) {
+	if participant.ShopCards != nil {
+		if err := json.Unmarshal(*participant.ShopCards, &cards); err != nil {
+			return nil, nil, fmt.Errorf("failed to parse shop cards: %w", err)
+		}
+	}
+	if participant.Team != nil {
+		if err := json.Unmarshal(*participant.Team, &team); err != nil {
+			return nil, nil, fmt.Errorf("failed to parse team: %w", err)
+		}
+	}
+	return cards, team, nil
+}
+
+// recordBattleCompletion records a custom event for battle completion.
+// This tracks key metrics for business analytics and monitoring.
+func recordBattleCompletion(nrApp *newrelic.Application, matchID string, format string, winnerID *int64, isDraw bool, numRounds int, teamADamage, teamBDamage int) {
+	if nrApp == nil {
+		return
+	}
+
+	// Create custom event for battle completion
+	params := map[string]interface{}{
+		"match_id":       matchID,
+		"format":         format, // "1v1" or "arena"
+		"is_draw":        isDraw,
+		"num_rounds":     numRounds,
+		"team_a_damage":  teamADamage,
+		"team_b_damage":  teamBDamage,
+	}
+
+	if winnerID != nil {
+		params["winner_id"] = *winnerID
+	}
+
+	nrApp.RecordCustomEvent("arena.battle.completed", params)
+}
+
+// recordCardTransaction records a custom event for card purchases, rerolls, and upgrades.
+// eventType should be "buy", "reroll", or "upgrade".
+func recordCardTransaction(nrApp *newrelic.Application, eventType string, matchID string, userID int64, coinsSpent int, cardATK, cardHP int) {
+	if nrApp == nil {
+		return
+	}
+
+	params := map[string]interface{}{
+		"event_type":   eventType,
+		"match_id":     matchID,
+		"user_id":      userID,
+		"coins_spent":  coinsSpent,
+	}
+
+	if cardATK > 0 {
+		params["card_atk"] = cardATK
+	}
+	if cardHP > 0 {
+		params["card_hp"] = cardHP
+	}
+
+	nrApp.RecordCustomEvent("arena.card.transaction", params)
+}
+
+// recordMatchEvent records a custom event for match lifecycle events.
+// eventType should be "created", "started", "completed", etc.
+func recordMatchEvent(nrApp *newrelic.Application, eventType string, matchID string, chatID int64, creatorID int64, matchType string) {
+	if nrApp == nil {
+		return
+	}
+
+	params := map[string]interface{}{
+		"event_type":  eventType,
+		"match_id":    matchID,
+		"chat_id":     chatID,
+		"creator_id":  creatorID,
+		"match_type":  matchType,
+	}
+
+	nrApp.RecordCustomEvent("arena.match.event", params)
+}
+
+// recordTournamentEvent records a custom event for tournament lifecycle events.
+func recordTournamentEvent(nrApp *newrelic.Application, eventType string, tournamentID int64, chatID int64, participantCount int) {
+	if nrApp == nil {
+		return
+	}
+
+	params := map[string]interface{}{
+		"event_type":        eventType,
+		"tournament_id":     tournamentID,
+		"chat_id":           chatID,
+		"participant_count": participantCount,
+	}
+
+	nrApp.RecordCustomEvent("arena.tournament.event", params)
 }
 
 // NewArenaService creates a new arena service
@@ -124,6 +248,52 @@ type ShopResponse struct {
 	TimeRemaining int                `json:"time_remaining_seconds"`
 }
 
+// ShopAffordability represents what actions a player can afford
+type ShopAffordability struct {
+	CanBuy               bool    `json:"can_buy"`
+	CanReroll            bool    `json:"can_reroll"`
+	CanUpgrade           bool    `json:"can_upgrade"`
+	CanSubmit            bool    `json:"can_submit"`
+	BuyDisabledReason    *string `json:"buy_disabled_reason"`
+	RerollDisabledReason *string `json:"reroll_disabled_reason"`
+	UpgradeDisabledReason *string `json:"upgrade_disabled_reason"`
+	SubmitDisabledReason *string `json:"submit_disabled_reason"`
+}
+
+// EnhancedShopCard wraps ShopCard with affordability info
+type EnhancedShopCard struct {
+	*battle.ShopCard
+	CanBuy            bool    `json:"can_buy"`
+	BuyDisabledReason *string `json:"buy_disabled_reason"`
+}
+
+// EnhancedTeamCard wraps Card with upgrade preview info
+type EnhancedTeamCard struct {
+	*battle.Card
+	CanUpgradeATK         bool    `json:"can_upgrade_atk"`
+	CanUpgradeHP          bool    `json:"can_upgrade_hp"`
+	UpgradeATKDisabledReason *string `json:"upgrade_atk_disabled_reason"`
+	UpgradeHPDisabledReason  *string `json:"upgrade_hp_disabled_reason"`
+	ATKIfUpgraded         int     `json:"atk_if_upgraded"`
+	HPIfUpgraded          int     `json:"hp_if_upgraded"`
+	MaxHPIfUpgraded       int     `json:"max_hp_if_upgraded"`
+}
+
+// EnhancedShopResponse is the full shop response with affordability and upgrade previews
+type EnhancedShopResponse struct {
+	MatchID              string                `json:"match_id"`
+	Status               string                `json:"status"`
+	Coins                int                   `json:"coins"`
+	Cards                []*EnhancedShopCard   `json:"cards"`
+	Team                 []*EnhancedTeamCard   `json:"team"`
+	TeamOrder            []int                 `json:"team_order"`
+	IsReady              bool                  `json:"is_ready"`
+	TeamSubmitted        bool                  `json:"team_submitted"`
+	Deadline             *time.Time            `json:"deadline,omitempty"`
+	TimeRemaining        int                   `json:"time_remaining_seconds"`
+	Affordability        ShopAffordability     `json:"affordability"`
+}
+
 // BattleResponse represents battle results
 type BattleResponse struct {
 	MatchID    string                   `json:"match_id"`
@@ -137,7 +307,7 @@ type BattleResponse struct {
 func (s *ArenaService) CreateMatch(ctx context.Context, chatID int64, creatorUserID int64) (*MatchResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:CreateMatch")
+		segment := txn.StartSegment("service:arena:create-match")
 		defer segment.End()
 	}
 
@@ -149,7 +319,10 @@ func (s *ArenaService) CreateMatch(ctx context.Context, chatID int64, creatorUse
 
 	// Only allow one active regular match at a time
 	for _, match := range activeMatches {
-		if match.MatchType == repository.MatchTypeRegular && match.Status == repository.MatchStatusOpen {
+		if match.MatchType == repository.MatchTypeRegular &&
+			(match.Status == repository.MatchStatusOpen ||
+				match.Status == repository.MatchStatusShopPhase ||
+				match.Status == repository.MatchStatusBattlePhase) {
 			return nil, ErrActiveMatchExists
 		}
 	}
@@ -181,6 +354,9 @@ func (s *ArenaService) CreateMatch(ctx context.Context, chatID int64, creatorUse
 		return nil, fmt.Errorf("failed to get participants: %w", err)
 	}
 
+	// Record match creation metric
+	recordMatchEvent(s.nrApp, "created", match.ID, chatID, creatorUserID, string(repository.MatchTypeRegular))
+
 	return &MatchResponse{
 		Match:        match,
 		Participants: participants,
@@ -192,7 +368,7 @@ func (s *ArenaService) CreateMatch(ctx context.Context, chatID int64, creatorUse
 func (s *ArenaService) GetMatch(ctx context.Context, matchID string) (*MatchResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetMatch")
+		segment := txn.StartSegment("service:arena:get-match")
 		defer segment.End()
 	}
 
@@ -222,7 +398,7 @@ func (s *ArenaService) GetMatch(ctx context.Context, matchID string) (*MatchResp
 func (s *ArenaService) GetActiveMatches(ctx context.Context, chatID int64) ([]*MatchResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetActiveMatches")
+		segment := txn.StartSegment("service:arena:get-active-matches")
 		defer segment.End()
 	}
 
@@ -250,7 +426,7 @@ func (s *ArenaService) GetActiveMatches(ctx context.Context, chatID int64) ([]*M
 func (s *ArenaService) JoinMatch(ctx context.Context, matchID string, userID int64) (*MatchResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:JoinMatch")
+		segment := txn.StartSegment("service:arena:join-match")
 		defer segment.End()
 	}
 
@@ -285,7 +461,7 @@ func (s *ArenaService) JoinMatch(ctx context.Context, matchID string, userID int
 func (s *ArenaService) LeaveMatch(ctx context.Context, matchID string, userID int64) error {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:LeaveMatch")
+		segment := txn.StartSegment("service:arena:leave-match")
 		defer segment.End()
 	}
 
@@ -309,7 +485,7 @@ func (s *ArenaService) LeaveMatch(ctx context.Context, matchID string, userID in
 func (s *ArenaService) StartMatch(ctx context.Context, matchID string, userID int64) (*MatchResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:StartMatch")
+		segment := txn.StartSegment("service:arena:start-match")
 		defer segment.End()
 	}
 
@@ -364,6 +540,12 @@ func (s *ArenaService) StartMatch(ctx context.Context, matchID string, userID in
 
 // dealCardsToParticipants deals initial shop cards to all participants
 func (s *ArenaService) dealCardsToParticipants(ctx context.Context, matchID string, chatID int64) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:deal-cards-to-participants")
+		defer segment.End()
+	}
+
 	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
 	if err != nil {
 		return err
@@ -393,14 +575,123 @@ func (s *ArenaService) dealCardsToParticipants(ctx context.Context, matchID stri
 	return nil
 }
 
-// GetShop retrieves the shop state for a player
-func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64) (*ShopResponse, error) {
+// computeShopAffordability computes what actions a player can afford in the shop.
+// Considers coins available and coins needed to complete team (3 cards total).
+// Returns affordability status and disabled reasons for each action if not affordable.
+func (s *ArenaService) computeShopAffordability(coins int, teamSize int, isReady bool) ShopAffordability {
+	remainingCards := shop.TeamSize - teamSize
+	coinsNeededForCards := remainingCards * shop.CardCost
+
+	canBuy := coins >= shop.CardCost && teamSize < shop.TeamSize
+	canReroll := coins >= (shop.RerollCost + coinsNeededForCards)
+	canUpgrade := coins >= (shop.UpgradeCost + coinsNeededForCards)
+	canSubmit := teamSize == shop.TeamSize && !isReady
+
+	aff := ShopAffordability{
+		CanBuy:     canBuy,
+		CanReroll:  canReroll,
+		CanUpgrade: canUpgrade,
+		CanSubmit:  canSubmit,
+	}
+
+	if !canBuy {
+		if teamSize >= shop.TeamSize {
+			reason := "team is full"
+			aff.BuyDisabledReason = &reason
+		} else {
+			reason := fmt.Sprintf("need %d coins", shop.CardCost)
+			aff.BuyDisabledReason = &reason
+		}
+	}
+
+	if !canReroll {
+		reason := fmt.Sprintf("need %d coins (%d reroll + %d to complete team)",
+			shop.RerollCost+coinsNeededForCards, shop.RerollCost, coinsNeededForCards)
+		aff.RerollDisabledReason = &reason
+	}
+
+	if !canUpgrade {
+		reason := fmt.Sprintf("need %d coins (%d upgrade + %d to complete team)",
+			shop.UpgradeCost+coinsNeededForCards, shop.UpgradeCost, coinsNeededForCards)
+		aff.UpgradeDisabledReason = &reason
+	}
+
+	if !canSubmit {
+		if teamSize < shop.TeamSize {
+			reason := fmt.Sprintf("team incomplete (%d/%d cards)", teamSize, shop.TeamSize)
+			aff.SubmitDisabledReason = &reason
+		} else if isReady {
+			reason := "already submitted"
+			aff.SubmitDisabledReason = &reason
+		}
+	}
+
+	return aff
+}
+
+// enhanceShopCards wraps each shop card with affordability info for client display.
+// Each card shows whether it can be purchased and disabled reason if not affordable.
+func (s *ArenaService) enhanceShopCards(cards []*battle.ShopCard, coins int, teamSize int) []*EnhancedShopCard {
+	enhanced := make([]*EnhancedShopCard, len(cards))
+	for i, card := range cards {
+		canBuy := !card.IsPurchased && coins >= shop.CardCost && teamSize < shop.TeamSize
+		enhanced[i] = &EnhancedShopCard{
+			ShopCard: card,
+			CanBuy:   canBuy,
+		}
+		if !canBuy {
+			if card.IsPurchased {
+				reason := "already purchased"
+				enhanced[i].BuyDisabledReason = &reason
+			} else if teamSize >= shop.TeamSize {
+				reason := "team is full"
+				enhanced[i].BuyDisabledReason = &reason
+			} else {
+				reason := fmt.Sprintf("need %d coins", shop.CardCost)
+				enhanced[i].BuyDisabledReason = &reason
+			}
+		}
+	}
+	return enhanced
+}
+
+// enhanceTeamCards wraps each team card with upgrade preview information.
+// Shows whether upgrades (ATK/HP) are affordable and projected stats after upgrade.
+func (s *ArenaService) enhanceTeamCards(team []*battle.Card, coins int, teamSize int) []*EnhancedTeamCard {
+	remainingCards := shop.TeamSize - teamSize
+	coinsNeededForCards := remainingCards * shop.CardCost
+	canAffordUpgrade := coins >= (shop.UpgradeCost + coinsNeededForCards)
+
+	enhanced := make([]*EnhancedTeamCard, len(team))
+	for i, card := range team {
+		enhanced[i] = &EnhancedTeamCard{
+			Card:                card,
+			CanUpgradeATK:       canAffordUpgrade,
+			CanUpgradeHP:        canAffordUpgrade,
+			ATKIfUpgraded:       card.ATK + shop.ATKUpgradeAmount,
+			HPIfUpgraded:        card.HP + shop.HPUpgradeAmount,
+			MaxHPIfUpgraded:     card.MaxHP + shop.HPUpgradeAmount,
+		}
+		if !canAffordUpgrade {
+			reason := fmt.Sprintf("need %d coins (%d upgrade + %d to complete team)",
+				shop.UpgradeCost+coinsNeededForCards, shop.UpgradeCost, coinsNeededForCards)
+			enhanced[i].UpgradeATKDisabledReason = &reason
+			enhanced[i].UpgradeHPDisabledReason = &reason
+		}
+	}
+	return enhanced
+}
+
+// GetShop retrieves the enhanced shop state for a player (includes affordability and upgrade previews).
+// Returns gracefully after team submission or phase transition instead of errors.
+func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetShop")
+		segment := txn.StartSegment("service:arena:get-shop")
 		defer segment.End()
 	}
 
+	// Get match and participant without strict phase validation
 	match, err := s.gameRepo.GetMatch(ctx, matchID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match: %w", err)
@@ -417,20 +708,56 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 		return nil, ErrNotParticipant
 	}
 
-	// Parse shop cards
-	var cards []*battle.ShopCard
-	if participant.ShopCards != nil {
-		if err := json.Unmarshal(*participant.ShopCards, &cards); err != nil {
-			return nil, fmt.Errorf("failed to parse shop cards: %w", err)
+	isReady := participant.Status == repository.ParticipantStatusReady
+
+	// If match moved to battle or completed phase, return status-only response
+	if match.Status == repository.MatchStatusBattlePhase || match.Status == repository.MatchStatusCompleted {
+		// Convert TeamOrder from int64 to int for API response
+		teamOrder := make([]int, len(participant.TeamOrder))
+		for i, v := range participant.TeamOrder {
+			teamOrder[i] = int(v)
 		}
+
+		// Return read-only state showing battle/completed phase
+		msg := "match has moved to battle phase"
+		return &EnhancedShopResponse{
+			MatchID:       matchID,
+			Status:        string(match.Status),
+			Coins:         participant.CoinsRemaining,
+			Cards:         nil, // No shop cards when not in shop phase
+			Team:          nil, // Will be populated in battle view
+			TeamOrder:     teamOrder,
+			IsReady:       isReady,
+			TeamSubmitted: isReady,
+			Deadline:      match.ShopPhaseDeadline,
+			TimeRemaining: 0,
+			Affordability: ShopAffordability{
+				CanBuy:                 false,
+				CanReroll:              false,
+				CanUpgrade:             false,
+				CanSubmit:              false,
+				BuyDisabledReason:      &msg,
+				RerollDisabledReason:   &msg,
+				UpgradeDisabledReason:  &msg,
+				SubmitDisabledReason:   &msg,
+			},
+		}, nil
 	}
 
-	// Parse team
-	var team []*battle.Card
-	if participant.Team != nil {
-		if err := json.Unmarshal(*participant.Team, &team); err != nil {
-			return nil, fmt.Errorf("failed to parse team: %w", err)
-		}
+	// Check if we're in shop phase
+	if match.Status != repository.MatchStatusShopPhase {
+		return nil, fmt.Errorf("failed to get shop: %w", ErrMatchNotInShopPhase)
+	}
+
+	// If user already submitted, return read-only state
+	if isReady {
+		return s.buildReadOnlyShopState(ctx, match, participant)
+	}
+
+	// Parse shop cards and team
+	cards, team, err := parseParticipantShopState(participant)
+	if err != nil {
+		return nil, err
 	}
 
 	// Calculate time remaining
@@ -448,24 +775,72 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 		teamOrder[i] = int(v)
 	}
 
-	return &ShopResponse{
+	// Build enhanced response with affordability and upgrade previews
+	enhancedCards := s.enhanceShopCards(cards, participant.CoinsRemaining, len(team))
+	enhancedTeam := s.enhanceTeamCards(team, participant.CoinsRemaining, len(team))
+	affordability := s.computeShopAffordability(participant.CoinsRemaining, len(team), false)
+
+	return &EnhancedShopResponse{
 		MatchID:       matchID,
 		Status:        string(match.Status),
 		Coins:         participant.CoinsRemaining,
-		Cards:         cards,
-		Team:          team,
+		Cards:         enhancedCards,
+		Team:          enhancedTeam,
 		TeamOrder:     teamOrder,
-		IsReady:       participant.Status == repository.ParticipantStatusReady,
+		IsReady:       false,
+		TeamSubmitted: false,
 		Deadline:      match.ShopPhaseDeadline,
 		TimeRemaining: timeRemaining,
+		Affordability: affordability,
+	}, nil
+}
+
+// buildReadOnlyShopState builds a read-only shop state for a user who already submitted their team.
+// Returns the user's team and order but no shop cards, with all affordability flags set to false.
+func (s *ArenaService) buildReadOnlyShopState(ctx context.Context, match *repository.Match, participant *repository.Participant) (*EnhancedShopResponse, error) {
+	// Parse team (cards not needed for submitted state)
+	_, team, err := parseParticipantShopState(participant)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert TeamOrder from int64 to int for API response
+	teamOrder := make([]int, len(participant.TeamOrder))
+	for i, v := range participant.TeamOrder {
+		teamOrder[i] = int(v)
+	}
+
+	// Build read-only response with submitted team
+	msg := "team already submitted"
+	return &EnhancedShopResponse{
+		MatchID:       match.ID,
+		Status:        string(match.Status),
+		Coins:         participant.CoinsRemaining,
+		Cards:         nil, // No shop cards for submitted players
+		Team:          s.enhanceTeamCards(team, participant.CoinsRemaining, len(team)),
+		TeamOrder:     teamOrder,
+		IsReady:       true,
+		TeamSubmitted: true,
+		Deadline:      match.ShopPhaseDeadline,
+		TimeRemaining: 0, // Submitted players don't need timer
+		Affordability: ShopAffordability{
+			CanBuy:                 false,
+			CanReroll:              false,
+			CanUpgrade:             false,
+			CanSubmit:              false,
+			BuyDisabledReason:      &msg,
+			RerollDisabledReason:   &msg,
+			UpgradeDisabledReason:  &msg,
+			SubmitDisabledReason:   &msg,
+		},
 	}, nil
 }
 
 // BuyCard purchases a card from the shop
-func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64, cardIndex int) (*ShopResponse, error) {
+func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64, cardIndex int) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:BuyCard")
+		segment := txn.StartSegment("service:arena:buy-card")
 		defer segment.End()
 	}
 
@@ -475,16 +850,9 @@ func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64
 	}
 
 	// Parse current state
-	var cards []*battle.ShopCard
-	if err := json.Unmarshal(*participant.ShopCards, &cards); err != nil {
-		return nil, fmt.Errorf("failed to parse shop cards: %w", err)
-	}
-
-	var team []*battle.Card
-	if participant.Team != nil {
-		if err := json.Unmarshal(*participant.Team, &team); err != nil {
-			return nil, fmt.Errorf("failed to parse team: %w", err)
-		}
+	cards, team, err := parseParticipantShopState(participant)
+	if err != nil {
+		return nil, err
 	}
 
 	// Validate purchase
@@ -521,14 +889,17 @@ func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64
 		return nil, fmt.Errorf("failed to save shop state: %w", err)
 	}
 
+	// Record card transaction metric
+	recordCardTransaction(s.nrApp, "buy", matchID, userID, shop.CardCost, newCard.ATK, newCard.HP)
+
 	return s.GetShop(ctx, matchID, userID)
 }
 
 // Reroll replaces unpurchased cards with new ones
-func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64) (*ShopResponse, error) {
+func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:Reroll")
+		segment := txn.StartSegment("service:arena:reroll")
 		defer segment.End()
 	}
 
@@ -609,14 +980,17 @@ func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64)
 		return nil, fmt.Errorf("failed to save shop state: %w", err)
 	}
 
+	// Record card transaction metric
+	recordCardTransaction(s.nrApp, "reroll", matchID, userID, shop.RerollCost, 0, 0)
+
 	return s.GetShop(ctx, matchID, userID)
 }
 
 // UpgradeCard applies an upgrade to a team card
-func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID int64, teamSlot int, upgradeType shop.UpgradeType) (*ShopResponse, error) {
+func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID int64, teamSlot int, upgradeType shop.UpgradeType) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:UpgradeCard")
+		segment := txn.StartSegment("service:arena:upgrade-card")
 		defer segment.End()
 	}
 
@@ -682,14 +1056,18 @@ func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID i
 		return nil, fmt.Errorf("failed to save shop state: %w", err)
 	}
 
+	// Record card transaction metric
+	upgradedCard := team[teamSlot]
+	recordCardTransaction(s.nrApp, "upgrade", matchID, userID, shop.UpgradeCost, upgradedCard.ATK, upgradedCard.HP)
+
 	return s.GetShop(ctx, matchID, userID)
 }
 
 // SetTeamOrder sets the battle order for a player's team
-func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID int64, order []int) (*ShopResponse, error) {
+func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID int64, order []int) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:SetTeamOrder")
+		segment := txn.StartSegment("service:arena:set-team-order")
 		defer segment.End()
 	}
 
@@ -737,10 +1115,10 @@ func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID 
 }
 
 // SubmitTeam submits the team for battle
-func (s *ArenaService) SubmitTeam(ctx context.Context, matchID string, userID int64) (*ShopResponse, error) {
+func (s *ArenaService) SubmitTeam(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:SubmitTeam")
+		segment := txn.StartSegment("service:arena:submit-team")
 		defer segment.End()
 	}
 
@@ -766,7 +1144,12 @@ func (s *ArenaService) SubmitTeam(ctx context.Context, matchID string, userID in
 	}
 
 	// Check if all participants are ready
-	go s.checkAndStartBattle(context.Background(), matchID)
+	// Create detached context for background battle check with timeout protection
+	asyncCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	go func() {
+		defer cancel()
+		s.checkAndStartBattle(asyncCtx, matchID)
+	}()
 
 	return s.GetShop(ctx, matchID, userID)
 }
@@ -791,6 +1174,12 @@ func (s *ArenaService) checkAndStartBattle(ctx context.Context, matchID string) 
 
 // StartBattle initiates the battle phase
 func (s *ArenaService) StartBattle(ctx context.Context, matchID string) (*BattleResponse, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:start-battle")
+		defer segment.End()
+	}
+
 	match, err := s.gameRepo.GetMatch(ctx, matchID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match: %w", err)
@@ -834,8 +1223,17 @@ func normalizeTeamOrder(order []int64, teamSize int) []int64 {
 	return normalized
 }
 
-// runBattle executes a single battle between two participants
+// runBattle executes a single 1v1 battle between two participants and records the results.
+// It handles team parsing, team order normalization, battle simulation, round persistence,
+// and leaderboard updates. Returns a BattleResponse with the outcome and auto-completes
+// the match for 1v1 format battles.
 func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *repository.ParticipantWithUser, roundNumber int) (*BattleResponse, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:run-battle")
+		defer segment.End()
+	}
+
 	// Parse teams
 	var teamACards, teamBCards []*battle.Card
 	if err := json.Unmarshal(*pA.Team, &teamACards); err != nil {
@@ -915,6 +1313,9 @@ func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *re
 	// Run battle simulation
 	result := battle.Simulate(teamA, teamB)
 
+	// Record battle completion metric
+	recordBattleCompletion(s.nrApp, matchID, "1v1", result.WinnerID, result.IsDraw, result.NumRounds, result.TeamADamage, result.TeamBDamage)
+
 	// Save round
 	teamAJSON, err := json.Marshal(orderedA)
 	if err != nil {
@@ -975,8 +1376,19 @@ func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *re
 	}, nil
 }
 
-// runArena executes arena format (round-robin for now)
+// runArena executes arena format with round-robin tournament bracket.
+// Each participant faces every other participant. Winner is determined by:
+// 1. Most wins across all battles
+// 2. Total damage dealt (as tiebreaker if wins are equal)
+// 3. Lower user_id (deterministic tiebreaker if damage is tied)
+// Completes the match with the tournament winner.
 func (s *ArenaService) runArena(ctx context.Context, matchID string, participants []*repository.ParticipantWithUser) (*BattleResponse, error) {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:run-arena")
+		defer segment.End()
+	}
+
 	roundNumber := 0
 
 	// Round-robin: each player fights each other player
@@ -1028,6 +1440,9 @@ func (s *ArenaService) runArena(ctx context.Context, matchID string, participant
 
 	s.gameRepo.CompleteMatch(ctx, matchID, winnerID)
 
+	// Record arena completion metric
+	recordBattleCompletion(s.nrApp, matchID, "arena", winnerID, false, roundNumber, 0, 0)
+
 	rounds, _ := s.gameRepo.GetMatchRounds(ctx, matchID)
 
 	return &BattleResponse{
@@ -1043,7 +1458,7 @@ func (s *ArenaService) runArena(ctx context.Context, matchID string, participant
 func (s *ArenaService) GetBattle(ctx context.Context, matchID string, userID int64) (*BattleResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetBattle")
+		segment := txn.StartSegment("service:arena:get-battle")
 		defer segment.End()
 	}
 
@@ -1082,7 +1497,7 @@ func (s *ArenaService) GetBattle(ctx context.Context, matchID string, userID int
 func (s *ArenaService) GetLeaderboard(ctx context.Context, chatID int64, matchType string, limit, offset int) ([]*repository.LeaderboardEntry, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetLeaderboard")
+		segment := txn.StartSegment("service:arena:get-leaderboard")
 		defer segment.End()
 	}
 
@@ -1108,7 +1523,7 @@ type PendingMatch struct {
 func (s *ArenaService) GetPendingMatches(ctx context.Context) ([]*PendingMatch, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetPendingMatches")
+		segment := txn.StartSegment("service:arena:get-pending-matches")
 		defer segment.End()
 	}
 
@@ -1165,7 +1580,7 @@ type AutoStartResult struct {
 func (s *ArenaService) AutoStartMatch(ctx context.Context, matchID string) (*AutoStartResult, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:AutoStartMatch")
+		segment := txn.StartSegment("service:arena:auto-start-match")
 		defer segment.End()
 	}
 
@@ -1253,11 +1668,14 @@ type ForceSubmitResult struct {
 	BattleStarted bool    `json:"battle_started"`
 }
 
-// ForceSubmitTeams auto-assigns teams for participants who haven't submitted
+// ForceSubmitTeams auto-assigns teams for participants who haven't submitted.
+// Uses a greedy strategy: auto-buys the 3 highest-ATK cards available.
+// Called when shop phase deadline expires. Starts battle immediately after all teams are ready.
+// Returns list of user IDs that were force-submitted and whether battle was started.
 func (s *ArenaService) ForceSubmitTeams(ctx context.Context, matchID string) (*ForceSubmitResult, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:ForceSubmitTeams")
+		segment := txn.StartSegment("service:arena:force-submit-teams")
 		defer segment.End()
 	}
 
@@ -1307,6 +1725,12 @@ func (s *ArenaService) ForceSubmitTeams(ctx context.Context, matchID string) (*F
 
 // forceSubmitTeam auto-buys cards and submits team for a participant
 func (s *ArenaService) forceSubmitTeam(ctx context.Context, matchID string, p *repository.ParticipantWithUser) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:force-submit-team")
+		defer segment.End()
+	}
+
 	// Parse current shop state
 	var cards []*battle.ShopCard
 	if p.ShopCards != nil {
@@ -1437,7 +1861,7 @@ type TournamentStartResult struct {
 func (s *ArenaService) GetOrCreateTodayTournament(ctx context.Context, chatID int64, date string) (*TournamentResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetOrCreateTodayTournament")
+		segment := txn.StartSegment("service:arena:get-or-create-today-tournament")
 		defer segment.End()
 	}
 
@@ -1464,7 +1888,7 @@ func (s *ArenaService) GetOrCreateTodayTournament(ctx context.Context, chatID in
 func (s *ArenaService) GetTodayTournament(ctx context.Context, chatID int64, date string) (*TournamentResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetTodayTournament")
+		segment := txn.StartSegment("service:arena:get-today-tournament")
 		defer segment.End()
 	}
 
@@ -1494,7 +1918,7 @@ func (s *ArenaService) GetTodayTournament(ctx context.Context, chatID int64, dat
 func (s *ArenaService) GetTournamentByID(ctx context.Context, tournamentID int64) (*TournamentResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetTournamentByID")
+		segment := txn.StartSegment("service:arena:get-tournament-by-id")
 		defer segment.End()
 	}
 
@@ -1529,7 +1953,7 @@ func (s *ArenaService) SetTournamentAnnounced(ctx context.Context, tournamentID 
 func (s *ArenaService) JoinTournament(ctx context.Context, tournamentID int64, userID int64) (*TournamentResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:JoinTournament")
+		segment := txn.StartSegment("service:arena:join-tournament")
 		defer segment.End()
 	}
 
@@ -1572,7 +1996,7 @@ func (s *ArenaService) JoinTournament(ctx context.Context, tournamentID int64, u
 func (s *ArenaService) LeaveTournament(ctx context.Context, tournamentID int64, userID int64) (*TournamentResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:LeaveTournament")
+		segment := txn.StartSegment("service:arena:leave-tournament")
 		defer segment.End()
 	}
 
@@ -1622,7 +2046,7 @@ func (s *ArenaService) GetTournamentsNeedingClose(ctx context.Context, currentTi
 func (s *ArenaService) CloseAndStartTournament(ctx context.Context, tournamentID int64) (*TournamentStartResult, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:CloseAndStartTournament")
+		segment := txn.StartSegment("service:arena:close-and-start-tournament")
 		defer segment.End()
 	}
 
@@ -1713,6 +2137,9 @@ func (s *ArenaService) CloseAndStartTournament(ctx context.Context, tournamentID
 	tournament, _ = s.gameRepo.GetTournamentByID(ctx, tournamentID)
 	match, _ = s.gameRepo.GetMatch(ctx, match.ID)
 
+	// Record tournament start metric
+	recordTournamentEvent(s.nrApp, "started", tournamentID, tournament.ChatID, len(participants))
+
 	return &TournamentStartResult{
 		Tournament:       tournament,
 		Match:            match,
@@ -1724,6 +2151,12 @@ func (s *ArenaService) CloseAndStartTournament(ctx context.Context, tournamentID
 
 // dealCardsToAllParticipants deals shop cards to all match participants
 func (s *ArenaService) dealCardsToAllParticipants(ctx context.Context, matchID string, chatID int64) error {
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("service:arena:deal-cards-to-all-participants")
+		defer segment.End()
+	}
+
 	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
 	if err != nil {
 		return fmt.Errorf("failed to get participants: %w", err)
@@ -1770,7 +2203,7 @@ func (s *ArenaService) GetChatsWithTimezone(ctx context.Context) ([]*repository.
 func (s *ArenaService) GetMatchHistory(ctx context.Context, chatID, userID int64, limit, offset int) ([]*repository.MatchHistoryEntry, int, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetMatchHistory")
+		segment := txn.StartSegment("service:arena:get-matchHistory")
 		defer segment.End()
 	}
 
@@ -1781,7 +2214,7 @@ func (s *ArenaService) GetMatchHistory(ctx context.Context, chatID, userID int64
 func (s *ArenaService) GetH2HRecord(ctx context.Context, chatID, userID, opponentID int64) (*repository.H2HRecord, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetH2HRecord")
+		segment := txn.StartSegment("service:arena:get-h2h-record")
 		defer segment.End()
 	}
 
@@ -1792,7 +2225,7 @@ func (s *ArenaService) GetH2HRecord(ctx context.Context, chatID, userID, opponen
 func (s *ArenaService) GetRecentMatchesVsOpponent(ctx context.Context, chatID, userID, opponentID int64, limit int) ([]*repository.MatchHistoryEntry, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetRecentMatchesVsOpponent")
+		segment := txn.StartSegment("service:arena:get-recent-matches-vs-opponent")
 		defer segment.End()
 	}
 
@@ -1809,7 +2242,7 @@ type ArenaProfileResponse struct {
 func (s *ArenaService) GetProfile(ctx context.Context, chatID, userID int64) (*ArenaProfileResponse, error) {
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
-		segment := txn.StartSegment("service:arena:GetProfile")
+		segment := txn.StartSegment("service:arena:get-profile")
 		defer segment.End()
 	}
 

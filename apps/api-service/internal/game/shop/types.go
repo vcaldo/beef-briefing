@@ -9,12 +9,12 @@ import (
 // Economy constants
 const (
 	StartingCoins    = 10
-	CardCost         = 2
+	CardCost         = 3
 	RerollCost       = 1
-	UpgradeCost      = 2
-	ShopSize         = 6
+	UpgradeCost      = 1
+	ShopSize         = 4
 	TeamSize         = 3
-	ATKUpgradeAmount = 1
+	ATKUpgradeAmount = 3
 	HPUpgradeAmount  = 3
 )
 

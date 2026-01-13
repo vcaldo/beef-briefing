@@ -57,14 +57,15 @@ export function ShopPage({ match, userId: _userId, onBack, onBattleStart }: Shop
   useEffect(() => {
     fetchShop();
 
-    // Stop polling if team submitted or match moved out of shop phase
-    if (shopState?.team_submitted || shopState?.status === 'battle_phase' || shopState?.status === 'completed') {
+    // Stop polling only when match exits shop phase (transitions to battle/completed)
+    // Continue polling even after team submission to detect when battle starts
+    if (shopState?.status === 'battle_phase' || shopState?.status === 'completed') {
       return;
     }
 
     const interval = setInterval(fetchShop, 3000); // Poll every 3s
     return () => clearInterval(interval);
-  }, [fetchShop, shopState?.team_submitted, shopState?.status]);
+  }, [fetchShop, shopState?.status]);
 
   // Countdown timer
   useEffect(() => {

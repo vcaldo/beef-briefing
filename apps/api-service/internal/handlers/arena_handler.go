@@ -1140,10 +1140,7 @@ type BotJoinMatchRequest struct {
 // POST /api/v1/arena/match
 func (h *ArenaHandler) HandleBotCreateMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:bot-create-match")
-	}
+	setTransactionName(ctx, "api:arena:bot-create-match")
 
 	var req BotCreateMatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1156,24 +1153,14 @@ func (h *ArenaHandler) HandleBotCreateMatch(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	match, err := h.service.CreateMatch(ctx, req.ChatID, req.CreatorUserID)
+	match, err := h.createMatchInternal(ctx, req.ChatID, req.CreatorUserID)
 	if err != nil {
-		slog.Error("failed to create match", "error", err, "chat_id", req.ChatID)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		if err == services.ErrNotEnoughCards || err == services.ErrActiveMatchExists {
-			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		httputil.RespondError(w, "failed to create match", http.StatusInternalServerError)
+		handleServiceError(ctx, w, err, "create match")
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", match.ID)
-		txn.AddAttribute("chat_id", req.ChatID)
-	}
+	addTransactionAttribute(ctx, "match_id", match.ID)
+	addTransactionAttribute(ctx, "chat_id", req.ChatID)
 
 	httputil.RespondJSON(w, match, http.StatusCreated)
 }
@@ -1182,33 +1169,19 @@ func (h *ArenaHandler) HandleBotCreateMatch(w http.ResponseWriter, r *http.Reque
 // GET /api/v1/arena/match/{id}
 func (h *ArenaHandler) HandleBotGetMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:bot-get-match")
-	}
+	setTransactionName(ctx, "api:arena:bot-get-match")
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
-	if matchID == "" {
-		httputil.RespondError(w, "match id is required", http.StatusBadRequest)
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-	}
+	addTransactionAttribute(ctx, "match_id", matchID)
 
-	match, err := h.service.GetMatch(ctx, matchID)
+	match, err := h.getMatchInternal(ctx, matchID, nil)
 	if err != nil {
-		slog.Error("failed to get match", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		if err == services.ErrMatchNotFound {
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-			return
-		}
-		httputil.RespondError(w, "failed to get match", http.StatusInternalServerError)
+		handleServiceError(ctx, w, err, "get match")
 		return
 	}
 
@@ -1219,13 +1192,13 @@ func (h *ArenaHandler) HandleBotGetMatch(w http.ResponseWriter, r *http.Request)
 // POST /api/v1/arena/match/{id}/join
 func (h *ArenaHandler) HandleBotJoinMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:bot-join-match")
-	}
+	setTransactionName(ctx, "api:arena:bot-join-match")
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var req BotJoinMatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1238,27 +1211,12 @@ func (h *ArenaHandler) HandleBotJoinMatch(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", req.UserID)
-	}
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", req.UserID)
 
-	match, err := h.service.JoinMatch(ctx, matchID, req.UserID)
+	match, err := h.joinMatchInternal(ctx, matchID, req.UserID)
 	if err != nil {
-		slog.Error("failed to join match", "error", err, "user_id", req.UserID)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrMatchNotOpen:
-			httputil.RespondError(w, "match is not open for joining", http.StatusBadRequest)
-		case services.ErrAlreadyJoined:
-			httputil.RespondError(w, "already joined this match", http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, "failed to join match", http.StatusInternalServerError)
-		}
+		handleServiceError(ctx, w, err, "join match")
 		return
 	}
 
@@ -1269,13 +1227,13 @@ func (h *ArenaHandler) HandleBotJoinMatch(w http.ResponseWriter, r *http.Request
 // POST /api/v1/arena/match/{id}/leave
 func (h *ArenaHandler) HandleBotLeaveMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:bot-leave-match")
-	}
+	setTransactionName(ctx, "api:arena:bot-leave-match")
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var req BotJoinMatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1288,25 +1246,12 @@ func (h *ArenaHandler) HandleBotLeaveMatch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", req.UserID)
-	}
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", req.UserID)
 
-	err := h.service.LeaveMatch(ctx, matchID, req.UserID)
+	err = h.leaveMatchInternal(ctx, matchID, req.UserID)
 	if err != nil {
-		slog.Error("failed to leave match", "error", err, "user_id", req.UserID)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrMatchNotOpen:
-			httputil.RespondError(w, "cannot leave after match has started", http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, "failed to leave match", http.StatusInternalServerError)
-		}
+		handleServiceError(ctx, w, err, "leave match")
 		return
 	}
 
@@ -1317,13 +1262,13 @@ func (h *ArenaHandler) HandleBotLeaveMatch(w http.ResponseWriter, r *http.Reques
 // POST /api/v1/arena/match/{id}/start
 func (h *ArenaHandler) HandleBotStartMatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		txn.SetName("api:arena:bot-start-match")
-	}
+	setTransactionName(ctx, "api:arena:bot-start-match")
 
-	vars := mux.Vars(r)
-	matchID := vars["id"]
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var req BotJoinMatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1336,27 +1281,12 @@ func (h *ArenaHandler) HandleBotStartMatch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if txn != nil {
-		txn.AddAttribute("match_id", matchID)
-		txn.AddAttribute("user_id", req.UserID)
-	}
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", req.UserID)
 
-	match, err := h.service.StartMatch(ctx, matchID, req.UserID)
+	match, err := h.startMatchInternal(ctx, matchID, req.UserID)
 	if err != nil {
-		slog.Error("failed to start match", "error", err, "user_id", req.UserID)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		switch err {
-		case services.ErrMatchNotFound:
-			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrNotCreator:
-			httputil.RespondError(w, "only the match creator can start the match", http.StatusForbidden)
-		case services.ErrMatchNotOpen:
-			httputil.RespondError(w, "match has already started", http.StatusBadRequest)
-		default:
-			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
-		}
+		handleServiceError(ctx, w, err, "start match")
 		return
 	}
 

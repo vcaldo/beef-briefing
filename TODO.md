@@ -25,8 +25,8 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 
 ### Phase 2: Lobby Screen (Day 3-4)
 
-- [ ] Implement LobbyPage with match polling and auto-navigation
-- [ ] Implement MatchList, MatchCard, CreateMatchButton, ParticipantsList components
+- [x] Implement LobbyPage with match polling and auto-navigation
+- [x] Implement MatchList, MatchCard, CreateMatchButton, ParticipantsList components
 - [ ] Test match creation, joining, and leaving flows
 - [ ] Test countdown timer and auto-start mechanics
 - [ ] Test polling and phase transition to shop when match starts
@@ -92,6 +92,8 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 - [x] Implement API client (`src/api/client.ts`) with 18+ Arena endpoints
 - [x] Define all TypeScript types (`src/types/index.ts`)
 - [x] Create global styles (`src/styles/global.css`) with Tailwind + custom CSS
+- [x] Implement LobbyPage with match polling and auto-navigation
+- [x] Implement MatchList, MatchCard, CreateMatchButton, ParticipantsList components
 
 ---
 

@@ -240,3 +240,73 @@ Next steps:
 - Implement LobbyPage with match polling and auto-navigation
 - Implement MatchList, MatchCard, CreateMatchButton, ParticipantsList components
 
+
+================================================================================
+2026-01-14 - Implement LobbyPage with match polling and auto-navigation
+================================================================================
+
+Task: Implement LobbyPage component and lobby sub-components for Arena Mini-App
+
+What was accomplished:
+- Implemented 5 lobby components in src/components/lobby/:
+
+  1. LobbyPage.tsx (~220 lines):
+     - Match polling every 2.5 seconds using setInterval
+     - Auto-navigation when match phase transitions (open → shop_phase → battle_phase)
+     - Match creation, joining, leaving, and starting handlers
+     - Error handling with dismissable error banner
+     - Sorts matches by status (open first, then active, then by date)
+
+  2. MatchList.tsx:
+     - Renders list of MatchCard components
+     - Empty state with encouraging message when no matches exist
+
+  3. MatchCard.tsx (~130 lines):
+     - Match info display with ranked/casual badge
+     - Countdown timer for join deadline
+     - Participant avatars in overlapping layout
+     - Action buttons: Join, Leave, Start Now, Go to Shop, Watch Battle, View Results
+     - Active state highlighting for ongoing matches
+
+  4. CreateMatchButton.tsx:
+     - Full-width primary button with loading spinner
+     - Emoji prefix for visual appeal
+
+  5. ParticipantsList.tsx (~100 lines):
+     - Full participant list for expanded match view
+     - User tags for "You" and "Host"
+     - Status icons and formatted status text
+
+- Updated App.tsx to integrate LobbyPage:
+  - Added renderPageContent() switch for tab-based rendering
+  - Pass currentUserId, onTabChange, and onMatchEnter callbacks
+  - Added handleMatchEnter callback for match ID tracking
+
+- Added CSS styles to global.css (~160 lines):
+  - .lobby-page, .lobby-actions, .create-match-btn styles
+  - .match-card-countdown styles
+  - .error-banner styles
+  - .participants-list, .participant-item styles
+  - .participant-avatar-lg, .participant-tag styles
+
+- Updated components/index.ts with lobby component exports
+- TypeScript compiles successfully (npx tsc --noEmit passes)
+- Docker build succeeds with bundle size: JS 66.24KB gzip, CSS 6.41KB gzip
+
+Files created:
+- apps/arena-mini-app/src/components/lobby/LobbyPage.tsx
+- apps/arena-mini-app/src/components/lobby/MatchList.tsx
+- apps/arena-mini-app/src/components/lobby/MatchCard.tsx
+- apps/arena-mini-app/src/components/lobby/CreateMatchButton.tsx
+- apps/arena-mini-app/src/components/lobby/ParticipantsList.tsx
+
+Files modified:
+- apps/arena-mini-app/src/App.tsx (integrated LobbyPage with tab switching)
+- apps/arena-mini-app/src/components/index.ts (added lobby exports)
+- apps/arena-mini-app/src/styles/global.css (added lobby styles)
+
+Next steps:
+- Test match creation, joining, and leaving flows
+- Test countdown timer and auto-start mechanics
+- Test polling and phase transition to shop when match starts
+

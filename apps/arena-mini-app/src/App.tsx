@@ -21,7 +21,8 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<GamePhase>('lobby')
   const [authData, setAuthData] = useState<AuthResponse | null>(null)
-  const [activeMatchId, setActiveMatchId] = useState<string | null>(null)
+  // Track active match ID for shop/battle navigation
+  const [_activeMatchId, setActiveMatchId] = useState<string | null>(null)
 
   const launchParams = useLaunchParams()
 
@@ -80,6 +81,57 @@ function App() {
 
   const currentPage = PAGE_HEADERS[activeTab]
 
+  // Handle match enter (from LobbyPage auto-navigation)
+  const handleMatchEnter = useCallback((matchId: string, _phase: 'shop' | 'battle') => {
+    setActiveMatchId(matchId)
+  }, [])
+
+  // Render page content based on active tab
+  const renderPageContent = () => {
+    switch (activeTab) {
+      case 'lobby':
+        return (
+          <LobbyPage
+            currentUserId={authData?.user_id}
+            onTabChange={setActiveTab}
+            onMatchEnter={handleMatchEnter}
+          />
+        )
+      case 'shop':
+        return (
+          <div className="empty-state">
+            <div className="empty-state-icon">🛒</div>
+            <h3 className="empty-state-title">Shop Coming Soon</h3>
+            <p className="empty-state-text">
+              Build your team by purchasing and upgrading cards.
+            </p>
+          </div>
+        )
+      case 'battle':
+        return (
+          <div className="empty-state">
+            <div className="empty-state-icon">⚔️</div>
+            <h3 className="empty-state-title">Battle Coming Soon</h3>
+            <p className="empty-state-text">
+              Watch your cards battle against your opponent.
+            </p>
+          </div>
+        )
+      case 'stats':
+        return (
+          <div className="empty-state">
+            <div className="empty-state-icon">📊</div>
+            <h3 className="empty-state-title">Stats Coming Soon</h3>
+            <p className="empty-state-text">
+              View leaderboards, your profile, and match history.
+            </p>
+          </div>
+        )
+      default:
+        return null
+    }
+  }
+
   // Main app with tab navigation
   return (
     <div className="app">
@@ -89,14 +141,7 @@ function App() {
           <p className="app-header-subtitle">{currentPage.subtitle}</p>
         </div>
 
-        {/* Page content will be rendered here by page components */}
-        <div className="empty-state">
-          <div className="empty-state-icon">🏗️</div>
-          <h3 className="empty-state-title">{currentPage.title} Coming Soon</h3>
-          <p className="empty-state-text">
-            This screen will be implemented in the next phase.
-          </p>
-        </div>
+        {renderPageContent()}
       </div>
 
       <TabBar activeTab={activeTab} onTabChange={setActiveTab} />

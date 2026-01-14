@@ -150,6 +150,50 @@ prod-update-ip: ## Update IP allowlist for api-service and card-renderer
 	scp $(PROD_ENV_FILE) $$($(MAKE) -s tf-ssh-user-host):~/beef-briefing/.env; \
 	ssh $$($(MAKE) -s tf-ssh-user-host) 'cd ~/beef-briefing && docker compose up -d --force-recreate --no-deps api-service card-renderer'
 
+# =============================================================================
+# LAYER CACHE (layer-cache-*)
+# =============================================================================
+layer-cache-clean: ## Clean local OCI layer cache
+	@rm -rf /tmp/beef-briefing-oci-cache
+	@echo "Local layer cache cleaned"
+
+layer-cache-clean-remote: ## Clean remote OCI layer cache
+	@ssh $$($(MAKE) -s tf-ssh-user-host) 'rm -rf ~/beef-briefing/.oci-cache'
+	@echo "Remote layer cache cleaned"
+
+layer-cache-stats: ## Show layer cache statistics (local and remote)
+	@echo "Layer Cache Statistics"
+	@echo "======================"
+	@echo ""
+	@echo "Local cache (/tmp/beef-briefing-oci-cache):"
+	@if [ -d /tmp/beef-briefing-oci-cache ]; then \
+		ls -1 /tmp/beef-briefing-oci-cache 2>/dev/null | while read dir; do \
+			size=$$(du -sh "/tmp/beef-briefing-oci-cache/$$dir" 2>/dev/null | cut -f1); \
+			blobs=0; \
+			if [ -d "/tmp/beef-briefing-oci-cache/$$dir/blobs/sha256" ]; then \
+				blobs=$$(ls -1 "/tmp/beef-briefing-oci-cache/$$dir/blobs/sha256" 2>/dev/null | wc -l); \
+			fi; \
+			echo "  $$dir: $$size ($$blobs blobs)"; \
+		done; \
+	else \
+		echo "  (no cache)"; \
+	fi
+	@echo ""
+	@echo "Remote cache (~/beef-briefing/.oci-cache):"
+	@ssh $$($(MAKE) -s tf-ssh-user-host) '\
+		if [ -d ~/beef-briefing/.oci-cache ]; then \
+			ls -1 ~/beef-briefing/.oci-cache 2>/dev/null | while read dir; do \
+				size=$$(du -sh "$$HOME/beef-briefing/.oci-cache/$$dir" 2>/dev/null | cut -f1); \
+				blobs=0; \
+				if [ -d "$$HOME/beef-briefing/.oci-cache/$$dir/blobs/sha256" ]; then \
+					blobs=$$(ls -1 "$$HOME/beef-briefing/.oci-cache/$$dir/blobs/sha256" 2>/dev/null | wc -l); \
+				fi; \
+				echo "  $$dir: $$size ($$blobs blobs)"; \
+			done; \
+		else \
+			echo "  (no cache)"; \
+		fi' 2>/dev/null || echo "  (unable to connect)"
+
 pg-tunnel: ## Open SSH tunnel to production PostgreSQL (localhost:5433 -> prod postgres)
 	@echo "Opening SSH tunnel to production PostgreSQL..."
 	@echo "Connect locally using: psql -h localhost -p 5433 -U postgres -d beef_briefing"
@@ -715,7 +759,9 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	up build deploy \
 	dev-up dev-up-build dev-up-logs dev-down dev-restart dev-ps dev-clean dev-prune \
 	prod-deploy prod-deploy-skip-build prod-deploy-skip-cleanup prod-deploy-regenerate-certs \
-	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik prod-update-ip pg-tunnel pg-dev pg-prod \
+	prod-rollback prod-rollback-force prod-backup-db prod-clean-certs prod-logs-traefik prod-update-ip \
+	layer-cache-clean layer-cache-clean-remote layer-cache-stats \
+	pg-tunnel pg-dev pg-prod \
 	docker-build docker-build-api docker-build-bot \
 	docker-logs docker-logs-api docker-logs-bot docker-logs-postgres docker-logs-minio \
 	docker-logs-newrelic \

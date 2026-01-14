@@ -155,23 +155,15 @@ else
 fi
 
 # =============================================================================
-# SAVE AND TRANSFER IMAGES
+# LAYER-AWARE IMAGE TRANSFER
 # =============================================================================
-log_step "Saving images to tarball..."
-IMAGE_TARBALL="/tmp/images-${COMMIT_HASH}.tar.gz"
+# Source layer transfer functions
+source "$SCRIPT_DIR/layer-transfer.sh"
 
-# Build image list with tags from IMAGES array
-IMAGE_ARGS=""
-for image in "${IMAGES[@]}"; do
-    IMAGE_ARGS="$IMAGE_ARGS $image:$COMMIT_HASH"
-done
+# Transfer images using OCI directory format (only changed layers)
+transfer_images "$COMMIT_HASH" "$SSH_HOST"
 
-docker save $IMAGE_ARGS | gzip > "$IMAGE_TARBALL"
-
-TARBALL_SIZE=$(du -h "$IMAGE_TARBALL" | cut -f1)
-log_success "Image archive created: $TARBALL_SIZE"
-
-log_step "Transferring files to server..."
+log_step "Transferring config files to server..."
 
 # Transfer compose file
 log_info "Transferring docker-compose.yml..."
@@ -191,11 +183,7 @@ if [[ "$HAS_LETSENCRYPT" == "true" ]]; then
     remote_copy "$LETSENCRYPT_DIR" "$SSH_HOST" "/tmp/"
 fi
 
-# Transfer image tarball
-log_info "Transferring images ($TARBALL_SIZE)..."
-remote_copy "$IMAGE_TARBALL" "$SSH_HOST" "/tmp/"
-
-log_success "All files transferred"
+log_success "All config files transferred"
 
 # =============================================================================
 # DEPLOY ON SERVER
@@ -231,10 +219,7 @@ remote_exec "$SSH_HOST" "
         echo 'Created acme.json for Let'\''s Encrypt'
     fi
 
-    # Load Docker images WHILE containers are still running (minimizes downtime)
-    echo 'Loading Docker images...'
-    gunzip -c /tmp/images-${COMMIT_HASH}.tar.gz | docker load
-
+    # Images already loaded by layer-aware transfer (transfer_images function)
     # NOW stop containers (just before replacing secrets - minimizes downtime)
     echo 'Stopping containers for secrets update...'
     cd ~/beef-briefing && docker compose down 2>/dev/null || true
@@ -249,50 +234,47 @@ remote_exec "$SSH_HOST" "
     echo 'Starting services...'
     cd ~/beef-briefing && docker compose up -d --no-build
 
-    # Cleanup tarball
-    rm /tmp/images-${COMMIT_HASH}.tar.gz
-
     echo 'Deployment complete!'
 "
 
 log_success "Services deployed with tag: $COMMIT_HASH"
 
 # =============================================================================
-# CLEANUP OLD IMAGES
+# CLEANUP OLD IMAGES AND LAYER CACHE
 # =============================================================================
-if [[ "$SKIP_CLEANUP" == "false" && -n "$PREVIOUS_TAG" ]]; then
-    log_step "Cleaning up old images on server..."
+if [[ "$SKIP_CLEANUP" == "false" ]]; then
+    log_step "Cleaning up old images and layer cache..."
 
-    remote_exec "$SSH_HOST" "
-        # Get all tags for beef-briefing images
-        CURRENT_TAG='$COMMIT_HASH'
-        PREVIOUS_TAG='$PREVIOUS_TAG'
+    # Cleanup Docker images (keep current and previous)
+    if [[ -n "$PREVIOUS_TAG" ]]; then
+        remote_exec "$SSH_HOST" "
+            # Get all tags for beef-briefing images
+            CURRENT_TAG='$COMMIT_HASH'
+            PREVIOUS_TAG='$PREVIOUS_TAG'
 
-        # Find and remove old images (keep only current and previous)
-        for repo in beef-briefing/api-service beef-briefing/telegram-bot beef-briefing/card-renderer; do
-            docker images \"\$repo\" --format '{{.Tag}}' | while read tag; do
-                if [[ \"\$tag\" != \"\$CURRENT_TAG\" && \"\$tag\" != \"\$PREVIOUS_TAG\" && \"\$tag\" != '<none>' ]]; then
-                    echo \"Removing \$repo:\$tag\"
-                    docker rmi \"\$repo:\$tag\" 2>/dev/null || true
-                fi
+            # Find and remove old images (keep only current and previous)
+            for repo in beef-briefing/api-service beef-briefing/telegram-bot beef-briefing/card-renderer; do
+                docker images \"\$repo\" --format '{{.Tag}}' | while read tag; do
+                    if [[ \"\$tag\" != \"\$CURRENT_TAG\" && \"\$tag\" != \"\$PREVIOUS_TAG\" && \"\$tag\" != '<none>' ]]; then
+                        echo \"Removing \$repo:\$tag\"
+                        docker rmi \"\$repo:\$tag\" 2>/dev/null || true
+                    fi
+                done
             done
-        done
 
-        # Prune dangling images
-        docker image prune -f
-    " || log_warn "Image cleanup had some warnings (non-fatal)"
+            # Prune dangling images
+            docker image prune -f
+        " || log_warn "Image cleanup had some warnings (non-fatal)"
+    fi
 
-    log_success "Old images cleaned up"
+    # Cleanup OCI layer cache (keep last 2 versions)
+    cleanup_local_cache 2
+    cleanup_remote_cache "$SSH_HOST" 2
+
+    log_success "Cleanup complete"
 else
-    log_warn "Skipping cleanup (--skip-cleanup or no previous tag)"
+    log_warn "Skipping cleanup (--skip-cleanup)"
 fi
-
-# =============================================================================
-# CLEANUP LOCAL TARBALL
-# =============================================================================
-log_info "Cleaning up local tarball..."
-rm -f "$IMAGE_TARBALL"
-log_success "Local cleanup complete"
 
 # =============================================================================
 # SUMMARY

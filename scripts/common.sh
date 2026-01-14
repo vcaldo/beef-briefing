@@ -17,6 +17,10 @@ SECRETS_DIR="$PROJECT_ROOT/infrastructure/secrets/apps"
 REMOTE_APP_DIR="~/beef-briefing"
 REMOTE_PREVIOUS_TAG_FILE="$REMOTE_APP_DIR/.previous_tag"
 
+# Layer cache directories (for OCI-format image transfer)
+LAYER_CACHE_DIR="/tmp/beef-briefing-oci-cache"
+REMOTE_LAYER_CACHE_DIR="$REMOTE_APP_DIR/.oci-cache"
+
 # Images to manage
 IMAGES=(
     "beef-briefing/api-service"

@@ -1,12 +1,22 @@
+/* Tailwind CSS Directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Import shared styles */
 @import '@beef-briefing/shared-mini-app/styles';
 
+/* Google Fonts - Outfit (display) and JetBrains Mono (stats) */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
+
 /* =====================================================
-   Arena Mini App Global Styles
+   Arena Mini App - Global Styles
+   A playful card-game aesthetic inspired by Hearthstone/Clash Royale
    ===================================================== */
 
-/* Telegram theme CSS variables */
+/* CSS Variables - Telegram Theme + Arena Colors */
 :root {
+  /* Telegram theme (overridden at runtime by SDK) */
   --tg-theme-bg-color: #ffffff;
   --tg-theme-text-color: #000000;
   --tg-theme-hint-color: #999999;
@@ -15,15 +25,32 @@
   --tg-theme-button-text-color: #ffffff;
   --tg-theme-secondary-bg-color: #f0f0f0;
 
-  /* Arena-specific colors */
-  --arena-gold: #ffd700;
-  --arena-silver: #c0c0c0;
-  --arena-bronze: #cd7f32;
-  --arena-hp-high: #22c55e;
-  --arena-hp-medium: #eab308;
-  --arena-hp-low: #ef4444;
+  /* Arena game colors */
+  --arena-dark: #1a1625;
+  --arena-purple: #7c3aed;
+  --arena-pink: #ec4899;
+  --arena-cyan: #06b6d4;
+  --arena-orange: #f97316;
+  --arena-gold: #eab308;
+
+  /* HP bar colors */
+  --hp-high: #22c55e;
+  --hp-medium: #eab308;
+  --hp-low: #ef4444;
+
+  /* Medal colors */
+  --medal-gold: #ffd700;
+  --medal-silver: #c0c0c0;
+  --medal-bronze: #cd7f32;
+
+  /* Spacing */
+  --tab-bar-height: 64px;
+  --header-height: 56px;
 }
 
+/* =====================================================
+   Base Styles
+   ===================================================== */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -32,43 +59,58 @@
 
 html,
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--tg-theme-bg-color);
   color: var(--tg-theme-text-color);
   min-height: 100vh;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 .app {
   min-height: 100vh;
-  padding: 0 0 20px 0;
+  padding-bottom: calc(var(--tab-bar-height) + 16px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* =====================================================
+   Typography
+   ===================================================== */
+.font-display {
+  font-family: 'Outfit', system-ui, sans-serif;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
 }
 
 /* =====================================================
    Header
    ===================================================== */
 .app-header {
-  padding: 16px;
-  text-align: center;
   position: sticky;
   top: 0;
+  z-index: 40;
+  padding: 12px 16px;
   background: var(--tg-theme-bg-color);
-  z-index: 10;
+  border-bottom: 1px solid var(--tg-theme-secondary-bg-color);
 }
 
 .app-header h1 {
+  font-family: 'Outfit', sans-serif;
   font-size: 20px;
-  font-weight: 600;
+  font-weight: 700;
+  text-align: center;
   margin: 0;
 }
 
 .app-header-subtitle {
   font-size: 12px;
   color: var(--tg-theme-hint-color);
-  font-weight: 400;
-  margin: 2px 0 0 0;
+  text-align: center;
+  margin-top: 2px;
 }
 
 /* =====================================================
@@ -79,11 +121,12 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
+  z-index: 100;
   display: flex;
   background: var(--tg-theme-bg-color);
   border-top: 1px solid var(--tg-theme-secondary-bg-color);
   padding: 8px 0 max(8px, env(safe-area-inset-bottom));
-  z-index: 100;
+  height: var(--tab-bar-height);
 }
 
 .tab-item {
@@ -97,7 +140,11 @@ body {
   border: none;
   cursor: pointer;
   color: var(--tg-theme-hint-color);
-  transition: color 0.2s ease;
+  transition: color 0.2s ease, transform 0.1s ease;
+}
+
+.tab-item:active {
+  transform: scale(0.95);
 }
 
 .tab-item.active {
@@ -119,12 +166,15 @@ body {
 
 .tab-label {
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* Page container with bottom padding for tab bar */
 .page-container {
-  padding-bottom: 80px;
+  padding: 16px;
+  padding-bottom: calc(var(--tab-bar-height) + 24px);
 }
 
 /* =====================================================
@@ -136,41 +186,73 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  gap: 8px;
+  gap: 16px;
+  background: linear-gradient(135deg, var(--arena-dark) 0%, #2d1f47 100%);
 }
 
 .splash-emoji {
   font-size: 80px;
-  animation: pulse 1.5s ease-in-out infinite;
-  margin-bottom: 16px;
+  animation: bounce-glow 2s ease-in-out infinite;
+}
+
+@keyframes bounce-glow {
+  0%, 100% {
+    transform: scale(1) translateY(0);
+    filter: drop-shadow(0 0 10px var(--arena-purple));
+  }
+  50% {
+    transform: scale(1.1) translateY(-8px);
+    filter: drop-shadow(0 0 20px var(--arena-purple));
+  }
 }
 
 .splash-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--tg-theme-text-color);
+  font-family: 'Outfit', sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(124, 58, 237, 0.5);
   margin: 0;
 }
 
 .splash-subtitle {
-  font-size: 18px;
-  color: var(--tg-theme-hint-color);
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.7);
   margin: 0;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.85;
-  }
+/* =====================================================
+   Loading States
+   ===================================================== */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  gap: 16px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--tg-theme-secondary-bg-color);
+  border-top-color: var(--arena-purple);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  color: var(--tg-theme-hint-color);
+  font-size: 14px;
 }
 
 /* =====================================================
-   Error State
+   Error States
    ===================================================== */
 .error-container {
   display: flex;
@@ -186,17 +268,23 @@ body {
 }
 
 .error-icon {
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  background: var(--tg-theme-secondary-bg-color);
-  color: var(--tg-theme-hint-color);
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--hp-low);
   font-size: 32px;
-  font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 16px;
+}
+
+.error-content h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
 }
 
 .error-content p {
@@ -206,132 +294,616 @@ body {
 }
 
 /* =====================================================
-   Loading State
+   Buttons
    ===================================================== */
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+.btn {
+  display: inline-flex;
   align-items: center;
-  min-height: 300px;
-  gap: 16px;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--tg-theme-secondary-bg-color);
-  border-top-color: var(--tg-theme-button-color);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.loading-container p {
-  color: var(--tg-theme-hint-color);
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  border: none;
+  font-family: 'Outfit', sans-serif;
   font-size: 14px;
-}
-
-/* =====================================================
-   Section Styles
-   ===================================================== */
-.section-title {
-  font-size: 16px;
   font-weight: 600;
-  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--arena-purple) 0%, var(--arena-pink) 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--arena-purple);
+  border: 2px solid var(--arena-purple);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.btn-action {
+  background: var(--arena-orange);
+  color: #ffffff;
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3);
+}
+
+.btn-action:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.btn-lg {
+  padding: 16px 32px;
+  font-size: 16px;
+  border-radius: 16px;
 }
 
 /* =====================================================
-   Card Styles (placeholder - will be expanded)
+   Cards - Base Container
    ===================================================== */
 .card-container {
   background: var(--tg-theme-secondary-bg-color);
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
 /* =====================================================
-   HP Bar (for battle phase)
+   Match Cards (Lobby)
+   ===================================================== */
+.match-card {
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.match-card:hover {
+  border-color: var(--arena-purple);
+}
+
+.match-card.active {
+  border-color: var(--arena-orange);
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(234, 179, 8, 0.1) 100%);
+}
+
+.match-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.match-card-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.match-card-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.match-card-badge.ranked {
+  background: linear-gradient(135deg, var(--medal-gold) 0%, #ffc107 100%);
+  color: #1a1625;
+}
+
+.match-card-badge.casual {
+  background: var(--tg-theme-hint-color);
+  color: #ffffff;
+}
+
+.match-card-participants {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.participant-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--arena-purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  border: 2px solid var(--tg-theme-bg-color);
+  margin-left: -8px;
+}
+
+.participant-avatar:first-child {
+  margin-left: 0;
+}
+
+.participant-count {
+  font-size: 14px;
+  color: var(--tg-theme-hint-color);
+}
+
+.match-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* =====================================================
+   Shop Cards
+   ===================================================== */
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.shop-card {
+  position: relative;
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.shop-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+.shop-card.affordable {
+  border-color: var(--hp-high);
+}
+
+.shop-card.not-affordable {
+  opacity: 0.6;
+  border-color: var(--hp-low);
+}
+
+.shop-card.purchased {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.shop-card-image {
+  aspect-ratio: 2/3;
+  width: 100%;
+  object-fit: cover;
+}
+
+.shop-card-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.shop-card-name {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+
+.shop-card-price {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--arena-gold);
+}
+
+/* =====================================================
+   Team Display (Shop Phase)
+   ===================================================== */
+.team-display {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 16px;
+  margin-bottom: 16px;
+}
+
+.team-slot {
+  position: relative;
+  width: 80px;
+  height: 120px;
+  border-radius: 8px;
+  border: 2px dashed var(--tg-theme-hint-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.team-slot.filled {
+  border-style: solid;
+  border-color: var(--arena-purple);
+  background: var(--tg-theme-bg-color);
+}
+
+.team-slot.selected {
+  border-color: var(--arena-orange);
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.4);
+}
+
+.team-slot-number {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--arena-purple);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.team-slot-placeholder {
+  font-size: 24px;
+  color: var(--tg-theme-hint-color);
+}
+
+/* =====================================================
+   Compact Card (Team/Battle Display)
+   ===================================================== */
+.compact-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.compact-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  transition: filter 0.3s ease;
+}
+
+.compact-card.dead .compact-card-image {
+  filter: grayscale(100%);
+  opacity: 0.5;
+}
+
+/* Stat overlays - positioned absolutely on compact cards */
+.compact-card-stat {
+  position: absolute;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  text-align: center;
+  pointer-events: none;
+}
+
+.compact-card-stat.atk {
+  color: #ff6b6b;
+}
+
+.compact-card-stat.def {
+  color: #4dabf7;
+}
+
+.compact-card-stat.hp {
+  color: #69db7c;
+}
+
+.compact-card-stat.upgraded {
+  animation: stat-upgrade 0.5s ease-out;
+}
+
+@keyframes stat-upgrade {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); color: var(--arena-gold); }
+  100% { transform: scale(1); }
+}
+
+/* =====================================================
+   HP Bar
    ===================================================== */
 .hp-bar {
-  height: 8px;
-  background: var(--tg-theme-secondary-bg-color);
-  border-radius: 4px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 0 0 6px 6px;
   overflow: hidden;
 }
 
 .hp-bar-fill {
   height: 100%;
-  transition: width 0.5s ease, background-color 0.3s ease;
+  transition: width 0.5s ease-out, background-color 0.3s ease;
+  border-radius: 0 0 0 6px;
 }
 
 .hp-bar-fill.hp-high {
-  background: var(--arena-hp-high);
+  background: linear-gradient(90deg, var(--hp-high) 0%, #4ade80 100%);
 }
 
 .hp-bar-fill.hp-medium {
-  background: var(--arena-hp-medium);
+  background: linear-gradient(90deg, var(--hp-medium) 0%, #facc15 100%);
 }
 
 .hp-bar-fill.hp-low {
-  background: var(--arena-hp-low);
+  background: linear-gradient(90deg, var(--hp-low) 0%, #f87171 100%);
+  animation: hp-low-pulse 1s ease-in-out infinite;
+}
+
+@keyframes hp-low-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 /* =====================================================
-   Button Styles
+   Battle Arena
    ===================================================== */
-.btn {
-  padding: 12px 24px;
-  border-radius: 20px;
-  border: none;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.battle-arena {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 16px;
 }
 
-.btn-primary {
-  background: var(--tg-theme-button-color);
-  color: var(--tg-theme-button-text-color);
+.battle-team {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }
 
-.btn-primary:hover {
-  opacity: 0.9;
+.battle-team.opponent {
+  transform: rotate(180deg);
 }
 
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.battle-team.opponent .battle-card {
+  transform: rotate(180deg);
 }
 
-.btn-secondary {
-  background: transparent;
-  color: var(--tg-theme-button-color);
-  border: 1.5px solid var(--tg-theme-button-color);
+.battle-card {
+  position: relative;
+  width: 80px;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.3s ease;
 }
 
-.btn-secondary:hover {
-  background: var(--tg-theme-button-color);
-  color: var(--tg-theme-button-text-color);
+.battle-card[data-is-attacking="true"] {
+  animation: attack-pulse 0.5s ease;
+  box-shadow: 0 0 20px var(--arena-orange);
+}
+
+.battle-card[data-is-defending="true"] {
+  box-shadow: 0 0 20px var(--arena-cyan);
+}
+
+.battle-card[data-is-alive="false"] {
+  filter: grayscale(100%);
+  opacity: 0.4;
+  transform: scale(0.9);
+}
+
+@keyframes attack-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1) translateY(-4px); }
+}
+
+.battle-vs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.battle-vs-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--arena-orange) 0%, var(--arena-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+}
+
+/* =====================================================
+   Event Log (Battle)
+   ===================================================== */
+.event-log {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 12px;
+}
+
+.event-message {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  animation: event-appear 0.3s ease-out;
+}
+
+@keyframes event-appear {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.event-message.attack {
+  background: rgba(249, 115, 22, 0.1);
+  border-left: 3px solid var(--arena-orange);
+}
+
+.event-message.death {
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 3px solid var(--hp-low);
+}
+
+.event-message.victory {
+  background: rgba(34, 197, 94, 0.1);
+  border-left: 3px solid var(--hp-high);
+}
+
+/* =====================================================
+   Victory Screen
+   ===================================================== */
+.victory-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(26, 22, 37, 0.95);
+  animation: victory-appear 0.5s ease-out;
+}
+
+@keyframes victory-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.victory-emoji {
+  font-size: 80px;
+  animation: victory-bounce 0.8s ease-out;
+}
+
+@keyframes victory-bounce {
+  0% { transform: scale(0) rotate(-20deg); }
+  60% { transform: scale(1.2) rotate(10deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+.victory-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 36px;
+  font-weight: 800;
+  margin-top: 16px;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--medal-gold) 0%, #ffc107 50%, var(--medal-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  animation: victory-glow 2s ease-in-out infinite;
+}
+
+@keyframes victory-glow {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.5)); }
+  50% { filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.8)); }
+}
+
+.victory-subtitle {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 8px;
 }
 
 /* =====================================================
    Coin Display
    ===================================================== */
 .coin-display {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-weight: 600;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 18px;
 }
 
 .coin-icon {
-  font-size: 16px;
+  font-size: 20px;
+  animation: coin-shine 3s ease-in-out infinite;
+}
+
+@keyframes coin-shine {
+  0%, 100% { filter: drop-shadow(0 0 2px var(--arena-gold)); }
+  50% { filter: drop-shadow(0 0 8px var(--arena-gold)); }
+}
+
+.coin-value {
+  color: var(--arena-gold);
+}
+
+.coin-display.affordable {
+  color: var(--hp-high);
+}
+
+.coin-display.not-affordable {
+  color: var(--hp-low);
 }
 
 /* =====================================================
@@ -341,12 +913,471 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: var(--tg-theme-secondary-bg-color);
+}
+
+.countdown-timer.relaxed {
+  color: var(--hp-high);
+}
+
+.countdown-timer.warning {
+  color: var(--hp-medium);
+  animation: timer-pulse 1s ease-in-out infinite;
+}
+
+.countdown-timer.urgent {
+  color: var(--hp-low);
+  animation: timer-urgent 0.5s ease-in-out infinite;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+@keyframes timer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes timer-urgent {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* =====================================================
+   Upgrade Buttons
+   ===================================================== */
+.upgrade-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.upgrade-btn {
+  display: flex;
+  align-items: center;
   gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.upgrade-btn:active {
+  transform: scale(0.95);
+}
+
+.upgrade-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.upgrade-btn.atk {
+  background: rgba(255, 107, 107, 0.2);
+  color: #ff6b6b;
+  border: 1px solid #ff6b6b;
+}
+
+.upgrade-btn.hp {
+  background: rgba(105, 219, 124, 0.2);
+  color: #69db7c;
+  border: 1px solid #69db7c;
+}
+
+.upgrade-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.upgrade-preview {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+/* =====================================================
+   Leaderboard
+   ===================================================== */
+.leaderboard-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.leaderboard-entry:hover {
+  transform: translateX(4px);
+}
+
+.leaderboard-entry.top-1 {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.2) 0%, rgba(255, 193, 7, 0.1) 100%);
+  border: 1px solid var(--medal-gold);
+}
+
+.leaderboard-entry.top-2 {
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.2) 0%, rgba(192, 192, 192, 0.1) 100%);
+  border: 1px solid var(--medal-silver);
+}
+
+.leaderboard-entry.top-3 {
+  background: linear-gradient(135deg, rgba(205, 127, 50, 0.2) 0%, rgba(205, 127, 50, 0.1) 100%);
+  border: 1px solid var(--medal-bronze);
+}
+
+.leaderboard-rank {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  min-width: 32px;
+  text-align: center;
+}
+
+.leaderboard-rank.gold { color: var(--medal-gold); }
+.leaderboard-rank.silver { color: var(--medal-silver); }
+.leaderboard-rank.bronze { color: var(--medal-bronze); }
+
+.leaderboard-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--arena-purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.leaderboard-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.leaderboard-name {
+  font-weight: 600;
   font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard-stats {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color);
+}
+
+.leaderboard-points {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--arena-gold);
+}
+
+/* =====================================================
+   Stats Cards
+   ===================================================== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.stat-card {
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-card-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.stat-card-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--tg-theme-text-color);
+}
+
+.stat-card-label {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color);
+  margin-top: 4px;
+}
+
+/* =====================================================
+   Match History Cards
+   ===================================================== */
+.history-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.history-result {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.history-result.win {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--hp-high);
+}
+
+.history-result.loss {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--hp-low);
+}
+
+.history-result.draw {
+  background: rgba(234, 179, 8, 0.2);
+  color: var(--hp-medium);
+}
+
+.history-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-opponent {
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-date {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color);
+}
+
+.history-details {
+  text-align: right;
+}
+
+.history-points {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.history-points.positive { color: var(--hp-high); }
+.history-points.negative { color: var(--hp-low); }
+
+/* =====================================================
+   Section Headers
+   ===================================================== */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.section-action {
+  font-size: 14px;
+  color: var(--arena-purple);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* =====================================================
+   Toggle Buttons (Ranked/Casual)
+   ===================================================== */
+.toggle-group {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 12px;
+}
+
+.toggle-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tg-theme-hint-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn.active {
+  background: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
+}
+
+/* =====================================================
+   Empty States
+   ===================================================== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.empty-state-text {
+  font-size: 14px;
+  color: var(--tg-theme-hint-color);
+  max-width: 280px;
+}
+
+/* =====================================================
+   Reroll Button
+   ===================================================== */
+.reroll-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--tg-theme-secondary-bg-color);
+  border: 2px solid var(--arena-cyan);
+  color: var(--arena-cyan);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reroll-btn:hover:not(:disabled) {
+  background: rgba(6, 182, 212, 0.1);
+  transform: translateY(-2px);
+}
+
+.reroll-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--tg-theme-hint-color);
+  color: var(--tg-theme-hint-color);
+}
+
+.reroll-btn .reroll-icon {
+  transition: transform 0.3s ease;
+}
+
+.reroll-btn:hover:not(:disabled) .reroll-icon {
+  transform: rotate(180deg);
+}
+
+/* =====================================================
+   Waiting State
+   ===================================================== */
+.waiting-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.waiting-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--tg-theme-secondary-bg-color);
+  border-top-color: var(--arena-purple);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+.waiting-text {
+  font-size: 16px;
   font-weight: 600;
   color: var(--tg-theme-hint-color);
 }
 
-.countdown-timer.urgent {
-  color: var(--arena-hp-low);
+/* =====================================================
+   Skeleton Loading
+   ===================================================== */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--tg-theme-secondary-bg-color) 25%,
+    var(--tg-theme-bg-color) 50%,
+    var(--tg-theme-secondary-bg-color) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* =====================================================
+   Utility Classes
+   ===================================================== */
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

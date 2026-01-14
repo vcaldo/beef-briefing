@@ -63,7 +63,8 @@ export function LobbyPage({
   }, [])
 
   /**
-   * Check if any match the user is in has transitioned to shop/battle
+   * Check if any match the user is in has transitioned to shop/battle.
+   * Also handles initial load when user already has an active match.
    */
   const checkForPhaseTransitions = useCallback((newMatches: MatchResponse[]) => {
     if (!currentUserId) return
@@ -73,16 +74,25 @@ export function LobbyPage({
       if (!isParticipant) continue
 
       const prevStatus = prevMatchStatesRef.current.get(match.id)
+      const isFirstLoad = prevMatchStatesRef.current.size === 0
 
       // Auto-navigate when match transitions to shop_phase
-      if (prevStatus === 'open' && match.status === 'shop_phase') {
+      // OR on first load if user already has an active shop_phase match
+      if (
+        (prevStatus === 'open' && match.status === 'shop_phase') ||
+        (isFirstLoad && match.status === 'shop_phase')
+      ) {
         onMatchEnter?.(match.id, 'shop')
         onTabChange?.('shop')
         return
       }
 
       // Auto-navigate when match transitions to battle_phase
-      if (prevStatus === 'shop_phase' && match.status === 'battle_phase') {
+      // OR on first load if user already has an active battle_phase match
+      if (
+        (prevStatus === 'shop_phase' && match.status === 'battle_phase') ||
+        (isFirstLoad && (match.status === 'battle_phase' || match.status === 'completed'))
+      ) {
         onMatchEnter?.(match.id, 'battle')
         onTabChange?.('battle')
         return

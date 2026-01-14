@@ -576,3 +576,45 @@ Files reviewed:
 
 Next steps:
 - Test polling and phase transition to shop when match starts
+
+
+================================================================================
+2026-01-15 - Test polling and phase transition to shop when match starts
+================================================================================
+
+Task: Test and verify polling and phase transition logic from lobby to shop phase
+
+What was accomplished:
+- Reviewed LobbyPage polling implementation (2.5 second interval)
+- Reviewed phase transition detection logic using prevMatchStatesRef
+- Reviewed App.tsx integration with handleMatchEnter and setActiveTab callbacks
+- Reviewed ShopPage polling and transition to battle phase (3 second interval)
+- Verified TypeScript compilation passes (npx tsc --noEmit)
+- Verified Docker build succeeds (JS 71.73KB gzip, CSS 7.44KB gzip)
+
+- Identified and fixed a gap in the implementation:
+  - Previous implementation only detected phase TRANSITIONS (from open to shop_phase)
+  - If a user refreshed the page while already in an active match, they wouldn't auto-navigate
+  - Added initial load detection in checkForPhaseTransitions:
+    - On first load, if user has a shop_phase match, auto-navigate to shop
+    - On first load, if user has a battle_phase or completed match, auto-navigate to battle
+  - This ensures consistent behavior whether the phase just changed or user rejoined
+
+Implementation details verified:
+- LobbyPage polling: POLL_INTERVAL = 2500ms (2.5 seconds)
+- State tracking: prevMatchStatesRef Map tracks previous match statuses
+- Auto-navigation triggers when:
+  - Match transitions from 'open' to 'shop_phase' → navigate to shop
+  - Match transitions from 'shop_phase' to 'battle_phase' → navigate to battle
+  - NEW: On first load when user already has active shop_phase/battle_phase match
+- Only triggers for matches where currentUserId is a participant
+- App.tsx properly wires callbacks: onMatchEnter sets activeMatchId, onTabChange sets activeTab
+- ShopPage receives matchId and handles shop_phase → battle_phase transition
+
+Files modified:
+- apps/arena-mini-app/src/components/lobby/LobbyPage.tsx (enhanced checkForPhaseTransitions)
+- TODO.md (marked task as complete)
+
+Next steps:
+- Test buy, reroll (before first purchase only), upgrade, order, and submit flows
+- Test reroll button disabled after first card purchase (permanent lockout)

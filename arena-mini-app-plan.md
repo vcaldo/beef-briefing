@@ -58,7 +58,7 @@ apps/arena-mini-app/
 2. SHOP_PHASE (3 min)
    - Reroll shop (1 coin, only BEFORE first card purchase)
    - Buy 3 cards from shop (4-6 available depending on rerolls)
-   - Upgrade cards (2 coins: +1 ATK or +3 HP per upgrade)
+   - Upgrade cards (1 coin: +3 ATK or +3 HP per upgrade)
    - Set battle order
    - Submit team
    ↓
@@ -72,9 +72,9 @@ apps/arena-mini-app/
 
 ### Economy
 - Starting coins: 10
-- Card cost: 2
+- Card cost: 3
 - Reroll cost: 1 (only before first card purchase)
-- Upgrade cost: 2
+- Upgrade cost: 1 (+3 ATK or +3 HP)
 
 ## API Integration
 
@@ -94,7 +94,7 @@ Extend BaseApiClient with all arena endpoints:
 - `getShop(matchId)` - Get shop state (poll every 3s)
 - `buyCard(matchId, cardIndex)` - Buy card from shop
 - `rerollShop(matchId)` - Reroll unpurchased cards (only before first purchase)
-- `upgradeCard(matchId, teamSlot, upgradeType)` - Upgrade ATK or HP (+1 ATK or +3 HP)
+- `upgradeCard(matchId, teamSlot, upgradeType)` - Upgrade ATK or HP (+3 ATK or +3 HP)
 - `setTeamOrder(matchId, order)` - Set battle order
 - `submitTeam(matchId)` - Submit team
 
@@ -808,7 +808,7 @@ CORS_ORIGINS: https://leaderboard.${DOMAIN_NAME},https://deck.${DOMAIN_NAME},htt
 - [ ] Buy cards from shop (4-6 available)
 - [ ] Reroll shop (only before first purchase)
 - [ ] Verify reroll disabled after first card purchase
-- [ ] Upgrade ATK and HP (verify +1 ATK, +3 HP)
+- [ ] Upgrade ATK and HP (verify +3 ATK, +3 HP)
 - [ ] Verify upgrade preview shows before/after stats on compact cards
 - [ ] Verify stat overlays display correctly on compact cards (ATK/DEF/HP at precise positions)
 - [ ] Reorder team
@@ -908,5 +908,5 @@ After implementation:
 ### Recent Changes (Commits 839406c & 38e221f)
 - **Compact Card Renderer Feature**: Added 300x450 compact cards with placeholder position metadata for stat overlays
 - **Re-roll Mechanics Change**: Reroll now only available BEFORE first card purchase (permanent lockout after buying first card)
-- **Shop Balance**: 4-6 cards available (depending on rerolls), costs 2 coins per card, 1 coin per reroll, 2 coins per upgrade
-- **Upgrade Values**: +1 ATK or +3 HP per upgrade (changed from previous values)
+- **Shop Balance**: 4-6 cards available (depending on rerolls), costs 3 coins per card, 1 coin per reroll, 1 coin per upgrade
+- **Upgrade Values**: +3 ATK or +3 HP per upgrade (changed from previous values)

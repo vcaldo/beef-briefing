@@ -2,7 +2,7 @@
 
 import logging
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Security
 from fastapi.security import APIKeyHeader
@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from ..generator import CardGenerator
 from ..instrumentation import add_custom_attributes, notice_error
+from ..renderer.position_loader import PositionLoader
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -35,6 +36,11 @@ def get_api_keys(request: Request) -> dict[str, str]:
 def get_default_theme(request: Request) -> str:
     """Get default theme from app state."""
     return getattr(request.app.state, "default_theme", "gaming")
+
+
+def get_position_loader(request: Request) -> Optional[PositionLoader]:
+    """Get position loader from app state."""
+    return getattr(request.app.state, "position_loader", None)
 
 
 async def verify_api_key(
@@ -70,6 +76,7 @@ class RenderRequest(BaseModel):
         None, description="Optional list of specific user IDs"
     )
     theme: str | None = Field(None, description="Template theme name (uses DEFAULT_CARD_THEME if not specified)")
+    card_type: str = Field("regular", description="Card type: 'regular' or 'compact'")
     force_regenerate: bool = Field(False, description="Regenerate even if exists")
 
 
@@ -105,6 +112,7 @@ class ImageInfo(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     username: str | None = None
+    placeholder_positions: Optional[dict[str, Any]] = None
 
 
 class ImageListResponse(BaseModel):
@@ -167,11 +175,19 @@ async def render_cards(
     # Use default theme from config if not specified
     theme = render_request.theme or get_default_theme(request)
 
+    # Validate card_type
+    if render_request.card_type not in ("regular", "compact"):
+        raise HTTPException(
+            status_code=400,
+            detail="card_type must be 'regular' or 'compact'",
+        )
+
     # Add custom attributes for observability
     add_custom_attributes({
         "card.chat_id": render_request.chat_id,
         "card.week_start": render_request.week_start,
         "card.theme": theme,
+        "card.card_type": render_request.card_type,
         "card.user_count": len(render_request.user_ids) if render_request.user_ids else 0,
         "card.force_regenerate": render_request.force_regenerate,
     })
@@ -182,6 +198,7 @@ async def render_cards(
             week_start=week_start,
             user_ids=render_request.user_ids,
             theme=theme,
+            card_type=render_request.card_type,
             force_regenerate=render_request.force_regenerate,
         )
 
@@ -218,13 +235,26 @@ async def get_images(
     week_start: Annotated[str | None, Query(description="Week start (YYYY-MM-DD)")] = None,
     user_id: Annotated[int | None, Query(description="Filter by user ID")] = None,
     theme: Annotated[str | None, Query(description="Filter by theme")] = None,
+    include_positions: Annotated[bool, Query(description="Include placeholder position metadata for compact cards")] = True,
+    request: Request = None,
     generator: CardGenerator = Depends(get_generator),
+    position_loader: Optional[PositionLoader] = Depends(get_position_loader),
 ):
     """
     Get card images for a chat/week.
 
-    Returns list of image references with metadata.
-    Public endpoint for Mini App gallery.
+    Returns list of image references with metadata. For compact cards,
+    optionally includes placeholder position coordinates for React overlays.
+
+    Args:
+        chat_id: Chat ID
+        week_start: Week start date (YYYY-MM-DD), defaults to latest
+        user_id: Optional filter by user ID
+        theme: Optional filter by theme (e.g., "neon_arcade_compact")
+        include_positions: Include placeholder positions (default: True)
+
+    Returns:
+        ImageListResponse with images and optional placeholder_positions field
     """
     # Get latest week if not specified
     if week_start is None:
@@ -248,23 +278,34 @@ async def get_images(
         theme=theme,
     )
 
-    return ImageListResponse(
-        images=[
-            ImageInfo(
-                id=img["id"],
-                user_id=img["user_id"],
-                chat_id=img["chat_id"],
-                week_start=img["week_start"].isoformat(),
-                storage_path=img["storage_path"],
-                theme=img["theme"],
-                generated_at=img["generated_at"].isoformat(),
-                first_name=img.get("first_name"),
-                last_name=img.get("last_name"),
-                username=img.get("username"),
-            )
-            for img in images
-        ]
-    )
+    # Build image list with optional position metadata
+    image_list = []
+    for img in images:
+        image_info = ImageInfo(
+            id=img["id"],
+            user_id=img["user_id"],
+            chat_id=img["chat_id"],
+            week_start=img["week_start"].isoformat(),
+            storage_path=img["storage_path"],
+            theme=img["theme"],
+            generated_at=img["generated_at"].isoformat(),
+            first_name=img.get("first_name"),
+            last_name=img.get("last_name"),
+            username=img.get("username"),
+        )
+
+        # Attach position metadata if requested and theme is compact
+        if include_positions and position_loader and "_compact" in img["theme"]:
+            base_theme = img["theme"].replace("_compact", "")
+            # Load positions for this theme (without tier-specific overrides for now)
+            # Tier-specific overrides would require additional database queries
+            positions = position_loader.load_positions(base_theme)
+            if positions:
+                image_info.placeholder_positions = positions
+
+        image_list.append(image_info)
+
+    return ImageListResponse(images=image_list)
 
 
 @router.get("/api/v1/image/{image_id}", response_model=ImageUrlResponse)

@@ -298,6 +298,15 @@ class TemplateLoader:
         """Get template path for a theme."""
         return f"themes/{theme}/card.html"
 
+    def get_compact_template_path(self, theme: str) -> str:
+        """Get compact template path for a theme."""
+        return f"themes/{theme}/compact_card.html"
+
+    def compact_template_exists(self, theme: str) -> bool:
+        """Check if a compact template exists for a theme."""
+        template_path = self.templates_dir / "themes" / theme / "compact_card.html"
+        return template_path.exists()
+
     def theme_exists(self, theme: str) -> bool:
         """Check if a theme template exists."""
         template_path = self.templates_dir / "themes" / theme / "card.html"
@@ -507,18 +516,25 @@ class TemplateLoader:
                 continue
         return badges
 
-    def render(self, theme: str, context: TemplateContext) -> str:
+    def render(self, theme: str, context: TemplateContext, card_type: str = "regular") -> str:
         """
         Render a card template to HTML.
 
         Args:
             theme: Template theme name
             context: TemplateContext with all data
+            card_type: Card type ('regular' or 'compact')
 
         Returns:
             Rendered HTML string
         """
-        template_path = self.get_template_path(theme)
+        if card_type == "compact":
+            if not self.compact_template_exists(theme):
+                raise ValueError(f"Compact template not found for theme: {theme}")
+            template_path = self.get_compact_template_path(theme)
+        else:
+            template_path = self.get_template_path(theme)
+
         template = self.env.get_template(template_path)
 
         # Load theme configuration

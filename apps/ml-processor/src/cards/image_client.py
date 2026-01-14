@@ -39,6 +39,7 @@ class CardImageClient:
         user_ids: list[int] | None = None,
         theme: str = "gaming",  # Fallback if caller doesn't specify; prefer using config.default_card_theme
         force_regenerate: bool = False,
+        card_type: str = "regular",
     ) -> RenderResult:
         """
         Request card image rendering from the card-image-generator service.
@@ -49,6 +50,7 @@ class CardImageClient:
             user_ids: Optional list of specific user IDs
             theme: Template theme name
             force_regenerate: Regenerate even if images exist
+            card_type: Card type ("regular" or "compact")
 
         Returns:
             RenderResult with generation counts and details
@@ -62,6 +64,7 @@ class CardImageClient:
                     "user_ids": user_ids,
                     "theme": theme,
                     "force_regenerate": force_regenerate,
+                    "card_type": card_type,
                 },
                 headers={"Authorization": f"Bearer {self.api_key}"},
             )

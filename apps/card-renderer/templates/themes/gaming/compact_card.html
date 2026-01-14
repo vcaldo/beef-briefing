@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width={{ 300 }}, height={{ 450 }}">
+    <style>
+        @import url('{{ theme.typography.google_fonts_import }}');
+
+        :root {
+            /* Background */
+            --bg-gradient-start: {{ theme.colors.bg_start }};
+            --bg-gradient-mid: {{ theme.colors.bg_mid }};
+            --bg-gradient-end: {{ theme.colors.bg_end }};
+
+            /* Primary colors */
+            --color-primary: {{ theme.colors.primary }};
+            --color-secondary: {{ theme.colors.secondary }};
+
+            /* Text */
+            --text-primary: {{ theme.colors.text_primary }};
+            --text-secondary: {{ theme.colors.text_secondary }};
+            --border-color: {{ theme.colors.border }};
+
+            /* Effects */
+            --avatar-glow: {{ theme.colors.effects.avatar_glow }};
+            --username-glow: {{ theme.colors.effects.username_glow }};
+            --border-gradient-1: {{ theme.colors.effects.border_gradient[0] }};
+            --border-gradient-2: {{ theme.colors.effects.border_gradient[1] }};
+            --border-gradient-3: {{ theme.colors.effects.border_gradient[2] }};
+            --decoration-pink: {{ theme.colors.effects.decoration_pink }};
+            --decoration-cyan: {{ theme.colors.effects.decoration_cyan }};
+
+            /* Tier colors */
+            --tier-1-start: {{ theme.colors.tier.tier_1[0] }};
+            --tier-1-end: {{ theme.colors.tier.tier_1[1] }};
+            --tier-2-start: {{ theme.colors.tier.tier_2[0] }};
+            --tier-2-end: {{ theme.colors.tier.tier_2[1] }};
+            --tier-3-start: {{ theme.colors.tier.tier_3[0] }};
+            --tier-3-end: {{ theme.colors.tier.tier_3[1] }};
+            --tier-4-start: {{ theme.colors.tier.tier_4[0] }};
+            --tier-4-end: {{ theme.colors.tier.tier_4[1] }};
+            --tier-5-start: {{ theme.colors.tier.tier_5[0] }};
+            --tier-5-end: {{ theme.colors.tier.tier_5[1] }};
+            --tier-6-start: {{ theme.colors.tier.tier_6[0] }};
+            --tier-6-end: {{ theme.colors.tier.tier_6[1] }};
+
+            /* Tier bar contrast colors */
+            --tier-1-contrast: {{ theme.colors.tier_bar_contrast.tier_1 | default('#1a1a2e') }};
+            --tier-2-contrast: {{ theme.colors.tier_bar_contrast.tier_2 | default('#1a1a2e') }};
+            --tier-3-contrast: {{ theme.colors.tier_bar_contrast.tier_3 | default('#ffffff') }};
+            --tier-4-contrast: {{ theme.colors.tier_bar_contrast.tier_4 | default('#1a1a2e') }};
+            --tier-5-contrast: {{ theme.colors.tier_bar_contrast.tier_5 | default('#ffffff') }};
+            --tier-6-contrast: {{ theme.colors.tier_bar_contrast.tier_6 | default('#1a1a2e') }};
+
+            /* Typography */
+            --font-header: '{{ theme.typography.header_font }}', sans-serif;
+            --font-body: '{{ theme.typography.body_font }}', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            font-family: var(--font-body);
+            background: transparent;
+        }
+
+        .card {
+            width: 300px;
+            height: 450px;
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 50%, var(--bg-gradient-end) 100%);
+            border-radius: 16px;
+            padding: 16px;
+            position: relative;
+            overflow: hidden;
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Background decoration */
+        .card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 30%, var(--decoration-pink) 0%, transparent 50%),
+                        radial-gradient(circle at 70% 70%, var(--decoration-cyan) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 16px;
+            padding: 2px;
+            background: linear-gradient(135deg, var(--border-gradient-1), var(--border-gradient-2), var(--border-gradient-3));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        /* Header with avatar and info - centered layout */
+        .card-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+
+        .avatar {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--color-secondary), var(--border-gradient-2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-header);
+            font-size: 56px;
+            font-weight: 700;
+            color: var(--text-primary);
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 20px var(--avatar-glow);
+            background-size: cover;
+            background-position: center;
+        }
+
+        .user-info {
+            flex: 1;
+            min-width: 0;
+            text-align: center;
+        }
+
+        .username {
+            font-family: var(--font-header);
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+            text-shadow: 0 0 8px var(--username-glow);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .handle {
+            font-size: 12px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Beef Meter */
+        .beef-meter {
+            margin-bottom: 16px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .beef-meter-rank {
+            font-family: var(--font-header);
+            font-size: 28px;
+            font-weight: 900;
+            color: var(--text-primary);
+            line-height: 1;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .beef-meter-content {
+            flex: 1;
+        }
+
+        .beef-meter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .beef-meter-tier {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
+        }
+
+        .beef-meter-value {
+            font-family: var(--font-header);
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .beef-meter-bar {
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .beef-meter-fill {
+            height: 100%;
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Wavy pattern for beef meter fill */
+        .beef-meter-fill::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            --s: 12px;
+            --c1: currentColor;
+            --c2: transparent;
+            --_g: 50%, #0000 37%, var(--c1) 39% 70%, #0000 72%;
+            --_s: 47% 50% at;
+            background:
+                radial-gradient(var(--_s) -10% var(--_g)) 0 calc(var(--s)/2),
+                radial-gradient(var(--_s) -10% var(--_g)) calc(var(--s)/2) 0,
+                radial-gradient(var(--_s) 110% var(--_g)),
+                radial-gradient(var(--_s) 110% var(--_g)) calc(var(--s)/2) calc(var(--s)/2),
+                var(--c2);
+            background-size: var(--s) var(--s);
+            opacity: 0.3;
+        }
+
+        /* Tier-specific colors with contrast text */
+        .beef-meter-fill.tier-1 {
+            background: linear-gradient(90deg, var(--tier-1-start), var(--tier-1-end));
+            color: var(--tier-1-contrast);
+        }
+        .beef-meter-fill.tier-2 {
+            background: linear-gradient(90deg, var(--tier-2-start), var(--tier-2-end));
+            color: var(--tier-2-contrast);
+        }
+        .beef-meter-fill.tier-3 {
+            background: linear-gradient(90deg, var(--tier-3-start), var(--tier-3-end));
+            color: var(--tier-3-contrast);
+        }
+        .beef-meter-fill.tier-4 {
+            background: linear-gradient(90deg, var(--tier-4-start), var(--tier-4-end));
+            color: var(--tier-4-contrast);
+        }
+        .beef-meter-fill.tier-5 {
+            background: linear-gradient(90deg, var(--tier-5-start), var(--tier-5-end));
+            color: var(--tier-5-contrast);
+        }
+        .beef-meter-fill.tier-6 {
+            background: linear-gradient(90deg, var(--tier-6-start), var(--tier-6-end));
+            color: var(--tier-6-contrast);
+        }
+
+        /* Combat Stats Placeholders */
+        .combat-stats-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .combat-stat {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            min-height: 70px;
+        }
+
+        .combat-icon {
+            font-size: 18px;
+        }
+
+        .combat-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+
+        .combat-value {
+            flex: 1;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            min-height: 20px;
+        }
+
+        /* HP Progress Bar - no label */
+        .hp-bar-container {
+            margin-top: auto;
+            margin-bottom: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hp-bar-background {
+            width: 100%;
+            height: 18px;
+            border-radius: 9px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+        }
+
+        .hp-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* Footer */
+        .card-footer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
+            position: relative;
+            z-index: 1;
+            margin-top: auto;
+            flex-shrink: 0;
+        }
+
+        .period {
+            font-size: 10px;
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <!-- Header with avatar and user info -->
+        <div class="card-header">
+            <div class="avatar" {% if user.photo_url %}style="background-image: url('{{ user.photo_url }}')"{% endif %}>
+                {% if not user.photo_url %}{{ user.initials }}{% endif %}
+            </div>
+            <div class="user-info">
+                <div class="username">{{ user.first_name }}{% if user.last_name %} {{ user.last_name }}{% endif %}</div>
+                {% if user.username %}<div class="handle">@{{ user.username }}</div>{% endif %}
+            </div>
+        </div>
+
+        <!-- Beef Meter -->
+        <div class="beef-meter {{ overall.tier_class }}">
+            <span class="beef-meter-rank">{% if rank %}#{{ rank }}{% else %}-{% endif %}</span>
+            <div class="beef-meter-content">
+                <div class="beef-meter-header">
+                    <span class="beef-meter-tier">{{ overall.label }}</span>
+                    <span class="beef-meter-value">{{ overall.score|round|int }}</span>
+                </div>
+                <div class="beef-meter-bar">
+                    <div class="beef-meter-fill {{ overall.tier_class }}" style="width: {{ overall.score }}%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Combat Stats Placeholders -->
+        <div class="combat-stats-container">
+            <div class="combat-stat">
+                <div class="combat-icon">⚔️</div>
+                <div class="combat-label">ATK</div>
+                <div class="combat-value"></div>
+            </div>
+            <div class="combat-stat">
+                <div class="combat-icon">🛡️</div>
+                <div class="combat-label">DEF</div>
+                <div class="combat-value"></div>
+            </div>
+            <div class="combat-stat">
+                <div class="combat-icon">🥩</div>
+                <div class="combat-label">HP</div>
+                <div class="combat-value"></div>
+            </div>
+        </div>
+
+        <!-- HP Progress Bar Placeholder -->
+        <div class="hp-bar-container">
+            <div class="hp-bar-background">
+                <div class="hp-bar-fill"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="card-footer">
+            <span class="period">Week {{ week_number }} · {{ period_display }}</span>
+        </div>
+    </div>
+</body>
+</html>

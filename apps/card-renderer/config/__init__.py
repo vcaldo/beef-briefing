@@ -42,6 +42,10 @@ class Config(BaseSettings):
     card_height: int = 600
     card_scale: int = 2  # Render at 2x for retina
 
+    # Compact Card Dimensions
+    compact_card_width: int = 300
+    compact_card_height: int = 450
+
     # Application Settings
     environment: str = "development"
     log_level: str = "info"

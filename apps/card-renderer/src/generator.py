@@ -54,6 +54,8 @@ class CardGenerator:
         card_width: int = 400,
         card_height: int = 600,
         card_scale: int = 2,
+        compact_card_width: int = 300,
+        compact_card_height: int = 450,
         tier_class_fn: Callable[[str], str] | None = None,
     ):
         self.engine = engine
@@ -68,6 +70,8 @@ class CardGenerator:
         )
         self.card_width = card_width
         self.card_height = card_height
+        self.compact_card_width = compact_card_width
+        self.compact_card_height = compact_card_height
         self.templates_dir = Path(templates_dir)
 
     async def start(self) -> None:
@@ -85,6 +89,7 @@ class CardGenerator:
         week_start: date | str,
         user_ids: list[int] | None = None,
         theme: str = "gaming",
+        card_type: str = "regular",
         force_regenerate: bool = False,
         template_version: int = 1,
     ) -> BatchRenderResult:
@@ -96,6 +101,7 @@ class CardGenerator:
             week_start: Week start date
             user_ids: Optional list of specific user IDs to render
             theme: Template theme name
+            card_type: Card type ('regular' or 'compact')
             force_regenerate: If True, regenerate even if images exist
             template_version: Template version number
 
@@ -124,11 +130,14 @@ class CardGenerator:
                 results=[],
             )
 
+        # Prepare storage theme name (includes _compact suffix for compact cards)
+        storage_theme = f"{theme}_compact" if card_type == "compact" else theme
+
         # Get existing images (for skip logic)
         existing_images = {}
         if not force_regenerate:
             existing_images = self.queries.get_existing_images(
-                chat_id, week_start, theme
+                chat_id, week_start, storage_theme
             )
 
         results = []
@@ -165,10 +174,12 @@ class CardGenerator:
                     chat_id=chat_id,
                     week_start=week_start,
                     theme=theme,
+                    card_type=card_type,
                     template_version=template_version,
                     rank=rank,
                     base_url=base_url,
                     category_rankings=category_rankings,
+                    storage_theme=storage_theme,
                 )
                 results.append(result)
                 if result.status == "generated":
@@ -209,10 +220,12 @@ class CardGenerator:
         chat_id: int,
         week_start: date,
         theme: str,
-        template_version: int,
-        rank: int,
-        base_url: str,
+        card_type: str = "regular",
+        template_version: int = 1,
+        rank: int = 1,
+        base_url: str = "",
         category_rankings: dict[str, dict[int, int]] | None = None,
+        storage_theme: str = "",
     ) -> RenderResult:
         """Render a single card image."""
         user_id = card_data["user_id"]
@@ -244,10 +257,29 @@ class CardGenerator:
         )
 
         # Render HTML
-        html_content = self.template_loader.render(theme, context)
+        html_content = self.template_loader.render(theme, context, card_type=card_type)
+
+        # Select dimensions based on card type
+        if card_type == "compact":
+            render_width = self.compact_card_width
+            render_height = self.compact_card_height
+        else:
+            render_width = self.card_width
+            render_height = self.card_height
+
+        # Create a temporary renderer with the correct dimensions
+        temp_renderer = PlaywrightRenderer(
+            width=render_width,
+            height=render_height,
+            scale=self.renderer.scale,
+        )
+        await temp_renderer.start()
 
         # Render to PNG
-        image_data = await self.renderer.render_html(html_content, base_url)
+        try:
+            image_data = await temp_renderer.render_html(html_content, base_url)
+        finally:
+            await temp_renderer.stop()
 
         # Upload to storage
         storage_path, file_hash, file_size = self.storage.upload_card_image(
@@ -255,7 +287,7 @@ class CardGenerator:
             week_start=week_start.isoformat(),
             user_id=user_id,
             image_data=image_data,
-            theme=theme,
+            theme=storage_theme,
         )
 
         # Save reference to database
@@ -267,9 +299,9 @@ class CardGenerator:
             storage_path=storage_path,
             file_hash=file_hash,
             file_size=file_size,
-            width=self.card_width * self.renderer.scale,
-            height=self.card_height * self.renderer.scale,
-            theme=theme,
+            width=render_width * self.renderer.scale,
+            height=render_height * self.renderer.scale,
+            theme=storage_theme,
             template_version=template_version,
             card_data_version=card_version,
         )

@@ -62,6 +62,29 @@ log_warn() {
 }
 
 # =============================================================================
+# SIGNAL HANDLING (Graceful Interrupt)
+# =============================================================================
+
+on_interrupt() {
+    echo ""
+    echo "=================================================="
+    log_warn "Script interrupted by user (Ctrl+C)"
+    echo "=================================================="
+
+    # Print final summary with metrics collected so far
+    print_final_summary
+
+    log_info "Progress file: $PROGRESS_FILE"
+    log_info "To continue, run: $0 $ITERATIONS $TODO_FILE $PROGRESS_FILE"
+
+    # Exit with standard signal code for SIGINT
+    exit 130
+}
+
+# Set up signal trap for graceful interruption
+trap 'on_interrupt' SIGINT SIGTERM
+
+# =============================================================================
 # PRICING FUNCTIONS
 # =============================================================================
 

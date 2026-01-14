@@ -472,6 +472,36 @@ git status  # ralph_metrics.jsonl should not appear
 - Monitor first run to check quality
 - Increase iterations once you see good results
 
+## Graceful Interrupt Handling
+
+Ralph handles Ctrl+C (SIGINT) gracefully:
+
+```bash
+./scripts/ralph.sh 20
+^C
+# Prints:
+# ==================================================
+# ⚠  Script interrupted by user (Ctrl+C)
+# ==================================================
+# [Final summary with collected metrics]
+# ℹ  Progress file: progress.txt
+# ℹ  To continue, run: ./scripts/ralph.sh 20 TODO.md progress.txt
+```
+
+**What happens when you press Ctrl+C:**
+1. Current iteration is cancelled (Claude process terminated)
+2. Final summary displays with metrics from completed iterations
+3. Remaining iterations are skipped
+4. You're given instructions to resume
+5. Exit code is 130 (standard for SIGINT)
+
+**To resume after interruption:**
+```bash
+./scripts/ralph.sh 20 TODO.md progress.txt
+```
+
+Ralph will continue from where it left off (completed tasks remain marked as `[x]`).
+
 ## Troubleshooting
 
 ### Script exits immediately

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 import { apiClient } from './api/client'
-import { TabBar, LoadingSpinner, ErrorDisplay, LobbyPage, ShopPage } from './components'
+import { TabBar, LoadingSpinner, ErrorDisplay, LobbyPage, ShopPage, BattlePage } from './components'
 import type { AuthResponse } from '@beef-briefing/shared-mini-app/types'
 import type { GamePhase } from './types'
 
@@ -110,13 +110,11 @@ function App() {
         )
       case 'battle':
         return (
-          <div className="empty-state">
-            <div className="empty-state-icon">⚔️</div>
-            <h3 className="empty-state-title">Battle Coming Soon</h3>
-            <p className="empty-state-text">
-              Watch your cards battle against your opponent.
-            </p>
-          </div>
+          <BattlePage
+            matchId={activeMatchId}
+            currentUserId={authData?.user_id}
+            onTabChange={setActiveTab}
+          />
         )
       case 'stats':
         return (

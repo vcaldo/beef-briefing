@@ -36,14 +36,14 @@ export { SubmitButton } from './shop/SubmitButton'
 export { RerollButton } from './shop/RerollButton'
 
 // ============================================================================
-// Battle Components (to be implemented)
+// Battle Components
 // ============================================================================
-// export { BattlePage } from './battle/BattlePage'
-// export { BattleArena } from './battle/BattleArena'
-// export { BattleCard } from './battle/BattleCard'
-// export { EventLog } from './battle/EventLog'
-// export { EventMessage } from './battle/EventMessage'
-// export { VictoryScreen } from './battle/VictoryScreen'
+export { BattlePage } from './battle/BattlePage'
+export { BattleArena } from './battle/BattleArena'
+export { BattleCard } from './battle/BattleCard'
+export { EventLog } from './battle/EventLog'
+export { EventMessage } from './battle/EventMessage'
+export { VictoryScreen } from './battle/VictoryScreen'
 
 // ============================================================================
 // Stats Components (to be implemented)

@@ -395,3 +395,90 @@ Next steps:
 - Test reroll button disabled after first card purchase (permanent lockout)
 - Test stat overlay positioning on compact cards
 - Test upgrade preview showing before/after stats on compact cards
+
+
+================================================================================
+2026-01-15 - Implement BattlePage with event playback controls and battle results
+================================================================================
+
+Task: Implement battle screen components for Arena Mini-App
+
+What was accomplished:
+- Implemented 6 battle components in src/components/battle/:
+
+  1. BattlePage.tsx (~280 lines):
+     - Fetches battle state from API on load
+     - Event playback system with play/pause controls
+     - Three playback speeds: slow (2s), normal (1s), fast (0.5s)
+     - Displays battle arena with both teams
+     - Shows event log with battle replay
+     - Battle results section with damage stats
+     - Auto-shows victory screen when playback completes
+     - Empty states for no match/no battle/battle starting
+
+  2. BattleArena.tsx:
+     - Displays opponent team (top, rotated) and your team (bottom)
+     - 3 cards per team with empty slot placeholders
+     - Passes attack/defend state to cards for highlighting
+
+  3. BattleCard.tsx:
+     - Compact card display (80x120 pixels) for battle
+     - Shows name, ATK, HP stats with overlays
+     - HP bar with color transitions (green/yellow/red)
+     - Attack/defend indicator badges
+     - Death overlay with skull icon
+     - Data attributes for CSS animations
+
+  4. EventLog.tsx:
+     - Scrollable list of battle events
+     - Auto-scrolls to bottom as new events appear
+     - Empty state for battle start
+
+  5. EventMessage.tsx:
+     - Individual event display with icon and text
+     - Styled by event type (attack, death, victory, summary, advance)
+     - Shows round number and damage dealt
+     - Highlights events involving your team
+
+  6. VictoryScreen.tsx:
+     - Full-screen overlay for battle end
+     - Victory/Defeat states with appropriate styling
+     - Winner announcement with emoji animation
+     - Action buttons (Back to Lobby, View Stats)
+     - Tap anywhere to close
+
+- Updated App.tsx to integrate BattlePage:
+  - Replaced placeholder with actual BattlePage component
+  - Passes matchId, currentUserId, onTabChange
+
+- Added CSS styles to global.css (~300 lines):
+  - .battle-page, .battle-header, .battle-round-badge styles
+  - .battle-card-* styles (image, name, stats, death, indicator)
+  - .playback-controls, .playback-btn, .speed-select styles
+  - .event-log-empty, .event-* enhanced styles
+  - .battle-results, .stat-item styles
+  - .victory-* enhanced styles (content, defeat, actions, hint)
+  - Animations: indicator-pop
+
+- Updated components/index.ts with battle component exports
+- TypeScript compiles successfully (npx tsc --noEmit passes)
+- Docker build succeeds with bundle size: JS 71.69KB gzip, CSS 7.43KB gzip
+
+Files created:
+- apps/arena-mini-app/src/components/battle/BattlePage.tsx
+- apps/arena-mini-app/src/components/battle/BattleArena.tsx
+- apps/arena-mini-app/src/components/battle/BattleCard.tsx
+- apps/arena-mini-app/src/components/battle/EventLog.tsx
+- apps/arena-mini-app/src/components/battle/EventMessage.tsx
+- apps/arena-mini-app/src/components/battle/VictoryScreen.tsx
+
+Files modified:
+- apps/arena-mini-app/src/App.tsx (integrated BattlePage)
+- apps/arena-mini-app/src/components/index.ts (added battle exports)
+- apps/arena-mini-app/src/styles/global.css (added battle page styles)
+- TODO.md (marked battle implementation tasks as complete)
+
+Next steps:
+- Test event playback with sequential display and stat updates
+- Test HP bar animations and color changes during battle
+- Test all event types (attack, death, summary, victory)

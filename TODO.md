@@ -52,13 +52,13 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 
 ### Phase 4: Battle Screen (Day 8-9)
 
-- [ ] Implement BattlePage with event playback controls and battle results display
-- [ ] Implement BattleArena with compact cards for both teams (3 cards each)
-- [ ] Implement BattleCard component using CompactCard with live stat updates
-- [ ] Implement HP bar animation after each attack event (smooth CSS transitions)
-- [ ] Implement HP bar color transitions (green >66% → yellow 33-66% → red <33%)
-- [ ] Implement EventLog and EventMessage components for battle replay
-- [ ] Implement VictoryScreen overlay with winner announcement
+- [x] Implement BattlePage with event playback controls and battle results display
+- [x] Implement BattleArena with compact cards for both teams (3 cards each)
+- [x] Implement BattleCard component using CompactCard with live stat updates
+- [x] Implement HP bar animation after each attack event (smooth CSS transitions)
+- [x] Implement HP bar color transitions (green >66% → yellow 33-66% → red <33%)
+- [x] Implement EventLog and EventMessage components for battle replay
+- [x] Implement VictoryScreen overlay with winner announcement
 - [ ] Test event playback with sequential display and stat updates
 - [ ] Test HP bar animations and color changes during battle
 - [ ] Test all event types (attack, death, summary, victory)
@@ -94,6 +94,8 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 - [x] Create global styles (`src/styles/global.css`) with Tailwind + custom CSS
 - [x] Implement LobbyPage with match polling and auto-navigation
 - [x] Implement MatchList, MatchCard, CreateMatchButton, ParticipantsList components
+- [x] Implement BattlePage with event playback controls and battle results display
+- [x] Implement BattleArena, BattleCard, EventLog, EventMessage, VictoryScreen components
 
 ---
 

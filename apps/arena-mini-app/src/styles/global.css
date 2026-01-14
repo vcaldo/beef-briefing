@@ -1121,6 +1121,344 @@ body {
   margin-top: 8px;
 }
 
+.victory-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px;
+}
+
+.victory-title.defeat {
+  background: linear-gradient(135deg, #6b7280 0%, #9ca3af 50%, #6b7280 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.victory-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.victory-btn {
+  min-width: 120px;
+}
+
+.victory-hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 24px;
+}
+
+/* =====================================================
+   Battle Page
+   ===================================================== */
+.battle-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 80px;
+}
+
+.battle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 12px;
+}
+
+.battle-round-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--arena-gold);
+  padding: 4px 12px;
+  background: rgba(255, 215, 0, 0.1);
+  border-radius: 20px;
+}
+
+.battle-progress {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color);
+}
+
+.battle-section {
+  padding: 0 8px;
+}
+
+.battle-section-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--tg-theme-text-color);
+}
+
+/* Battle Card Enhancements */
+.battle-card-empty {
+  width: 80px;
+  height: 120px;
+  border-radius: 8px;
+  background: var(--tg-theme-secondary-bg-color);
+  opacity: 0.3;
+}
+
+.battle-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.battle-card-name {
+  position: absolute;
+  bottom: 28px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  padding: 2px 4px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+}
+
+.battle-card-stats {
+  position: absolute;
+  bottom: 14px;
+  left: 4px;
+  right: 4px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.battle-stat {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.battle-stat.atk {
+  color: var(--arena-orange);
+}
+
+.battle-stat.hp {
+  color: var(--hp-high);
+}
+
+.hp-bar.battle-hp {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 0 0 8px 8px;
+}
+
+.battle-card-death {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.death-icon {
+  font-size: 24px;
+  opacity: 0.9;
+}
+
+.battle-card-indicator {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  border-radius: 50%;
+  animation: indicator-pop 0.3s ease-out;
+}
+
+.battle-card-indicator.attack {
+  background: var(--arena-orange);
+}
+
+.battle-card-indicator.defend {
+  background: var(--arena-cyan);
+}
+
+@keyframes indicator-pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Playback Controls */
+.playback-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 16px;
+  margin: 0 8px;
+}
+
+.playback-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: var(--tg-theme-bg-color);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.playback-btn:hover {
+  transform: scale(1.1);
+}
+
+.playback-btn:active {
+  transform: scale(0.95);
+}
+
+.playback-btn.play-pause {
+  width: 56px;
+  height: 56px;
+  font-size: 24px;
+  background: linear-gradient(135deg, var(--arena-purple) 0%, var(--arena-pink) 100%);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+
+.speed-select {
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--tg-theme-bg-color);
+  color: var(--tg-theme-text-color);
+  border: 1px solid var(--tg-theme-hint-color);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Event Log Enhancements */
+.event-log-empty {
+  padding: 24px;
+  text-align: center;
+}
+
+.event-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.event-icon {
+  font-size: 16px;
+}
+
+.event-round {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--tg-theme-hint-color);
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.event-text {
+  flex: 1;
+}
+
+.event-damage {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hp-low);
+}
+
+.event-message.summary {
+  background: rgba(168, 85, 247, 0.1);
+  border-left: 3px solid var(--arena-purple);
+}
+
+.event-message.advance {
+  background: rgba(34, 211, 238, 0.1);
+  border-left: 3px solid var(--arena-cyan);
+}
+
+.event-message.your-team {
+  background: rgba(168, 85, 247, 0.15);
+}
+
+/* Battle Results */
+.battle-results {
+  padding: 20px;
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 16px;
+  margin: 0 8px;
+  text-align: center;
+}
+
+.battle-results-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.battle-results-stats {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--tg-theme-hint-color);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--arena-gold);
+}
+
+.battle-results-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
 /* =====================================================
    Coin Display
    ===================================================== */

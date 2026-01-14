@@ -317,7 +317,41 @@ DEFAULT_CARD_THEME=neon_arcade
 
 **Available themes**: gaming, clean, sticker, meme, vaporwave, blueprint, mythic, noir_luxury, neon_arcade, sticker_retro
 
-Theme files are located in `apps/card-renderer/templates/themes/`. Each theme has a `theme.json` (colors/typography) and `card.html` (template).
+Theme files are located in `apps/card-renderer/templates/themes/`. Each theme has:
+- `theme.json` (colors/typography configuration)
+- `card.html` (HTML/CSS template for 400x600 regular cards)
+- `compact_card.html` (optional HTML/CSS template for 300x450 compact cards)
+
+**Compact Cards**:
+- Smaller format (300x450 pixels) designed for gallery views
+- Include placeholder structures for React apps to overlay dynamic values
+- Support the same theme system as regular cards
+- Available for: gaming, clean, neon_arcade (and expandable to other themes)
+
+**Compact Card Configuration**:
+```bash
+# Card dimensions
+COMPACT_CARD_WIDTH=300
+COMPACT_CARD_HEIGHT=450
+```
+
+**API Usage**:
+```bash
+# Request compact cards
+curl -X POST http://localhost:8051/api/v1/render \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chat_id": -1003280306634,
+    "week_start": "2025-01-06",
+    "card_type": "compact",
+    "theme": "gaming"
+  }'
+
+# Compact cards are stored with "_compact" suffix: gaming_compact, clean_compact, etc.
+# Filter results by theme:
+curl -X GET "http://localhost:8051/api/v1/images?chat_id=-1003280306634&theme=gaming_compact"
+```
 
 ### Ranked Tournaments Configuration
 

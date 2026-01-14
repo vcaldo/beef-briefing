@@ -483,6 +483,19 @@ ml-run-cards: ## Generate weekly user cards (dev)
 ml-run-render: ## Render card images (dev)
 	./scripts/ml-processor.sh render $(ML_ARGS)
 
+ml-run-render-regular: ## Render regular card images only (dev)
+	./scripts/ml-processor.sh render --card-type regular $(ML_ARGS)
+
+ml-run-render-compact: ## Render compact card images only (dev)
+	./scripts/ml-processor.sh render --card-type compact $(ML_ARGS)
+
+ml-run-render-all: ## Render both regular and compact card images (dev)
+	@echo "Rendering regular cards..."
+	./scripts/ml-processor.sh render --card-type regular $(ML_ARGS)
+	@echo "Rendering compact cards..."
+	./scripts/ml-processor.sh render --card-type compact $(ML_ARGS)
+	@echo "Done! Both regular and compact cards rendered."
+
 # Production (requires: make pg-tunnel in another terminal)
 ml-run-prod: ## Run ml-processor batch processing (prod)
 	./scripts/ml-processor.sh --prod process $(ML_ARGS)
@@ -501,6 +514,19 @@ ml-run-cards-prod: ## Generate weekly user cards (prod)
 
 ml-run-render-prod: ## Render card images (prod)
 	./scripts/ml-processor.sh --prod render $(ML_ARGS)
+
+ml-run-render-regular-prod: ## Render regular card images only (prod)
+	./scripts/ml-processor.sh --prod render --card-type regular $(ML_ARGS)
+
+ml-run-render-compact-prod: ## Render compact card images only (prod)
+	./scripts/ml-processor.sh --prod render --card-type compact $(ML_ARGS)
+
+ml-run-render-all-prod: ## Render both regular and compact card images (prod)
+	@echo "Rendering regular cards..."
+	./scripts/ml-processor.sh --prod render --card-type regular $(ML_ARGS)
+	@echo "Rendering compact cards..."
+	./scripts/ml-processor.sh --prod render --card-type compact $(ML_ARGS)
+	@echo "Done! Both regular and compact cards rendered."
 
 # Impersonation mode (generate cards from source chat, store to target chat)
 ml-cards-impersonate: ## Generate cards with impersonation (dev) - SOURCE_CHAT_ID TARGET_CHAT_ID ML_ARGS required
@@ -776,7 +802,9 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	tf-object-storage-endpoint tf-object-storage-access-key tf-object-storage-secret-key tf-object-storage-bucket \
 	tf-connect tf-setup tf-sync-object-storage tf-update-ssh-config tf-docs tf-deploy-check \
 	ml-run ml-run-status ml-run-once ml-run-continuous ml-run-cards ml-run-render \
+	ml-run-render-regular ml-run-render-compact ml-run-render-all \
 	ml-run-prod ml-run-status-prod ml-run-once-prod ml-run-continuous-prod ml-run-cards-prod ml-run-render-prod \
+	ml-run-render-regular-prod ml-run-render-compact-prod ml-run-render-all-prod \
 	ml-shell ml-clean-dev ml-clean-prod ml-clean-cards-dev ml-clean-cards-prod \
 	ml-dashboard-up ml-dashboard-up-build ml-dashboard-down ml-dashboard-logs \
 	ml-dashboard-logs-backend ml-dashboard-logs-frontend ml-dashboard-shell \

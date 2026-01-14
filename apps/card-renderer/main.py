@@ -74,6 +74,8 @@ generator = CardGenerator(
     card_width=config.card_width,
     card_height=config.card_height,
     card_scale=config.card_scale,
+    compact_card_width=config.compact_card_width,
+    compact_card_height=config.compact_card_height,
     tier_class_fn=config.get_tier_class,
 )
 

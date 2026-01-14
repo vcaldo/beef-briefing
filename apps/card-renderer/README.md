@@ -50,6 +50,8 @@ curl -X POST http://localhost:8051/api/v1/render \
 | `CARD_WIDTH` | `400` | Card width (pixels) |
 | `CARD_HEIGHT` | `600` | Card height (pixels) |
 | `CARD_SCALE` | `2` | Render scale (2 = retina) |
+| `COMPACT_CARD_WIDTH` | `300` | Compact card width (pixels) |
+| `COMPACT_CARD_HEIGHT` | `450` | Compact card height (pixels) |
 | `APP_KEYS_DIR` | `/app/secrets/app_keys` | API keys directory |
 
 ## API Reference
@@ -64,11 +66,18 @@ Trigger card image generation.
 {
   "chat_id": -1003280306634,
   "week_start": "2025-01-06",
-  "user_ids": [123, 456],       // optional: specific users
-  "theme": "gaming",            // optional
-  "force_regenerate": false     // optional: regenerate existing
+  "user_ids": [123, 456],           // optional: specific users
+  "theme": "gaming",                // optional: uses DEFAULT_CARD_THEME if not specified
+  "card_type": "regular",           // optional: "regular" or "compact" (default: "regular")
+  "force_regenerate": false         // optional: regenerate existing
 }
 ```
+
+**Card Types:**
+- `regular`: Full-size cards (400x600 pixels, 75% of screen)
+- `compact`: Smaller cards (300x450 pixels, designed for compact gallery views)
+  - Compact cards are stored with `{theme}_compact` suffix (e.g., `gaming_compact`)
+  - Include placeholder boxes for combat stats and HP bar that React apps can overlay values into
 
 ### GET `/api/v1/images`
 
@@ -88,9 +97,21 @@ Health check (unauthenticated).
 
 ## Theme System
 
-Themes consist of two files in `templates/themes/{name}/`:
+Themes consist of the following files in `templates/themes/{name}/`:
 - `theme.json` - Colors and typography configuration
-- `card.html` - Jinja2 HTML/CSS template
+- `card.html` - Jinja2 HTML/CSS template for regular cards (400x600)
+- `compact_card.html` - (optional) Jinja2 HTML/CSS template for compact cards (300x450)
+
+### Compact Card Templates
+
+Compact cards are smaller versions designed for gallery views and React apps that overlay values dynamically. Each compact template includes:
+- Circular avatar with tier-styled glow
+- User name and rank badge (#N)
+- Tier bar with label and gradient
+- **Placeholder boxes** for combat stats (ATK, DEF, HP) showing "--"
+- **Placeholder container** for HP progress bar (0% fill)
+
+The PNG images are **static structures only** - React apps use absolute positioning to overlay actual values on top of the placeholder positions.
 
 ### Available Themes
 

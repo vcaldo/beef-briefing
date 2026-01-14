@@ -70,6 +70,7 @@ class RenderRequest(BaseModel):
         None, description="Optional list of specific user IDs"
     )
     theme: str | None = Field(None, description="Template theme name (uses DEFAULT_CARD_THEME if not specified)")
+    card_type: str = Field("regular", description="Card type: 'regular' or 'compact'")
     force_regenerate: bool = Field(False, description="Regenerate even if exists")
 
 
@@ -167,11 +168,19 @@ async def render_cards(
     # Use default theme from config if not specified
     theme = render_request.theme or get_default_theme(request)
 
+    # Validate card_type
+    if render_request.card_type not in ("regular", "compact"):
+        raise HTTPException(
+            status_code=400,
+            detail="card_type must be 'regular' or 'compact'",
+        )
+
     # Add custom attributes for observability
     add_custom_attributes({
         "card.chat_id": render_request.chat_id,
         "card.week_start": render_request.week_start,
         "card.theme": theme,
+        "card.card_type": render_request.card_type,
         "card.user_count": len(render_request.user_ids) if render_request.user_ids else 0,
         "card.force_regenerate": render_request.force_regenerate,
     })
@@ -182,6 +191,7 @@ async def render_cards(
             week_start=week_start,
             user_ids=render_request.user_ids,
             theme=theme,
+            card_type=render_request.card_type,
             force_regenerate=render_request.force_regenerate,
         )
 

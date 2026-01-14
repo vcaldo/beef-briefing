@@ -265,8 +265,12 @@ export function TeamCard({
             disabled={!card.can_upgrade_atk}
             title={card.upgrade_atk_disabled_reason}
           >
-            ⚔️ +3
-            <span className="upgrade-preview">→{card.atk_if_upgraded}</span>
+            <span className="upgrade-label">⚔️ +3</span>
+            <span className="upgrade-preview">
+              <span className="upgrade-before">{card.atk}</span>
+              <span className="upgrade-arrow">→</span>
+              <span className="upgrade-after">{card.atk_if_upgraded}</span>
+            </span>
           </button>
           <button
             className="upgrade-btn hp"
@@ -274,8 +278,12 @@ export function TeamCard({
             disabled={!card.can_upgrade_hp}
             title={card.upgrade_hp_disabled_reason}
           >
-            ❤️ +3
-            <span className="upgrade-preview">→{card.max_hp_if_upgraded}</span>
+            <span className="upgrade-label">❤️ +3</span>
+            <span className="upgrade-preview">
+              <span className="upgrade-before">{card.max_hp}</span>
+              <span className="upgrade-arrow">→</span>
+              <span className="upgrade-after">{card.max_hp_if_upgraded}</span>
+            </span>
           </button>
         </div>
       )}

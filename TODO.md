@@ -28,7 +28,7 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 - [x] Implement LobbyPage with match polling and auto-navigation
 - [x] Implement MatchList, MatchCard, CreateMatchButton, ParticipantsList components
 - [x] Test match creation, joining, and leaving flows
-- [ ] Test countdown timer and auto-start mechanics
+- [x] Test countdown timer and auto-start mechanics
 - [ ] Test polling and phase transition to shop when match starts
 
 ### Phase 3: Shop Screen (Day 5-7)

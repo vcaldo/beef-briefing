@@ -522,3 +522,57 @@ Files modified:
 Next steps:
 - Test countdown timer and auto-start mechanics
 - Test polling and phase transition to shop when match starts
+
+
+================================================================================
+2026-01-15 - Test countdown timer and auto-start mechanics
+================================================================================
+
+Task: Verify and test countdown timer and auto-start mechanics in LobbyPage
+
+What was accomplished:
+- Reviewed and verified CountdownTimer component implementation:
+  - Properly calculates time remaining from deadline (ISO string/Date) or timeRemainingSeconds
+  - Updates every second via setInterval
+  - Three urgency states with distinct visual feedback:
+    - relaxed (>30s): Green color
+    - warning (10-30s): Yellow color with pulse animation
+    - urgent (<10s): Red color with scale animation and red background
+  - Calls onComplete callback when timer reaches zero
+  - JetBrains Mono font for clear readability
+
+- Verified MatchCard countdown integration:
+  - Shows timer for open matches with join_deadline
+  - Uses compact format (mm:ss) with "to join" label
+  - Properly positioned with match-card-countdown CSS
+
+- Verified auto-start mechanics in LobbyPage:
+  - Polling runs every 2.5 seconds (POLL_INTERVAL = 2500ms)
+  - Tracks previous match states via prevMatchStatesRef
+  - Auto-navigation triggers when status changes from 'open' to 'shop_phase'
+  - Creator can manually start via "Start Now" button (requires 2+ participants)
+  - After manual start, immediate navigation to shop phase
+  - Auto-start is server-driven (backend handles deadline expiration)
+
+- Verified CSS animations:
+  - timer-pulse: opacity fade animation for warning state
+  - timer-urgent: scale pulse animation for urgent state
+  - Proper color transitions using --hp-high, --hp-medium, --hp-low CSS variables
+
+- TypeScript compilation: Passes (npx tsc --noEmit)
+- Docker build: Succeeds (JS 71.69KB gzip, CSS 7.43KB gzip)
+
+Implementation verified complete:
+- CountdownTimer is display-only (visual feedback)
+- Auto-start mechanics work via polling + phase transition detection
+- Manual start works via API call with immediate navigation
+- All CSS styles are in place for urgency states
+
+Files reviewed:
+- apps/arena-mini-app/src/components/common/CountdownTimer.tsx
+- apps/arena-mini-app/src/components/lobby/MatchCard.tsx
+- apps/arena-mini-app/src/components/lobby/LobbyPage.tsx
+- apps/arena-mini-app/src/styles/global.css
+
+Next steps:
+- Test polling and phase transition to shop when match starts

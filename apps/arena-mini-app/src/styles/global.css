@@ -151,6 +151,11 @@ body {
   color: var(--tg-theme-button-color);
 }
 
+.tab-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .tab-icon {
   width: 24px;
   height: 24px;

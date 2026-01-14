@@ -15,9 +15,9 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 - [x] Implement API client (`src/api/client.ts`) with 18+ Arena endpoints
 - [x] Define all TypeScript types (`src/types/index.ts`)
 - [x] Create global styles (`src/styles/global.css`) with Tailwind + custom CSS
-- [ ] Implement common components (TabBar, Card, CountdownTimer, LoadingSpinner, ErrorDisplay)
+- [x] Implement common components (TabBar, Card, CountdownTimer, LoadingSpinner, ErrorDisplay)
 - [x] Set up main app component (`src/App.tsx`) with tab navigation and authentication
-- [ ] Test Dockerfile build (multi-stage build with Nginx)
+- [x] Test Dockerfile build (multi-stage build with Nginx)
 
 ---
 

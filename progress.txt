@@ -138,3 +138,105 @@ Next steps:
 - Implement common components (TabBar, Card, CountdownTimer, LoadingSpinner, ErrorDisplay)
 - Test Dockerfile build
 
+
+================================================================================
+2026-01-14 - Implement common components (TabBar, Card, CountdownTimer, LoadingSpinner, ErrorDisplay)
+================================================================================
+
+Task: Implement reusable common components for Arena Mini-App
+
+What was accomplished:
+- Created 5 common components following patterns from leaderboard-mini-app and deck-mini-app:
+
+  1. TabBar (src/components/common/TabBar.tsx):
+     - SVG icons for Lobby, Shop, Battle, Stats tabs
+     - Active state highlighting
+     - Support for disabled tabs
+     - Accessible with aria-current attribute
+
+  2. LoadingSpinner (src/components/common/LoadingSpinner.tsx):
+     - Three size variants (sm, md, lg)
+     - Optional loading message
+     - Full screen overlay mode
+
+  3. ErrorDisplay (src/components/common/ErrorDisplay.tsx):
+     - Configurable title and message
+     - Optional retry callback with button
+     - Full screen mode for app-level errors
+
+  4. CountdownTimer (src/components/common/CountdownTimer.tsx):
+     - Supports deadline (ISO string/Date) or timeRemainingSeconds
+     - Three urgency states: relaxed (>30s), warning (10-30s), urgent (<10s)
+     - onComplete callback when timer reaches zero
+     - Compact format option (mm:ss)
+
+  5. Card components (src/components/common/Card.tsx):
+     - ShopCardDisplay: Regular 400x600 shop cards with price overlay
+     - CompactCard: 300x450 format with stat overlays (ATK/HP) and HP bar
+     - TeamCard: Compact card with upgrade buttons (+3 ATK/HP preview)
+     - EmptySlot: Placeholder for empty team slots
+     - CardImage: Shared image loading with skeleton and error fallback
+
+- Updated App.tsx to use new components:
+  - Replaced inline TabBar with TabBar component
+  - Added LoadingSpinner to splash screen
+  - Replaced error state with ErrorDisplay component
+  - Added retry functionality to error state
+  - Simplified header rendering with configuration object
+
+- Added CSS for disabled tab state (.tab-item.disabled)
+- Updated component index exports
+- TypeScript compiles successfully (npx tsc --noEmit passes)
+
+Files created:
+- apps/arena-mini-app/src/components/common/TabBar.tsx
+- apps/arena-mini-app/src/components/common/LoadingSpinner.tsx
+- apps/arena-mini-app/src/components/common/ErrorDisplay.tsx
+- apps/arena-mini-app/src/components/common/CountdownTimer.tsx
+- apps/arena-mini-app/src/components/common/Card.tsx
+
+Files modified:
+- apps/arena-mini-app/src/components/index.ts (added component exports)
+- apps/arena-mini-app/src/App.tsx (integrated TabBar, LoadingSpinner, ErrorDisplay)
+- apps/arena-mini-app/src/styles/global.css (added .tab-item.disabled style)
+
+Next steps:
+- Test Dockerfile build (multi-stage build with Nginx)
+- Implement LobbyPage with match polling and auto-navigation
+
+
+================================================================================
+2026-01-14 - Test Dockerfile build (multi-stage build with Nginx)
+================================================================================
+
+Task: Test that the arena-mini-app Docker build succeeds
+
+What was accomplished:
+- Added arena-mini-app to pnpm-workspace.yaml for proper monorepo workspace resolution
+- Successfully tested Docker multi-stage build:
+  - Stage 1 (builder): Node 22 Alpine + pnpm installs all workspace dependencies
+  - TypeScript compilation and Vite build completed successfully
+  - Stage 2 (production): Nginx Alpine serves static assets
+- Build output verified:
+  - CSS: 26.60 kB (gzip: 6.07 kB)
+  - JS: 195.86 kB (gzip: 64.09 kB)
+  - Total gzipped: ~70 KB (well under 300KB target)
+- Container tested and verified:
+  - Health endpoint returns "ok" at /health
+  - Index.html served correctly at root
+  - Nginx configuration working (gzip, security headers, SPA routing)
+- Minor CSS warnings about @import order (non-blocking, cosmetic)
+
+Files modified:
+- pnpm-workspace.yaml (added arena-mini-app to workspace packages)
+
+Test commands used:
+- docker build -f apps/arena-mini-app/Dockerfile -t arena-mini-app:test .
+- docker run -d --name arena-mini-app-test -p 8989:80 arena-mini-app:test
+- curl localhost:8989/health → "ok"
+- curl localhost:8989/ → HTML served correctly
+
+Next steps:
+- Implement LobbyPage with match polling and auto-navigation
+- Implement MatchList, MatchCard, CreateMatchButton, ParticipantsList components
+

@@ -482,3 +482,43 @@ Next steps:
 - Test event playback with sequential display and stat updates
 - Test HP bar animations and color changes during battle
 - Test all event types (attack, death, summary, victory)
+
+
+================================================================================
+2026-01-15 - Test match creation, joining, and leaving flows
+================================================================================
+
+Task: Test and fix match creation, joining, and leaving flows in LobbyPage
+
+What was accomplished:
+- Reviewed LobbyPage, MatchCard, MatchList, CreateMatchButton, and API client implementations
+- Verified TypeScript compilation passes (npx tsc --noEmit)
+- Verified Docker build succeeds (JS 71.71KB gzip, CSS 7.44KB gzip)
+- Identified and fixed issues in the UI:
+
+  1. Fixed btn-spinner CSS for proper inline display in buttons:
+     - Added display: inline-block
+     - Added margin-right: 8px for spacing from text
+     - Added vertical-align: middle for proper alignment
+
+  2. Added loading spinners to MatchCard action buttons:
+     - Join button now shows "Joining..." with spinner while loading
+     - Leave button now shows "Leaving..." with spinner while loading
+     - Start Now button now shows "Starting..." with spinner while loading
+
+- Verified match flow logic is correct:
+  - Match creation: Creator creates match, becomes first participant
+  - Join: Non-participants can join open matches
+  - Leave: Participants (except creator) can leave open matches
+  - Start: Creator can start match when 2+ participants and match is open
+  - Creator cannot leave their own match (enforced in canLeave condition)
+  - Auto-navigation triggers when match transitions to shop_phase or battle_phase
+
+Files modified:
+- apps/arena-mini-app/src/styles/global.css (fixed btn-spinner styling)
+- apps/arena-mini-app/src/components/lobby/MatchCard.tsx (added loading spinners to action buttons)
+- TODO.md (marked task as complete)
+
+Next steps:
+- Test countdown timer and auto-start mechanics
+- Test polling and phase transition to shop when match starts

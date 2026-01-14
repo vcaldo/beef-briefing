@@ -61,7 +61,7 @@ export function MatchCard({
             onClick={() => onJoin(match.id)}
             disabled={isLoading}
           >
-            Join
+            {isLoading ? <><span className="btn-spinner" />Joining...</> : 'Join'}
           </button>
         )}
         {canLeave && (
@@ -70,7 +70,7 @@ export function MatchCard({
             onClick={() => onLeave(match.id)}
             disabled={isLoading}
           >
-            Leave
+            {isLoading ? <><span className="btn-spinner" />Leaving...</> : 'Leave'}
           </button>
         )}
         {canStart && (
@@ -79,7 +79,7 @@ export function MatchCard({
             onClick={() => onStart(match.id)}
             disabled={isLoading}
           >
-            Start Now
+            {isLoading ? <><span className="btn-spinner" />Starting...</> : 'Start Now'}
           </button>
         )}
         {isActive && isParticipant && (

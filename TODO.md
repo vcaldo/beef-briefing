@@ -10,13 +10,13 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 
 ### Phase 1: Foundation (Day 1-2)
 
-- [ ] Create project structure (`apps/arena-mini-app/`)
-- [ ] Set up configuration files (package.json, tsconfig, vite, tailwind, postcss)
+- [x] Create project structure (`apps/arena-mini-app/`)
+- [x] Set up configuration files (package.json, tsconfig, vite, tailwind, postcss)
 - [ ] Implement API client (`src/api/client.ts`) with 18+ Arena endpoints
 - [ ] Define all TypeScript types (`src/types/index.ts`)
 - [ ] Create global styles (`src/styles/global.css`) with Tailwind + custom CSS
 - [ ] Implement common components (TabBar, Card, CountdownTimer, LoadingSpinner, ErrorDisplay)
-- [ ] Set up main app component (`src/App.tsx`) with tab navigation and authentication
+- [x] Set up main app component (`src/App.tsx`) with tab navigation and authentication
 - [ ] Test Dockerfile build (multi-stage build with Nginx)
 
 ---
@@ -86,7 +86,9 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 
 ## Completed
 
-(No tasks completed yet)
+- [x] Create project structure (`apps/arena-mini-app/`)
+- [x] Set up configuration files (package.json, tsconfig, vite, Dockerfile, nginx.conf)
+- [x] Set up main app component (`src/App.tsx`) with tab navigation and authentication
 
 ---
 

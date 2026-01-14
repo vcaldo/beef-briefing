@@ -1,0 +1,352 @@
+/* Import shared styles */
+@import '@beef-briefing/shared-mini-app/styles';
+
+/* =====================================================
+   Arena Mini App Global Styles
+   ===================================================== */
+
+/* Telegram theme CSS variables */
+:root {
+  --tg-theme-bg-color: #ffffff;
+  --tg-theme-text-color: #000000;
+  --tg-theme-hint-color: #999999;
+  --tg-theme-link-color: #168acd;
+  --tg-theme-button-color: #3390ec;
+  --tg-theme-button-text-color: #ffffff;
+  --tg-theme-secondary-bg-color: #f0f0f0;
+
+  /* Arena-specific colors */
+  --arena-gold: #ffd700;
+  --arena-silver: #c0c0c0;
+  --arena-bronze: #cd7f32;
+  --arena-hp-high: #22c55e;
+  --arena-hp-medium: #eab308;
+  --arena-hp-low: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--tg-theme-bg-color);
+  color: var(--tg-theme-text-color);
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  min-height: 100vh;
+  padding: 0 0 20px 0;
+}
+
+/* =====================================================
+   Header
+   ===================================================== */
+.app-header {
+  padding: 16px;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  background: var(--tg-theme-bg-color);
+  z-index: 10;
+}
+
+.app-header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.app-header-subtitle {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color);
+  font-weight: 400;
+  margin: 2px 0 0 0;
+}
+
+/* =====================================================
+   Tab Bar Navigation
+   ===================================================== */
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  background: var(--tg-theme-bg-color);
+  border-top: 1px solid var(--tg-theme-secondary-bg-color);
+  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+  z-index: 100;
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--tg-theme-hint-color);
+  transition: color 0.2s ease;
+}
+
+.tab-item.active {
+  color: var(--tg-theme-button-color);
+}
+
+.tab-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-emoji {
+  font-size: 22px;
+  line-height: 24px;
+}
+
+.tab-label {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* Page container with bottom padding for tab bar */
+.page-container {
+  padding-bottom: 80px;
+}
+
+/* =====================================================
+   Splash Screen
+   ===================================================== */
+.splash-screen {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  gap: 8px;
+}
+
+.splash-emoji {
+  font-size: 80px;
+  animation: pulse 1.5s ease-in-out infinite;
+  margin-bottom: 16px;
+}
+
+.splash-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--tg-theme-text-color);
+  margin: 0;
+}
+
+.splash-subtitle {
+  font-size: 18px;
+  color: var(--tg-theme-hint-color);
+  margin: 0;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.85;
+  }
+}
+
+/* =====================================================
+   Error State
+   ===================================================== */
+.error-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.error-content {
+  text-align: center;
+  max-width: 300px;
+}
+
+.error-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--tg-theme-secondary-bg-color);
+  color: var(--tg-theme-hint-color);
+  font-size: 32px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.error-content p {
+  color: var(--tg-theme-hint-color);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* =====================================================
+   Loading State
+   ===================================================== */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  gap: 16px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--tg-theme-secondary-bg-color);
+  border-top-color: var(--tg-theme-button-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-container p {
+  color: var(--tg-theme-hint-color);
+  font-size: 14px;
+}
+
+/* =====================================================
+   Section Styles
+   ===================================================== */
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* =====================================================
+   Card Styles (placeholder - will be expanded)
+   ===================================================== */
+.card-container {
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* =====================================================
+   HP Bar (for battle phase)
+   ===================================================== */
+.hp-bar {
+  height: 8px;
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hp-bar-fill {
+  height: 100%;
+  transition: width 0.5s ease, background-color 0.3s ease;
+}
+
+.hp-bar-fill.hp-high {
+  background: var(--arena-hp-high);
+}
+
+.hp-bar-fill.hp-medium {
+  background: var(--arena-hp-medium);
+}
+
+.hp-bar-fill.hp-low {
+  background: var(--arena-hp-low);
+}
+
+/* =====================================================
+   Button Styles
+   ===================================================== */
+.btn {
+  padding: 12px 24px;
+  border-radius: 20px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--tg-theme-button-color);
+  border: 1.5px solid var(--tg-theme-button-color);
+}
+
+.btn-secondary:hover {
+  background: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
+}
+
+/* =====================================================
+   Coin Display
+   ===================================================== */
+.coin-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.coin-icon {
+  font-size: 16px;
+}
+
+/* =====================================================
+   Countdown Timer
+   ===================================================== */
+.countdown-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tg-theme-hint-color);
+}
+
+.countdown-timer.urgent {
+  color: var(--arena-hp-low);
+}

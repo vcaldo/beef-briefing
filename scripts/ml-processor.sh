@@ -57,6 +57,7 @@ Options (passed through to main.py):
   --window-days N        Rolling window for cards (default: 30)
   --min-messages N       Min messages for cards (default: 10)
   --theme T              Theme for card images (default: gaming)
+  --card-type T          Card type for render (regular or compact, default: regular)
   --force                Force regenerate card images
 
 Examples:
@@ -65,7 +66,8 @@ Examples:
   $0 status                                 # Dev status
   $0 --prod status                          # Prod status
   $0 cards --week 2025-01-06                # Generate cards (dev)
-  $0 render --week 2025-01-06               # Render card images (dev)
+  $0 render --week 2025-01-06               # Render regular card images (dev)
+  $0 render --card-type compact             # Render compact card images
   $0 render --force                         # Force re-render images
   $0 cards --chat-id -1009876543 --source-chat-id -1001234567 --timezone UTC  # Impersonation mode
   $0 shell                                  # Open shell

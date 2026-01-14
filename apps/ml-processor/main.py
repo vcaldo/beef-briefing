@@ -295,6 +295,7 @@ def run_render_cards(args, config):
             "week": args.week,
             "theme": args.theme,
             "force": args.force,
+            "card_type": args.card_type,
         }
     )
 
@@ -345,12 +346,14 @@ def run_render_cards(args, config):
         week_start=week_start,
         theme=args.theme,
         force_regenerate=args.force,
+        card_type=args.card_type,
     )
 
     # Print results
     print("\nCard Image Rendering Results:")
     print(f"  Week: {week_start}")
     print(f"  Theme: {args.theme}")
+    print(f"  Card Type: {args.card_type}")
     print(f"  Generated: {result.generated}")
     print(f"  Skipped: {result.skipped}")
     print(f"  Failed: {result.failed}")
@@ -601,6 +604,13 @@ def main():
         "--force",
         action="store_true",
         help="Force regenerate images even if they exist",
+    )
+    render_cards_parser.add_argument(
+        "--card-type",
+        type=str,
+        choices=["regular", "compact"],
+        default="regular",
+        help="Card type to render (default: regular)",
     )
 
     # clean-cards command

@@ -56,7 +56,13 @@ export function ShopPage({
       setError(null)
 
       // Check for phase transition to battle
-      if (prevStatusRef.current === 'shop_phase' && data.status === 'battle_phase') {
+      // Either: (1) detected transition from shop_phase → battle_phase, or
+      // (2) initial load when match is already in battle_phase or completed
+      const isInitialLoad = prevStatusRef.current === null
+      const isTransition = prevStatusRef.current === 'shop_phase' && data.status === 'battle_phase'
+      const alreadyInBattle = isInitialLoad && (data.status === 'battle_phase' || data.status === 'completed')
+
+      if (isTransition || alreadyInBattle) {
         onBattleStart?.(matchId)
         onTabChange?.('battle')
       }

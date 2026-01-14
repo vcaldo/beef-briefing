@@ -905,3 +905,56 @@ Implementation verified complete:
 Next steps:
 - Test countdown timer and auto-transition to battle phase
 - Test card image loading and fallback states
+
+
+================================================================================
+2026-01-15 - Test countdown timer and auto-transition to battle phase
+================================================================================
+
+Task: Test and verify countdown timer and auto-transition from shop to battle phase
+
+What was accomplished:
+- Comprehensive code review of countdown timer and phase transition implementations
+- Verified CountdownTimer component implementation:
+  - Properly calculates time remaining from `timeRemainingSeconds` prop
+  - Updates local state when prop changes (sync with polling)
+  - Counts down every second with internal interval
+  - Three urgency states with distinct visual feedback:
+    - relaxed (>30s): Green color
+    - warning (10-30s): Yellow color with pulse animation
+    - urgent (<10s): Red color with scale animation and red background
+  - onComplete callback when timer reaches zero
+  - JetBrains Mono font for clear readability
+
+- Verified backend time_remaining_seconds calculation (arena_service.go lines 767-774):
+  - Calculates seconds until shop_phase_deadline
+  - Returns 0 if deadline passed
+  - Correctly sent in ShopResponse
+
+- Verified ShopPage polling and phase transition (3 second interval):
+  - Polling continues during all shop operations
+  - Phase transition detection via prevStatusRef comparison
+
+- Found and fixed a gap in the implementation:
+  - Previous implementation only detected transitions (shop_phase → battle_phase)
+  - If user's match was ALREADY in battle_phase on initial load, they weren't auto-navigated
+  - Enhanced checkForPhaseTransitions in ShopPage.tsx to also detect:
+    - Initial load when match is already in battle_phase
+    - Initial load when match is already completed
+  - This ensures consistent behavior for page refreshes and late arrivals
+
+- TypeScript compilation: Passes (npx tsc --noEmit)
+- Docker build: Succeeds (JS 71.80KB gzip, CSS 7.48KB gzip)
+
+Files modified:
+- apps/arena-mini-app/src/components/shop/ShopPage.tsx (enhanced phase transition detection for initial load)
+- TODO.md (marked task as complete)
+
+Implementation details verified:
+- CountdownTimer syncs with polling updates (effect re-runs when timeRemainingSeconds prop changes)
+- Timer shows urgency states at correct thresholds (>30s green, 10-30s yellow, <10s red)
+- Auto-transition to battle works for both phase changes AND initial load scenarios
+- CSS animations provide clear visual feedback as deadline approaches
+
+Next steps:
+- Test card image loading and fallback states

@@ -583,7 +583,7 @@ func (s *ArenaService) computeShopAffordability(coins int, teamSize int, isReady
 	coinsNeededForCards := remainingCards * shop.CardCost
 
 	canBuy := coins >= shop.CardCost && teamSize < shop.TeamSize
-	canReroll := coins >= (shop.RerollCost + coinsNeededForCards)
+	canReroll := teamSize == 0 && coins >= shop.RerollCost
 	canUpgrade := coins >= (shop.UpgradeCost + coinsNeededForCards)
 	canSubmit := teamSize == shop.TeamSize && !isReady
 
@@ -605,8 +605,12 @@ func (s *ArenaService) computeShopAffordability(coins int, teamSize int, isReady
 	}
 
 	if !canReroll {
-		reason := fmt.Sprintf("need %d coins (%d reroll + %d to complete team)",
-			shop.RerollCost+coinsNeededForCards, shop.RerollCost, coinsNeededForCards)
+		var reason string
+		if teamSize > 0 {
+			reason = "cannot reroll after purchasing cards"
+		} else {
+			reason = fmt.Sprintf("need %d coins", shop.RerollCost)
+		}
 		aff.RerollDisabledReason = &reason
 	}
 

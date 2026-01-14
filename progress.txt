@@ -808,3 +808,100 @@ Implementation is production-ready with CSS-based positioning approach.
 
 Next steps:
 - Test upgrade preview showing before/after stats on compact cards
+
+
+================================================================================
+2026-01-15 - Test upgrade preview showing before/after stats on compact cards
+================================================================================
+
+Task: Test and improve upgrade preview showing before/after stats on compact cards
+
+What was accomplished:
+- Reviewed the existing upgrade preview implementation in TeamCard component
+- Found that the original implementation only showed the "after" value (e.g., "→12")
+- Enhanced the upgrade preview to show a clear before/after comparison:
+  - ATK upgrade button now shows: "⚔️ +3  9 → 12" (current ATK → ATK after upgrade)
+  - HP upgrade button now shows: "❤️ +3  15 → 18" (current MaxHP → MaxHP after upgrade)
+- Added new CSS classes for improved styling:
+  - .upgrade-label: Bold font for the emoji and +3 label
+  - .upgrade-preview: Flex layout with gap for before/after values
+  - .upgrade-before: Dimmed opacity for current value
+  - .upgrade-arrow: Smaller, subtle arrow between values
+  - .upgrade-after: Golden color highlight for the upgraded value
+- Verified backend provides correct preview values:
+  - arena_service.go calculates atk_if_upgraded = card.ATK + shop.ATKUpgradeAmount
+  - arena_service.go calculates max_hp_if_upgraded = card.MaxHP + shop.HPUpgradeAmount
+- Verified TypeScript compilation: npx tsc --noEmit passes
+- Verified Docker build: succeeds (JS 71.78KB gzip, CSS 7.48KB gzip)
+
+Files modified:
+- apps/arena-mini-app/src/components/common/Card.tsx (enhanced upgrade preview display)
+- apps/arena-mini-app/src/styles/global.css (added before/after styling classes)
+- TODO.md (marked task as complete)
+
+Implementation verified complete:
+- Before value shown with dimmed opacity
+- Arrow separator with subtle styling
+- After value highlighted in gold color
+- Clear visual indication of the stat change
+- Button layout maintains proper alignment
+
+Next steps:
+- Test read-only state after team submission ("Waiting for others...")
+- Test countdown timer and auto-transition to battle phase
+
+
+================================================================================
+2026-01-15 - Test read-only state after team submission ("Waiting for others...")
+================================================================================
+
+Task: Verify read-only state implementation after team submission
+
+What was accomplished:
+- Comprehensive code review of the read-only state implementation across all shop components
+- Verified the following behaviors when `team_submitted` is true:
+
+  1. ShopPage.tsx (lines 239-273):
+     - Renders simplified view with header (coins + timer) and team display only
+     - Shop cards section completely hidden (not shown)
+     - Reroll button completely hidden (not shown)
+     - Submit button completely hidden (not shown)
+     - Shows "Waiting for others..." message with animated spinner
+     - Explanatory text: "Your team has been submitted. The battle will start when all players are ready."
+
+  2. TeamDisplay.tsx (lines 54-79, 103-126):
+     - `readOnly=true` prop passed from ShopPage
+     - Card click handlers disabled (no reordering possible)
+     - Upgrade callbacks not passed to TeamCard (no upgrade actions)
+     - Reorder hint text hidden in read-only mode
+     - Empty slots also respect read-only (no click handlers)
+
+  3. TeamCard.tsx (lines 260-289):
+     - When `readOnly=true`, upgrade buttons are completely hidden (not just disabled)
+     - Card still displays with all stats visible (ATK, HP, name)
+
+  4. CSS Waiting State (lines 1941-1964):
+     - `.waiting-state`: Flex column centered with 32px padding
+     - `.waiting-spinner`: 48x48px purple animated spinner (border-top-color: var(--arena-purple))
+     - `.waiting-text`: 16px bold text in hint color
+
+  5. Polling and Phase Transition (lines 59-62, 170-178):
+     - Polling continues every 3 seconds even after submission
+     - Phase transition detection works: when status changes to 'battle_phase', auto-navigates to battle
+     - Users don't need to manually refresh or navigate
+
+- Verified TypeScript types include `team_submitted: boolean` in ShopResponse (line 154)
+- Verified backend properly sets `TeamSubmitted: true` when player submits (arena_service.go line 827)
+- TypeScript compilation: Passes (npx tsc --noEmit)
+- Docker build: Succeeds
+
+Implementation verified complete:
+- Read-only mode properly hides all interactive elements
+- Team is still visible with all card stats
+- Waiting state provides clear feedback to user
+- Polling continues for phase transition detection
+- No bugs found
+
+Next steps:
+- Test countdown timer and auto-transition to battle phase
+- Test card image loading and fallback states

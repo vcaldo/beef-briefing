@@ -62,6 +62,39 @@ log_warn() {
 }
 
 # =============================================================================
+# PRICING FUNCTIONS
+# =============================================================================
+
+# Get pricing for a Claude model
+# Returns: "input_price output_price" (per million tokens)
+get_model_pricing() {
+    local model="$1"
+
+    # Determine model tier from model name
+    if [[ "$model" =~ haiku ]]; then
+        echo "0.80 4.00"  # Haiku: $0.80/MTok input, $4.00/MTok output
+    elif [[ "$model" =~ sonnet ]]; then
+        echo "3.00 12.00"  # Sonnet: $3.00/MTok input, $12.00/MTok output
+    elif [[ "$model" =~ opus ]]; then
+        echo "15.00 45.00"  # Opus: $15.00/MTok input, $45.00/MTok output
+    else
+        # Default to Haiku if model tier can't be determined
+        echo "0.80 4.00"
+    fi
+}
+
+# Get the primary model used in this session from metrics log
+get_session_model() {
+    if [[ ! -f "$METRICS_LOG" ]]; then
+        echo "unknown"
+        return
+    fi
+
+    # Get the model from the first metric entry
+    jq -r '.model // "unknown"' "$METRICS_LOG" 2>/dev/null | head -1
+}
+
+# =============================================================================
 # METRICS FUNCTIONS
 # =============================================================================
 
@@ -88,8 +121,8 @@ extract_iteration_metrics() {
     fi
 
     # Extract metrics from JSON with defaults
-    ITERATION_MODEL=$(echo "$json" | jq -r '.model // "unknown"')
-    ITERATION_STOP_REASON=$(echo "$json" | jq -r '.stop_reason // "unknown"')
+    ITERATION_MODEL=$(echo "$json" | jq -r '.modelUsage | keys[0] // "unknown"')
+    ITERATION_STOP_REASON=$(echo "$json" | jq -r '.type // "unknown"')
     ITERATION_INPUT_TOKENS=$(echo "$json" | jq -r '.usage.input_tokens // 0')
     ITERATION_OUTPUT_TOKENS=$(echo "$json" | jq -r '.usage.output_tokens // 0')
     ITERATION_CACHE_CREATE_TOKENS=$(echo "$json" | jq -r '.usage.cache_creation_input_tokens // 0')
@@ -160,28 +193,6 @@ print_metrics_summary() {
     local duration_sec=$((ITERATION_DURATION % 60))
     local duration_str=$(printf "%dm %02ds" "$duration_min" "$duration_sec")
 
-    # Format numbers with commas (if GNU coreutils)
-    local input_tokens_fmt
-    local output_tokens_fmt
-    local total_tokens_fmt
-    local cache_create_fmt
-    local cache_read_fmt
-
-    # Try to use locale-aware formatting, fallback to plain if not available
-    if printf '%d' 1234 2>/dev/null | grep -q ','; then
-        input_tokens_fmt=$(printf "%'d" "$ITERATION_INPUT_TOKENS")
-        output_tokens_fmt=$(printf "%'d" "$ITERATION_OUTPUT_TOKENS")
-        total_tokens_fmt=$(printf "%'d" "$ITERATION_TOTAL_TOKENS")
-        cache_create_fmt=$(printf "%'d" "$ITERATION_CACHE_CREATE_TOKENS")
-        cache_read_fmt=$(printf "%'d" "$ITERATION_CACHE_READ_TOKENS")
-    else
-        input_tokens_fmt="$ITERATION_INPUT_TOKENS"
-        output_tokens_fmt="$ITERATION_OUTPUT_TOKENS"
-        total_tokens_fmt="$ITERATION_TOTAL_TOKENS"
-        cache_create_fmt="$ITERATION_CACHE_CREATE_TOKENS"
-        cache_read_fmt="$ITERATION_CACHE_READ_TOKENS"
-    fi
-
     # Calculate cache hit rate
     local cache_hit_rate="N/A"
     if [[ $ITERATION_INPUT_TOKENS -gt 0 ]]; then
@@ -191,34 +202,22 @@ print_metrics_summary() {
 
     # Status icon
     local status_icon="✓"
-    local status_text="Success"
-    local status_color="$GREEN"
     if [[ "$ITERATION_SUCCESS" == "false" ]]; then
         status_icon="✗"
-        status_text="Failed (exit code: $CLAUDE_EXIT_CODE)"
-        status_color="$RED"
     fi
 
-    # Print box with metrics
-    echo -e "${CYAN}┌─────────────────────────────────────────────────────────────┐${NC}"
-    echo -e "${CYAN}│${NC}                     INTERACTION METRICS                     ${CYAN}│${NC}"
-    echo -e "${CYAN}├─────────────────────────────────────────────────────────────┤${NC}"
-    printf "${CYAN}│${NC}  %-60s ${CYAN}│${NC}\n" "Duration:          $duration_str"
-    printf "${CYAN}│${NC}  %-60s ${CYAN}│${NC}\n" "Model:             $ITERATION_MODEL"
-    printf "${CYAN}│${NC}  %-60s ${CYAN}│${NC}\n" "Stop Reason:       $ITERATION_STOP_REASON"
-    echo -e "${CYAN}│${NC}                                                              ${CYAN}│${NC}"
-    echo -e "${CYAN}│${NC}  Token Usage:                                               ${CYAN}│${NC}"
-    printf "${CYAN}│${NC}    %-58s ${CYAN}│${NC}\n" "Input:           $input_tokens_fmt tokens"
-    printf "${CYAN}│${NC}    %-58s ${CYAN}│${NC}\n" "Output:          $output_tokens_fmt tokens"
-    printf "${CYAN}│${NC}    %-58s ${CYAN}│${NC}\n" "Total:           $total_tokens_fmt tokens"
-    echo -e "${CYAN}│${NC}                                                              ${CYAN}│${NC}"
-    echo -e "${CYAN}│${NC}  Cache Performance:                                         ${CYAN}│${NC}"
-    printf "${CYAN}│${NC}    %-58s ${CYAN}│${NC}\n" "Created:         $cache_create_fmt tokens"
-    printf "${CYAN}│${NC}    %-58s ${CYAN}│${NC}\n" "Read:            $cache_read_fmt tokens ($cache_hit_rate)"
-    echo -e "${CYAN}│${NC}                                                              ${CYAN}│${NC}"
-    printf "${CYAN}│${NC}  %-60s ${CYAN}│${NC}\n" "Changes:           $ITERATION_FILES_CHANGED files modified"
-    printf "${status_color}│${NC}  %-60s ${CYAN}│${NC}\n" "Status:            $status_icon $status_text"
-    echo -e "${CYAN}└─────────────────────────────────────────────────────────────┘${NC}"
+    # Print simple list format (no box borders)
+    echo "--- Iteration Metrics ---"
+    echo "Duration: $duration_str"
+    echo "Model: $ITERATION_MODEL"
+    echo "Status: $ITERATION_STOP_REASON"
+    echo "Input tokens: $ITERATION_INPUT_TOKENS"
+    echo "Output tokens: $ITERATION_OUTPUT_TOKENS"
+    echo "Total tokens: $ITERATION_TOTAL_TOKENS"
+    echo "Cache created: $ITERATION_CACHE_CREATE_TOKENS tokens"
+    echo "Cache read: $ITERATION_CACHE_READ_TOKENS tokens ($cache_hit_rate hit rate)"
+    echo "Files changed: $ITERATION_FILES_CHANGED"
+    echo "Success: $status_icon"
 }
 
 print_final_summary() {
@@ -268,9 +267,14 @@ print_final_summary() {
     local total_min=$((TOTAL_DURATION / 60))
     local total_sec=$((TOTAL_DURATION % 60))
 
-    # Cost estimate (using Haiku pricing: $0.80/MTok input, $4.00/MTok output)
-    local input_cost=$(awk "BEGIN {printf \"%.3f\", ($TOTAL_INPUT_TOKENS / 1000000) * 0.80}")
-    local output_cost=$(awk "BEGIN {printf \"%.3f\", ($TOTAL_OUTPUT_TOKENS / 1000000) * 4.00}")
+    # Get actual model used and its pricing
+    local session_model=$(get_session_model)
+    local pricing=$(get_model_pricing "$session_model")
+    read -r input_price output_price <<< "$pricing"
+
+    # Cost estimate based on actual model used
+    local input_cost=$(awk "BEGIN {printf \"%.3f\", ($TOTAL_INPUT_TOKENS / 1000000) * $input_price}")
+    local output_cost=$(awk "BEGIN {printf \"%.3f\", ($TOTAL_OUTPUT_TOKENS / 1000000) * $output_price}")
     local total_cost=$(awk "BEGIN {printf \"%.3f\", $input_cost + $output_cost}")
 
     echo "Iterations:"
@@ -300,7 +304,7 @@ print_final_summary() {
         echo "  Average:         $((TOTAL_FILES_CHANGED / INTERACTION_COUNT)) files per iteration"
     fi
     echo ""
-    echo "Cost Estimate (Claude Haiku 4.5):"
+    echo "Cost Estimate ($session_model):"
     echo "  Input tokens:    \$$input_cost"
     echo "  Output tokens:   \$$output_cost"
     echo "  Total:           \$$total_cost"
@@ -411,7 +415,7 @@ If, while working on the task, you determine ALL tasks are complete, output exac
 <promise>COMPLETE</promise>") 2>&1 || CLAUDE_EXIT_CODE=$?
 
     # Extract text content from JSON for completion check and display
-    result=$(echo "$claude_json" | jq -r '.content[0].text // ""')
+    result=$(echo "$claude_json" | jq -r '.result // ""')
 
     # Extract and log metrics
     extract_iteration_metrics "$claude_json" "$ITERATION_START"

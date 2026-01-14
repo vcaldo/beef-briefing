@@ -10,6 +10,8 @@ The Card Renderer generates weekly stats cards from user data in the `ml_user_ca
 
 - **HTML/CSS Templates**: Customizable card designs with Jinja2 templating
 - **Theme System**: 9+ built-in themes with JSON configuration
+- **Compact Cards**: Smaller gallery-optimized format with React overlay support
+- **Placeholder Positions**: API-provided pixel coordinates for precise value overlays
 - **Retina Quality**: 2x scale rendering for crisp images
 - **Badge System**: Automatically derived badges based on user stats
 - **Presigned URLs**: Secure, time-limited image access
@@ -81,9 +83,91 @@ Trigger card image generation.
 
 ### GET `/api/v1/images`
 
-List card images for a chat/week.
+List card images for a chat/week with optional placeholder position metadata.
 
-**Parameters:** `chat_id`, `week_start`, `user_id`, `theme`
+**Parameters:**
+- `chat_id` (required): Chat ID
+- `week_start` (optional): Week start date (YYYY-MM-DD), defaults to latest
+- `user_id` (optional): Filter by user ID
+- `theme` (optional): Filter by theme (e.g., `gaming_compact`)
+- `include_positions` (optional, default: `true`): Include placeholder position metadata for compact cards
+
+**Placeholder Positions** (Compact Cards Only):
+
+When `include_positions=true` and requesting compact cards, the response includes a `placeholder_positions` object with coordinates for overlaying values:
+
+```json
+{
+  "images": [
+    {
+      "id": 123,
+      "user_id": 456,
+      "chat_id": -1003280306634,
+      "week_start": "2025-01-06",
+      "theme": "gaming_compact",
+      "placeholder_positions": {
+        "version": "1.0",
+        "card_dimensions": {
+          "width": 300,
+          "height": 450,
+          "scale": 2
+        },
+        "placeholders": {
+          "combat_stats": {
+            "atk": { "x": 58, "y": 308, "width": 50, "height": 25, ... },
+            "def": { "x": 150, "y": 308, "width": 50, "height": 25, ... },
+            "hp": { "x": 242, "y": 308, "width": 50, "height": 25, ... }
+          },
+          "hp_bar": {
+            "container": { "x": 16, "y": 410, "width": 268, "height": 18, ... },
+            "fill": { "x": 16, "y": 410, "max_width": 268, "height": 18, ... }
+          }
+        },
+        "tier_variations": { ... }
+      }
+    }
+  ]
+}
+```
+
+**React Integration Example:**
+
+```javascript
+// Fetch card with positions
+const response = await fetch(
+  `/api/v1/images?chat_id=${chatId}&theme=gaming_compact&include_positions=true`,
+  { headers: { 'Authorization': `Bearer ${apiKey}` } }
+);
+const { images } = await response.json();
+const card = images[0];
+
+// Use positions to overlay values
+const { placeholders, card_dimensions } = card.placeholder_positions;
+const atkPosition = placeholders.combat_stats.atk;
+
+// Render with absolute positioning
+<div style={{
+  position: 'relative',
+  width: card_dimensions.width,
+  height: card_dimensions.height
+}}>
+  <img src={card.url} alt="card" />
+  <div style={{
+    position: 'absolute',
+    left: `${atkPosition.x}px`,
+    top: `${atkPosition.y}px`,
+    fontSize: `${atkPosition.font_size}px`,
+    color: atkPosition.color
+  }}>
+    {userStats.combat.atk}
+  </div>
+</div>
+```
+
+**Notes:**
+- Positions are in logical pixels (300x450). Actual PNG is rendered at 600x900 (2x scale).
+- Regular cards (without `_compact` theme suffix) don't include placeholder positions.
+- Set `include_positions=false` to skip position data (useful for bandwidth optimization).
 
 ### GET `/api/v1/image/{id}`
 

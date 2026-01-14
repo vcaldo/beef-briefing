@@ -21,10 +21,12 @@ if config.new_relic_enabled():
 # Now import everything else
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
 from sqlalchemy import create_engine
 
 from src.api import router
 from src.generator import CardGenerator
+from src.renderer.position_loader import PositionLoader
 from src.storage import CardStorageClient
 
 # Configure logging
@@ -88,10 +90,16 @@ async def lifespan(app: FastAPI):
     # Initialize generator (starts Playwright)
     await generator.start()
 
-    # Store generator, API keys, and config in app state
+    # Initialize position loader for compact card placeholder coordinates
+    templates_dir = Path(config.templates_dir) / "themes"
+    position_loader = PositionLoader(templates_dir)
+    logger.info(f"Position loader initialized with templates dir: {templates_dir}")
+
+    # Store generator, API keys, config, and position loader in app state
     app.state.generator = generator
     app.state.api_keys = config.get_app_keys()
     app.state.default_theme = config.default_card_theme
+    app.state.position_loader = position_loader
 
     logger.info(
         f"Service ready on {config.card_renderer_host}:{config.card_renderer_port}"

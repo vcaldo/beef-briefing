@@ -78,26 +78,26 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 8px;
-            margin-bottom: 12px;
+            gap: 10px;
+            margin-bottom: 16px;
             position: relative;
             z-index: 1;
             flex-shrink: 0;
         }
 
         .avatar {
-            width: 80px;
-            height: 80px;
+            width: 160px;
+            height: 160px;
             border-radius: 50%;
             background: var(--color-secondary);
             display: flex;
             align-items: center;
             justify-content: center;
             font-family: var(--font-header);
-            font-size: 32px;
+            font-size: 64px;
             font-weight: 700;
             color: var(--text-primary);
-            border: 3px solid var(--border-color);
+            border: 5px solid var(--border-color);
             background-size: cover;
             background-position: center;
         }
@@ -132,13 +132,13 @@
             display: flex;
             flex-direction: column;
             align-items: stretch;
-            padding: 6px 10px;
+            padding: 10px 14px;
             border-radius: 8px;
             border: 1px solid var(--tier-border);
             position: relative;
             overflow: hidden;
-            margin-bottom: 12px;
-            gap: 2px;
+            margin-bottom: 16px;
+            gap: 6px;
             background: linear-gradient(135deg, var(--tier-color-1), var(--tier-color-2));
         }
 
@@ -155,7 +155,7 @@
 
         .tier-label {
             font-family: var(--font-header);
-            font-size: 9px;
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -164,7 +164,7 @@
 
         .tier-value {
             font-family: var(--font-header);
-            font-size: 14px;
+            font-size: 18px;
             font-weight: 900;
             color: var(--text-primary);
             margin-left: auto;
@@ -218,14 +218,14 @@
         .combat-stats-container {
             display: flex;
             gap: 8px;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
             position: relative;
             z-index: 1;
         }
 
         .combat-stat {
             flex: 1;
-            padding: 10px;
+            padding: 12px;
             border-radius: 6px;
             border: 1px solid var(--border-color);
             background: rgba(0, 0, 0, 0.05);
@@ -233,7 +233,7 @@
             flex-direction: column;
             align-items: center;
             gap: 6px;
-            min-height: 60px;
+            min-height: 70px;
         }
 
         .combat-icon {
@@ -265,8 +265,8 @@
 
         .hp-bar-background {
             width: 100%;
-            height: 8px;
-            border-radius: 4px;
+            height: 14px;
+            border-radius: 7px;
             background: rgba(0, 0, 0, 0.1);
             border: 1px solid var(--border-color);
             overflow: hidden;
@@ -277,6 +277,25 @@
             background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
             width: 0%;
             transition: width 0.3s ease;
+        }
+
+        /* Footer */
+        .card-footer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
+            position: relative;
+            z-index: 1;
+            margin-top: auto;
+            flex-shrink: 0;
+        }
+
+        .period {
+            font-size: 10px;
+            color: var(--text-secondary);
+            opacity: 0.7;
         }
     </style>
 </head>
@@ -296,8 +315,8 @@
         <!-- Tier box with rank -->
         <div class="tier-box {{ overall.tier_class }}">
             <div class="tier-stat">
-                <span class="tier-label">{{ overall.label }}</span>
                 <span class="tier-value">{% if rank %}#{{ rank }}{% else %}-{% endif %}</span>
+                <span class="tier-label">{{ overall.label }}</span>
             </div>
         </div>
 
@@ -325,6 +344,11 @@
             <div class="hp-bar-background">
                 <div class="hp-bar-fill"></div>
             </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="card-footer">
+            <span class="period">Week {{ week_number }} · {{ period_display }}</span>
         </div>
     </div>
 </body>

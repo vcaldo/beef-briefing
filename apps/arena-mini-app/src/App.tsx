@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 import { apiClient } from './api/client'
-import { TabBar, LoadingSpinner, ErrorDisplay, LobbyPage } from './components'
+import { TabBar, LoadingSpinner, ErrorDisplay, LobbyPage, ShopPage } from './components'
 import type { AuthResponse } from '@beef-briefing/shared-mini-app/types'
 import type { GamePhase } from './types'
 
@@ -22,7 +22,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<GamePhase>('lobby')
   const [authData, setAuthData] = useState<AuthResponse | null>(null)
   // Track active match ID for shop/battle navigation
-  const [_activeMatchId, setActiveMatchId] = useState<string | null>(null)
+  const [activeMatchId, setActiveMatchId] = useState<string | null>(null)
 
   const launchParams = useLaunchParams()
 

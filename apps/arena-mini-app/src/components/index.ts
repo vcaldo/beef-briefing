@@ -26,15 +26,14 @@ export { CreateMatchButton } from './lobby/CreateMatchButton'
 export { ParticipantsList } from './lobby/ParticipantsList'
 
 // ============================================================================
-// Shop Components (to be implemented)
+// Shop Components
 // ============================================================================
-// export { ShopPage } from './shop/ShopPage'
-// export { ShopCards } from './shop/ShopCards'
-// export { TeamDisplay } from './shop/TeamDisplay'
-// export { CoinDisplay } from './shop/CoinDisplay'
-// export { UpgradeButtons } from './shop/UpgradeButtons'
-// export { SubmitButton } from './shop/SubmitButton'
-// export { RerollButton } from './shop/RerollButton'
+export { ShopPage } from './shop/ShopPage'
+export { ShopCards } from './shop/ShopCards'
+export { TeamDisplay } from './shop/TeamDisplay'
+export { CoinDisplay } from './shop/CoinDisplay'
+export { SubmitButton } from './shop/SubmitButton'
+export { RerollButton } from './shop/RerollButton'
 
 // ============================================================================
 // Battle Components (to be implemented)

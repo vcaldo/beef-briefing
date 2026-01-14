@@ -100,22 +100,6 @@ if ! touch "$PROGRESS_FILE" 2>/dev/null; then
 fi
 
 # =============================================================================
-# GIT VALIDATION (optional warning)
-# =============================================================================
-
-if ! git config user.name > /dev/null 2>&1; then
-    log_warn "Git user.name not configured"
-    log_warn "Run: git config --global user.name 'Your Name'"
-fi
-
-if ! git config user.email > /dev/null 2>&1; then
-    log_warn "Git user.email not configured"
-    log_warn "Run: git config --global user.email 'your@email.com'"
-fi
-
-echo ""
-
-# =============================================================================
 # MAIN LOOP
 # =============================================================================
 
@@ -144,9 +128,6 @@ Guidelines:
    - Task name
    - What was accomplished
    - Next steps (if any)
-5. Make a git commit for the work you completed
-   - Use a clear, descriptive commit message
-   - The commit will automatically use your configured git user
 
 IMPORTANT: Only work on a SINGLE task per iteration.
 

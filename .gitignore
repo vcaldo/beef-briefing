@@ -171,3 +171,7 @@ terraform.rc
 # Vite deps
 _metadata.json
 package.json
+
+# Ralph automation metrics
+ralph_metrics.jsonl
+progress.txt

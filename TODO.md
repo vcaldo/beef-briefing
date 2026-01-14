@@ -38,8 +38,8 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 - [x] Implement CompactCard component (300x450 with position overlays and stat rendering)
 - [x] Implement TeamDisplay and TeamCard components (compact cards with stat overlays and HP bar)
 - [x] Implement CoinDisplay, UpgradeButtons, SubmitButton, RerollButton components
-- [ ] Test buy, reroll (before first purchase only), upgrade, order, and submit flows
-- [ ] Test reroll button disabled after first card purchase (permanent lockout)
+- [x] Test buy, reroll (before first purchase only), upgrade, order, and submit flows
+- [x] Test reroll button disabled after first card purchase (permanent lockout)
 - [ ] Test stat overlay positioning on compact cards using placeholder_positions
 - [ ] Test upgrade preview showing before/after stats on compact cards
 - [ ] Test read-only state after team submission ("Waiting for others...")

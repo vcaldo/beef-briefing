@@ -28,7 +28,7 @@
 
 Beef Arena is a competitive card battle game where players:
 1. Join matches with other players
-2. Build teams of 3 cards from a random shop
+2. Build teams of 3 cards from a random shop (with optional rerolls before first purchase)
 3. Battle automatically using turn-based combat
 4. Earn rankings based on wins/losses
 
@@ -83,8 +83,8 @@ The game supports two modes:
   - Frontend can continue polling to detect when battle starts
   - No errors returned for post-submission requests
 - **Actions**:
-  - Buy cards from shop (6 cards available)
-  - Reroll shop for new cards
+  - **Reroll shop** (only before first card purchase) - Replace unpurchased cards with new ones
+  - Buy cards from shop (4-6 cards available depending on rerolls)
   - Upgrade purchased cards (ATK or HP)
   - Set team battle order
   - Submit team when ready
@@ -127,11 +127,15 @@ The game supports two modes:
 | Action | Cost | Constraint | Description |
 |--------|------|------------|-------------|
 | **Buy Card** | 2 coins | Team not full (< 3) | Purchase card from shop slot |
-| **Reroll Shop** | 1 coin | Must leave enough for team | Replace unpurchased cards with new ones |
+| **Reroll Shop** | 1 coin | No cards purchased yet | Replace unpurchased cards with new ones (only before first purchase) |
 | **Upgrade ATK** | 2 coins | Card in team | +1 ATK per upgrade |
 | **Upgrade HP** | 2 coins | Card in team | +3 HP per upgrade |
 
-**Important**: Reroll and upgrade actions validate that you'll have enough coins remaining to complete your 3-card team. *(Logic in [shop/types.go:48-82](shop/types.go#L48-L82))*
+**Important**:
+- **Reroll** is only available **before any card is purchased**. Once you buy your first card, the reroll button becomes permanently disabled for that match.
+- **Upgrade** actions validate that you'll have enough coins remaining to complete your 3-card team.
+
+*(Logic in [shop/types.go:48-82](shop/types.go#L48-L82))*
 
 #### Shop Card Selection
 - Cards are randomly selected from the current week's `ml_user_cards` for the chat
@@ -147,19 +151,23 @@ The game supports two modes:
 #### Building Your Team
 
 **Step-by-step**:
-1. **Buy 3 cards** from shop (required)
+1. **Review initial shop cards**
+   - You start with 4 random cards (6 total with rerolls)
+2. **Optional: Reroll** (only before first purchase)
+   - Costs 1 coin
+   - Replaces unpurchased cards with new ones
+   - **Once you buy your first card, reroll becomes permanently disabled**
+3. **Buy 3 cards** from shop (required)
    - Each purchase costs 2 coins
    - Choose wisely based on stats
-2. **Optional: Reroll** before buying if you don't like options
-   - Costs 1 coin
-   - Can reroll multiple times
-3. **Optional: Upgrade** purchased cards
+   - This is your only chance to reroll - decide before buying!
+4. **Optional: Upgrade** purchased cards
    - Choose ATK for more damage
    - Choose HP for more survivability
-4. **Set battle order** (positions 0, 1, 2)
+5. **Set battle order** (positions 0, 1, 2)
    - Position 0 = front (battles first)
    - Position 2 = back (battles last)
-5. **Submit team** to proceed to battle
+6. **Submit team** to proceed to battle
 
 ---
 
@@ -429,10 +437,13 @@ POST /api/v1/mini-app/arena/match/<match_id>/reroll
 ```
 
 **Requirements**:
-- Have enough coins for: reroll (1) + remaining team slots (2 each)
-- Example: With 1 card purchased, need 1 + (2 * 2) = 5 coins
+- Have 1+ coins
+- **No cards purchased yet** (team must be empty)
+- Once you buy your first card, reroll is permanently disabled for that match
 
 **Response**: Updated shop state with new unpurchased cards
+
+**Error**: Returns `400 Bad Request` if you've already purchased a card with message "cannot reroll after purchasing cards"
 
 *Handler: [arena_handler.go:533-560](../handlers/arena_handler.go#L533-L560)*
 
@@ -1110,8 +1121,10 @@ const updatedShop = await POST(`/api/v1/mini-app/arena/match/${matchId}/buy`, {
   card_index: 0
 });
 
-// Reroll shop
-const updatedShop = await POST(`/api/v1/mini-app/arena/match/${matchId}/reroll`);
+// Reroll shop (only available before first purchase)
+if (shop.team.length === 0 && shop.coins >= 1) {
+  const updatedShop = await POST(`/api/v1/mini-app/arena/match/${matchId}/reroll`);
+}
 
 // Upgrade card
 const updatedShop = await POST(`/api/v1/mini-app/arena/match/${matchId}/upgrade`, {
@@ -1208,9 +1221,11 @@ function canBuyCard(shop: ShopState, cardIndex: number): boolean {
 
 // Check if can reroll
 function canReroll(shop: ShopState): boolean {
-  const remainingCards = 3 - shop.team.length;
-  const coinsNeeded = 1 + (remainingCards * 2);
-  return shop.coins >= coinsNeeded;
+  // Reroll only available before any card is purchased
+  if (shop.team.length > 0) {
+    return false;
+  }
+  return shop.coins >= 1;
 }
 
 // Check if can upgrade

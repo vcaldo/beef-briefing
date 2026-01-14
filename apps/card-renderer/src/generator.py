@@ -210,7 +210,7 @@ class CardGenerator:
         base_url: str,
     ) -> dict[str, bytes]:
         """
-        Render card in all sizes in parallel.
+        Render card in all sizes sequentially.
 
         Args:
             html_content: Rendered HTML content for the card
@@ -219,8 +219,9 @@ class CardGenerator:
         Returns:
             Dictionary mapping size name ('large', 'medium', 'small') to PNG bytes
         """
-        async def render_size(size_name: str, dimensions: dict[str, int]) -> tuple[str, bytes]:
-            """Render a single size variant."""
+        results = {}
+
+        for size_name, dimensions in CARD_SIZES.items():
             renderer = PlaywrightRenderer(
                 width=dimensions['width'],
                 height=dimensions['height'],
@@ -229,18 +230,11 @@ class CardGenerator:
             await renderer.start()
             try:
                 image_data = await renderer.render_html(html_content, base_url)
-                return size_name, image_data
+                results[size_name] = image_data
             finally:
                 await renderer.stop()
 
-        # Create tasks for all sizes
-        tasks = [render_size(name, dims) for name, dims in CARD_SIZES.items()]
-
-        # Render all sizes in parallel
-        results = await asyncio.gather(*tasks)
-
-        # Convert to dictionary
-        return {size_name: image_data for size_name, image_data in results}
+        return results
 
     @function_trace_async(name="render_single_card", group="CardGenerator")
     async def _render_single_card(

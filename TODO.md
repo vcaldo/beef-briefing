@@ -33,11 +33,11 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 
 ### Phase 3: Shop Screen (Day 5-7)
 
-- [ ] Implement ShopPage with shop polling and action handling
-- [ ] Implement ShopCards and ShopCard components (display regular 400x600 card images)
-- [ ] Implement CompactCard component (300x450 with position overlays and stat rendering)
-- [ ] Implement TeamDisplay and TeamCard components (compact cards with stat overlays and HP bar)
-- [ ] Implement CoinDisplay, UpgradeButtons, SubmitButton, RerollButton components
+- [x] Implement ShopPage with shop polling and action handling
+- [x] Implement ShopCards and ShopCard components (display regular 400x600 card images)
+- [x] Implement CompactCard component (300x450 with position overlays and stat rendering)
+- [x] Implement TeamDisplay and TeamCard components (compact cards with stat overlays and HP bar)
+- [x] Implement CoinDisplay, UpgradeButtons, SubmitButton, RerollButton components
 - [ ] Test buy, reroll (before first purchase only), upgrade, order, and submit flows
 - [ ] Test reroll button disabled after first card purchase (permanent lockout)
 - [ ] Test stat overlay positioning on compact cards using placeholder_positions

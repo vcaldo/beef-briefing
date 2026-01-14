@@ -708,6 +708,77 @@ body {
   color: var(--arena-gold);
 }
 
+/* Shop Card Wrapper */
+.shop-card-wrapper {
+  position: relative;
+}
+
+.shop-card-wrapper.loading .shop-card {
+  pointer-events: none;
+}
+
+.shop-card-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 12px;
+  z-index: 10;
+}
+
+.shop-card-tooltip {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100%);
+  padding: 4px 8px;
+  background: var(--arena-dark);
+  color: var(--hp-low);
+  font-size: 11px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 20;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.shop-card-wrapper:hover .shop-card-tooltip {
+  opacity: 1;
+}
+
+/* Shop Page Layout */
+.shop-page {
+  padding: 0;
+}
+
+.shop-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--tg-theme-secondary-bg-color);
+}
+
+.shop-header-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.shop-actions {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--tg-theme-secondary-bg-color);
+}
+
+.submit-btn {
+  width: 100%;
+}
+
 /* =====================================================
    Team Display (Shop Phase)
    ===================================================== */
@@ -764,6 +835,21 @@ body {
 .team-slot-placeholder {
   font-size: 24px;
   color: var(--tg-theme-hint-color);
+}
+
+.team-display.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.team-reorder-hint {
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+  color: var(--tg-theme-hint-color);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--tg-theme-secondary-bg-color);
 }
 
 /* =====================================================
@@ -1067,6 +1153,11 @@ body {
 
 .coin-display.not-affordable {
   color: var(--hp-low);
+}
+
+.coin-cost {
+  font-size: 14px;
+  color: var(--tg-theme-hint-color);
 }
 
 /* =====================================================
@@ -1473,6 +1564,12 @@ body {
 
 .reroll-btn:hover:not(:disabled) .reroll-icon {
   transform: rotate(180deg);
+}
+
+.reroll-cost {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  opacity: 0.8;
 }
 
 /* =====================================================

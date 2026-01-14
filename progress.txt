@@ -310,3 +310,88 @@ Next steps:
 - Test countdown timer and auto-start mechanics
 - Test polling and phase transition to shop when match starts
 
+
+================================================================================
+2026-01-15 - Implement ShopPage with shop polling and action handling
+================================================================================
+
+Task: Implement ShopPage and shop sub-components for Arena Mini-App
+
+What was accomplished:
+- Implemented 6 shop components in src/components/shop/:
+
+  1. ShopPage.tsx (~280 lines):
+     - Shop polling every 3 seconds using setInterval
+     - Auto-navigation when match transitions to battle_phase
+     - Card purchasing, rerolling, upgrading, reordering, and team submission handlers
+     - Error handling with dismissable error banner
+     - Loading states for all actions
+     - Waiting state with "Waiting for others..." after team submission
+     - Read-only mode after team is submitted
+
+  2. ShopCards.tsx:
+     - Grid layout of shop cards using ShopCardDisplay component
+     - Loading overlay for cards being purchased
+     - Disabled reason tooltips for unaffordable cards
+
+  3. TeamDisplay.tsx (~120 lines):
+     - 3-slot team display with empty slot placeholders
+     - Team order reordering via tap-to-swap interface
+     - Upgrade buttons for ATK (+3) and HP (+3)
+     - Read-only mode after submission
+     - Reorder hint text for user guidance
+
+  4. CoinDisplay.tsx:
+     - Coin count display with animated shine effect
+     - Optional affordability indicator (green/red)
+
+  5. RerollButton.tsx:
+     - Reroll button with cost display (🪙 1)
+     - Disabled after first card purchase (permanent lockout)
+     - Loading spinner during reroll
+
+  6. SubmitButton.tsx:
+     - Full-width primary button for team submission
+     - Disabled until team has 3 cards
+     - Loading state during submission
+
+- Updated App.tsx to integrate ShopPage:
+  - Changed _activeMatchId to activeMatchId (removed underscore prefix)
+  - Replaced shop placeholder with ShopPage component
+  - Pass matchId, currentUserId, onTabChange, and onBattleStart callbacks
+
+- Added CSS styles to global.css (~80 lines):
+  - .shop-card-wrapper, .shop-card-loading, .shop-card-tooltip styles
+  - .shop-page, .shop-header, .shop-header-info, .shop-actions styles
+  - .submit-btn, .team-display.loading, .team-reorder-hint styles
+  - .coin-cost, .reroll-cost styles
+
+- Updated components/index.ts with shop component exports
+- TypeScript compiles successfully (npx tsc --noEmit passes)
+- Docker build succeeds with bundle size: JS 69.12KB gzip, CSS 6.70KB gzip
+
+Note: The following components were already implemented in Phase 1:
+- ShopCardDisplay (in common/Card.tsx) - regular 400x600 shop cards
+- CompactCard (in common/Card.tsx) - 300x450 with stat overlays
+- TeamCard (in common/Card.tsx) - compact card with upgrade buttons
+- EmptySlot (in common/Card.tsx) - placeholder for empty team slots
+
+Files created:
+- apps/arena-mini-app/src/components/shop/ShopPage.tsx
+- apps/arena-mini-app/src/components/shop/ShopCards.tsx
+- apps/arena-mini-app/src/components/shop/TeamDisplay.tsx
+- apps/arena-mini-app/src/components/shop/CoinDisplay.tsx
+- apps/arena-mini-app/src/components/shop/RerollButton.tsx
+- apps/arena-mini-app/src/components/shop/SubmitButton.tsx
+
+Files modified:
+- apps/arena-mini-app/src/App.tsx (integrated ShopPage with tab switching)
+- apps/arena-mini-app/src/components/index.ts (added shop exports)
+- apps/arena-mini-app/src/styles/global.css (added shop styles)
+- TODO.md (marked shop implementation tasks as complete)
+
+Next steps:
+- Test buy, reroll (before first purchase only), upgrade, order, and submit flows
+- Test reroll button disabled after first card purchase (permanent lockout)
+- Test stat overlay positioning on compact cards
+- Test upgrade preview showing before/after stats on compact cards

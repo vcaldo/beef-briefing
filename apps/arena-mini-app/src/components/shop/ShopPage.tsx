@@ -31,7 +31,7 @@ interface ShopPageProps {
  */
 export function ShopPage({
   matchId,
-  currentUserId,
+  currentUserId: _currentUserId,
   onTabChange,
   onBattleStart,
 }: ShopPageProps) {

@@ -99,13 +99,14 @@ function App() {
         )
       case 'shop':
         return (
-          <div className="empty-state">
-            <div className="empty-state-icon">🛒</div>
-            <h3 className="empty-state-title">Shop Coming Soon</h3>
-            <p className="empty-state-text">
-              Build your team by purchasing and upgrading cards.
-            </p>
-          </div>
+          <ShopPage
+            matchId={activeMatchId}
+            currentUserId={authData?.user_id}
+            onTabChange={setActiveTab}
+            onBattleStart={(matchId) => {
+              setActiveMatchId(matchId)
+            }}
+          />
         )
       case 'battle':
         return (

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 import { apiClient } from './api/client'
-import { TabBar, LoadingSpinner, ErrorDisplay } from './components'
+import { TabBar, LoadingSpinner, ErrorDisplay, LobbyPage } from './components'
 import type { AuthResponse } from '@beef-briefing/shared-mini-app/types'
 import type { GamePhase } from './types'
 
@@ -20,7 +20,8 @@ function App() {
   const [appState, setAppState] = useState<AppState>('loading')
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<GamePhase>('lobby')
-  const [_authData, setAuthData] = useState<AuthResponse | null>(null)
+  const [authData, setAuthData] = useState<AuthResponse | null>(null)
+  const [activeMatchId, setActiveMatchId] = useState<string | null>(null)
 
   const launchParams = useLaunchParams()
 

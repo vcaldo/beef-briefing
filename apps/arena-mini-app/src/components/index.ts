@@ -17,13 +17,13 @@ export {
 } from './common/Card'
 
 // ============================================================================
-// Lobby Components (to be implemented)
+// Lobby Components
 // ============================================================================
-// export { LobbyPage } from './lobby/LobbyPage'
-// export { MatchList } from './lobby/MatchList'
-// export { MatchCard } from './lobby/MatchCard'
-// export { CreateMatchButton } from './lobby/CreateMatchButton'
-// export { ParticipantsList } from './lobby/ParticipantsList'
+export { LobbyPage } from './lobby/LobbyPage'
+export { MatchList } from './lobby/MatchList'
+export { MatchCard } from './lobby/MatchCard'
+export { CreateMatchButton } from './lobby/CreateMatchButton'
+export { ParticipantsList } from './lobby/ParticipantsList'
 
 // ============================================================================
 // Shop Components (to be implemented)

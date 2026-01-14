@@ -84,11 +84,17 @@ check_container() {
 
 # Run docker exec with environment overrides
 docker_exec() {
+    # Check if TTY is available
+    local docker_flags="-i"
+    if [[ -t 0 ]]; then
+        docker_flags="-it"
+    fi
+
     if [[ -n "$ENV_OVERRIDES" ]]; then
         # shellcheck disable=SC2086
-        docker exec -it $ENV_OVERRIDES "$CONTAINER" "$@"
+        docker exec $docker_flags $ENV_OVERRIDES "$CONTAINER" "$@"
     else
-        docker exec -it "$CONTAINER" "$@"
+        docker exec $docker_flags "$CONTAINER" "$@"
     fi
 }
 

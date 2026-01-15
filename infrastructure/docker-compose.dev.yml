@@ -284,6 +284,28 @@ services:
     networks:
       - beef-dev-network
 
+  # Arena Mini App - Development with hot reload
+  arena-mini-app-dev:
+    image: node:22-alpine
+    container_name: beef-arena-mini-app-dev
+    working_dir: /workspace/apps/arena-mini-app
+    volumes:
+      - ..:/workspace
+      - arena_mini_app_node_modules_dev:/workspace/apps/arena-mini-app/node_modules
+      - shared_mini_app_node_modules_dev:/workspace/apps/shared-mini-app/node_modules
+    ports:
+      - "5175:5175"
+    command: sh -c "npm install -g pnpm && cd /workspace && pnpm install --filter @beef-briefing/arena-mini-app... && cd apps/arena-mini-app && pnpm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_API_URL: http://localhost:8080
+      VITE_CARD_API_URL: http://localhost:8051
+      VITE_NEW_RELIC_BROWSER_ACCOUNT_ID: ${NEW_RELIC_ACCOUNT_ID:-}
+      VITE_NEW_RELIC_BROWSER_APP_ID: ${NEW_RELIC_BROWSER_ARENA_APP_ID:-}
+      VITE_NEW_RELIC_BROWSER_LICENSE_KEY: ${NEW_RELIC_BROWSER_LICENSE_KEY:-}
+      VITE_ENVIRONMENT: development
+    networks:
+      - beef-dev-network
+
   # ML Dashboard - Dev-only tool for exploring ML data
   ml-dashboard-backend:
     build:
@@ -335,6 +357,7 @@ volumes:
   ml_models_cache_dev:
   deck_mini_app_node_modules_dev:
   leaderboard_mini_app_node_modules_dev:
+  arena_mini_app_node_modules_dev:
   ml_dashboard_node_modules_dev:
   shared_mini_app_node_modules_dev:
 

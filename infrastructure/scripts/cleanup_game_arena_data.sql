@@ -52,8 +52,13 @@ ALTER TABLE chats DROP COLUMN IF EXISTS ranked_tournaments_enabled;
 -- =====================================================
 -- REMOVE MIGRATION RECORDS
 -- =====================================================
+-- Note: schema_migrations stores full filenames, not just version numbers
+-- Only removing game-related migrations (009, 013); 010, 011 are card_images
 
-DELETE FROM schema_migrations WHERE version IN ('009', '010', '011', '012');
+DELETE FROM schema_migrations WHERE version IN (
+  '009_game_arena.sql',
+  '013_fix_draw_handling.sql'
+);
 
 -- =====================================================
 -- VERIFICATION
@@ -68,6 +73,6 @@ AND table_schema = 'public';
 
 SELECT COUNT(*) as remaining_migrations
 FROM schema_migrations
-WHERE version IN ('009', '010', '011', '012');
+WHERE version IN ('009_game_arena.sql', '013_fix_draw_handling.sql');
 
 COMMIT;

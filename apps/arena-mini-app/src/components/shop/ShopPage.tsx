@@ -528,12 +528,6 @@ export function ShopPage({
                     )}
                   </div>
 
-                  {/* Cost badge */}
-                  {!isPurchased && (
-                    <div className={`shop-card-cost ${!canAfford ? 'unaffordable' : ''}`}>
-                      🪙 {cardCost}
-                    </div>
-                  )}
                 </div>
               )
             })}

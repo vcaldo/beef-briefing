@@ -896,27 +896,6 @@ a:focus:not(:focus-visible),
   pointer-events: none;
 }
 
-.shop-card-cost {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 4px 8px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--coin-gold);
-}
-
-.shop-card-cost.unaffordable {
-  color: var(--hp-low);
-  opacity: 0.8;
-}
-
 .shop-card-purchased {
   opacity: 0.6;
   pointer-events: none;

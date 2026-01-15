@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Card as CardType, ShopCard, EnhancedShopCard, EnhancedTeamCard } from '../../types'
 
 interface CardImageProps {
@@ -10,14 +10,27 @@ interface CardImageProps {
   name: string
   /** Whether to show loading skeleton */
   showSkeleton?: boolean
+  /** Size variant for fallback text */
+  size?: 'sm' | 'md' | 'lg'
 }
 
 /**
  * Card image with loading and error states.
+ * - Shows skeleton animation while loading
+ * - Shows initials fallback on error or missing URL
+ * - Resets loading state when src changes
  */
-function CardImage({ src, alt, name, showSkeleton = true }: CardImageProps) {
+function CardImage({ src, alt, name, showSkeleton = true, size = 'lg' }: CardImageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
+
+  // Reset loading state when src changes
+  useEffect(() => {
+    if (src) {
+      setIsLoading(true)
+      setHasError(false)
+    }
+  }, [src])
 
   // Generate initials for fallback
   const initials = name
@@ -27,9 +40,16 @@ function CardImage({ src, alt, name, showSkeleton = true }: CardImageProps) {
     .slice(0, 2)
     .toUpperCase()
 
+  // Size-based text classes
+  const sizeClasses = {
+    sm: 'text-sm',
+    md: 'text-lg',
+    lg: 'text-2xl',
+  }
+
   if (!src || hasError) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-[var(--arena-purple)] text-white font-display font-bold text-2xl">
+      <div className={`w-full h-full flex items-center justify-center bg-[var(--arena-purple)] text-white font-display font-bold ${sizeClasses[size]}`}>
         {initials || '?'}
       </div>
     )
@@ -37,7 +57,7 @@ function CardImage({ src, alt, name, showSkeleton = true }: CardImageProps) {
 
   return (
     <>
-      {showSkeleton && isLoading && <div className="skeleton absolute inset-0" />}
+      {showSkeleton && isLoading && <div className="card-image-skeleton absolute inset-0" />}
       <img
         src={src}
         alt={alt}
@@ -167,6 +187,7 @@ export function CompactCard({
         src={card.photo_url}
         alt={`${card.name}'s card`}
         name={card.name}
+        size="md"
       />
 
       {/* Position badge */}

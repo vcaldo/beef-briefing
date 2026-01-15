@@ -44,7 +44,7 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 - [x] Test upgrade preview showing before/after stats on compact cards
 - [x] Test read-only state after team submission ("Waiting for others...")
 - [x] Test countdown timer and auto-transition to battle phase
-- [ ] Test card image loading and fallback states
+- [x] Test card image loading and fallback states
 
 ---
 

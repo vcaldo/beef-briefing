@@ -958,3 +958,56 @@ Implementation details verified:
 
 Next steps:
 - Test card image loading and fallback states
+
+
+================================================================================
+2026-01-15 - Test card image loading and fallback states
+================================================================================
+
+Task: Test and improve card image loading and fallback states
+
+What was accomplished:
+- Comprehensive code review of CardImage component in Card.tsx
+- Verified existing implementation has correct loading/error handling:
+  - isLoading state shows skeleton while image loads
+  - hasError state shows initials fallback when image fails
+  - No URL shows initials fallback immediately
+
+- Enhanced CardImage component with improvements:
+  1. Added useEffect to reset loading state when src prop changes
+     - Previously, if src changed, the old loading state persisted
+     - Now properly shows skeleton again when switching images
+
+  2. Added size prop for consistent fallback text sizing:
+     - 'sm' for battle cards (text-sm)
+     - 'md' for compact cards (text-lg)
+     - 'lg' for shop cards (text-2xl)
+
+  3. Updated CompactCard to use size="md" for appropriate fallback sizing
+
+- Added dedicated card-image-skeleton CSS class:
+  - Uses arena theme colors (--arena-dark, --arena-purple)
+  - Matches shimmer animation from existing skeleton class
+  - Inherits border-radius from parent container
+
+- BattleCard note: Currently uses initials-only display (no photo_url in CardSnapshot)
+  - This is intentional - CardSnapshot from backend doesn't include photo URLs
+  - Battle cards are small (80x120px), initials are appropriate
+  - Future enhancement: could add photo_url to CardSnapshot if desired
+
+- TypeScript compilation: Passes (npx tsc --noEmit)
+- Docker build: Succeeds (JS 71.87KB gzip, CSS 7.52KB gzip)
+
+Files modified:
+- apps/arena-mini-app/src/components/common/Card.tsx (enhanced CardImage with useEffect and size prop)
+- apps/arena-mini-app/src/styles/global.css (added card-image-skeleton class)
+- TODO.md (marked task as complete)
+
+Implementation verified complete:
+- Loading state: Shows purple-themed shimmer skeleton
+- Error state: Shows initials in purple background
+- No URL state: Shows initials immediately (no loading attempt)
+- Src change handling: Properly resets to loading state
+
+Next steps:
+- Test event playback with sequential display and stat updates (Phase 4)

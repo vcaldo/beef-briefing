@@ -701,7 +701,7 @@ export interface LeaderboardResponse {
 /**
  * A single match in the user's history.
  *
- * Contains match result, opponent info, and performance stats.
+ * Contains match result, opponent info, and team data.
  * Used in the Stats page history tab.
  *
  * @example
@@ -716,38 +716,41 @@ export interface MatchHistoryEntry {
   match_id: string
   /** Whether match was ranked or casual */
   match_type: MatchType
-  /** Opponent's user ID */
-  opponent_id: number
-  /** Opponent's display name */
-  opponent_name: string
-  /** Opponent's username (optional) */
-  opponent_username?: string
+  /** Current user's profile photo URL */
+  your_photo_url?: string
+  /** Opponent information */
+  opponent: {
+    /** Opponent's user ID */
+    user_id: number
+    /** Opponent's display name */
+    first_name: string
+    /** Opponent's username (optional) */
+    username?: string
+    /** Opponent's profile photo URL */
+    photo_url?: string
+  }
   /** Match outcome for current user */
   result: 'win' | 'loss' | 'draw'
-  /** Total damage dealt by user */
-  damage_dealt: number
-  /** Total damage received by user */
-  damage_received: number
-  /** Rating points gained/lost (ranked only) */
-  rating_change?: number
+  /** Cards in user's team */
+  your_team: Card[]
+  /** Cards in opponent's team */
+  opponent_team: Card[]
   /** ISO timestamp when match completed */
-  played_at: string
+  completed_at: string
 }
 
 /**
- * Paginated match history response from getHistory endpoint.
+ * Match history response from getHistory endpoint.
  *
  * @see {@link MatchHistoryEntry} Individual entry structure
  */
 export interface HistoryResponse {
-  /** Match history entries for current page */
+  /** Match history entries */
   matches: MatchHistoryEntry[]
   /** Total number of matches */
   total: number
-  /** Current page number (0-indexed) */
-  page: number
-  /** Entries per page */
-  limit: number
+  /** Whether more matches exist beyond current page */
+  has_more: boolean
 }
 
 /**

@@ -263,7 +263,7 @@ type ShopAffordability struct {
 // EnhancedShopCard wraps ShopCard with affordability info
 type EnhancedShopCard struct {
 	*battle.ShopCard
-	CanBuy            bool    `json:"can_buy"`
+	CanAfford         bool    `json:"can_afford"`
 	BuyDisabledReason *string `json:"buy_disabled_reason"`
 }
 
@@ -291,6 +291,7 @@ type EnhancedShopResponse struct {
 	TeamSubmitted        bool                  `json:"team_submitted"`
 	Deadline             *time.Time            `json:"deadline,omitempty"`
 	TimeRemaining        int                   `json:"time_remaining_seconds"`
+	CanReroll            bool                  `json:"can_reroll"`
 	Affordability        ShopAffordability     `json:"affordability"`
 }
 
@@ -638,12 +639,12 @@ func (s *ArenaService) computeShopAffordability(coins int, teamSize int, isReady
 func (s *ArenaService) enhanceShopCards(cards []*battle.ShopCard, coins int, teamSize int) []*EnhancedShopCard {
 	enhanced := make([]*EnhancedShopCard, len(cards))
 	for i, card := range cards {
-		canBuy := !card.IsPurchased && coins >= shop.CardCost && teamSize < shop.TeamSize
+		canAfford := !card.IsPurchased && coins >= shop.CardCost && teamSize < shop.TeamSize
 		enhanced[i] = &EnhancedShopCard{
-			ShopCard: card,
-			CanBuy:   canBuy,
+			ShopCard:  card,
+			CanAfford: canAfford,
 		}
-		if !canBuy {
+		if !canAfford {
 			if card.IsPurchased {
 				reason := "already purchased"
 				enhanced[i].BuyDisabledReason = &reason
@@ -795,6 +796,7 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 		TeamSubmitted: false,
 		Deadline:      match.ShopPhaseDeadline,
 		TimeRemaining: timeRemaining,
+		CanReroll:     affordability.CanReroll,
 		Affordability: affordability,
 	}, nil
 }
@@ -827,6 +829,7 @@ func (s *ArenaService) buildReadOnlyShopState(ctx context.Context, match *reposi
 		TeamSubmitted: true,
 		Deadline:      match.ShopPhaseDeadline,
 		TimeRemaining: 0, // Submitted players don't need timer
+		CanReroll:     false,
 		Affordability: ShopAffordability{
 			CanBuy:                 false,
 			CanReroll:              false,

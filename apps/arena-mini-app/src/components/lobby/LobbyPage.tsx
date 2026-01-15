@@ -25,6 +25,7 @@ interface LobbyPageProps {
   userId: number
   firstName: string
   onNavigateToShop: () => void
+  onNavigateToBattle: () => void
   activeMatch: Match | null
   onMatchChange: (match: Match | null) => void
 }
@@ -34,6 +35,7 @@ export function LobbyPage({
   userId,
   firstName,
   onNavigateToShop,
+  onNavigateToBattle,
   activeMatch,
   onMatchChange,
 }: LobbyPageProps) {
@@ -52,7 +54,7 @@ export function LobbyPage({
     (matchList: Match[]): Match | null => {
       for (const match of matchList) {
         const isParticipant = match.participants?.some((p) => p.user_id === userId)
-        if (isParticipant && (match.status === 'open' || match.status === 'shop_phase')) {
+        if (isParticipant && (match.status === 'open' || match.status === 'shop_phase' || match.status === 'battle_phase')) {
           return match
         }
       }
@@ -102,6 +104,17 @@ export function LobbyPage({
         return
       }
 
+      // Handle battle_phase - user may have refreshed during battle
+      if (userMatch && userMatch.status === 'battle_phase') {
+        addPageAction('match_phase_recovery', {
+          match_id: userMatch.id,
+          status: 'battle_phase',
+        })
+        onMatchChange(userMatch)
+        onNavigateToBattle()
+        return
+      }
+
       // Sync active match state with parent component
       if (userMatch !== activeMatch) {
         onMatchChange(userMatch)
@@ -126,7 +139,7 @@ export function LobbyPage({
         noticeError(err, { context: 'lobby_fetch_matches' })
       }
     }
-  }, [chatId, userId, findUserMatch, activeMatch, onMatchChange, onNavigateToShop, loading])
+  }, [chatId, userId, findUserMatch, activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle, loading])
 
   // Poll for match with specific match ID (when user is in a match)
   const fetchMatchDetails = useCallback(async () => {
@@ -146,6 +159,18 @@ export function LobbyPage({
         })
         onMatchChange(match)
         onNavigateToShop()
+        return
+      }
+
+      // Check for phase transition to battle
+      if (match.status === 'battle_phase') {
+        addPageAction('match_phase_transition', {
+          match_id: match.id,
+          from_status: activeMatch.status,
+          to_status: 'battle_phase',
+        })
+        onMatchChange(match)
+        onNavigateToBattle()
         return
       }
 
@@ -170,7 +195,7 @@ export function LobbyPage({
       // On error, fall back to fetching all matches
       fetchMatches()
     }
-  }, [activeMatch, onMatchChange, onNavigateToShop, fetchMatches])
+  }, [activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle, fetchMatches])
 
   /**
    * Setup match polling with adaptive intervals.

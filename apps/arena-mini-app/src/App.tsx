@@ -183,6 +183,7 @@ function App() {
             activeMatch={activeMatch}
             onMatchChange={handleMatchChange}
             onNavigateToShop={navigateToShop}
+            onNavigateToBattle={navigateToBattle}
           />
         )
       case 'shop':
@@ -221,6 +222,7 @@ function App() {
             activeMatch={activeMatch}
             onMatchChange={handleMatchChange}
             onNavigateToShop={navigateToShop}
+            onNavigateToBattle={navigateToBattle}
           />
         )
     }

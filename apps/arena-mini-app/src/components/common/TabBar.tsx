@@ -49,7 +49,8 @@ const ShopIcon = () => (
   </svg>
 )
 
-const BattleIcon = () => (
+// Exported for potential future use (Battle screen accessible via auto-navigation only)
+export const BattleIcon = () => (
   <svg
     width="24"
     height="24"
@@ -92,12 +93,12 @@ const StatsIcon = () => (
 
 /**
  * Tab configuration for arena mini-app navigation
- * 4 tabs: Lobby, Shop, Battle, Stats
+ * 3 tabs: Lobby, Shop, Stats
+ * Battle screen is only accessible via automatic transition from shop phase
  */
 const TABS: Tab[] = [
   { id: 'lobby', label: 'Lobby', icon: <LobbyIcon /> },
   { id: 'shop', label: 'Shop', icon: <ShopIcon /> },
-  { id: 'battle', label: 'Battle', icon: <BattleIcon /> },
   { id: 'stats', label: 'Stats', icon: <StatsIcon /> },
 ]
 

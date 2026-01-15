@@ -10,10 +10,21 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import { SortableContext, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer, CompactCard } from '../common'
+import { SortableTeamSlot } from './SortableTeamSlot'
 
 import type {
   Match,
@@ -66,6 +77,49 @@ export function ShopPage({
   const cardCost = gameConstants?.card_cost ?? 3
   const rerollCost = gameConstants?.reroll_cost ?? 1
   const upgradeCost = gameConstants?.upgrade_cost ?? 1
+
+  // Drag-and-drop sensors for team reordering
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 5 } })
+  )
+
+  // Handle drag end for team reordering
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id || !activeMatch) return
+
+      // Get current positions and reorder
+      const positions = teamCards.map((c) => c.position).sort((a, b) => a - b)
+      const oldIndex = positions.indexOf(Number(active.id))
+      const newIndex = positions.indexOf(Number(over.id))
+
+      if (oldIndex === -1 || newIndex === -1) return
+
+      const newOrder = arrayMove(positions, oldIndex, newIndex)
+
+      setActionLoading('reorder')
+      try {
+        const data = await apiClient.setTeamOrder(activeMatch.id, newOrder)
+        addPageAction('team_reordered', {
+          match_id: activeMatch.id,
+          old_order: positions,
+          new_order: newOrder,
+        })
+        setShopData(data)
+      } catch (err) {
+        console.error('Failed to reorder team:', err)
+        setError(err instanceof Error ? err.message : 'Failed to reorder team')
+        if (err instanceof Error) {
+          noticeError(err, { context: 'reorder_team', match_id: activeMatch.id })
+        }
+      } finally {
+        setActionLoading(null)
+      }
+    },
+    [activeMatch, teamCards]
+  )
 
   // Fetch shop data from API
   const fetchShop = useCallback(async () => {
@@ -369,84 +423,99 @@ export function ShopPage({
         </div>
       )}
 
-      {/* Team display - sticky at top */}
+      {/* Team display - sticky at top with drag-and-drop reordering */}
       <section className="shop-team-section">
         <h2 className="shop-section-title">Your Team ({teamCards.length}/{teamSize})</h2>
-        <div className="team-display">
-          {Array.from({ length: teamSize }).map((_, slotIndex) => {
-            const card = teamCards.find((c) => c.position === slotIndex)
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={teamCards.map((c) => c.position)}
+            strategy={horizontalListSortingStrategy}
+          >
+            <div className="team-display">
+              {Array.from({ length: teamSize }).map((_, slotIndex) => {
+                const card = teamCards.find((c) => c.position === slotIndex)
 
-            if (!card) {
-              return (
-                <div key={slotIndex} className="team-slot empty">
-                  <span className="team-slot-number">{slotIndex + 1}</span>
-                  <span className="team-slot-empty-text">Empty</span>
-                </div>
-              )
-            }
-
-            return (
-              <div key={slotIndex} className="team-slot filled">
-                <span className="team-slot-number">{slotIndex + 1}</span>
-                {card.card_image_url ? (
-                  <CompactCard
-                    imageUrl={card.card_image_url}
-                    positions={card.placeholder_positions}
-                    currentStats={{
-                      atk: card.atk,
-                      def: card.def,
-                      hp: card.hp,
-                      maxHp: card.max_hp,
-                    }}
-                    isAlive={true}
-                    showHpBar={true}
-                    cardName={card.name}
-                    cardId={card.card_id}
-                  />
-                ) : (
-                  <div className="team-card-simple">
-                    <div className="team-card-name">{card.name}</div>
-                    <div className="team-card-stats">
-                      <span className="stat atk">⚔️ {card.atk}</span>
-                      <span className="stat def">🛡️ {card.def}</span>
-                      <span className="stat hp">❤️ {card.hp}</span>
+                if (!card) {
+                  return (
+                    <div key={slotIndex} className="team-slot empty">
+                      <span className="team-slot-number">{slotIndex + 1}</span>
+                      <span className="team-slot-empty-text">Empty</span>
                     </div>
-                  </div>
-                )}
+                  )
+                }
 
-                {/* Upgrade buttons - only show if not submitted */}
-                {!isSubmitted && (
-                  <div className="team-card-upgrades">
-                    <button
-                      className="upgrade-btn upgrade-atk"
-                      onClick={() => handleUpgrade(slotIndex, 'atk')}
-                      disabled={coins < upgradeCost || actionLoading !== null}
-                      title={`+3 ATK (${upgradeCost} coin)`}
-                    >
-                      {actionLoading === `upgrade-${slotIndex}-atk` ? (
-                        <LoadingSpinner size="sm" inline />
+                // Wrap filled slots with SortableTeamSlot for drag-and-drop
+                // Disabled after team submission
+                return (
+                  <SortableTeamSlot key={slotIndex} id={slotIndex} disabled={isSubmitted}>
+                    <div className={`team-slot filled ${actionLoading === 'reorder' ? 'dragging' : ''}`}>
+                      <span className="team-slot-number">{slotIndex + 1}</span>
+                      {card.card_image_url ? (
+                        <CompactCard
+                          imageUrl={card.card_image_url}
+                          positions={card.placeholder_positions}
+                          currentStats={{
+                            atk: card.atk,
+                            def: card.def,
+                            hp: card.hp,
+                            maxHp: card.max_hp,
+                          }}
+                          isAlive={true}
+                          showHpBar={true}
+                          cardName={card.name}
+                          cardId={card.card_id}
+                        />
                       ) : (
-                        <>⚔️ +3</>
+                        <div className="team-card-simple">
+                          <div className="team-card-name">{card.name}</div>
+                          <div className="team-card-stats">
+                            <span className="stat atk">⚔️ {card.atk}</span>
+                            <span className="stat def">🛡️ {card.def}</span>
+                            <span className="stat hp">❤️ {card.hp}</span>
+                          </div>
+                        </div>
                       )}
-                    </button>
-                    <button
-                      className="upgrade-btn upgrade-hp"
-                      onClick={() => handleUpgrade(slotIndex, 'hp')}
-                      disabled={coins < upgradeCost || actionLoading !== null}
-                      title={`+3 HP (${upgradeCost} coin)`}
-                    >
-                      {actionLoading === `upgrade-${slotIndex}-hp` ? (
-                        <LoadingSpinner size="sm" inline />
-                      ) : (
-                        <>❤️ +3</>
+
+                      {/* Upgrade buttons - only show if not submitted */}
+                      {!isSubmitted && (
+                        <div className="team-card-upgrades">
+                          <button
+                            className="upgrade-btn upgrade-atk"
+                            onClick={() => handleUpgrade(slotIndex, 'atk')}
+                            disabled={coins < upgradeCost || actionLoading !== null}
+                            title={`+3 ATK (${upgradeCost} coin)`}
+                          >
+                            {actionLoading === `upgrade-${slotIndex}-atk` ? (
+                              <LoadingSpinner size="sm" inline />
+                            ) : (
+                              <>⚔️ +3</>
+                            )}
+                          </button>
+                          <button
+                            className="upgrade-btn upgrade-hp"
+                            onClick={() => handleUpgrade(slotIndex, 'hp')}
+                            disabled={coins < upgradeCost || actionLoading !== null}
+                            title={`+3 HP (${upgradeCost} coin)`}
+                          >
+                            {actionLoading === `upgrade-${slotIndex}-hp` ? (
+                              <LoadingSpinner size="sm" inline />
+                            ) : (
+                              <>❤️ +3</>
+                            )}
+                          </button>
+                        </div>
                       )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+                    </div>
+                  </SortableTeamSlot>
+                )
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
       </section>
 
       {/* Shop cards grid - only show if not submitted */}

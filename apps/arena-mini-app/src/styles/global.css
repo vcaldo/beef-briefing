@@ -1207,6 +1207,20 @@ a:focus:not(:focus-visible),
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* Drag-and-drop styles for team reordering */
+.team-slot.filled.dragging {
+  opacity: 0.5;
+  transform: scale(1.05);
+}
+
+.team-slot.filled {
+  cursor: grab;
+}
+
+.team-slot.filled:active {
+  cursor: grabbing;
+}
+
 .team-slot-number {
   position: absolute;
   top: -10px;

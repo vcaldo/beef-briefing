@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiClient } from '../../api/client'
 import { LoadingSpinner } from '../common/LoadingSpinner'
 import { ErrorDisplay } from '../common/ErrorDisplay'
@@ -27,6 +27,7 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
   // Leaderboard state
   const [leaderboardType, setLeaderboardType] = useState<'ranked' | 'regular'>('ranked')
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
 
   // Profile state
   const [profile, setProfile] = useState<ProfileStats | null>(null)
@@ -36,6 +37,7 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
   const [matchHistory, setMatchHistory] = useState<MatchHistoryEntry[]>([])
   const [historyHasMore, setHistoryHasMore] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
+  const matchHistoryRef = useRef<MatchHistoryEntry[]>([])
 
   // H2H state
   const [h2hSearchQuery, setH2hSearchQuery] = useState('')
@@ -44,7 +46,7 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
   const [h2hLoading, setH2hLoading] = useState(false)
   const [h2hSearched, setH2hSearched] = useState(false)
 
-  // Load initial data
+  // Load initial data (profile only - leaderboard loaded separately)
   const loadInitialData = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -52,7 +54,7 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
     try {
       // Load leaderboard and profile in parallel
       const [leaderboardRes, profileRes] = await Promise.all([
-        apiClient.getLeaderboard(leaderboardType, 50, 0),
+        apiClient.getLeaderboard('ranked', 50, 0),
         apiClient.getProfile(),
       ])
 
@@ -65,15 +67,18 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
     } finally {
       setLoading(false)
     }
-  }, [leaderboardType])
+  }, [])
 
   // Load leaderboard when type changes
   const loadLeaderboard = useCallback(async (type: 'ranked' | 'regular') => {
+    setLeaderboardLoading(true)
     try {
       const res = await apiClient.getLeaderboard(type, 50, 0)
       setLeaderboard(res.entries || [])
     } catch (err) {
       console.error('Failed to load leaderboard:', err)
+    } finally {
+      setLeaderboardLoading(false)
     }
   }, [])
 
@@ -81,21 +86,22 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
   const loadMatchHistory = useCallback(async (reset: boolean = false) => {
     setHistoryLoading(true)
     try {
-      const offset = reset ? 0 : matchHistory.length
+      const offset = reset ? 0 : matchHistoryRef.current.length
       const res = await apiClient.getMatchHistory(20, offset)
 
-      if (reset) {
-        setMatchHistory(res.matches || [])
-      } else {
-        setMatchHistory(prev => [...prev, ...(res.matches || [])])
-      }
+      const newHistory = reset
+        ? (res.matches || [])
+        : [...matchHistoryRef.current, ...(res.matches || [])]
+
+      matchHistoryRef.current = newHistory
+      setMatchHistory(newHistory)
       setHistoryHasMore(res.has_more)
     } catch (err) {
       console.error('Failed to load match history:', err)
     } finally {
       setHistoryLoading(false)
     }
-  }, [matchHistory.length])
+  }, [])
 
   // Search H2H record
   const searchH2H = useCallback(async () => {
@@ -180,19 +186,26 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
         <button
           className={`toggle-btn ${leaderboardType === 'ranked' ? 'active' : ''}`}
           onClick={() => setLeaderboardType('ranked')}
+          disabled={leaderboardLoading}
         >
           Ranked
         </button>
         <button
           className={`toggle-btn ${leaderboardType === 'regular' ? 'active' : ''}`}
           onClick={() => setLeaderboardType('regular')}
+          disabled={leaderboardLoading}
         >
           Casual
         </button>
       </div>
 
-      <div className="leaderboard-list">
-        {leaderboard.length === 0 ? (
+      <div className={`leaderboard-list ${leaderboardLoading ? 'loading' : ''}`}>
+        {leaderboardLoading ? (
+          <div className="leaderboard-loading">
+            <span className="btn-spinner" />
+            <span>Loading...</span>
+          </div>
+        ) : leaderboard.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">🏆</div>
             <h3 className="empty-state-title">No Rankings Yet</h3>

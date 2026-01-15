@@ -2136,6 +2136,20 @@ body {
   flex-direction: column;
 }
 
+.leaderboard-list.loading {
+  opacity: 0.5;
+}
+
+.leaderboard-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  color: var(--text-hint);
+  font-size: 14px;
+}
+
 .leaderboard-entry.current-user {
   border: 2px solid var(--arena-purple);
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);

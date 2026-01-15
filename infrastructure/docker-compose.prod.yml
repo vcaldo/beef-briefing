@@ -128,7 +128,7 @@ services:
       # Mini App authentication
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      CORS_ORIGINS: https://deck.${DOMAIN_NAME},https://leaderboard.${DOMAIN_NAME}
+      CORS_ORIGINS: https://deck.${DOMAIN_NAME},https://leaderboard.${DOMAIN_NAME},https://arena.${DOMAIN_NAME}
     volumes:
       - ./secrets/apps/card-renderer:/app/secrets:ro
     depends_on:

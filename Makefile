@@ -578,13 +578,13 @@ ml-clean-cards-prod: ## Clean cards for a chat (prod). Usage: make ml-clean-card
 # ML DASHBOARD (ml-dashboard-*)
 # =============================================================================
 # Dev-only tool for exploring ML-processed data
-# Backend: FastAPI (port 8052) | Frontend: React/Vite (port 5175)
+# Backend: FastAPI (port 8052) | Frontend: React/Vite (port 6175)
 
 ml-dashboard-up: ## Start ML Dashboard (backend + frontend)
 	@$(DC) up -d ml-dashboard-backend ml-dashboard-frontend
 	@echo ""
 	@echo "ML Dashboard started:"
-	@echo "  Frontend: http://localhost:5175"
+	@echo "  Frontend: http://localhost:6175"
 	@echo "  Backend:  http://localhost:8052"
 	@echo ""
 
@@ -592,7 +592,7 @@ ml-dashboard-up-build: ## Rebuild and start ML Dashboard
 	@$(DC) up -d --build ml-dashboard-backend ml-dashboard-frontend
 	@echo ""
 	@echo "ML Dashboard started:"
-	@echo "  Frontend: http://localhost:5175"
+	@echo "  Frontend: http://localhost:6175"
 	@echo "  Backend:  http://localhost:8052"
 	@echo ""
 

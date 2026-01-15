@@ -5,13 +5,13 @@
    and purple/pink/cyan accents. Dark theme with energetic highlights.
    ============================================================================= */
 
+/* Google Fonts imports - MUST be before Tailwind directives */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 /* Tailwind CSS imports */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Google Fonts imports */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 /* =============================================================================
    CSS Custom Properties (Telegram theme + Arena custom)

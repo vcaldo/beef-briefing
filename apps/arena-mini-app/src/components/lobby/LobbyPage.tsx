@@ -489,3 +489,5 @@ export function LobbyPage({
     </div>
   )
 }
+
+export default LobbyPage

@@ -792,3 +792,5 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     </div>
   )
 }
+
+export default StatsPage

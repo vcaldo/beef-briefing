@@ -1,16 +1,19 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 
 import { apiClient } from './api/client'
 import { setCustomAttribute, addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { ErrorBoundary } from '@beef-briefing/shared-mini-app/components'
-import { TabBar, SplashScreen, ErrorDisplay } from './components/common'
-import { LobbyPage } from './components/lobby'
-import { ShopPage } from './components/shop'
-import { BattlePage } from './components/battle'
-import { StatsPage } from './components/stats'
+import { TabBar, SplashScreen, ErrorDisplay, LoadingSpinner } from './components/common'
 
 import type { TabId, AppState, GameConstants, Match } from './types'
+
+// Lazy load page components for code splitting
+// Each page will be loaded in a separate chunk when first accessed
+const LobbyPage = lazy(() => import('./components/lobby/LobbyPage'))
+const ShopPage = lazy(() => import('./components/shop/ShopPage'))
+const BattlePage = lazy(() => import('./components/battle/BattlePage'))
+const StatsPage = lazy(() => import('./components/stats/StatsPage'))
 
 function App() {
   // App state
@@ -254,7 +257,9 @@ function App() {
   return (
     <div className="app">
       <ErrorBoundary key={activeTab} onReset={handleErrorReset} name={`arena-${activeTab}`}>
-        {renderPage()}
+        <Suspense fallback={<LoadingSpinner message="Loading..." />}>
+          {renderPage()}
+        </Suspense>
       </ErrorBoundary>
       <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
     </div>

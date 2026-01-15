@@ -106,15 +106,15 @@ get_model_pricing() {
     fi
 }
 
-# Get the primary model used in this session from metrics log
-get_session_model() {
+# Get all unique models used in this session from metrics log
+get_session_models() {
     if [[ ! -f "$METRICS_LOG" ]]; then
         echo "unknown"
         return
     fi
 
-    # Get the model from the first metric entry
-    jq -r '.model // "unknown"' "$METRICS_LOG" 2>/dev/null | head -1
+    # Get all unique models from metrics log and join with comma
+    jq -r '.model // "unknown"' "$METRICS_LOG" 2>/dev/null | sort -u | tr '\n' ',' | sed 's/,$//'
 }
 
 # =============================================================================
@@ -290,12 +290,21 @@ print_final_summary() {
     local total_min=$((TOTAL_DURATION / 60))
     local total_sec=$((TOTAL_DURATION % 60))
 
-    # Get actual model used and its pricing
-    local session_model=$(get_session_model)
-    local pricing=$(get_model_pricing "$session_model")
+    # Get all models used in session
+    local session_models=$(get_session_models)
+
+    # Check if multiple models were used and warn
+    if [[ "$session_models" == *","* ]]; then
+        log_warn "Multiple models detected in session: $session_models"
+        log_warn "Cost estimate uses pricing for: $(echo "$session_models" | cut -d',' -f1) only"
+    fi
+
+    # For cost calculation, use the first model
+    local primary_model=$(echo "$session_models" | cut -d',' -f1)
+    local pricing=$(get_model_pricing "$primary_model")
     read -r input_price output_price <<< "$pricing"
 
-    # Cost estimate based on actual model used
+    # Cost estimate based on primary model used
     local input_cost=$(awk "BEGIN {printf \"%.3f\", ($TOTAL_INPUT_TOKENS / 1000000) * $input_price}")
     local output_cost=$(awk "BEGIN {printf \"%.3f\", ($TOTAL_OUTPUT_TOKENS / 1000000) * $output_price}")
     local total_cost=$(awk "BEGIN {printf \"%.3f\", $input_cost + $output_cost}")
@@ -327,7 +336,10 @@ print_final_summary() {
         echo "  Average:         $((TOTAL_FILES_CHANGED / INTERACTION_COUNT)) files per iteration"
     fi
     echo ""
-    echo "Cost Estimate ($session_model):"
+    echo "Models Used:"
+    echo "  $session_models"
+    echo ""
+    echo "Cost Estimate (based on $primary_model):"
     echo "  Input tokens:    \$$input_cost"
     echo "  Output tokens:   \$$output_cost"
     echo "  Total:           \$$total_cost"

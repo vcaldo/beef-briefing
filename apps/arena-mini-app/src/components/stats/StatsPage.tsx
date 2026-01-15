@@ -208,10 +208,25 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     [chatId]
   )
 
-  // Load initial data when tab changes
+  /**
+   * Load data when switching to a tab that hasn't been loaded yet.
+   *
+   * Caching strategy:
+   * - Data is cached in component state (leaderboardData, profileData, etc.)
+   * - Only fetch if data is null (not yet loaded)
+   * - Use the Refresh button for manual updates
+   *
+   * This avoids unnecessary API calls when switching between tabs,
+   * providing a snappier UX. The trade-off is slightly stale data
+   * until the user explicitly refreshes.
+   *
+   * H2H is special: it requires selecting an opponent first,
+   * so no auto-fetch occurs when navigating to that tab.
+   */
   useEffect(() => {
     switch (activeSubTab) {
       case 'leaderboard':
+        // Only fetch if not already cached
         if (!leaderboardData) {
           fetchLeaderboard()
         }
@@ -227,7 +242,8 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
         }
         break
       case 'h2h':
-        // H2H requires selecting an opponent, no auto-fetch
+        // H2H requires user to select an opponent from Leaderboard/History
+        // No auto-fetch - user must click on a player first
         break
     }
   }, [activeSubTab, leaderboardData, profileData, historyData, fetchLeaderboard, fetchProfile, fetchHistory])

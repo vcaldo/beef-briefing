@@ -61,22 +61,36 @@ export function LobbyPage({
     [userId]
   )
 
-  // Fetch matches from API
+  /**
+   * Fetch all active matches from the API and handle phase transitions.
+   *
+   * Key behaviors:
+   * 1. Detects when user's match transitions to shop_phase → auto-navigate
+   * 2. Updates local match list state for display
+   * 3. Tracks user's active match across the app
+   *
+   * Phase transition detection is critical for seamless UX: when the match
+   * creator starts a match or auto-start triggers, this callback detects
+   * the status change and navigates to the shop screen automatically.
+   */
   const fetchMatches = useCallback(async () => {
+    // Skip if component unmounted (prevents React state update warnings)
     if (!isMountedRef.current) return
 
     try {
       const fetchedMatches = await apiClient.getMatches(chatId)
 
+      // Double-check mounted state after async operation
       if (!isMountedRef.current) return
 
       setMatches(fetchedMatches)
       setError(null)
 
-      // Find user's current match
+      // Find if user is participating in any active match
       const userMatch = findUserMatch(fetchedMatches)
 
-      // Check for phase transition to shop
+      // CRITICAL: Detect phase transition to trigger navigation
+      // This happens when match creator clicks "Start" or auto-start triggers
       if (userMatch && userMatch.status === 'shop_phase') {
         addPageAction('match_phase_transition', {
           match_id: userMatch.id,
@@ -84,16 +98,16 @@ export function LobbyPage({
           to_status: 'shop_phase',
         })
         onMatchChange(userMatch)
-        onNavigateToShop()
+        onNavigateToShop() // Navigate to Shop tab automatically
         return
       }
 
-      // Update active match state
+      // Sync active match state with parent component
       if (userMatch !== activeMatch) {
         onMatchChange(userMatch)
       }
 
-      // First successful load
+      // First successful load - update loading state and track analytics
       if (loading) {
         setLoading(false)
         addPageAction('lobby_loaded', {
@@ -158,20 +172,33 @@ export function LobbyPage({
     }
   }, [activeMatch, onMatchChange, onNavigateToShop, fetchMatches])
 
-  // Setup polling
+  /**
+   * Setup match polling with adaptive intervals.
+   *
+   * Polling strategy:
+   * - When NOT in a match: Poll /matches every 3s to show available matches
+   * - When IN a match: Poll /match/{id} every 2s for faster status updates
+   *
+   * This effect re-runs when activeMatch changes to switch between strategies.
+   * The faster polling when in a match ensures users see phase transitions
+   * (open → shop_phase) quickly for responsive navigation.
+   */
   useEffect(() => {
     isMountedRef.current = true
 
-    // Initial fetch
+    // Fetch immediately on mount or when activeMatch changes
     fetchMatches()
 
-    // Setup polling based on whether user is in a match
+    // Configure polling based on match participation status
     const startPolling = () => {
+      // Clear any existing interval before starting a new one
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current)
       }
 
+      // Use faster polling (2s) when in a match for quicker phase detection
       const interval = activeMatch ? POLL_INTERVAL_IN_MATCH : POLL_INTERVAL_NO_MATCH
+      // Poll specific match endpoint when in a match, otherwise poll match list
       const pollFn = activeMatch ? fetchMatchDetails : fetchMatches
 
       pollIntervalRef.current = window.setInterval(pollFn, interval)
@@ -179,6 +206,7 @@ export function LobbyPage({
 
     startPolling()
 
+    // Cleanup: mark unmounted and clear interval to prevent memory leaks
     return () => {
       isMountedRef.current = false
       if (pollIntervalRef.current) {

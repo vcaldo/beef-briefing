@@ -134,10 +134,20 @@ export function BattlePage({
     fetchBattle()
   }, [fetchBattle])
 
-  // Apply event to card states
+  /**
+   * Apply a battle event to update card states for animation.
+   *
+   * Two modes of operation:
+   * 1. If the API provides card_states snapshot, use it directly (preferred)
+   * 2. Otherwise, compute state changes from event data (fallback)
+   *
+   * The card states drive the visual representation: HP bars, attack/defend
+   * highlighting, and dead card styling (grayscale + opacity).
+   */
   const applyEvent = useCallback(
     (event: BattleEvent, eventIndex: number) => {
-      // If event has card_states, use them directly
+      // Mode 1: API provides complete card states snapshot
+      // This is the preferred mode as it ensures UI matches server state exactly
       if (event.card_states && event.card_states.length > 0) {
         const newStates = new Map<number, CardSnapshot>()
         event.card_states.forEach((state) => {
@@ -147,11 +157,13 @@ export function BattlePage({
         return
       }
 
-      // Otherwise, update based on event type
+      // Mode 2: Compute state changes from event data (fallback)
+      // Used when API doesn't provide card_states or for backwards compatibility
       setCardStates((prevStates) => {
         const newStates = new Map(prevStates)
 
-        // Clear attack/defend flags first
+        // Reset attack/defend flags from previous event
+        // This ensures only the current attacker/defender are highlighted
         newStates.forEach((state, cardId) => {
           newStates.set(cardId, {
             ...state,
@@ -161,7 +173,7 @@ export function BattlePage({
         })
 
         if (event.type === 'attack' || event.type === 'damage') {
-          // Mark attacker
+          // Highlight the attacking card with orange glow animation
           if (event.attacker_card_id) {
             const attacker = newStates.get(event.attacker_card_id)
             if (attacker) {
@@ -172,7 +184,8 @@ export function BattlePage({
             }
           }
 
-          // Mark defender and update HP
+          // Highlight defender and update their HP for HP bar animation
+          // hp_after is provided by the API after damage calculation
           if (event.defender_card_id) {
             const defender = newStates.get(event.defender_card_id)
             if (defender) {
@@ -184,7 +197,8 @@ export function BattlePage({
             }
           }
         } else if (event.type === 'death') {
-          // Mark card as dead
+          // Mark card as dead - triggers grayscale + opacity styling
+          // This happens when a card's HP reaches 0
           if (event.defender_card_id) {
             const deadCard = newStates.get(event.defender_card_id)
             if (deadCard) {
@@ -209,24 +223,34 @@ export function BattlePage({
     []
   )
 
-  // Playback control - advance to next event
+  /**
+   * Advance playback to the next battle event.
+   *
+   * Called on each tick of the playback interval. The interval speed
+   * is determined by PLAYBACK_SPEEDS[playbackSpeedIndex].
+   *
+   * When the last event is reached, playback stops and the victory
+   * screen is displayed automatically.
+   */
   const advanceEvent = useCallback(() => {
     if (!battleData) return
 
     setCurrentEventIndex((prevIndex) => {
       const nextIndex = prevIndex + 1
 
+      // Check if we've reached the end of the battle events
       if (nextIndex >= battleData.events.length) {
-        // Playback complete
+        // Stop playback and show victory/defeat screen
         setIsPlaying(false)
         setShowVictory(true)
         addPageAction('battle_playback_complete', {
           match_id: matchId,
         })
+        // Return previous index to prevent going out of bounds
         return prevIndex
       }
 
-      // Apply the event
+      // Apply the event to update card states (HP, alive, attacking, etc.)
       applyEvent(battleData.events[nextIndex], nextIndex)
       return nextIndex
     })

@@ -241,3 +241,63 @@ If you see this error, check for `Date.now()` or similar in state initializers.
 - Verify `placeholder_positions` metadata is included in card response
 - Check CSS transitions are not being blocked
 - Fallback HP bar displays if metadata is missing
+
+## Future Enhancements
+
+### Animation Library Integration
+
+The current implementation uses CSS animations with data attributes prepared for future Framer Motion integration:
+- `data-card-id`, `data-is-alive`, `data-is-attacking`, `data-is-defending`
+- CSS keyframes: `attack-pulse`, `damage-shake`, `bounce-slow`
+- Upgrade to Framer Motion for smoother, physics-based animations
+- Add card flip animations when purchasing
+- Implement damage number popups during battle
+
+### Drag-and-Drop Team Ordering
+
+Currently, team ordering uses simple swap buttons. Future improvements:
+- Implement react-dnd or similar for touch-friendly drag-and-drop
+- Visual feedback during drag operations
+- Snap-to-slot animations
+
+### Battle Enhancements
+
+- **Sound effects**: Attack sounds, victory fanfares, UI feedback
+- **Particle effects**: Damage sparks, death animations, victory confetti
+- **Camera shake**: Screen shake on heavy hits
+- **Slow motion**: Dramatic slowdown for killing blows
+
+### Card Image Optimization
+
+- Implement image preloading during splash screen
+- Add progressive image loading (blur-up technique)
+- Cache card images in IndexedDB for offline viewing
+- Implement virtual scrolling for large card lists
+
+### Social Features
+
+- Match spectating for non-participants
+- Share battle replays via Telegram
+- Challenge specific players to matches
+- Tournament brackets for multi-round competitions
+
+### Statistics Enhancements
+
+- Win/loss graphs over time
+- Card usage statistics (most picked, highest win rate)
+- Achievement system with badges
+- Seasonal rankings with rewards
+
+### Performance Improvements
+
+- Service Worker for offline capability
+- WebSocket connections for real-time updates (replace polling)
+- Server-sent events for match state changes
+- Background sync for missed updates
+
+### Accessibility Improvements
+
+- High contrast mode toggle
+- Reduced motion preference support
+- Screen reader announcements for battle events
+- Voice control integration

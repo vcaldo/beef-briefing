@@ -124,16 +124,32 @@ export function ShopPage({
     }
   }, [activeMatch, onNavigateToBattle, onMatchChange, loading])
 
-  // Setup polling
+  /**
+   * Setup shop polling for phase transition detection.
+   *
+   * CRITICAL: Polling continues AFTER team submission!
+   *
+   * Unlike typical patterns where polling stops after user action,
+   * we must keep polling to detect when the opponent submits their
+   * team and the match transitions to battle_phase.
+   *
+   * Polling flow:
+   * 1. User buys cards, upgrades, and submits team
+   * 2. After submission, user sees "Waiting for opponent..." message
+   * 3. Polling continues at 3s intervals
+   * 4. When API returns status='battle_phase', navigate to Battle tab
+   */
   useEffect(() => {
     isMountedRef.current = true
 
-    // Initial fetch
+    // Fetch shop data immediately
     fetchShop()
 
-    // Setup polling - ALWAYS poll, even after submission (to detect battle start)
+    // Poll every 3 seconds to detect battle phase transition
+    // This interval runs continuously regardless of submission status
     pollIntervalRef.current = window.setInterval(fetchShop, POLL_INTERVAL)
 
+    // Cleanup on unmount
     return () => {
       isMountedRef.current = false
       if (pollIntervalRef.current) {
@@ -143,7 +159,17 @@ export function ShopPage({
     }
   }, [fetchShop])
 
-  // Buy card handler
+  /**
+   * Buy a card from the shop and add it to the team.
+   *
+   * Game mechanics:
+   * - Each card costs cardCost (default: 3 coins)
+   * - Card is added to first empty team slot
+   * - IMPORTANT: First purchase permanently disables reroll (canReroll → false)
+   * - Team can hold up to teamSize cards (default: 3)
+   *
+   * The cardIndex identifies which shop slot to purchase from (0-indexed).
+   */
   const handleBuyCard = useCallback(
     async (cardIndex: number) => {
       if (!activeMatch || actionLoading) return
@@ -156,6 +182,7 @@ export function ShopPage({
           card_index: cardIndex,
           coins_remaining: data.coins,
         })
+        // After buying, data.can_reroll will be false (server enforces this)
         setShopData(data)
       } catch (err) {
         console.error('Failed to buy card:', err)
@@ -170,8 +197,19 @@ export function ShopPage({
     [activeMatch, actionLoading]
   )
 
-  // Reroll handler
+  /**
+   * Reroll the shop to get new cards.
+   *
+   * CRITICAL GAME MECHANIC:
+   * - Reroll costs 1 coin
+   * - Can ONLY reroll BEFORE buying any card
+   * - After first card purchase, reroll is permanently disabled (canReroll=false)
+   * - This is enforced both in UI (button disabled) and backend (API returns error)
+   *
+   * The canReroll flag comes from the API response and reflects server-side state.
+   */
   const handleReroll = useCallback(async () => {
+    // Guard: prevent action if already loading or reroll not allowed
     if (!activeMatch || actionLoading || !canReroll) return
 
     setActionLoading('reroll')
@@ -181,6 +219,7 @@ export function ShopPage({
         match_id: activeMatch.id,
         coins_remaining: data.coins,
       })
+      // Note: After reroll, canReroll remains true until a card is bought
       setShopData(data)
     } catch (err) {
       console.error('Failed to reroll shop:', err)

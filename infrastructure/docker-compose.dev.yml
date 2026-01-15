@@ -244,13 +244,14 @@ services:
   deck-mini-app-dev:
     image: node:22-alpine
     container_name: beef-deck-mini-app-dev
-    working_dir: /app
+    working_dir: /workspace/apps/deck-mini-app
     volumes:
-      - ../apps/deck-mini-app:/app
-      - deck_mini_app_node_modules_dev:/app/node_modules
+      - ..:/workspace
+      - deck_mini_app_node_modules_dev:/workspace/apps/deck-mini-app/node_modules
+      - shared_mini_app_node_modules_dev:/workspace/apps/shared-mini-app/node_modules
     ports:
       - "5173:5173"
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    command: sh -c "npm install -g pnpm && cd /workspace && pnpm install --filter @beef-briefing/deck-mini-app... && cd apps/deck-mini-app && pnpm run dev -- --host 0.0.0.0"
     environment:
       VITE_API_URL: http://localhost:8080
       # New Relic Browser monitoring (optional)
@@ -334,6 +335,7 @@ volumes:
   deck_mini_app_node_modules_dev:
   leaderboard_mini_app_node_modules_dev:
   ml_dashboard_node_modules_dev:
+  shared_mini_app_node_modules_dev:
 
 networks:
   beef-dev-network:

@@ -253,7 +253,7 @@ if [[ "$SKIP_CLEANUP" == "false" ]]; then
             PREVIOUS_TAG='$PREVIOUS_TAG'
 
             # Find and remove old images (keep only current and previous)
-            for repo in beef-briefing/api-service beef-briefing/telegram-bot beef-briefing/card-renderer; do
+            for repo in beef-briefing/api-service beef-briefing/telegram-bot beef-briefing/card-renderer beef-briefing/deck-mini-app beef-briefing/leaderboard-mini-app beef-briefing/arena-mini-app; do
                 docker images \"\$repo\" --format '{{.Tag}}' | while read tag; do
                     if [[ \"\$tag\" != \"\$CURRENT_TAG\" && \"\$tag\" != \"\$PREVIOUS_TAG\" && \"\$tag\" != '<none>' ]]; then
                         echo \"Removing \$repo:\$tag\"

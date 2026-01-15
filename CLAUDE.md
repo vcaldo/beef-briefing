@@ -26,7 +26,7 @@ A Go-based Telegram bot system for managing beef briefing subscriptions with RES
    - **Profile Photos**: Upload/retrieve user and chat profile photos
    - **ML Analytics**: Batch message processing for ML pipeline
    - **Cards**: Weekly user stats cards with presigned image URLs
-   - **Mini App**: JWT-authenticated endpoints for deck-mini-app and leaderboard-mini-app
+   - **Mini App**: JWT-authenticated endpoints for deck-mini-app, leaderboard-mini-app, and arena-mini-app
    - **Auth**: API Key (internal services) and JWT (Mini Apps) authentication
 
 2. **telegram-bot**: Telegram bot that listens to group messages and forwards to API
@@ -79,6 +79,7 @@ Internet (443/80) → Traefik (SSL termination)
                          ├─→ cards-api.{domain} → Card Renderer (8051)
                          ├─→ leaderboard.{domain} → Leaderboard Mini App
                          ├─→ deck.{domain} → Deck Mini App
+                         ├─→ arena.{domain} → Arena Mini App
                          └─→ {domain}/dashboard → Traefik Dashboard
 
 Internal Docker Network:

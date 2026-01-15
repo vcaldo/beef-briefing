@@ -19,21 +19,29 @@ export function SubmitButton({
   isLoading,
   onSubmit,
 }: SubmitButtonProps) {
+  const ariaLabel = isLoading
+    ? 'Submitting team...'
+    : canSubmit
+      ? 'Submit team and start battle'
+      : `Cannot submit: ${disabledReason || 'Team not complete'}`
+
   return (
     <button
       className="btn btn-primary btn-lg submit-btn"
       onClick={onSubmit}
       disabled={!canSubmit || isLoading}
       title={disabledReason}
+      aria-label={ariaLabel}
+      aria-busy={isLoading}
     >
       {isLoading ? (
         <>
-          <div className="btn-spinner" />
+          <div className="btn-spinner" aria-hidden="true" />
           <span>Submitting...</span>
         </>
       ) : (
         <>
-          <span>⚔️</span>
+          <span aria-hidden="true">⚔️</span>
           <span>Ready for Battle!</span>
         </>
       )}

@@ -7,14 +7,14 @@ interface Tab {
 }
 
 const LobbyIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
     <polyline points="9 22 9 12 15 12 15 22" />
   </svg>
 )
 
 const ShopIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
     <circle cx="9" cy="21" r="1" />
     <circle cx="20" cy="21" r="1" />
     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
@@ -22,7 +22,7 @@ const ShopIcon = () => (
 )
 
 const BattleIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
     <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
     <path d="M13 19l6-6" />
     <path d="M16 16l4 4" />
@@ -34,7 +34,7 @@ const BattleIcon = () => (
 )
 
 const StatsIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
     <line x1="18" y1="20" x2="18" y2="10" />
     <line x1="12" y1="20" x2="12" y2="4" />
     <line x1="6" y1="20" x2="6" y2="14" />
@@ -56,18 +56,23 @@ interface TabBarProps {
 
 export function TabBar({ activeTab, onTabChange, disabledTabs = [] }: TabBarProps) {
   return (
-    <nav className="tab-bar">
+    <nav className="tab-bar" role="tablist" aria-label="Main navigation">
       {TABS.map((tab) => {
         const isDisabled = disabledTabs.includes(tab.id)
+        const isActive = activeTab === tab.id
         return (
           <button
             key={tab.id}
-            className={`tab-item ${activeTab === tab.id ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
+            className={`tab-item ${isActive ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
             onClick={() => !isDisabled && onTabChange(tab.id)}
-            aria-current={activeTab === tab.id ? 'page' : undefined}
+            role="tab"
+            aria-selected={isActive}
+            aria-controls={`${tab.id}-panel`}
+            aria-disabled={isDisabled}
             disabled={isDisabled}
+            tabIndex={isActive ? 0 : -1}
           >
-            <span className="tab-icon">{tab.icon}</span>
+            <span className="tab-icon" aria-hidden="true">{tab.icon}</span>
             <span className="tab-label">{tab.label}</span>
           </button>
         )

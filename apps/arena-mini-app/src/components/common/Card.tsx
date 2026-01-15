@@ -100,13 +100,21 @@ export function ShopCardDisplay({ card, onClick, isSelected }: ShopCardDisplayPr
       ? 'affordable'
       : 'not-affordable'
 
+  const ariaLabel = card.is_purchased
+    ? `${card.name}'s card, already purchased`
+    : canBuy
+      ? `Buy ${card.name}'s card for 3 coins`
+      : `${card.name}'s card, not affordable`
+
   return (
     <div
       className={`shop-card ${affordabilityClass} ${isSelected ? 'ring-2 ring-[var(--arena-orange)]' : ''}`}
       onClick={onClick}
       role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
+      tabIndex={onClick ? 0 : -1}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onClick?.()}
+      aria-label={ariaLabel}
+      aria-disabled={!canBuy || card.is_purchased}
     >
       <div className="shop-card-image aspect-[2/3]">
         <CardImage
@@ -181,7 +189,8 @@ export function CompactCard({
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
-      onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onClick?.()}
+      aria-label={`${card.name}'s card, Attack ${card.atk}, HP ${card.hp} of ${card.max_hp}${isDead ? ', defeated' : ''}${isSelected ? ', selected' : ''}`}
     >
       <CardImage
         src={card.photo_url}
@@ -279,15 +288,16 @@ export function TeamCard({
 
       {/* Upgrade buttons */}
       {!readOnly && (
-        <div className="upgrade-buttons">
+        <div className="upgrade-buttons" role="group" aria-label={`Upgrade options for ${card.name}`}>
           <button
             className="upgrade-btn atk"
             onClick={onUpgradeAtk}
             disabled={!card.can_upgrade_atk}
             title={card.upgrade_atk_disabled_reason}
+            aria-label={`Upgrade attack from ${card.atk} to ${card.atk_if_upgraded}. Costs 1 coin${!card.can_upgrade_atk ? `. ${card.upgrade_atk_disabled_reason || 'Not available'}` : ''}`}
           >
-            <span className="upgrade-label">⚔️ +3</span>
-            <span className="upgrade-preview">
+            <span className="upgrade-label" aria-hidden="true">⚔️ +3</span>
+            <span className="upgrade-preview" aria-hidden="true">
               <span className="upgrade-before">{card.atk}</span>
               <span className="upgrade-arrow">→</span>
               <span className="upgrade-after">{card.atk_if_upgraded}</span>
@@ -298,9 +308,10 @@ export function TeamCard({
             onClick={onUpgradeHp}
             disabled={!card.can_upgrade_hp}
             title={card.upgrade_hp_disabled_reason}
+            aria-label={`Upgrade HP from ${card.max_hp} to ${card.max_hp_if_upgraded}. Costs 1 coin${!card.can_upgrade_hp ? `. ${card.upgrade_hp_disabled_reason || 'Not available'}` : ''}`}
           >
-            <span className="upgrade-label">❤️ +3</span>
-            <span className="upgrade-preview">
+            <span className="upgrade-label" aria-hidden="true">❤️ +3</span>
+            <span className="upgrade-preview" aria-hidden="true">
               <span className="upgrade-before">{card.max_hp}</span>
               <span className="upgrade-arrow">→</span>
               <span className="upgrade-after">{card.max_hp_if_upgraded}</span>
@@ -328,9 +339,16 @@ interface EmptySlotProps {
  */
 export function EmptySlot({ position, onClick }: EmptySlotProps) {
   return (
-    <div className="team-slot" onClick={onClick} role="button" tabIndex={0}>
-      <div className="team-slot-number">{position}</div>
-      <span className="team-slot-placeholder">+</span>
+    <div
+      className="team-slot"
+      onClick={onClick}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onClick?.()}
+      role="button"
+      tabIndex={onClick ? 0 : -1}
+      aria-label={`Empty team slot ${position}`}
+    >
+      <div className="team-slot-number" aria-hidden="true">{position}</div>
+      <span className="team-slot-placeholder" aria-hidden="true">+</span>
     </div>
   )
 }

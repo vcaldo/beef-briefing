@@ -11,5 +11,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Separate vendor chunks for better caching
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-telegram': ['@telegram-apps/sdk-react'],
+        },
+      },
+    },
   },
 })

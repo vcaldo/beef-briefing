@@ -1,9 +1,15 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 import { apiClient } from './api/client'
-import { TabBar, LoadingSpinner, ErrorDisplay, LobbyPage, ShopPage, BattlePage, StatsPage } from './components'
+import { TabBar, LoadingSpinner, ErrorDisplay } from './components'
 import type { AuthResponse } from '@beef-briefing/shared-mini-app/types'
 import type { GamePhase } from './types'
+
+// Lazy load page components for code splitting
+const LobbyPage = lazy(() => import('./components/lobby/LobbyPage').then(m => ({ default: m.LobbyPage })))
+const ShopPage = lazy(() => import('./components/shop/ShopPage').then(m => ({ default: m.ShopPage })))
+const BattlePage = lazy(() => import('./components/battle/BattlePage').then(m => ({ default: m.BattlePage })))
+const StatsPage = lazy(() => import('./components/stats/StatsPage').then(m => ({ default: m.StatsPage })))
 
 // App states
 type AppState = 'loading' | 'authenticated' | 'error'
@@ -118,7 +124,7 @@ function App() {
         )
       case 'stats':
         return (
-          <StatsPage currentUserId={authData?.user_id} />
+          <StatsPage currentUserId={authData?.user_id} isActive={activeTab === 'stats'} />
         )
       default:
         return null
@@ -128,14 +134,28 @@ function App() {
   // Main app with tab navigation
   return (
     <div className="app">
-      <div className="page-container">
-        <div className="app-header">
+      {/* Skip link for keyboard users */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
+      <main id="main-content" className="page-container" role="main">
+        <header className="app-header">
           <h1>{currentPage.title}</h1>
           <p className="app-header-subtitle">{currentPage.subtitle}</p>
-        </div>
+        </header>
 
-        {renderPageContent()}
-      </div>
+        <div
+          id={`${activeTab}-panel`}
+          role="tabpanel"
+          aria-labelledby={activeTab}
+          tabIndex={0}
+        >
+          <Suspense fallback={<LoadingSpinner size="lg" message="Loading..." />}>
+            {renderPageContent()}
+          </Suspense>
+        </div>
+      </main>
 
       <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
     </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiClient } from '../../api/client'
+import { ApiError } from '@beef-briefing/shared-mini-app/api'
 import { LoadingSpinner } from '../common/LoadingSpinner'
 import { ErrorDisplay } from '../common/ErrorDisplay'
 import { MatchList } from './MatchList'
@@ -8,6 +9,12 @@ import type { MatchResponse, GamePhase } from '../../types'
 
 /** Polling interval in milliseconds (2.5 seconds as per plan) */
 const POLL_INTERVAL = 2500
+
+/** Maximum polling interval during backoff (30 seconds) */
+const MAX_POLL_INTERVAL = 30000
+
+/** Number of consecutive failures before showing persistent error */
+const CONSECUTIVE_FAILURE_THRESHOLD = 3
 
 interface LobbyPageProps {
   /** Current user's Telegram ID */
@@ -37,14 +44,24 @@ export function LobbyPage({
   // Track previous match states for auto-navigation
   const prevMatchStatesRef = useRef<Map<string, string>>(new Map())
 
+  // Exponential backoff state for polling failures
+  const consecutiveFailuresRef = useRef(0)
+  const currentPollIntervalRef = useRef(POLL_INTERVAL)
+
   /**
-   * Fetch matches from the API
+   * Fetch matches from the API with exponential backoff on failures
    */
   const fetchMatches = useCallback(async (showLoading = false) => {
     try {
       if (showLoading) setLoading(true)
       const data = await apiClient.listMatches()
       setMatches(data)
+
+      // Reset backoff on success
+      consecutiveFailuresRef.current = 0
+      currentPollIntervalRef.current = POLL_INTERVAL
+
+      // Only clear error if we've recovered from consecutive failures
       setError(null)
 
       // Check for phase transitions to auto-navigate
@@ -56,11 +73,31 @@ export function LobbyPage({
       prevMatchStatesRef.current = newStates
     } catch (err) {
       console.error('Failed to fetch matches:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load matches')
+
+      // Increment consecutive failures and apply backoff
+      consecutiveFailuresRef.current += 1
+
+      // Exponential backoff: double the interval up to max
+      if (consecutiveFailuresRef.current > 1) {
+        currentPollIntervalRef.current = Math.min(
+          currentPollIntervalRef.current * 2,
+          MAX_POLL_INTERVAL
+        )
+      }
+
+      // Only show error after threshold consecutive failures OR if no data yet
+      if (consecutiveFailuresRef.current >= CONSECUTIVE_FAILURE_THRESHOLD || matches.length === 0) {
+        const errorMsg = err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to load matches'
+        setError(errorMsg)
+      }
     } finally {
       if (showLoading) setLoading(false)
     }
-  }, [])
+  }, [matches.length])
 
   /**
    * Check if any match the user is in has transitioned to shop/battle.
@@ -203,13 +240,20 @@ export function LobbyPage({
     fetchMatches(true)
   }, [fetchMatches])
 
-  // Set up polling
+  // Set up polling with dynamic interval (supports exponential backoff)
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchMatches(false)
-    }, POLL_INTERVAL)
+    let timeoutId: ReturnType<typeof setTimeout>
 
-    return () => clearInterval(interval)
+    const poll = () => {
+      fetchMatches(false)
+      // Schedule next poll with current interval (may be increased due to backoff)
+      timeoutId = setTimeout(poll, currentPollIntervalRef.current)
+    }
+
+    // Start polling after initial interval
+    timeoutId = setTimeout(poll, currentPollIntervalRef.current)
+
+    return () => clearTimeout(timeoutId)
   }, [fetchMatches])
 
   // Loading state

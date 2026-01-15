@@ -9,6 +9,8 @@ type StatsSubTab = 'leaderboard' | 'profile' | 'history' | 'h2h'
 
 interface StatsPageProps {
   currentUserId?: number
+  /** Whether this page is currently active (for data refresh on tab switch) */
+  isActive?: boolean
 }
 
 // Sub-tab configuration
@@ -19,7 +21,7 @@ const SUB_TABS: { id: StatsSubTab; label: string; icon: string }[] = [
   { id: 'h2h', label: 'H2H', icon: '⚔️' },
 ]
 
-export function StatsPage({ currentUserId }: StatsPageProps) {
+export function StatsPage({ currentUserId, isActive }: StatsPageProps) {
   const [activeSubTab, setActiveSubTab] = useState<StatsSubTab>('leaderboard')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +39,7 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
   const [matchHistory, setMatchHistory] = useState<MatchHistoryEntry[]>([])
   const [historyHasMore, setHistoryHasMore] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyInitialLoaded, setHistoryInitialLoaded] = useState(false)
   const matchHistoryRef = useRef<MatchHistoryEntry[]>([])
 
   // H2H state
@@ -69,14 +72,21 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
     }
   }, [])
 
+  // Error states for individual sections
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [h2hError, setH2hError] = useState<string | null>(null)
+
   // Load leaderboard when type changes
   const loadLeaderboard = useCallback(async (type: 'ranked' | 'regular') => {
     setLeaderboardLoading(true)
+    setLeaderboardError(null)
     try {
       const res = await apiClient.getLeaderboard(type, 50, 0)
       setLeaderboard(res.entries || [])
     } catch (err) {
       console.error('Failed to load leaderboard:', err)
+      setLeaderboardError(err instanceof Error ? err.message : 'Failed to load leaderboard')
     } finally {
       setLeaderboardLoading(false)
     }
@@ -85,6 +95,7 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
   // Load match history with pagination
   const loadMatchHistory = useCallback(async (reset: boolean = false) => {
     setHistoryLoading(true)
+    setHistoryError(null)
     try {
       const offset = reset ? 0 : matchHistoryRef.current.length
       const res = await apiClient.getMatchHistory(20, offset)
@@ -96,8 +107,11 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
       matchHistoryRef.current = newHistory
       setMatchHistory(newHistory)
       setHistoryHasMore(res.has_more)
+      setHistoryInitialLoaded(true)
     } catch (err) {
       console.error('Failed to load match history:', err)
+      setHistoryError(err instanceof Error ? err.message : 'Failed to load match history')
+      setHistoryInitialLoaded(true) // Mark as loaded so we show error state
     } finally {
       setHistoryLoading(false)
     }
@@ -109,12 +123,14 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
 
     setH2hLoading(true)
     setH2hSearched(true)
+    setH2hError(null)
     try {
       // Try to parse as user ID or search by username
       const opponentId = parseInt(h2hSearchQuery, 10)
       if (isNaN(opponentId)) {
         setH2hRecord(null)
         setH2hMatches([])
+        setH2hError('Please enter a valid user ID (numbers only)')
         return
       }
 
@@ -125,15 +141,37 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
       console.error('Failed to load H2H record:', err)
       setH2hRecord(null)
       setH2hMatches([])
+      // Distinguish between "not found" (404) and actual errors
+      const errorMsg = err instanceof Error ? err.message : 'Failed to load H2H record'
+      if (errorMsg.toLowerCase().includes('not found')) {
+        // This is expected behavior - no record exists
+        setH2hError(null)
+      } else {
+        setH2hError(errorMsg)
+      }
     } finally {
       setH2hLoading(false)
     }
   }, [h2hSearchQuery])
 
-  // Initial load
+  // Track previous active state to detect when tab becomes active
+  const wasActiveRef = useRef(isActive)
+
+  // Initial load and refresh when tab becomes active
   useEffect(() => {
-    loadInitialData()
-  }, [])
+    // Load on mount OR when tab becomes active (was inactive, now active)
+    const becameActive = !wasActiveRef.current && isActive
+    if (becameActive || wasActiveRef.current === undefined) {
+      loadInitialData()
+      // Reset history so it reloads fresh data on next visit
+      if (becameActive) {
+        setHistoryInitialLoaded(false)
+        matchHistoryRef.current = []
+        setMatchHistory([])
+      }
+    }
+    wasActiveRef.current = isActive
+  }, [isActive, loadInitialData])
 
   // Load leaderboard when type changes
   useEffect(() => {
@@ -144,10 +182,10 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
 
   // Load history when switching to history tab
   useEffect(() => {
-    if (activeSubTab === 'history' && matchHistory.length === 0) {
+    if (activeSubTab === 'history' && !historyInitialLoaded) {
       loadMatchHistory(true)
     }
-  }, [activeSubTab])
+  }, [activeSubTab, historyInitialLoaded, loadMatchHistory])
 
   if (loading) {
     return <LoadingSpinner message="Loading stats..." />
@@ -205,6 +243,17 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
             <span className="btn-spinner" />
             <span>Loading...</span>
           </div>
+        ) : leaderboardError ? (
+          <div className="section-error">
+            <div className="section-error-icon">!</div>
+            <p className="section-error-text">{leaderboardError}</p>
+            <button
+              className="section-error-retry"
+              onClick={() => loadLeaderboard(leaderboardType)}
+            >
+              Retry
+            </button>
+          </div>
         ) : leaderboard.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">🏆</div>
@@ -214,14 +263,16 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
             </p>
           </div>
         ) : (
-          leaderboard.map((entry, index) => (
-            <LeaderboardEntryRow
-              key={entry.user_id}
-              entry={entry}
-              rank={index + 1}
-              isCurrentUser={entry.user_id === currentUserId}
-            />
-          ))
+          <div className="stagger-list">
+            {leaderboard.map((entry, index) => (
+              <LeaderboardEntryRow
+                key={entry.user_id}
+                entry={entry}
+                rank={index + 1}
+                isCurrentUser={entry.user_id === currentUserId}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -244,7 +295,7 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
 
           <div className="profile-section">
             <h3 className="section-title">Ranked Stats</h3>
-            <div className="stats-grid">
+            <div className="stats-grid stagger-grid">
               <StatCard icon="🏆" value={profile.ranked_wins} label="Wins" />
               <StatCard icon="💔" value={profile.ranked_losses} label="Losses" />
               <StatCard icon="🔥" value={profile.ranked_current_streak} label="Streak" />
@@ -254,7 +305,7 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
 
           <div className="profile-section">
             <h3 className="section-title">Casual Stats</h3>
-            <div className="stats-grid">
+            <div className="stats-grid stagger-grid">
               <StatCard icon="🏆" value={profile.regular_wins} label="Wins" />
               <StatCard icon="💔" value={profile.regular_losses} label="Losses" />
               <StatCard icon="🔥" value={profile.regular_current_streak} label="Streak" />
@@ -278,7 +329,26 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
   // Render history tab
   const renderHistory = () => (
     <div className="stats-section">
-      {matchHistory.length === 0 && !historyLoading ? (
+      {!historyInitialLoaded && historyLoading ? (
+        // Initial loading state
+        <div className="history-loading">
+          <span className="btn-spinner" style={{ width: 32, height: 32 }} />
+          <span>Loading history...</span>
+        </div>
+      ) : historyError && matchHistory.length === 0 ? (
+        // Error state when no data loaded
+        <div className="section-error">
+          <div className="section-error-icon">!</div>
+          <p className="section-error-text">{historyError}</p>
+          <button
+            className="section-error-retry"
+            onClick={() => loadMatchHistory(true)}
+          >
+            Retry
+          </button>
+        </div>
+      ) : matchHistory.length === 0 && historyInitialLoaded ? (
+        // Empty state after initial load completed
         <div className="empty-state">
           <div className="empty-state-icon">📜</div>
           <h3 className="empty-state-title">No Match History</h3>
@@ -288,7 +358,15 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
         </div>
       ) : (
         <>
-          <div className="history-list">
+          {/* Show error banner for pagination errors when we have some data */}
+          {historyError && matchHistory.length > 0 && (
+            <div className="error-banner">
+              <span>{historyError}</span>
+              <button onClick={() => setHistoryError(null)}>✕</button>
+            </div>
+          )}
+
+          <div className="history-list stagger-list">
             {matchHistory.map(match => (
               <MatchHistoryRow key={match.match_id} match={match} />
             ))}
@@ -338,7 +416,18 @@ export function StatsPage({ currentUserId }: StatsPageProps) {
 
       {h2hSearched && !h2hLoading && (
         <>
-          {!h2hRecord ? (
+          {h2hError ? (
+            <div className="section-error">
+              <div className="section-error-icon">!</div>
+              <p className="section-error-text">{h2hError}</p>
+              <button
+                className="section-error-retry"
+                onClick={searchH2H}
+              >
+                Retry
+              </button>
+            </div>
+          ) : !h2hRecord ? (
             <div className="empty-state">
               <div className="empty-state-icon">⚔️</div>
               <h3 className="empty-state-title">No Record Found</h3>

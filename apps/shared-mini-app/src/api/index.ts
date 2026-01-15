@@ -1,2 +1,3 @@
 // API client base class
-export { BaseApiClient } from './BaseApiClient';
+export { BaseApiClient, ApiError } from './BaseApiClient';
+export type { ApiErrorType } from './BaseApiClient';

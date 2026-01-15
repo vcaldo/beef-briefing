@@ -36,7 +36,7 @@ export function MatchList({
   }
 
   return (
-    <div className="match-list">
+    <div className="match-list stagger-list">
       {matches.map((match) => (
         <MatchCard
           key={match.id}

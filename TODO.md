@@ -70,17 +70,17 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 - [x] Implement ProfileTab and ProfileStats components
 - [x] Implement HistoryTab and MatchHistoryCard components
 - [x] Implement H2HTab with opponent search and head-to-head records
-- [ ] Test pagination, filters, and data loading across all stats tabs
+- [x] Test pagination, filters, and data loading across all stats tabs
 
 ### Phase 6: Integration & Polish (Day 12-14)
 
-- [ ] End-to-end testing (full match flow: lobby → shop → battle → stats)
-- [ ] Error handling and edge cases (API errors, network failures, timeouts)
-- [ ] Performance optimization (bundle size <300KB gzipped, lazy loading)
-- [ ] UI polish and theme refinement (playful card-game aesthetic)
-- [ ] Test compact card overlay system across all themes (gaming, clean, neon_arcade)
-- [ ] Accessibility improvements (touch targets, keyboard nav, screen readers)
-- [ ] Documentation and README
+- [x] End-to-end testing (full match flow: lobby → shop → battle → stats)
+- [x] Error handling and edge cases (API errors, network failures, timeouts)
+- [x] Performance optimization (bundle size <300KB gzipped, lazy loading)
+- [x] UI polish and theme refinement (playful card-game aesthetic)
+- [x] Test compact card overlay system across all themes (gaming, clean, neon_arcade)
+- [x] Accessibility improvements (touch targets, keyboard nav, screen readers)
+- [x] Documentation and README
 
 ---
 

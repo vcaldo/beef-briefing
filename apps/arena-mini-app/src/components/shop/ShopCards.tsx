@@ -26,7 +26,7 @@ export function ShopCards({ cards, onBuy, buyingCardIndex }: ShopCardsProps) {
   }
 
   return (
-    <div className="shop-grid">
+    <div className="shop-grid stagger-grid">
       {cards.map((card) => {
         const isLoading = buyingCardIndex === card.index
         const isDisabled = !card.can_buy || card.is_purchased || isLoading

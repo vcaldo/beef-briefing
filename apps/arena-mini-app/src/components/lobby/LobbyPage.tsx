@@ -54,7 +54,7 @@ export function LobbyPage({
     (matchList: Match[]): Match | null => {
       for (const match of matchList) {
         const isParticipant = match.participants?.some((p) => p.user_id === userId)
-        if (isParticipant && (match.status === 'open' || match.status === 'shop_phase' || match.status === 'battle_phase')) {
+        if (isParticipant && (match.status === 'open' || match.status === 'shop_phase' || match.status === 'battle_phase' || match.status === 'completed')) {
           return match
         }
       }
@@ -162,20 +162,20 @@ export function LobbyPage({
         return
       }
 
-      // Check for phase transition to battle
-      if (match.status === 'battle_phase') {
+      // Check for phase transition to battle (or completed - battle executes instantly)
+      if (match.status === 'battle_phase' || match.status === 'completed') {
         addPageAction('match_phase_transition', {
           match_id: match.id,
           from_status: activeMatch.status,
-          to_status: 'battle_phase',
+          to_status: match.status,
         })
         onMatchChange(match)
         onNavigateToBattle()
         return
       }
 
-      // Check if match was cancelled or completed
-      if (match.status === 'cancelled' || match.status === 'completed') {
+      // Check if match was cancelled
+      if (match.status === 'cancelled') {
         addPageAction('match_ended', {
           match_id: match.id,
           status: match.status,

@@ -879,6 +879,7 @@ func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64
 	// Execute purchase
 	cards[cardIndex].IsPurchased = true
 	newCard := cards[cardIndex].ToCard()
+	newCard.Position = len(team)
 	team = append(team, newCard)
 	coins := participant.CoinsRemaining - shop.CardCost
 

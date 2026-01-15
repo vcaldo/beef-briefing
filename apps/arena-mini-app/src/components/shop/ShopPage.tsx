@@ -79,19 +79,19 @@ export function ShopPage({
       setShopData(data)
       setError(null)
 
-      // Check for phase transition to battle
-      if (data.status === 'battle_phase') {
+      // Check for phase transition to battle (or completed - battle executes instantly)
+      if (data.status === 'battle_phase' || data.status === 'completed') {
         addPageAction('match_phase_transition', {
           match_id: activeMatch.id,
           from_status: 'shop_phase',
-          to_status: 'battle_phase',
+          to_status: data.status,
         })
         onNavigateToBattle()
         return
       }
 
       // Check if match was cancelled
-      if (data.status === 'cancelled' || data.status === 'completed') {
+      if (data.status === 'cancelled') {
         addPageAction('match_ended_in_shop', {
           match_id: activeMatch.id,
           status: data.status,

@@ -256,11 +256,17 @@ function App() {
   // Main app with tab navigation
   return (
     <div className="app">
-      <ErrorBoundary key={activeTab} onReset={handleErrorReset} name={`arena-${activeTab}`}>
-        <Suspense fallback={<LoadingSpinner message="Loading..." />}>
-          {renderPage()}
-        </Suspense>
-      </ErrorBoundary>
+      {/* Skip link for keyboard users to bypass navigation */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+      <main id="main-content" role="main" aria-label={`${activeTab} page`}>
+        <ErrorBoundary key={activeTab} onReset={handleErrorReset} name={`arena-${activeTab}`}>
+          <Suspense fallback={<LoadingSpinner message="Loading..." />}>
+            {renderPage()}
+          </Suspense>
+        </ErrorBoundary>
+      </main>
       <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
   )

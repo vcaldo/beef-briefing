@@ -343,7 +343,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
                   onClick={() => handleSelectOpponent(entry.user_id)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSelectOpponent(entry.user_id)}
+                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleSelectOpponent(entry.user_id))}
                 >
                   <div className={`leaderboard-rank ${getRankClass(entry.rank)}`}>
                     {entry.rank}
@@ -565,7 +565,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
                   onClick={() => handleSelectOpponent(match.opponent_id)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSelectOpponent(match.opponent_id)}
+                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleSelectOpponent(match.opponent_id))}
                 >
                   <div className="history-result">
                     <span className={`result-badge ${match.result}`}>

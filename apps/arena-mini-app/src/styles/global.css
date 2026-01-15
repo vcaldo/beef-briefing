@@ -83,6 +83,48 @@ body {
 }
 
 /* =============================================================================
+   Focus Styles (Accessibility)
+   ============================================================================= */
+/* Focus-visible styles for keyboard navigation */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+[tabindex="0"]:focus-visible,
+.tab-item:focus-visible,
+.leaderboard-item:focus-visible,
+.history-item:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--arena-orange);
+  outline-offset: 2px;
+}
+
+/* Remove default focus outline (use focus-visible instead) */
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+[role="button"]:focus:not(:focus-visible),
+[tabindex="0"]:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Skip link for keyboard users (hidden until focused) */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  padding: 8px 16px;
+  background: var(--arena-orange);
+  color: white;
+  font-weight: 600;
+  z-index: 100;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* =============================================================================
    Typography
    ============================================================================= */
 .font-display {

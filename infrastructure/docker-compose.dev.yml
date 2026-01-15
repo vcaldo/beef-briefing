@@ -251,7 +251,7 @@ services:
       - shared_mini_app_node_modules_dev:/workspace/apps/shared-mini-app/node_modules
     ports:
       - "5173:5173"
-    command: sh -c "npm install -g pnpm && cd /workspace && pnpm install --filter @beef-briefing/deck-mini-app... && cd apps/deck-mini-app && pnpm run dev -- --host 0.0.0.0"
+    command: sh -c "npm install -g pnpm && cd /workspace && pnpm install --filter deck-mini-app... && cd apps/deck-mini-app && pnpm run dev -- --host 0.0.0.0"
     environment:
       VITE_API_URL: http://localhost:8080
       # New Relic Browser monitoring (optional)
@@ -273,7 +273,7 @@ services:
       - shared_mini_app_node_modules_dev:/workspace/apps/shared-mini-app/node_modules
     ports:
       - "5174:5174"
-    command: sh -c "npm install -g pnpm && cd /workspace && pnpm install --filter @beef-briefing/leaderboard-mini-app... && cd apps/leaderboard-mini-app && pnpm run dev -- --host 0.0.0.0"
+    command: sh -c "npm install -g pnpm && cd /workspace && pnpm install --filter leaderboard-mini-app... && cd apps/leaderboard-mini-app && pnpm run dev -- --host 0.0.0.0"
     environment:
       VITE_API_URL: http://localhost:8080
       # New Relic Browser monitoring (optional)
@@ -295,7 +295,7 @@ services:
       - shared_mini_app_node_modules_dev:/workspace/apps/shared-mini-app/node_modules
     ports:
       - "5175:5175"
-    command: sh -c "npm install -g pnpm && cd /workspace && pnpm install --filter @beef-briefing/arena-mini-app... && cd apps/arena-mini-app && pnpm run dev -- --host 0.0.0.0"
+    command: sh -c "npm install -g pnpm && cd /workspace && pnpm install --filter arena-mini-app... && cd apps/arena-mini-app && pnpm run dev -- --host 0.0.0.0"
     environment:
       VITE_API_URL: http://localhost:8080
       VITE_CARD_API_URL: http://localhost:8051

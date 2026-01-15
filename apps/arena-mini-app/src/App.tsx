@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 import { apiClient } from './api/client'
-import { TabBar, LoadingSpinner, ErrorDisplay, LobbyPage, ShopPage, BattlePage } from './components'
+import { TabBar, LoadingSpinner, ErrorDisplay, LobbyPage, ShopPage, BattlePage, StatsPage } from './components'
 import type { AuthResponse } from '@beef-briefing/shared-mini-app/types'
 import type { GamePhase } from './types'
 
@@ -118,13 +118,7 @@ function App() {
         )
       case 'stats':
         return (
-          <div className="empty-state">
-            <div className="empty-state-icon">📊</div>
-            <h3 className="empty-state-title">Stats Coming Soon</h3>
-            <p className="empty-state-text">
-              View leaderboards, your profile, and match history.
-            </p>
-          </div>
+          <StatsPage currentUserId={authData?.user_id} />
         )
       default:
         return null

@@ -2067,3 +2067,351 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* =====================================================
+   Stats Page
+   ===================================================== */
+.stats-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stats-subtabs {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.stats-subtabs::-webkit-scrollbar {
+  display: none;
+}
+
+.stats-subtab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: var(--tg-theme-hint-color);
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 0;
+}
+
+.stats-subtab.active {
+  background: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
+}
+
+.stats-subtab-icon {
+  font-size: 18px;
+}
+
+.stats-subtab-label {
+  white-space: nowrap;
+}
+
+.stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Leaderboard specific */
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.leaderboard-entry.current-user {
+  border: 2px solid var(--arena-purple);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);
+}
+
+.you-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--arena-purple);
+  color: white;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+/* Profile specific */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, var(--arena-dark) 0%, var(--arena-purple) 100%);
+  border-radius: 16px;
+}
+
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--arena-purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: white;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-name {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+}
+
+.profile-username {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 2px 0 0;
+}
+
+.profile-summary {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 8px 0 0;
+}
+
+.profile-ranks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-rank-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.profile-rank-badge.ranked {
+  background: var(--arena-gold);
+  color: var(--arena-dark);
+}
+
+.profile-rank-badge.casual {
+  background: var(--arena-cyan);
+  color: var(--arena-dark);
+}
+
+.profile-section {
+  margin-top: 8px;
+}
+
+.profile-section .section-title {
+  margin-bottom: 12px;
+}
+
+/* History specific */
+.history-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.history-type {
+  font-size: 18px;
+}
+
+.load-more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 2px dashed var(--tg-theme-hint-color);
+  background: transparent;
+  color: var(--tg-theme-hint-color);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.load-more-btn:hover:not(:disabled) {
+  border-color: var(--arena-purple);
+  color: var(--arena-purple);
+}
+
+.load-more-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* H2H specific */
+.h2h-search {
+  display: flex;
+  gap: 8px;
+}
+
+.h2h-input {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 2px solid var(--tg-theme-secondary-bg-color);
+  background: var(--tg-theme-secondary-bg-color);
+  color: var(--tg-theme-text-color);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.h2h-input:focus {
+  border-color: var(--arena-purple);
+}
+
+.h2h-input::placeholder {
+  color: var(--tg-theme-hint-color);
+}
+
+.h2h-search-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: none;
+  background: var(--arena-purple);
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.h2h-search-btn:hover:not(:disabled) {
+  background: var(--arena-pink);
+  transform: scale(1.05);
+}
+
+.h2h-search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.h2h-record {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  background: var(--tg-theme-secondary-bg-color);
+  border-radius: 16px;
+}
+
+.h2h-opponent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.h2h-opponent-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--arena-purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+}
+
+.h2h-opponent-info h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.h2h-opponent-info p {
+  font-size: 13px;
+  color: var(--tg-theme-hint-color);
+  margin: 2px 0 0;
+}
+
+.h2h-stats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.h2h-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.h2h-stat.separator {
+  color: var(--tg-theme-hint-color);
+}
+
+.h2h-stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.h2h-stat.wins .h2h-stat-value {
+  color: var(--hp-high);
+}
+
+.h2h-stat.losses .h2h-stat-value {
+  color: var(--hp-low);
+}
+
+.h2h-stat-label {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color);
+  text-transform: uppercase;
+}
+
+.h2h-winrate {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--arena-gold);
+}
+
+.h2h-matches {
+  width: 100%;
+}
+
+.h2h-matches .section-title {
+  margin-bottom: 12px;
+}

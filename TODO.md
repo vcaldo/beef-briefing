@@ -65,7 +65,7 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 
 ### Phase 5: Stats Screen (Day 10-11)
 
-- [ ] Implement StatsPage with 4 sub-tabs (Leaderboard, Profile, History, H2H)
+- [x] Implement StatsPage with 4 sub-tabs (Leaderboard, Profile, History, H2H)
 - [ ] Implement LeaderboardTab and LeaderboardEntry components (ranked/casual toggle)
 - [ ] Implement ProfileTab and ProfileStats components
 - [ ] Implement HistoryTab and MatchHistoryCard components

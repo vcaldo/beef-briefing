@@ -46,13 +46,6 @@ export { EventMessage } from './battle/EventMessage'
 export { VictoryScreen } from './battle/VictoryScreen'
 
 // ============================================================================
-// Stats Components (to be implemented)
+// Stats Components
 // ============================================================================
-// export { StatsPage } from './stats/StatsPage'
-// export { LeaderboardTab } from './stats/LeaderboardTab'
-// export { LeaderboardEntry } from './stats/LeaderboardEntry'
-// export { ProfileTab } from './stats/ProfileTab'
-// export { ProfileStats } from './stats/ProfileStats'
-// export { HistoryTab } from './stats/HistoryTab'
-// export { MatchHistoryCard } from './stats/MatchHistoryCard'
-// export { H2HTab } from './stats/H2HTab'
+export { StatsPage } from './stats/StatsPage'

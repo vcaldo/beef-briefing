@@ -1,4 +1,5 @@
 packages:
   - "apps/leaderboard-mini-app"
   - "apps/deck-mini-app"
+  - "apps/arena-mini-app"
   - "apps/shared-mini-app"

@@ -122,6 +122,7 @@ func (t *Team) IsEmpty() bool {
 type CardSnapshot struct {
 	CardID      int64  `json:"card_id"`
 	UserID      int64  `json:"user_id"`
+	TeamOwnerID int64  `json:"team_owner_id"` // Telegram user ID of the player who owns this card's team
 	Name        string `json:"name"`
 	HP          int    `json:"hp"`
 	MaxHP       int    `json:"max_hp"`

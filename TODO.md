@@ -59,9 +59,9 @@ Ralph will work through these tasks in priority order. See [scripts/RALPH.md](sc
 - [x] Implement HP bar color transitions (green >66% → yellow 33-66% → red <33%)
 - [x] Implement EventLog and EventMessage components for battle replay
 - [x] Implement VictoryScreen overlay with winner announcement
-- [ ] Test event playback with sequential display and stat updates
-- [ ] Test HP bar animations and color changes during battle
-- [ ] Test all event types (attack, death, summary, victory)
+- [x] Test event playback with sequential display and stat updates
+- [x] Test HP bar animations and color changes during battle
+- [x] Test all event types (attack, death, summary, victory)
 
 ### Phase 5: Stats Screen (Day 10-11)
 

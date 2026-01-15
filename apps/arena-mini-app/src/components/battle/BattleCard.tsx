@@ -29,6 +29,20 @@ function CardImage({ name }: { name: string }) {
 }
 
 /**
+ * Get the HP bar color based on current percentage.
+ * Colors transition smoothly using CSS variables.
+ */
+function getHpColor(hpPercent: number): string {
+  if (hpPercent > 66) {
+    return 'var(--hp-high)' // Green
+  } else if (hpPercent > 33) {
+    return 'var(--hp-medium)' // Yellow
+  } else {
+    return 'var(--hp-low)' // Red
+  }
+}
+
+/**
  * Battle card component showing card state during combat.
  * Displays HP bar, attack/defend animations, and death state.
  */
@@ -40,6 +54,7 @@ export function BattleCard({
   // Calculate HP percentage for bar
   const hpPercent = Math.max(0, (card.hp / card.max_hp) * 100)
   const hpClass = hpPercent > 66 ? 'hp-high' : hpPercent > 33 ? 'hp-medium' : 'hp-low'
+  const hpColor = getHpColor(hpPercent)
 
   return (
     <div
@@ -47,6 +62,7 @@ export function BattleCard({
       data-is-attacking={isAttacking}
       data-is-defending={isDefending}
       data-is-alive={card.is_alive}
+      data-hp-level={hpClass}
     >
       {/* Card image */}
       <div className="battle-card-image">
@@ -61,14 +77,17 @@ export function BattleCard({
       {/* Stats overlay */}
       <div className="battle-card-stats">
         <span className="battle-stat atk">⚔️{card.atk}</span>
-        <span className="battle-stat hp">❤️{card.hp}</span>
+        <span className="battle-stat hp" style={{ color: hpColor }}>❤️{card.hp}</span>
       </div>
 
       {/* HP Bar */}
       <div className="hp-bar battle-hp">
         <div
           className={`hp-bar-fill ${hpClass}`}
-          style={{ width: `${hpPercent}%` }}
+          style={{
+            width: `${hpPercent}%`,
+            '--hp-bar-color': hpColor,
+          } as React.CSSProperties}
         />
       </div>
 

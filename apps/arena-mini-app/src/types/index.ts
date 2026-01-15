@@ -168,6 +168,7 @@ export type BattleEventType = 'attack' | 'damage' | 'death' | 'advance' | 'victo
 export interface CardSnapshot {
   card_id: number
   user_id: number
+  team_owner_id: number
   name: string
   hp: number
   max_hp: number

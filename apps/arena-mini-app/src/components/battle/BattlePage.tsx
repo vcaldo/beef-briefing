@@ -89,6 +89,7 @@ export function BattlePage({
       const playerACards: CardSnapshot[] = round.player_a_team.map((card, idx) => ({
         card_id: card.card_id,
         user_id: card.user_id,
+        team_owner_id: round.player_a_id,
         name: card.name,
         hp: card.hp,
         max_hp: card.max_hp,
@@ -101,6 +102,7 @@ export function BattlePage({
       const playerBCards: CardSnapshot[] = round.player_b_team.map((card, idx) => ({
         card_id: card.card_id,
         user_id: card.user_id,
+        team_owner_id: round.player_b_id,
         name: card.name,
         hp: card.hp,
         max_hp: card.max_hp,
@@ -267,9 +269,9 @@ export function BattlePage({
   const round = battle.rounds[0]
   const cardStates = getCurrentCardStates()
 
-  // Separate cards by team owner
-  const playerACards = cardStates.filter(c => c.user_id === round.player_a_id)
-  const playerBCards = cardStates.filter(c => c.user_id === round.player_b_id)
+  // Separate cards by team owner (use team_owner_id, NOT user_id)
+  const playerACards = cardStates.filter(c => c.team_owner_id === round.player_a_id)
+  const playerBCards = cardStates.filter(c => c.team_owner_id === round.player_b_id)
 
   // Determine which team is "yours" vs opponent
   const isPlayerA = currentUserId === round.player_a_id

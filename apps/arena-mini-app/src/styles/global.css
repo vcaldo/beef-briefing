@@ -926,8 +926,9 @@ body {
 
 .hp-bar-fill {
   height: 100%;
-  transition: width 0.5s ease-out, background-color 0.3s ease;
+  transition: width 0.5s ease-out;
   border-radius: 0 0 0 6px;
+  position: relative;
 }
 
 .hp-bar-fill.hp-high {
@@ -941,6 +942,17 @@ body {
 .hp-bar-fill.hp-low {
   background: linear-gradient(90deg, var(--hp-low) 0%, #f87171 100%);
   animation: hp-low-pulse 1s ease-in-out infinite;
+}
+
+/* Damage flash effect - overlays a white flash when HP decreases */
+.hp-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: white;
+  opacity: 0;
+  animation: none;
+  border-radius: inherit;
 }
 
 @keyframes hp-low-pulse {
@@ -987,6 +999,7 @@ body {
 }
 
 .battle-card[data-is-defending="true"] {
+  animation: defend-shake 0.4s ease;
   box-shadow: 0 0 20px var(--arena-cyan);
 }
 
@@ -996,9 +1009,27 @@ body {
   transform: scale(0.9);
 }
 
+/* HP level visual effects on battle card */
+.battle-card[data-hp-level="hp-low"][data-is-alive="true"] {
+  animation: damage-critical 1s ease-in-out infinite;
+}
+
 @keyframes attack-pulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.1) translateY(-4px); }
+}
+
+@keyframes defend-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+@keyframes damage-critical {
+  0%, 100% { box-shadow: 0 0 8px var(--hp-low); }
+  50% { box-shadow: 0 0 16px var(--hp-low); }
 }
 
 .battle-vs {
@@ -1410,6 +1441,25 @@ body {
 
 .event-message.your-team {
   background: rgba(168, 85, 247, 0.15);
+}
+
+.event-message.victory.draw {
+  background: rgba(148, 163, 184, 0.1);
+  border-left-color: var(--tg-theme-hint-color);
+}
+
+.event-message.summary.kill-streak {
+  background: rgba(249, 115, 22, 0.15);
+  border-left-color: var(--arena-orange);
+}
+
+.event-message.summary.kill-streak .event-icon {
+  animation: fire-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes fire-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
 }
 
 /* Battle Results */

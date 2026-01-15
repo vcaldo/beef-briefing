@@ -32,6 +32,7 @@ func captureCardStates(teamA, teamB *Team, attackerID, defenderID int64) []CardS
 			states = append(states, CardSnapshot{
 				CardID:      card.CardID,
 				UserID:      card.UserID,
+				TeamOwnerID: teamA.OwnerID,
 				Name:        card.Name,
 				HP:          card.HP,
 				MaxHP:       card.MaxHP,
@@ -50,6 +51,7 @@ func captureCardStates(teamA, teamB *Team, attackerID, defenderID int64) []CardS
 			states = append(states, CardSnapshot{
 				CardID:      card.CardID,
 				UserID:      card.UserID,
+				TeamOwnerID: teamB.OwnerID,
 				Name:        card.Name,
 				HP:          card.HP,
 				MaxHP:       card.MaxHP,

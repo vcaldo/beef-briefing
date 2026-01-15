@@ -174,3 +174,5 @@ package.json
 
 # LLM automation
 plans/*
+
+.pnpm-store/*

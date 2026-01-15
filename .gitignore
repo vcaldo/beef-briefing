@@ -171,3 +171,6 @@ terraform.rc
 # Vite deps
 _metadata.json
 package.json
+
+# LLM automation
+plans/*

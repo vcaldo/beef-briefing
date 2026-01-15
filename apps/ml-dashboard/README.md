@@ -18,7 +18,7 @@ The ML Dashboard provides a visual interface to browse and analyze the machine l
 │                    ML Dashboard                              │
 ├─────────────────────────┬───────────────────────────────────┤
 │   Frontend (React)      │        Backend (FastAPI)          │
-│   Port: 5175            │        Port: 8052                 │
+│   Port: 6175            │        Port: 8052                 │
 │                         │                                   │
 │   - Dashboard           │   /api/stats      - Stats         │
 │   - Messages Browser    │   /api/messages   - ML results    │
@@ -40,7 +40,7 @@ The ML Dashboard provides a visual interface to browse and analyze the machine l
 make ml-dashboard-up-build
 
 # Access the dashboard
-open http://localhost:5175
+open http://localhost:6175
 
 # View logs
 make ml-dashboard-logs

@@ -27,7 +27,7 @@ declare -A DEV_SERVICES=(
     ["deck-mini-app-dev"]="5174|http://localhost:5174|"
     ["leaderboard-mini-app-dev"]="5173|http://localhost:5173|"
     ["ml-dashboard-backend"]="8000|http://localhost:8000|"
-    ["ml-dashboard-frontend"]="5175|http://localhost:5175|"
+    ["ml-dashboard-frontend"]="6175|http://localhost:6175|"
 )
 
 declare -A PROD_SERVICES=(

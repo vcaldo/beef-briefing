@@ -125,7 +125,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
       setProfileData(data)
       addPageAction('profile_loaded', {
         user_id: data.user_id,
-        tier: data.stats.tier,
+        tier: data.stats?.tier,
       })
     } catch (err) {
       if (!isMountedRef.current) return

@@ -124,7 +124,6 @@ func TestGetUserCard_WithStats(t *testing.T) {
 func TestGetChatCards_Sorting(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(t, db)
-	defer cleanupTables(t, db, "ml_user_card_images", "ml_user_cards", "users", "chats")
 
 	repo := NewCardRepository(db, nil)
 	cleanupTables(t, db, "ml_user_card_images", "ml_user_cards", "users", "chats")

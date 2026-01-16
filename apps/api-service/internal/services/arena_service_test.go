@@ -713,12 +713,22 @@ func setupArenaTestDB(t *testing.T) *testutil.TestDB {
 	tdb := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
-	// Cleanup any existing test data
-	_, _ = tdb.DB.ExecContext(ctx, "DELETE FROM game_match_participants WHERE match_id IN (SELECT id FROM game_matches WHERE chat_id = $1)", testChatID)
-	_, _ = tdb.DB.ExecContext(ctx, "DELETE FROM game_matches WHERE chat_id = $1", testChatID)
-	_, _ = tdb.DB.ExecContext(ctx, "DELETE FROM ml_user_cards WHERE chat_id = $1", testChatID)
-	_, _ = tdb.DB.ExecContext(ctx, "DELETE FROM chats WHERE id = $1", testChatID)
-	_, _ = tdb.DB.ExecContext(ctx, "DELETE FROM users WHERE id IN ($1, $2, $3)", testCreatorUserID, testJoinerUserID, testUser3ID)
+	// Cleanup any existing test data using TRUNCATE CASCADE
+	// This is more efficient than DELETE and handles foreign key constraints automatically
+	tablesToCleanup := []string{
+		"game_match_participants",
+		"game_match_rounds",
+		"game_matches",
+		"ml_user_cards",
+	}
+
+	for _, table := range tablesToCleanup {
+		_, err := tdb.DB.ExecContext(ctx, fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
+		if err != nil {
+			// Only log warning for non-existent tables, don't fail the test
+			t.Logf("Warning: failed to truncate table %s: %v", table, err)
+		}
+	}
 
 	// Create test chat
 	_, err := tdb.DB.ExecContext(ctx, `

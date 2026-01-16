@@ -1,14 +1,15 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
 
+	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/httputil"
+	"beef-briefing/apps/api-service/internal/jsonutil"
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
@@ -66,7 +67,7 @@ func (h *ProfilePhotoHandler) HandleUserPhotos(w http.ResponseWriter, r *http.Re
 	}
 
 	var req models.UserProfilePhotosRequest
-	if err := json.Unmarshal([]byte(metadataJSON), &req); err != nil {
+	if err := jsonutil.Unmarshal([]byte(metadataJSON), &req); err != nil {
 		slog.Error("failed to decode metadata", "error", err)
 		if txn != nil {
 			txn.NoticeError(err)
@@ -133,7 +134,7 @@ func (h *ProfilePhotoHandler) HandleChatPhotos(w http.ResponseWriter, r *http.Re
 	}
 
 	var req models.ChatProfilePhotosRequest
-	if err := json.Unmarshal([]byte(metadataJSON), &req); err != nil {
+	if err := jsonutil.Unmarshal([]byte(metadataJSON), &req); err != nil {
 		slog.Error("failed to decode metadata", "error", err)
 		if txn != nil {
 			txn.NoticeError(err)
@@ -303,7 +304,7 @@ func (h *ProfilePhotoHandler) HandleGetUserPhoto(w http.ResponseWriter, r *http.
 	// Get photo URL from service
 	url, err := h.profilePhotoService.GetUserPhoto(ctx, userID, size)
 	if err != nil {
-		if errors.Is(err, services.ErrPhotoNotFound) {
+		if errors.Is(err, apperror.ErrPhotoNotFound) {
 			slog.Debug("user photo not found", "user_id", userID, "size", size)
 			httputil.RespondError(w, "photo not found", http.StatusNotFound)
 			return
@@ -365,7 +366,7 @@ func (h *ProfilePhotoHandler) HandleGetChatPhoto(w http.ResponseWriter, r *http.
 	// Get photo URL from service
 	url, err := h.profilePhotoService.GetChatPhoto(ctx, chatID, size)
 	if err != nil {
-		if errors.Is(err, services.ErrPhotoNotFound) {
+		if errors.Is(err, apperror.ErrPhotoNotFound) {
 			slog.Debug("chat photo not found", "chat_id", chatID, "size", size)
 			httputil.RespondError(w, "photo not found", http.StatusNotFound)
 			return

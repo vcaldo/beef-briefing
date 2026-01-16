@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"beef-briefing/apps/api-service/internal/models"
+	"beef-briefing/apps/api-service/internal/nrutil"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
@@ -22,11 +23,7 @@ func NewProfilePhotoRepository(db *sql.DB, nrApp *newrelic.Application) *Profile
 // ReplaceUserPhotos atomically replaces all profile photos for a user
 // Deletes existing photos and inserts new ones in a single transaction
 func (r *ProfilePhotoRepository) ReplaceUserPhotos(ctx context.Context, tx *sql.Tx, userID int64, photos []models.DBUserProfilePhoto) error {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:replace-user-photos")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:replace-user-photos")()
 
 	// Delete existing photos
 	deleteQuery := `DELETE FROM user_profile_photos WHERE user_id = $1`
@@ -65,11 +62,7 @@ func (r *ProfilePhotoRepository) ReplaceUserPhotos(ctx context.Context, tx *sql.
 // ReplaceChatPhotos atomically replaces all profile photos for a chat
 // Deletes existing photos and inserts new ones in a single transaction
 func (r *ProfilePhotoRepository) ReplaceChatPhotos(ctx context.Context, tx *sql.Tx, chatID int64, photos []models.DBChatProfilePhoto) error {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:replace-chat-photos")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:replace-chat-photos")()
 
 	// Delete existing photos
 	deleteQuery := `DELETE FROM chat_profile_photos WHERE chat_id = $1`
@@ -108,11 +101,7 @@ func (r *ProfilePhotoRepository) ReplaceChatPhotos(ctx context.Context, tx *sql.
 
 // GetUserPhotos returns all profile photos for a user
 func (r *ProfilePhotoRepository) GetUserPhotos(ctx context.Context, userID int64) ([]models.DBUserProfilePhoto, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-user-photos")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:get-user-photos")()
 
 	query := `
 		SELECT id, user_id, telegram_file_id, telegram_file_unique_id,
@@ -154,11 +143,7 @@ func (r *ProfilePhotoRepository) GetUserPhotos(ctx context.Context, userID int64
 
 // GetChatPhotos returns all profile photos for a chat
 func (r *ProfilePhotoRepository) GetChatPhotos(ctx context.Context, chatID int64) ([]models.DBChatProfilePhoto, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-chat-photos")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:get-chat-photos")()
 
 	query := `
 		SELECT id, chat_id, photo_size, telegram_file_id, telegram_file_unique_id,
@@ -201,11 +186,7 @@ func (r *ProfilePhotoRepository) GetChatPhotos(ctx context.Context, chatID int64
 
 // GetAllUserIDs returns all user IDs from the database
 func (r *ProfilePhotoRepository) GetAllUserIDs(ctx context.Context) ([]int64, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-all-user-ids")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:get-all-user-ids")()
 
 	query := `SELECT id FROM users ORDER BY id`
 
@@ -229,11 +210,7 @@ func (r *ProfilePhotoRepository) GetAllUserIDs(ctx context.Context) ([]int64, er
 
 // GetAllChatIDs returns all chat IDs from the database
 func (r *ProfilePhotoRepository) GetAllChatIDs(ctx context.Context) ([]int64, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-all-chat-ids")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:get-all-chat-ids")()
 
 	query := `SELECT id FROM chats ORDER BY id`
 
@@ -292,11 +269,7 @@ func (r *ProfilePhotoRepository) GetUserPhotoBySize(ctx context.Context, userID 
 // Falls back to available size if requested not found
 // Returns nil if chat has no photos.
 func (r *ProfilePhotoRepository) GetChatPhotoBySize(ctx context.Context, chatID int64, size string) (*models.DBChatProfilePhoto, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-chat-photo-by-size")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:get-chat-photo-by-size")()
 
 	// Map size to database photo_size
 	dbSize := "big"

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"beef-briefing/apps/api-service/internal/models"
+	"beef-briefing/apps/api-service/internal/nrutil"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
@@ -21,11 +22,7 @@ func NewUserRepository(db *sql.DB, nrApp *newrelic.Application) *UserRepository 
 
 // UpsertUser inserts or updates a user
 func (r *UserRepository) UpsertUser(ctx context.Context, tx *sql.Tx, user *models.User) error {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:upsert-user")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:upsert-user")()
 
 	query := `
 		INSERT INTO users (id, is_bot, first_name, last_name, username, language_code, is_premium)

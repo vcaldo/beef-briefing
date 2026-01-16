@@ -15,7 +15,6 @@ import (
 	"beef-briefing/apps/api-service/internal/handlers"
 	"beef-briefing/apps/api-service/internal/middleware"
 	"beef-briefing/apps/api-service/internal/migrations"
-	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/apps/api-service/internal/storage"
 	"beef-briefing/pkg/config"
@@ -217,7 +216,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	multiKeyAuth := middleware.NewMultiAPIKeyAuth(appKeys)
 
 	// Create services and handlers with New Relic instrumentation
-	ingestService := services.NewIngestService(db, minioClient, nrApp)
+	ingestService := services.NewIngestService(db, minioClient, nrApp, nil)
 	ingestHandler := handlers.NewIngestHandler(ingestService, cfg)
 
 	profilePhotoService := services.NewProfilePhotoService(db, minioClient, nrApp)
@@ -226,7 +225,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	mlService := services.NewMLService(db, nrApp)
 	mlHandler := handlers.NewMLHandler(mlService, cfg)
 
-	cardService := services.NewCardService(db, minioClient, nrApp)
+	cardService := services.NewCardService(db, minioClient, nrApp, nil)
 	cardHandler := handlers.NewCardHandler(cardService, cfg)
 
 	// Chat handler
@@ -237,13 +236,12 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	var arenaHandler *handlers.ArenaHandler
 	var jwtAuth *middleware.JWTAuth
 	if cfg.MiniAppEnabled() {
-		miniAppService := services.NewMiniAppService(db, cfg.JWTSecretKey, cfg.TelegramBotToken, nrApp, minioClient, cfg)
+		miniAppService := services.NewMiniAppService(db, cfg.JWTSecretKey, cfg.TelegramBotToken, nrApp, minioClient, cfg, nil)
 		miniAppHandler = handlers.NewMiniAppHandler(miniAppService, cardService, cfg)
 		jwtAuth = middleware.NewJWTAuth(cfg.JWTSecretKey)
 
 		// Arena game service and handler
-		gameRepo := repository.NewGameRepository(db, nrApp)
-		arenaService := services.NewArenaService(db, gameRepo, minioClient, cardService, nrApp)
+		arenaService := services.NewArenaService(db, minioClient, cardService, nrApp, nil)
 		arenaHandler = handlers.NewArenaHandler(arenaService, cfg)
 
 		slog.Info("Mini App endpoints enabled")

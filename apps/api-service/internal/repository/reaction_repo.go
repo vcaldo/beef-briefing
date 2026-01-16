@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"beef-briefing/apps/api-service/internal/models"
+	"beef-briefing/apps/api-service/internal/nrutil"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
@@ -22,11 +23,7 @@ func NewReactionRepository(db *sql.DB, nrApp *newrelic.Application) *ReactionRep
 
 // InsertMessageReaction inserts individual user reactions
 func (r *ReactionRepository) InsertMessageReaction(ctx context.Context, tx *sql.Tx, reaction *models.MessageReactionUpdated) error {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:insert-message-reaction")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:insert-message-reaction")()
 
 	// Insert reactions from new_reaction array
 	for _, newReact := range reaction.NewReaction {

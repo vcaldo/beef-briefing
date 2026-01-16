@@ -3,20 +3,18 @@ package services
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/models"
+	"beef-briefing/apps/api-service/internal/nrutil"
 	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/storage"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
-
-// ErrPhotoNotFound is returned when no photo exists for a user or chat.
-var ErrPhotoNotFound = errors.New("photo not found")
 
 // ProfilePhotoService handles profile photo processing for users and chats.
 type ProfilePhotoService struct {
@@ -40,11 +38,7 @@ func NewProfilePhotoService(db *sql.DB, storageClient *storage.MinIOClient, nrAp
 
 // ProcessUserPhotos stores profile photos for a user, replacing any existing photos.
 func (s *ProfilePhotoService) ProcessUserPhotos(ctx context.Context, userID int64, photos []models.ProfilePhotoMeta, files map[string][]byte) error {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("service:process-user-photos")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:process-user-photos")()
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -102,11 +96,7 @@ func (s *ProfilePhotoService) ProcessUserPhotos(ctx context.Context, userID int6
 
 // ProcessChatPhotos stores profile photos for a chat, replacing any existing photos.
 func (s *ProfilePhotoService) ProcessChatPhotos(ctx context.Context, chatID int64, photos []models.ProfilePhotoMeta, files map[string][]byte) error {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("service:process-chat-photos")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:process-chat-photos")()
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -207,11 +197,7 @@ func (s *ProfilePhotoService) uploadOrReuseMedia(ctx context.Context, tx *sql.Tx
 // Size can be "small", "medium", or "large" (default).
 // Returns a pre-signed URL for the photo with 1-hour expiry.
 func (s *ProfilePhotoService) GetUserPhoto(ctx context.Context, userID int64, size string) (string, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("service:get-user-photo")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:get-user-photo")()
 
 	photo, err := s.profilePhotoRepo.GetUserPhotoBySize(ctx, userID, size)
 	if err != nil {
@@ -219,7 +205,7 @@ func (s *ProfilePhotoService) GetUserPhoto(ctx context.Context, userID int64, si
 	}
 
 	if photo == nil {
-		return "", ErrPhotoNotFound
+		return "", apperror.ErrPhotoNotFound
 	}
 
 	url, err := s.storageClient.GetPresignedURL(ctx, photo.MinIOObjectKey, time.Hour)
@@ -240,11 +226,7 @@ func (s *ProfilePhotoService) GetUserPhoto(ctx context.Context, userID int64, si
 // Size can be "small", "medium", or "large" (default).
 // Returns a pre-signed URL for the photo with 1-hour expiry.
 func (s *ProfilePhotoService) GetChatPhoto(ctx context.Context, chatID int64, size string) (string, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("service:get-chat-photo")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:get-chat-photo")()
 
 	photo, err := s.profilePhotoRepo.GetChatPhotoBySize(ctx, chatID, size)
 	if err != nil {
@@ -252,7 +234,7 @@ func (s *ProfilePhotoService) GetChatPhoto(ctx context.Context, chatID int64, si
 	}
 
 	if photo == nil {
-		return "", ErrPhotoNotFound
+		return "", apperror.ErrPhotoNotFound
 	}
 
 	url, err := s.storageClient.GetPresignedURL(ctx, photo.MinIOObjectKey, time.Hour)

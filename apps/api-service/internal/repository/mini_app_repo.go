@@ -5,19 +5,36 @@ import (
 	"database/sql"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/nrutil"
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 // MiniAppRepository handles database operations for Mini App analytics.
+// It acts as a facade that delegates to specialized sub-repositories.
 type MiniAppRepository struct {
 	db    *sql.DB
 	nrApp *newrelic.Application
+
+	// Sub-repositories
+	stats       *StatsRepository
+	leaderboard *LeaderboardRepository
+	heatmap     *HeatmapRepository
 }
 
 // NewMiniAppRepository creates a new MiniAppRepository.
 func NewMiniAppRepository(db *sql.DB, nrApp *newrelic.Application) *MiniAppRepository {
-	return &MiniAppRepository{db: db, nrApp: nrApp}
+	return &MiniAppRepository{
+		db:          db,
+		nrApp:       nrApp,
+		stats:       NewStatsRepository(db, nrApp),
+		leaderboard: NewLeaderboardRepository(db, nrApp),
+		heatmap:     NewHeatmapRepository(db, nrApp),
+	}
 }
+
+// =============================================================================
+// Types
+// =============================================================================
 
 // OverviewStats represents overview statistics for a chat.
 type OverviewStats struct {
@@ -119,1761 +136,6 @@ type HeatmapData struct {
 	TotalMessages int64         `json:"total_messages"`
 }
 
-// GetOverviewStats returns overview statistics for a chat.
-// If startDate/endDate are nil, uses materialized views for all-time stats.
-func (r *MiniAppRepository) GetOverviewStats(ctx context.Context, chatID int64, startDate, endDate *time.Time) (*OverviewStats, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-overview-stats")
-		defer segment.End()
-	}
-
-	stats := &OverviewStats{}
-
-	if startDate == nil && endDate == nil {
-		// All-time: use materialized views
-		err := r.db.QueryRowContext(ctx, `
-			SELECT
-				COALESCE(SUM(message_count), 0) as total_messages,
-				COUNT(DISTINCT user_id) as total_users
-			FROM mv_user_statistics
-			WHERE chat_id = $1
-		`, chatID).Scan(&stats.TotalMessages, &stats.TotalUsers)
-		if err != nil {
-			return nil, err
-		}
-
-		// Get reactions from MV
-		err = r.db.QueryRowContext(ctx, `
-			SELECT COALESCE(SUM(count), 0) as total_reactions
-			FROM mv_reaction_distribution
-			WHERE chat_id = $1
-		`, chatID).Scan(&stats.TotalReactions)
-		if err != nil {
-			return nil, err
-		}
-
-		// Get media from MV
-		err = r.db.QueryRowContext(ctx, `
-			SELECT COALESCE(SUM(count), 0) as total_media
-			FROM mv_media_distribution
-			WHERE chat_id = $1
-		`, chatID).Scan(&stats.TotalMedia)
-		if err != nil {
-			return nil, err
-		}
-
-		// Calculate messages per day
-		var activeDays int64
-		err = r.db.QueryRowContext(ctx, `
-			SELECT COUNT(*) as active_days
-			FROM mv_daily_message_stats
-			WHERE chat_id = $1
-		`, chatID).Scan(&activeDays)
-		if err != nil {
-			return nil, err
-		}
-
-		if activeDays > 0 {
-			stats.MessagesPerDay = float64(stats.TotalMessages) / float64(activeDays)
-		}
-	} else {
-		// Date-filtered: use live queries
-		err := r.db.QueryRowContext(ctx, `
-			SELECT
-				COUNT(DISTINCT m.id) as total_messages,
-				COUNT(DISTINCT m.user_id) as total_users,
-				COUNT(DISTINCT mf.id) as total_media
-			FROM messages m
-			LEFT JOIN media_files mf ON mf.message_id = m.id
-			WHERE m.chat_id = $1
-				AND m.date >= $2
-				AND m.date < $3
-		`, chatID, startDate, endDate).Scan(&stats.TotalMessages, &stats.TotalUsers, &stats.TotalMedia)
-		if err != nil {
-			return nil, err
-		}
-
-		// Reactions with date filter
-		err = r.db.QueryRowContext(ctx, `
-			SELECT COUNT(*) as total_reactions
-			FROM message_reactions
-			WHERE chat_id = $1
-				AND date >= $2
-				AND date < $3
-				AND is_removed = false
-		`, chatID, startDate, endDate).Scan(&stats.TotalReactions)
-		if err != nil {
-			return nil, err
-		}
-
-		// Calculate messages per day
-		if startDate != nil && endDate != nil {
-			days := int(endDate.Sub(*startDate).Hours() / 24)
-			if days > 0 {
-				stats.MessagesPerDay = float64(stats.TotalMessages) / float64(days)
-			}
-		}
-	}
-
-	return stats, nil
-}
-
-// GetDailyActivity returns daily message activity for a chat in the specified timezone.
-func (r *MiniAppRepository) GetDailyActivity(ctx context.Context, chatID int64, startDate, endDate *time.Time, tz *time.Location) ([]DailyActivity, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-daily-activity")
-		defer segment.End()
-	}
-
-	tzName := "UTC"
-	if tz != nil {
-		tzName = tz.String()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time: query live data with timezone conversion
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				DATE(m.date AT TIME ZONE $2) as activity_date,
-				COUNT(*) as message_count,
-				COUNT(DISTINCT m.user_id) as unique_users
-			FROM messages m
-			WHERE m.chat_id = $1
-			GROUP BY DATE(m.date AT TIME ZONE $2)
-			ORDER BY activity_date
-		`, chatID, tzName)
-	} else {
-		// Date-filtered: query live data with timezone conversion
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				DATE(m.date AT TIME ZONE $4) as activity_date,
-				COUNT(*) as message_count,
-				COUNT(DISTINCT m.user_id) as unique_users
-			FROM messages m
-			WHERE m.chat_id = $1
-				AND m.date >= $2
-				AND m.date < $3
-			GROUP BY DATE(m.date AT TIME ZONE $4)
-			ORDER BY activity_date
-		`, chatID, startDate, endDate, tzName)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var activity []DailyActivity
-	for rows.Next() {
-		var date time.Time
-		var a DailyActivity
-		if err := rows.Scan(&date, &a.Messages, &a.Users); err != nil {
-			return nil, err
-		}
-		a.Date = date.Format("2006-01-02")
-		activity = append(activity, a)
-	}
-
-	return activity, rows.Err()
-}
-
-// GetUserDailyActivity returns daily message activity for a specific user in a chat.
-func (r *MiniAppRepository) GetUserDailyActivity(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time, tz *time.Location) ([]DailyActivity, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-user-daily-activity")
-		defer segment.End()
-	}
-
-	tzName := "UTC"
-	if tz != nil {
-		tzName = tz.String()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time: query live data with timezone conversion
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				DATE(m.date AT TIME ZONE $3) as activity_date,
-				COUNT(*) as message_count
-			FROM messages m
-			WHERE m.chat_id = $1 AND m.user_id = $2
-			GROUP BY DATE(m.date AT TIME ZONE $3)
-			ORDER BY activity_date
-		`, chatID, userID, tzName)
-	} else {
-		// Date-filtered: query live data with timezone conversion
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				DATE(m.date AT TIME ZONE $5) as activity_date,
-				COUNT(*) as message_count
-			FROM messages m
-			WHERE m.chat_id = $1 AND m.user_id = $2
-				AND m.date >= $3
-				AND m.date < $4
-			GROUP BY DATE(m.date AT TIME ZONE $5)
-			ORDER BY activity_date
-		`, chatID, userID, startDate, endDate, tzName)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var activity []DailyActivity
-	for rows.Next() {
-		var date time.Time
-		var a DailyActivity
-		if err := rows.Scan(&date, &a.Messages); err != nil {
-			return nil, err
-		}
-		a.Date = date.Format("2006-01-02")
-		a.Users = 1 // Single user
-		activity = append(activity, a)
-	}
-
-	return activity, rows.Err()
-}
-
-// GetUserRankings returns user rankings for a chat.
-// tzName is the IANA timezone name for streak calculations (e.g., "America/Sao_Paulo").
-// If empty, defaults to UTC.
-func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, metric string, limit, offset int, startDate, endDate *time.Time, tzName string) ([]UserRanking, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-user-rankings")
-		defer segment.End()
-	}
-
-	// Default to UTC if no timezone specified
-	if tzName == "" {
-		tzName = "UTC"
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time: use materialized view for standard metrics, live query for reply/streak metrics
-		if metric == "current_streak" {
-			// Streak metric: compute consecutive days for all users (timezone-aware)
-			query := `
-				WITH user_dates AS (
-					SELECT user_id, DATE(date AT TIME ZONE $4) as activity_date
-					FROM messages
-					WHERE chat_id = $1
-					GROUP BY user_id, DATE(date AT TIME ZONE $4)
-				),
-				numbered AS (
-					SELECT
-						user_id,
-						activity_date,
-						activity_date - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY activity_date ASC))::int as grp
-					FROM user_dates
-				),
-				user_last_active AS (
-					SELECT user_id, MAX(activity_date) as last_active
-					FROM user_dates
-					GROUP BY user_id
-				),
-				user_streaks AS (
-					SELECT
-						n.user_id,
-						CASE
-							-- Only count streak if last activity was today or yesterday (in specified timezone)
-							WHEN la.last_active >= (CURRENT_TIMESTAMP AT TIME ZONE $4)::date - INTERVAL '1 day'
-							THEN (
-								SELECT COUNT(*)
-								FROM numbered n2
-								WHERE n2.user_id = n.user_id
-									AND n2.grp = (
-										SELECT grp FROM numbered n3
-										WHERE n3.user_id = n.user_id
-										ORDER BY n3.activity_date DESC LIMIT 1
-									)
-							)
-							ELSE 0
-						END as streak
-					FROM (SELECT DISTINCT user_id FROM numbered) n
-					JOIN user_last_active la ON la.user_id = n.user_id
-				)
-				SELECT
-					mv.user_id,
-					mv.first_name,
-					mv.last_name,
-					mv.username,
-					COALESCE(us.streak, 0) as score,
-					ROW_NUMBER() OVER (ORDER BY COALESCE(us.streak, 0) DESC, mv.message_count DESC) as rank,
-					(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mv.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-				FROM mv_user_statistics mv
-				LEFT JOIN user_streaks us ON us.user_id = mv.user_id
-				WHERE mv.chat_id = $1
-					AND mv.is_bot = false
-				ORDER BY COALESCE(us.streak, 0) DESC, mv.message_count DESC
-				LIMIT $2 OFFSET $3
-			`
-			rows, err = r.db.QueryContext(ctx, query, chatID, limit, offset, tzName)
-		} else if metric == "replies_sent" || metric == "replies_received" {
-			// Reply metrics need live computation
-			query := `
-				WITH replies_sent AS (
-					SELECT m.user_id, COUNT(*) as replies_sent
-					FROM messages m
-					WHERE m.chat_id = $1
-						AND m.reply_to_message_id IS NOT NULL
-					GROUP BY m.user_id
-				),
-				replies_received AS (
-					SELECT orig.user_id, COUNT(*) as replies_received
-					FROM messages m
-					JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
-					WHERE m.chat_id = $1
-						AND m.reply_to_message_id IS NOT NULL
-					GROUP BY orig.user_id
-				)
-				SELECT
-					mv.user_id,
-					mv.first_name,
-					mv.last_name,
-					mv.username,
-					COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) as score,
-					ROW_NUMBER() OVER (ORDER BY COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) DESC) as rank,
-					(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mv.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-				FROM mv_user_statistics mv
-				LEFT JOIN replies_sent rps ON rps.user_id = mv.user_id
-				LEFT JOIN replies_received rpr ON rpr.user_id = mv.user_id
-				WHERE mv.chat_id = $1
-					AND mv.is_bot = false
-				ORDER BY COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) DESC
-				LIMIT $2 OFFSET $3
-			`
-			rows, err = r.db.QueryContext(ctx, query, chatID, limit, offset)
-		} else {
-			// Standard metrics from MV
-			query := `
-				SELECT
-					user_id,
-					first_name,
-					last_name,
-					username,
-					` + sanitizeMetricColumn(metric) + ` as score,
-					ROW_NUMBER() OVER (ORDER BY ` + sanitizeMetricColumn(metric) + ` DESC) as rank,
-					(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mv_user_statistics.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-				FROM mv_user_statistics
-				WHERE chat_id = $1
-					AND is_bot = false
-				ORDER BY ` + sanitizeMetricColumn(metric) + ` DESC
-				LIMIT $2 OFFSET $3
-			`
-			rows, err = r.db.QueryContext(ctx, query, chatID, limit, offset)
-		}
-	} else {
-		// Date-filtered: use live query
-		if metric == "current_streak" {
-			// Streak metric with date filter (timezone-aware)
-			query := `
-				WITH user_dates AS (
-					SELECT user_id, DATE(date AT TIME ZONE $6) as activity_date
-					FROM messages
-					WHERE chat_id = $1
-						AND date >= $2
-						AND date < $3
-					GROUP BY user_id, DATE(date AT TIME ZONE $6)
-				),
-				numbered AS (
-					SELECT
-						user_id,
-						activity_date,
-						activity_date - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY activity_date ASC))::int as grp
-					FROM user_dates
-				),
-				user_last_active AS (
-					SELECT user_id, MAX(activity_date) as last_active
-					FROM user_dates
-					GROUP BY user_id
-				),
-				user_streaks AS (
-					SELECT
-						n.user_id,
-						CASE
-							-- Only count streak if last activity was within period end or yesterday (in specified timezone)
-							WHEN la.last_active >= LEAST($3::date, (CURRENT_TIMESTAMP AT TIME ZONE $6)::date) - INTERVAL '1 day'
-							THEN (
-								SELECT COUNT(*)
-								FROM numbered n2
-								WHERE n2.user_id = n.user_id
-									AND n2.grp = (
-										SELECT grp FROM numbered n3
-										WHERE n3.user_id = n.user_id
-										ORDER BY n3.activity_date DESC LIMIT 1
-									)
-							)
-							ELSE 0
-						END as streak
-					FROM (SELECT DISTINCT user_id FROM numbered) n
-					JOIN user_last_active la ON la.user_id = n.user_id
-				),
-				user_info AS (
-					SELECT
-						m.user_id,
-						u.first_name,
-						u.last_name,
-						u.username,
-						u.is_bot,
-						COUNT(*) as message_count
-					FROM messages m
-					JOIN users u ON u.id = m.user_id
-					WHERE m.chat_id = $1
-						AND m.date >= $2
-						AND m.date < $3
-					GROUP BY m.user_id, u.first_name, u.last_name, u.username, u.is_bot
-				)
-				SELECT
-					ui.user_id,
-					ui.first_name,
-					ui.last_name,
-					ui.username,
-					COALESCE(us.streak, 0) as score,
-					ROW_NUMBER() OVER (ORDER BY COALESCE(us.streak, 0) DESC, ui.message_count DESC) as rank,
-					(SELECT minio_object_key FROM user_profile_photos WHERE user_id = ui.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-				FROM user_info ui
-				LEFT JOIN user_streaks us ON us.user_id = ui.user_id
-				WHERE ui.is_bot = false
-				ORDER BY COALESCE(us.streak, 0) DESC, ui.message_count DESC
-				LIMIT $4 OFFSET $5
-			`
-			rows, err = r.db.QueryContext(ctx, query, chatID, startDate, endDate, limit, offset, tzName)
-		} else {
-			query := `
-				WITH user_stats AS (
-					SELECT
-						m.user_id,
-						u.first_name,
-						u.last_name,
-						u.username,
-						u.is_bot,
-						COUNT(*) as message_count,
-						COUNT(DISTINCT DATE(m.date AT TIME ZONE $6)) as active_days
-					FROM messages m
-					JOIN users u ON u.id = m.user_id
-					WHERE m.chat_id = $1
-						AND m.date >= $2
-						AND m.date < $3
-					GROUP BY m.user_id, u.first_name, u.last_name, u.username, u.is_bot
-				),
-				reactions_sent AS (
-					SELECT user_id, COUNT(*) as reactions_sent
-					FROM message_reactions
-					WHERE chat_id = $1
-						AND date >= $2
-						AND date < $3
-						AND is_removed = false
-					GROUP BY user_id
-				),
-				reactions_received AS (
-					SELECT m.user_id, COUNT(*) as reactions_received
-					FROM message_reactions mr
-					JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
-					WHERE mr.chat_id = $1
-						AND mr.date >= $2
-						AND mr.date < $3
-						AND mr.is_removed = false
-					GROUP BY m.user_id
-				),
-				replies_sent AS (
-					SELECT m.user_id, COUNT(*) as replies_sent
-					FROM messages m
-					WHERE m.chat_id = $1
-						AND m.date >= $2
-						AND m.date < $3
-						AND m.reply_to_message_id IS NOT NULL
-					GROUP BY m.user_id
-				),
-				replies_received AS (
-					SELECT orig.user_id, COUNT(*) as replies_received
-					FROM messages m
-					JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
-					WHERE m.chat_id = $1
-						AND m.date >= $2
-						AND m.date < $3
-						AND m.reply_to_message_id IS NOT NULL
-					GROUP BY orig.user_id
-				)
-				SELECT
-					us.user_id,
-					us.first_name,
-					us.last_name,
-					us.username,
-					COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) as score,
-					ROW_NUMBER() OVER (ORDER BY COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) DESC) as rank,
-					(SELECT minio_object_key FROM user_profile_photos WHERE user_id = us.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-				FROM user_stats us
-				LEFT JOIN reactions_sent rs ON rs.user_id = us.user_id
-				LEFT JOIN reactions_received rr ON rr.user_id = us.user_id
-				LEFT JOIN replies_sent rps ON rps.user_id = us.user_id
-				LEFT JOIN replies_received rpr ON rpr.user_id = us.user_id
-				WHERE us.is_bot = false
-				ORDER BY COALESCE(` + sanitizeMetricColumnCTE(metric) + `, 0) DESC
-				LIMIT $4 OFFSET $5
-			`
-			rows, err = r.db.QueryContext(ctx, query, chatID, startDate, endDate, limit, offset, tzName)
-		}
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var rankings []UserRanking
-	for rows.Next() {
-		var rank int64
-		var r UserRanking
-		if err := rows.Scan(&r.UserID, &r.FirstName, &r.LastName, &r.Username, &r.Score, &rank, &r.PhotoObjectKey); err != nil {
-			return nil, err
-		}
-		// Adjust rank for offset
-		r.Rank = offset + len(rankings) + 1
-		rankings = append(rankings, r)
-	}
-
-	return rankings, rows.Err()
-}
-
-// GetUserRankingsTotal returns the total count of users for pagination.
-func (r *MiniAppRepository) GetUserRankingsTotal(ctx context.Context, chatID int64, startDate, endDate *time.Time) (int, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-user-rankings-total")
-		defer segment.End()
-	}
-
-	var total int
-
-	if startDate == nil && endDate == nil {
-		err := r.db.QueryRowContext(ctx, `
-			SELECT COUNT(*) as total
-			FROM mv_user_statistics
-			WHERE chat_id = $1
-				AND is_bot = false
-		`, chatID).Scan(&total)
-		if err != nil {
-			return 0, err
-		}
-	} else {
-		err := r.db.QueryRowContext(ctx, `
-			SELECT COUNT(DISTINCT m.user_id) as total
-			FROM messages m
-			JOIN users u ON u.id = m.user_id
-			WHERE m.chat_id = $1
-				AND m.date >= $2
-				AND m.date < $3
-				AND u.is_bot = false
-		`, chatID, startDate, endDate).Scan(&total)
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	return total, nil
-}
-
-// sanitizeMetricColumn ensures the metric column name is safe for SQL
-func sanitizeMetricColumn(metric string) string {
-	switch metric {
-	case "message_count":
-		return "message_count"
-	case "reactions_sent":
-		return "reactions_sent"
-	case "reactions_received":
-		return "reactions_received"
-	case "replies_sent":
-		return "replies_sent"
-	case "replies_received":
-		return "replies_received"
-	case "active_days":
-		return "active_days"
-	default:
-		return "message_count"
-	}
-}
-
-// sanitizeMetricColumnCTE returns the column reference for CTE queries
-func sanitizeMetricColumnCTE(metric string) string {
-	switch metric {
-	case "message_count":
-		return "us.message_count"
-	case "reactions_sent":
-		return "rs.reactions_sent"
-	case "reactions_received":
-		return "rr.reactions_received"
-	case "replies_sent":
-		return "rps.replies_sent"
-	case "replies_received":
-		return "rpr.replies_received"
-	case "active_days":
-		return "us.active_days"
-	default:
-		return "us.message_count"
-	}
-}
-
-// GetTopReactions returns the top reactions used in a chat.
-func (r *MiniAppRepository) GetTopReactions(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]TopReaction, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-top-reactions")
-		defer segment.End()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time: use materialized view
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT emoji, reaction_type, count
-			FROM mv_reaction_distribution
-			WHERE chat_id = $1
-			ORDER BY count DESC
-			LIMIT $2
-		`, chatID, limit)
-	} else {
-		// Date-filtered: use live query
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				COALESCE(mr.emoji_value, mr.custom_emoji_id, 'paid') as emoji,
-				mr.reaction_type,
-				COUNT(*) as count
-			FROM message_reactions mr
-			WHERE mr.chat_id = $1
-				AND mr.is_removed = false
-				AND mr.date >= $2
-				AND mr.date < $3
-			GROUP BY COALESCE(mr.emoji_value, mr.custom_emoji_id, 'paid'), mr.reaction_type
-			ORDER BY count DESC
-			LIMIT $4
-		`, chatID, startDate, endDate, limit)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var reactions []TopReaction
-	for rows.Next() {
-		var r TopReaction
-		if err := rows.Scan(&r.Emoji, &r.ReactionType, &r.Count); err != nil {
-			return nil, err
-		}
-		reactions = append(reactions, r)
-	}
-
-	return reactions, rows.Err()
-}
-
-// GetTopReactionGivers returns users who give the most reactions.
-func (r *MiniAppRepository) GetTopReactionGivers(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]ReactionUser, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-top-reaction-givers")
-		defer segment.End()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time: use materialized view
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				user_id,
-				first_name,
-				last_name,
-				username,
-				reactions_sent as score,
-				ROW_NUMBER() OVER (ORDER BY reactions_sent DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mv_user_statistics.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM mv_user_statistics
-			WHERE chat_id = $1
-				AND is_bot = false
-				AND reactions_sent > 0
-			ORDER BY reactions_sent DESC
-			LIMIT $2
-		`, chatID, limit)
-	} else {
-		// Date-filtered: use live query
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				mr.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mr.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM message_reactions mr
-			JOIN users u ON u.id = mr.user_id
-			WHERE mr.chat_id = $1
-				AND mr.is_removed = false
-				AND mr.user_id IS NOT NULL
-				AND mr.date >= $2
-				AND mr.date < $3
-				AND u.is_bot = false
-			GROUP BY mr.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $4
-		`, chatID, startDate, endDate, limit)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var users []ReactionUser
-	for rows.Next() {
-		var rank int64
-		var u ReactionUser
-		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.Score, &rank, &u.PhotoObjectKey); err != nil {
-			return nil, err
-		}
-		u.Rank = int(rank)
-		users = append(users, u)
-	}
-
-	return users, rows.Err()
-}
-
-// GetTopReactionReceivers returns users who receive the most reactions.
-func (r *MiniAppRepository) GetTopReactionReceivers(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]ReactionUser, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-top-reaction-receivers")
-		defer segment.End()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time: use materialized view
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				user_id,
-				first_name,
-				last_name,
-				username,
-				reactions_received as score,
-				ROW_NUMBER() OVER (ORDER BY reactions_received DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mv_user_statistics.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM mv_user_statistics
-			WHERE chat_id = $1
-				AND is_bot = false
-				AND reactions_received > 0
-			ORDER BY reactions_received DESC
-			LIMIT $2
-		`, chatID, limit)
-	} else {
-		// Date-filtered: use live query
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				m.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM message_reactions mr
-			JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
-			JOIN users u ON u.id = m.user_id
-			WHERE mr.chat_id = $1
-				AND mr.is_removed = false
-				AND m.user_id IS NOT NULL
-				AND mr.date >= $2
-				AND mr.date < $3
-				AND u.is_bot = false
-			GROUP BY m.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $4
-		`, chatID, startDate, endDate, limit)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var users []ReactionUser
-	for rows.Next() {
-		var rank int64
-		var u ReactionUser
-		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.Score, &rank, &u.PhotoObjectKey); err != nil {
-			return nil, err
-		}
-		u.Rank = int(rank)
-		users = append(users, u)
-	}
-
-	return users, rows.Err()
-}
-
-// GetUserProfileStats returns personal stats for a user including their rankings.
-// tzName is the IANA timezone name for streak calculations (e.g., "America/Sao_Paulo").
-// If empty, defaults to UTC.
-func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time, tzName string) (*ProfileStats, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-user-profile-stats")
-		defer segment.End()
-	}
-
-	stats := &ProfileStats{}
-
-	if startDate == nil && endDate == nil {
-		// All-time: use materialized view with window functions for ranking
-		err := r.db.QueryRowContext(ctx, `
-			WITH replies_sent AS (
-				SELECT m.user_id, COUNT(*) as replies_sent
-				FROM messages m
-				WHERE m.chat_id = $1
-					AND m.reply_to_message_id IS NOT NULL
-				GROUP BY m.user_id
-			),
-			replies_received AS (
-				SELECT orig.user_id, COUNT(*) as replies_received
-				FROM messages m
-				JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
-				WHERE m.chat_id = $1
-					AND m.reply_to_message_id IS NOT NULL
-				GROUP BY orig.user_id
-			),
-			ranked AS (
-				SELECT
-					mv.user_id,
-					mv.message_count,
-					mv.reactions_sent,
-					mv.reactions_received,
-					mv.active_days,
-					COALESCE(rps.replies_sent, 0) as replies_sent,
-					COALESCE(rpr.replies_received, 0) as replies_received,
-					ROW_NUMBER() OVER (ORDER BY mv.message_count DESC) as rank_by_messages,
-					ROW_NUMBER() OVER (ORDER BY mv.reactions_received DESC) as rank_by_reactions
-				FROM mv_user_statistics mv
-				LEFT JOIN replies_sent rps ON rps.user_id = mv.user_id
-				LEFT JOIN replies_received rpr ON rpr.user_id = mv.user_id
-				WHERE mv.chat_id = $1 AND mv.is_bot = false
-			)
-			SELECT
-				message_count,
-				reactions_sent,
-				reactions_received,
-				replies_sent,
-				replies_received,
-				active_days,
-				rank_by_messages,
-				rank_by_reactions
-			FROM ranked
-			WHERE user_id = $2
-		`, chatID, userID).Scan(
-			&stats.MessageCount,
-			&stats.ReactionsSent,
-			&stats.ReactionsReceived,
-			&stats.RepliesSent,
-			&stats.RepliesReceived,
-			&stats.ActiveDays,
-			&stats.RankByMessages,
-			&stats.RankByReactionsReceived,
-		)
-		if err == sql.ErrNoRows {
-			// User not found in stats, return zeros
-			return stats, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// Date-filtered: use live query
-		err := r.db.QueryRowContext(ctx, `
-			WITH user_stats AS (
-				SELECT
-					m.user_id,
-					COUNT(*) as message_count,
-					COUNT(DISTINCT DATE(m.date AT TIME ZONE $5)) as active_days
-				FROM messages m
-				JOIN users u ON u.id = m.user_id
-				WHERE m.chat_id = $1
-					AND m.date >= $2
-					AND m.date < $3
-					AND u.is_bot = false
-				GROUP BY m.user_id
-			),
-			reactions_sent AS (
-				SELECT user_id, COUNT(*) as reactions_sent
-				FROM message_reactions
-				WHERE chat_id = $1
-					AND date >= $2
-					AND date < $3
-					AND is_removed = false
-				GROUP BY user_id
-			),
-			reactions_received AS (
-				SELECT m.user_id, COUNT(*) as reactions_received
-				FROM message_reactions mr
-				JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
-				WHERE mr.chat_id = $1
-					AND mr.date >= $2
-					AND mr.date < $3
-					AND mr.is_removed = false
-				GROUP BY m.user_id
-			),
-			replies_sent AS (
-				SELECT m.user_id, COUNT(*) as replies_sent
-				FROM messages m
-				WHERE m.chat_id = $1
-					AND m.date >= $2
-					AND m.date < $3
-					AND m.reply_to_message_id IS NOT NULL
-				GROUP BY m.user_id
-			),
-			replies_received AS (
-				SELECT orig.user_id, COUNT(*) as replies_received
-				FROM messages m
-				JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
-				WHERE m.chat_id = $1
-					AND m.date >= $2
-					AND m.date < $3
-					AND m.reply_to_message_id IS NOT NULL
-				GROUP BY orig.user_id
-			),
-			combined AS (
-				SELECT
-					us.user_id,
-					us.message_count,
-					us.active_days,
-					COALESCE(rs.reactions_sent, 0) as reactions_sent,
-					COALESCE(rr.reactions_received, 0) as reactions_received,
-					COALESCE(rps.replies_sent, 0) as replies_sent,
-					COALESCE(rpr.replies_received, 0) as replies_received,
-					ROW_NUMBER() OVER (ORDER BY us.message_count DESC) as rank_by_messages,
-					ROW_NUMBER() OVER (ORDER BY COALESCE(rr.reactions_received, 0) DESC) as rank_by_reactions
-				FROM user_stats us
-				LEFT JOIN reactions_sent rs ON rs.user_id = us.user_id
-				LEFT JOIN reactions_received rr ON rr.user_id = us.user_id
-				LEFT JOIN replies_sent rps ON rps.user_id = us.user_id
-				LEFT JOIN replies_received rpr ON rpr.user_id = us.user_id
-			)
-			SELECT
-				message_count,
-				reactions_sent,
-				reactions_received,
-				replies_sent,
-				replies_received,
-				active_days,
-				rank_by_messages,
-				rank_by_reactions
-			FROM combined
-			WHERE user_id = $4
-		`, chatID, startDate, endDate, userID, tzName).Scan(
-			&stats.MessageCount,
-			&stats.ReactionsSent,
-			&stats.ReactionsReceived,
-			&stats.RepliesSent,
-			&stats.RepliesReceived,
-			&stats.ActiveDays,
-			&stats.RankByMessages,
-			&stats.RankByReactionsReceived,
-		)
-		if err == sql.ErrNoRows {
-			return stats, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Calculate avg messages per day
-	if stats.ActiveDays > 0 {
-		stats.AvgMessagesPerDay = float64(stats.MessageCount) / float64(stats.ActiveDays)
-	}
-
-	// Calculate current streak
-	streak, err := r.getUserCurrentStreak(ctx, chatID, userID, startDate, endDate, tzName)
-	if err != nil {
-		// Log but don't fail - streak is not critical
-		stats.CurrentStreak = 0
-	} else {
-		stats.CurrentStreak = streak
-	}
-
-	return stats, nil
-}
-
-// getUserCurrentStreak calculates the current consecutive days streak for a user.
-// tzName is the IANA timezone name for streak calculations (e.g., "America/Sao_Paulo").
-// If empty, defaults to UTC.
-func (r *MiniAppRepository) getUserCurrentStreak(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time, tzName string) (int64, error) {
-	// Default to UTC if no timezone specified
-	if tzName == "" {
-		tzName = "UTC"
-	}
-
-	var query string
-	var args []interface{}
-
-	if startDate == nil && endDate == nil {
-		// All-time streak: consecutive days ending today or yesterday (active streak only, timezone-aware)
-		query = `
-			WITH user_dates AS (
-				SELECT DISTINCT DATE(date AT TIME ZONE $3) as activity_date
-				FROM messages
-				WHERE chat_id = $1 AND user_id = $2
-			),
-			most_recent AS (
-				SELECT MAX(activity_date) as last_active FROM user_dates
-			),
-			numbered AS (
-				SELECT
-					activity_date,
-					activity_date - (ROW_NUMBER() OVER (ORDER BY activity_date ASC))::int as grp
-				FROM user_dates
-			)
-			SELECT CASE
-				-- Only count streak if last activity was today or yesterday (in specified timezone)
-				WHEN (SELECT last_active FROM most_recent) >= (CURRENT_TIMESTAMP AT TIME ZONE $3)::date - INTERVAL '1 day'
-				THEN (
-					SELECT COUNT(*)
-					FROM numbered
-					WHERE grp = (SELECT grp FROM numbered ORDER BY activity_date DESC LIMIT 1)
-				)
-				ELSE 0
-			END
-		`
-		args = []interface{}{chatID, userID, tzName}
-	} else {
-		// Period-filtered streak: consecutive days ending at period end or yesterday (timezone-aware)
-		query = `
-			WITH user_dates AS (
-				SELECT DISTINCT DATE(date AT TIME ZONE $5) as activity_date
-				FROM messages
-				WHERE chat_id = $1 AND user_id = $2
-					AND date >= $3 AND date < $4
-			),
-			most_recent AS (
-				SELECT MAX(activity_date) as last_active FROM user_dates
-			),
-			numbered AS (
-				SELECT
-					activity_date,
-					activity_date - (ROW_NUMBER() OVER (ORDER BY activity_date ASC))::int as grp
-				FROM user_dates
-			)
-			SELECT CASE
-				-- Only count streak if last activity was within the period's end or yesterday (in specified timezone)
-				WHEN (SELECT last_active FROM most_recent) >= LEAST($4::date, (CURRENT_TIMESTAMP AT TIME ZONE $5)::date) - INTERVAL '1 day'
-				THEN (
-					SELECT COUNT(*)
-					FROM numbered
-					WHERE grp = (SELECT grp FROM numbered ORDER BY activity_date DESC LIMIT 1)
-				)
-				ELSE 0
-			END
-		`
-		args = []interface{}{chatID, userID, startDate, endDate, tzName}
-	}
-
-	var streak int64
-	err := r.db.QueryRowContext(ctx, query, args...).Scan(&streak)
-	if err == sql.ErrNoRows {
-		return 0, nil
-	}
-	return streak, err
-}
-
-// GetTopReactorsToUser returns users who react most to a specific user's messages.
-func (r *MiniAppRepository) GetTopReactorsToUser(ctx context.Context, chatID, userID int64, limit int, startDate, endDate *time.Time) ([]TopInteractor, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-top-reactors-to-user")
-		defer segment.End()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time: live query (no MV for this specific data)
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				mr.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				MODE() WITHIN GROUP (ORDER BY COALESCE(mr.emoji_value, mr.custom_emoji_id, 'paid')) as top_emoji,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mr.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM message_reactions mr
-			JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
-			JOIN users u ON u.id = mr.user_id
-			WHERE mr.chat_id = $1
-				AND m.user_id = $2
-				AND mr.user_id != $2
-				AND mr.is_removed = false
-				AND u.is_bot = false
-			GROUP BY mr.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $3
-		`, chatID, userID, limit)
-	} else {
-		// Date-filtered
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				mr.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				MODE() WITHIN GROUP (ORDER BY COALESCE(mr.emoji_value, mr.custom_emoji_id, 'paid')) as top_emoji,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mr.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM message_reactions mr
-			JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
-			JOIN users u ON u.id = mr.user_id
-			WHERE mr.chat_id = $1
-				AND m.user_id = $2
-				AND mr.user_id != $2
-				AND mr.is_removed = false
-				AND mr.date >= $3
-				AND mr.date < $4
-				AND u.is_bot = false
-			GROUP BY mr.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $5
-		`, chatID, userID, startDate, endDate, limit)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var interactors []TopInteractor
-	for rows.Next() {
-		var rank int64
-		var i TopInteractor
-		if err := rows.Scan(&i.UserID, &i.FirstName, &i.LastName, &i.Username, &i.Score, &i.TopEmoji, &rank, &i.PhotoObjectKey); err != nil {
-			return nil, err
-		}
-		i.Rank = int(rank)
-		interactors = append(interactors, i)
-	}
-
-	return interactors, rows.Err()
-}
-
-// GetTopReactedToByUser returns users whose messages a specific user reacts to most.
-func (r *MiniAppRepository) GetTopReactedToByUser(ctx context.Context, chatID, userID int64, limit int, startDate, endDate *time.Time) ([]TopInteractor, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-top-reacted-to-by-user")
-		defer segment.End()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time: live query (no MV for this specific data)
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				m.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				MODE() WITHIN GROUP (ORDER BY COALESCE(mr.emoji_value, mr.custom_emoji_id, 'paid')) as top_emoji,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM message_reactions mr
-			JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
-			JOIN users u ON u.id = m.user_id
-			WHERE mr.chat_id = $1
-				AND mr.user_id = $2
-				AND m.user_id != $2
-				AND mr.is_removed = false
-				AND u.is_bot = false
-			GROUP BY m.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $3
-		`, chatID, userID, limit)
-	} else {
-		// Date-filtered
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				m.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				MODE() WITHIN GROUP (ORDER BY COALESCE(mr.emoji_value, mr.custom_emoji_id, 'paid')) as top_emoji,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM message_reactions mr
-			JOIN messages m ON m.chat_id = mr.chat_id AND m.message_id = mr.message_id
-			JOIN users u ON u.id = m.user_id
-			WHERE mr.chat_id = $1
-				AND mr.user_id = $2
-				AND m.user_id != $2
-				AND mr.is_removed = false
-				AND mr.date >= $3
-				AND mr.date < $4
-				AND u.is_bot = false
-			GROUP BY m.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $5
-		`, chatID, userID, startDate, endDate, limit)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var interactors []TopInteractor
-	for rows.Next() {
-		var rank int64
-		var i TopInteractor
-		if err := rows.Scan(&i.UserID, &i.FirstName, &i.LastName, &i.Username, &i.Score, &i.TopEmoji, &rank, &i.PhotoObjectKey); err != nil {
-			return nil, err
-		}
-		i.Rank = int(rank)
-		interactors = append(interactors, i)
-	}
-
-	return interactors, rows.Err()
-}
-
-// GetTopRepliersToUser returns users who reply most to a specific user's messages.
-func (r *MiniAppRepository) GetTopRepliersToUser(ctx context.Context, chatID, userID int64, limit int, startDate, endDate *time.Time) ([]TopInteractor, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-top-repliers-to-user")
-		defer segment.End()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				m.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM messages m
-			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
-			JOIN users u ON u.id = m.user_id
-			WHERE m.chat_id = $1
-				AND orig.user_id = $2
-				AND m.user_id != $2
-				AND m.reply_to_message_id IS NOT NULL
-				AND u.is_bot = false
-			GROUP BY m.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $3
-		`, chatID, userID, limit)
-	} else {
-		// Date-filtered
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				m.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM messages m
-			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
-			JOIN users u ON u.id = m.user_id
-			WHERE m.chat_id = $1
-				AND orig.user_id = $2
-				AND m.user_id != $2
-				AND m.reply_to_message_id IS NOT NULL
-				AND m.date >= $3
-				AND m.date < $4
-				AND u.is_bot = false
-			GROUP BY m.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $5
-		`, chatID, userID, startDate, endDate, limit)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var interactors []TopInteractor
-	for rows.Next() {
-		var rank int64
-		var i TopInteractor
-		if err := rows.Scan(&i.UserID, &i.FirstName, &i.LastName, &i.Username, &i.Score, &rank, &i.PhotoObjectKey); err != nil {
-			return nil, err
-		}
-		i.Rank = int(rank)
-		interactors = append(interactors, i)
-	}
-
-	return interactors, rows.Err()
-}
-
-// GetTopRepliedToByUser returns users that a specific user replies to most.
-func (r *MiniAppRepository) GetTopRepliedToByUser(ctx context.Context, chatID, userID int64, limit int, startDate, endDate *time.Time) ([]TopInteractor, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-top-replied-to-by-user")
-		defer segment.End()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				orig.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = orig.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM messages m
-			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
-			JOIN users u ON u.id = orig.user_id
-			WHERE m.chat_id = $1
-				AND m.user_id = $2
-				AND orig.user_id != $2
-				AND m.reply_to_message_id IS NOT NULL
-				AND u.is_bot = false
-			GROUP BY orig.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $3
-		`, chatID, userID, limit)
-	} else {
-		// Date-filtered
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				orig.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = orig.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM messages m
-			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
-			JOIN users u ON u.id = orig.user_id
-			WHERE m.chat_id = $1
-				AND m.user_id = $2
-				AND orig.user_id != $2
-				AND m.reply_to_message_id IS NOT NULL
-				AND m.date >= $3
-				AND m.date < $4
-				AND u.is_bot = false
-			GROUP BY orig.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $5
-		`, chatID, userID, startDate, endDate, limit)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var interactors []TopInteractor
-	for rows.Next() {
-		var rank int64
-		var i TopInteractor
-		if err := rows.Scan(&i.UserID, &i.FirstName, &i.LastName, &i.Username, &i.Score, &rank, &i.PhotoObjectKey); err != nil {
-			return nil, err
-		}
-		i.Rank = int(rank)
-		interactors = append(interactors, i)
-	}
-
-	return interactors, rows.Err()
-}
-
-// GetTopReplySenders returns users who send the most replies in a chat.
-func (r *MiniAppRepository) GetTopReplySenders(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]ReactionUser, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-top-reply-senders")
-		defer segment.End()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time: live query (no MV for reply stats)
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				m.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM messages m
-			JOIN users u ON u.id = m.user_id
-			WHERE m.chat_id = $1
-				AND m.reply_to_message_id IS NOT NULL
-				AND u.is_bot = false
-			GROUP BY m.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $2
-		`, chatID, limit)
-	} else {
-		// Date-filtered
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				m.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = m.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM messages m
-			JOIN users u ON u.id = m.user_id
-			WHERE m.chat_id = $1
-				AND m.reply_to_message_id IS NOT NULL
-				AND m.date >= $2
-				AND m.date < $3
-				AND u.is_bot = false
-			GROUP BY m.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $4
-		`, chatID, startDate, endDate, limit)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var users []ReactionUser
-	for rows.Next() {
-		var rank int64
-		var u ReactionUser
-		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.Score, &rank, &u.PhotoObjectKey); err != nil {
-			return nil, err
-		}
-		u.Rank = int(rank)
-		users = append(users, u)
-	}
-
-	return users, rows.Err()
-}
-
-// GetTopReplyReceivers returns users whose messages receive the most replies in a chat.
-func (r *MiniAppRepository) GetTopReplyReceivers(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]ReactionUser, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-top-reply-receivers")
-		defer segment.End()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time: live query (no MV for reply stats)
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				orig.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = orig.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM messages m
-			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
-			JOIN users u ON u.id = orig.user_id
-			WHERE m.chat_id = $1
-				AND m.reply_to_message_id IS NOT NULL
-				AND u.is_bot = false
-			GROUP BY orig.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $2
-		`, chatID, limit)
-	} else {
-		// Date-filtered
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				orig.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				COUNT(*) as score,
-				ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = orig.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM messages m
-			JOIN messages orig ON orig.chat_id = m.chat_id AND orig.message_id = m.reply_to_message_id
-			JOIN users u ON u.id = orig.user_id
-			WHERE m.chat_id = $1
-				AND m.reply_to_message_id IS NOT NULL
-				AND m.date >= $2
-				AND m.date < $3
-				AND u.is_bot = false
-			GROUP BY orig.user_id, u.first_name, u.last_name, u.username
-			ORDER BY score DESC
-			LIMIT $4
-		`, chatID, startDate, endDate, limit)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var users []ReactionUser
-	for rows.Next() {
-		var rank int64
-		var u ReactionUser
-		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.Score, &rank, &u.PhotoObjectKey); err != nil {
-			return nil, err
-		}
-		u.Rank = int(rank)
-		users = append(users, u)
-	}
-
-	return users, rows.Err()
-}
-
-// GetGroupHeatmap returns the activity heatmap for a chat in the specified timezone.
-func (r *MiniAppRepository) GetGroupHeatmap(ctx context.Context, chatID int64, startDate, endDate *time.Time, tz *time.Location) (*HeatmapData, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-group-heatmap")
-		defer segment.End()
-	}
-
-	tzName := "UTC"
-	if tz != nil {
-		tzName = tz.String()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time query with timezone
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				EXTRACT(DOW FROM m.date AT TIME ZONE $2)::int as day_of_week,
-				EXTRACT(HOUR FROM m.date AT TIME ZONE $2)::int as hour,
-				COUNT(*) as message_count,
-				COUNT(DISTINCT m.user_id) as unique_users
-			FROM messages m
-			WHERE m.chat_id = $1
-			GROUP BY
-				EXTRACT(DOW FROM m.date AT TIME ZONE $2),
-				EXTRACT(HOUR FROM m.date AT TIME ZONE $2)
-			ORDER BY day_of_week, hour
-		`, chatID, tzName)
-	} else {
-		// Date-filtered query with timezone
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				EXTRACT(DOW FROM m.date AT TIME ZONE $4)::int as day_of_week,
-				EXTRACT(HOUR FROM m.date AT TIME ZONE $4)::int as hour,
-				COUNT(*) as message_count,
-				COUNT(DISTINCT m.user_id) as unique_users
-			FROM messages m
-			WHERE m.chat_id = $1
-				AND m.date >= $2
-				AND m.date < $3
-			GROUP BY
-				EXTRACT(DOW FROM m.date AT TIME ZONE $4),
-				EXTRACT(HOUR FROM m.date AT TIME ZONE $4)
-			ORDER BY day_of_week, hour
-		`, chatID, startDate, endDate, tzName)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	heatmap := &HeatmapData{
-		Data: []HeatmapCell{},
-	}
-
-	for rows.Next() {
-		var cell HeatmapCell
-		if err := rows.Scan(&cell.DayOfWeek, &cell.Hour, &cell.MessageCount, &cell.UniqueUsers); err != nil {
-			return nil, err
-		}
-		heatmap.Data = append(heatmap.Data, cell)
-		heatmap.TotalMessages += cell.MessageCount
-		if cell.MessageCount > heatmap.MaxCount {
-			heatmap.MaxCount = cell.MessageCount
-		}
-	}
-
-	return heatmap, rows.Err()
-}
-
-// GetUserHeatmap returns the activity heatmap for a specific user in the specified timezone.
-func (r *MiniAppRepository) GetUserHeatmap(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time, tz *time.Location) (*HeatmapData, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-user-heatmap")
-		defer segment.End()
-	}
-
-	tzName := "UTC"
-	if tz != nil {
-		tzName = tz.String()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time with timezone
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				EXTRACT(DOW FROM m.date AT TIME ZONE $3)::int as day_of_week,
-				EXTRACT(HOUR FROM m.date AT TIME ZONE $3)::int as hour,
-				COUNT(*) as message_count
-			FROM messages m
-			WHERE m.chat_id = $1 AND m.user_id = $2
-			GROUP BY
-				EXTRACT(DOW FROM m.date AT TIME ZONE $3),
-				EXTRACT(HOUR FROM m.date AT TIME ZONE $3)
-			ORDER BY day_of_week, hour
-		`, chatID, userID, tzName)
-	} else {
-		// Date-filtered with timezone
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				EXTRACT(DOW FROM m.date AT TIME ZONE $5)::int as day_of_week,
-				EXTRACT(HOUR FROM m.date AT TIME ZONE $5)::int as hour,
-				COUNT(*) as message_count
-			FROM messages m
-			WHERE m.chat_id = $1
-				AND m.user_id = $2
-				AND m.date >= $3
-				AND m.date < $4
-			GROUP BY
-				EXTRACT(DOW FROM m.date AT TIME ZONE $5),
-				EXTRACT(HOUR FROM m.date AT TIME ZONE $5)
-			ORDER BY day_of_week, hour
-		`, chatID, userID, startDate, endDate, tzName)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	heatmap := &HeatmapData{
-		Data: []HeatmapCell{},
-	}
-
-	for rows.Next() {
-		var cell HeatmapCell
-		if err := rows.Scan(&cell.DayOfWeek, &cell.Hour, &cell.MessageCount); err != nil {
-			return nil, err
-		}
-		heatmap.Data = append(heatmap.Data, cell)
-		heatmap.TotalMessages += cell.MessageCount
-		if cell.MessageCount > heatmap.MaxCount {
-			heatmap.MaxCount = cell.MessageCount
-		}
-	}
-
-	return heatmap, rows.Err()
-}
-
-// GetUserPhotoObjectKey returns the largest profile photo object key for a user.
-func (r *MiniAppRepository) GetUserPhotoObjectKey(ctx context.Context, userID int64) (*string, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-user-photo-key")
-		defer segment.End()
-	}
-
-	var objectKey sql.NullString
-	err := r.db.QueryRowContext(ctx, `
-		SELECT minio_object_key
-		FROM user_profile_photos
-		WHERE user_id = $1
-		ORDER BY width DESC
-		LIMIT 1
-	`, userID).Scan(&objectKey)
-
-	if err == sql.ErrNoRows || !objectKey.Valid {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return &objectKey.String, nil
-}
-
-// GetChatTitle returns the title of a chat.
-func (r *MiniAppRepository) GetChatTitle(ctx context.Context, chatID int64) (*string, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-chat-title")
-		defer segment.End()
-	}
-
-	var title sql.NullString
-	err := r.db.QueryRowContext(ctx, `
-		SELECT title
-		FROM chats
-		WHERE id = $1
-	`, chatID).Scan(&title)
-
-	if err == sql.ErrNoRows || !title.Valid {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return &title.String, nil
-}
-
 // ChatUser represents a user in a chat for admin selection.
 type ChatUser struct {
 	UserID         int64   `json:"user_id"`
@@ -1881,72 +143,6 @@ type ChatUser struct {
 	LastName       *string `json:"last_name,omitempty"`
 	Username       *string `json:"username,omitempty"`
 	PhotoObjectKey *string `json:"-"` // Internal use, not serialized
-}
-
-// GetChatUsers returns all non-bot users who have sent messages in a chat.
-func (r *MiniAppRepository) GetChatUsers(ctx context.Context, chatID int64) ([]ChatUser, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-chat-users")
-		defer segment.End()
-	}
-
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT
-			user_id,
-			first_name,
-			last_name,
-			username,
-			(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mv_user_statistics.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-		FROM mv_user_statistics
-		WHERE chat_id = $1 AND is_bot = false
-		ORDER BY first_name, last_name
-	`, chatID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var users []ChatUser
-	for rows.Next() {
-		var u ChatUser
-		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.PhotoObjectKey); err != nil {
-			return nil, err
-		}
-		users = append(users, u)
-	}
-
-	return users, rows.Err()
-}
-
-// GetUserInfo returns basic info for a specific user.
-func (r *MiniAppRepository) GetUserInfo(ctx context.Context, userID int64) (*ChatUser, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-user-info")
-		defer segment.End()
-	}
-
-	var u ChatUser
-	err := r.db.QueryRowContext(ctx, `
-		SELECT
-			id,
-			first_name,
-			last_name,
-			username,
-			(SELECT minio_object_key FROM user_profile_photos WHERE user_id = users.id ORDER BY width DESC LIMIT 1) as photo_object_key
-		FROM users
-		WHERE id = $1
-	`, userID).Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.PhotoObjectKey)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return &u, nil
 }
 
 // MediaOverviewStats represents aggregate media statistics for a chat.
@@ -1996,350 +192,280 @@ type MediaUser struct {
 	PhotoObjectKey *string `json:"-"` // Internal use, not serialized
 }
 
+// =============================================================================
+// Helper functions
+// =============================================================================
+
+// sanitizeMetricColumn ensures the metric column name is safe for SQL
+func sanitizeMetricColumn(metric string) string {
+	switch metric {
+	case "message_count":
+		return "message_count"
+	case "reactions_sent":
+		return "reactions_sent"
+	case "reactions_received":
+		return "reactions_received"
+	case "replies_sent":
+		return "replies_sent"
+	case "replies_received":
+		return "replies_received"
+	case "active_days":
+		return "active_days"
+	default:
+		return "message_count"
+	}
+}
+
+// sanitizeMetricColumnCTE returns the column reference for CTE queries
+func sanitizeMetricColumnCTE(metric string) string {
+	switch metric {
+	case "message_count":
+		return "us.message_count"
+	case "reactions_sent":
+		return "rs.reactions_sent"
+	case "reactions_received":
+		return "rr.reactions_received"
+	case "replies_sent":
+		return "rps.replies_sent"
+	case "replies_received":
+		return "rpr.replies_received"
+	case "active_days":
+		return "us.active_days"
+	default:
+		return "us.message_count"
+	}
+}
+
+// =============================================================================
+// Stats delegation
+// =============================================================================
+
+// GetOverviewStats returns overview statistics for a chat.
+func (r *MiniAppRepository) GetOverviewStats(ctx context.Context, chatID int64, startDate, endDate *time.Time) (*OverviewStats, error) {
+	return r.stats.GetOverviewStats(ctx, chatID, startDate, endDate)
+}
+
+// GetDailyActivity returns daily message activity for a chat.
+func (r *MiniAppRepository) GetDailyActivity(ctx context.Context, chatID int64, startDate, endDate *time.Time, tz *time.Location) ([]DailyActivity, error) {
+	return r.stats.GetDailyActivity(ctx, chatID, startDate, endDate, tz)
+}
+
+// GetUserDailyActivity returns daily message activity for a specific user in a chat.
+func (r *MiniAppRepository) GetUserDailyActivity(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time, tz *time.Location) ([]DailyActivity, error) {
+	return r.stats.GetUserDailyActivity(ctx, chatID, userID, startDate, endDate, tz)
+}
+
+// GetUserProfileStats returns personal stats for a user including their rankings.
+func (r *MiniAppRepository) GetUserProfileStats(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time, tzName string) (*ProfileStats, error) {
+	return r.stats.GetUserProfileStats(ctx, chatID, userID, startDate, endDate, tzName)
+}
+
 // GetMediaOverviewStats returns aggregate media statistics for a chat.
 func (r *MiniAppRepository) GetMediaOverviewStats(ctx context.Context, chatID int64, startDate, endDate *time.Time) (*MediaOverviewStats, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-media-overview-stats")
-		defer segment.End()
-	}
-
-	stats := &MediaOverviewStats{}
-
-	if startDate == nil && endDate == nil {
-		// All-time: use materialized view
-		err := r.db.QueryRowContext(ctx, `
-			SELECT
-				COALESCE(SUM(count), 0) as total_media,
-				COALESCE(SUM(CASE WHEN media_type = 'photo' THEN count ELSE 0 END), 0) as total_photos,
-				COALESCE(SUM(CASE WHEN media_type IN ('video', 'video_note') THEN count ELSE 0 END), 0) as total_videos,
-				COALESCE(SUM(CASE WHEN media_type = 'animation' THEN count ELSE 0 END), 0) as total_gifs,
-				COALESCE(SUM(CASE WHEN media_type = 'voice' THEN count ELSE 0 END), 0) as total_voice,
-				COALESCE(SUM(CASE WHEN media_type = 'document' THEN count ELSE 0 END), 0) as total_documents,
-				COALESCE(SUM(CASE WHEN media_type = 'sticker' THEN count ELSE 0 END), 0) as total_stickers,
-				COALESCE(SUM(total_size), 0) as total_size
-			FROM mv_media_distribution
-			WHERE chat_id = $1
-		`, chatID).Scan(&stats.TotalMedia, &stats.TotalPhotos, &stats.TotalVideos,
-			&stats.TotalGifs, &stats.TotalVoice, &stats.TotalDocuments, &stats.TotalStickers,
-			&stats.TotalSize)
-		if err != nil {
-			return nil, err
-		}
-
-		// Calculate other (total - known types)
-		stats.TotalOther = stats.TotalMedia - stats.TotalPhotos - stats.TotalVideos -
-			stats.TotalGifs - stats.TotalVoice - stats.TotalDocuments - stats.TotalStickers
-
-		// Calculate media per day using active days
-		var activeDays int64
-		err = r.db.QueryRowContext(ctx, `
-			SELECT COUNT(*) as active_days
-			FROM mv_daily_message_stats
-			WHERE chat_id = $1
-		`, chatID).Scan(&activeDays)
-		if err != nil {
-			return nil, err
-		}
-
-		if activeDays > 0 {
-			stats.MediaPerDay = float64(stats.TotalMedia) / float64(activeDays)
-		}
-	} else {
-		// Date-filtered: use live query combining media_files and photos tables
-		err := r.db.QueryRowContext(ctx, `
-			WITH media_stats AS (
-				SELECT
-					mf.media_type,
-					COUNT(*) as count,
-					COALESCE(SUM(mf.file_size), 0) as total_size
-				FROM media_files mf
-				JOIN messages m ON m.id = mf.message_id
-				WHERE m.chat_id = $1
-					AND m.date >= $2
-					AND m.date < $3
-				GROUP BY mf.media_type
-
-				UNION ALL
-
-				SELECT
-					'photo' as media_type,
-					COUNT(*) as count,
-					COALESCE(SUM(p.file_size), 0) as total_size
-				FROM photos p
-				JOIN messages m ON m.id = p.message_id
-				WHERE m.chat_id = $1
-					AND m.date >= $2
-					AND m.date < $3
-			)
-			SELECT
-				COALESCE(SUM(count), 0) as total_media,
-				COALESCE(SUM(CASE WHEN media_type = 'photo' THEN count ELSE 0 END), 0) as total_photos,
-				COALESCE(SUM(CASE WHEN media_type IN ('video', 'video_note') THEN count ELSE 0 END), 0) as total_videos,
-				COALESCE(SUM(CASE WHEN media_type = 'animation' THEN count ELSE 0 END), 0) as total_gifs,
-				COALESCE(SUM(CASE WHEN media_type = 'voice' THEN count ELSE 0 END), 0) as total_voice,
-				COALESCE(SUM(CASE WHEN media_type = 'document' THEN count ELSE 0 END), 0) as total_documents,
-				COALESCE(SUM(CASE WHEN media_type = 'sticker' THEN count ELSE 0 END), 0) as total_stickers,
-				COALESCE(SUM(total_size), 0) as total_size
-			FROM media_stats
-		`, chatID, startDate, endDate).Scan(&stats.TotalMedia, &stats.TotalPhotos, &stats.TotalVideos,
-			&stats.TotalGifs, &stats.TotalVoice, &stats.TotalDocuments, &stats.TotalStickers,
-			&stats.TotalSize)
-		if err != nil {
-			return nil, err
-		}
-
-		stats.TotalOther = stats.TotalMedia - stats.TotalPhotos - stats.TotalVideos -
-			stats.TotalGifs - stats.TotalVoice - stats.TotalDocuments - stats.TotalStickers
-
-		// Calculate media per day
-		if startDate != nil && endDate != nil {
-			days := int(endDate.Sub(*startDate).Hours() / 24)
-			if days > 0 {
-				stats.MediaPerDay = float64(stats.TotalMedia) / float64(days)
-			}
-		}
-	}
-
-	return stats, nil
+	return r.stats.GetMediaOverviewStats(ctx, chatID, startDate, endDate)
 }
 
 // GetMediaTypeDistribution returns the distribution of media types for a chat.
 func (r *MiniAppRepository) GetMediaTypeDistribution(ctx context.Context, chatID int64, startDate, endDate *time.Time) ([]MediaTypeDistribution, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-media-type-distribution")
-		defer segment.End()
-	}
-
-	var rows *sql.Rows
-	var err error
-
-	if startDate == nil && endDate == nil {
-		// All-time: use materialized view
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT media_type, count, COALESCE(total_size, 0) as total_size
-			FROM mv_media_distribution
-			WHERE chat_id = $1
-			ORDER BY count DESC
-		`, chatID)
-	} else {
-		// Date-filtered: use live query
-		rows, err = r.db.QueryContext(ctx, `
-			WITH media_stats AS (
-				SELECT
-					mf.media_type::text as media_type,
-					COUNT(*) as count,
-					COALESCE(SUM(mf.file_size), 0) as total_size
-				FROM media_files mf
-				JOIN messages m ON m.id = mf.message_id
-				WHERE m.chat_id = $1
-					AND m.date >= $2
-					AND m.date < $3
-				GROUP BY mf.media_type
-
-				UNION ALL
-
-				SELECT
-					'photo' as media_type,
-					COUNT(*) as count,
-					COALESCE(SUM(p.file_size), 0) as total_size
-				FROM photos p
-				JOIN messages m ON m.id = p.message_id
-				WHERE m.chat_id = $1
-					AND m.date >= $2
-					AND m.date < $3
-			)
-			SELECT media_type, SUM(count) as count, SUM(total_size) as total_size
-			FROM media_stats
-			GROUP BY media_type
-			ORDER BY count DESC
-		`, chatID, startDate, endDate)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var distribution []MediaTypeDistribution
-	for rows.Next() {
-		var d MediaTypeDistribution
-		if err := rows.Scan(&d.MediaType, &d.Count, &d.TotalSize); err != nil {
-			return nil, err
-		}
-		distribution = append(distribution, d)
-	}
-
-	return distribution, rows.Err()
+	return r.stats.GetMediaTypeDistribution(ctx, chatID, startDate, endDate)
 }
 
 // GetMediaActivity returns daily media upload activity for a chat.
 func (r *MiniAppRepository) GetMediaActivity(ctx context.Context, chatID int64, startDate, endDate *time.Time, tz *time.Location) ([]MediaActivity, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-media-activity")
-		defer segment.End()
-	}
+	return r.stats.GetMediaActivity(ctx, chatID, startDate, endDate, tz)
+}
 
-	tzName := "UTC"
-	if tz != nil {
-		tzName = tz.String()
-	}
+// =============================================================================
+// Leaderboard delegation
+// =============================================================================
 
-	var rows *sql.Rows
-	var err error
+// GetUserRankings returns user rankings for a chat.
+func (r *MiniAppRepository) GetUserRankings(ctx context.Context, chatID int64, metric string, limit, offset int, startDate, endDate *time.Time, tzName string) ([]UserRanking, error) {
+	return r.leaderboard.GetUserRankings(ctx, chatID, metric, limit, offset, startDate, endDate, tzName)
+}
 
-	if startDate == nil && endDate == nil {
-		// All-time query with timezone
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				DATE(m.date AT TIME ZONE $2) as activity_date,
-				COUNT(DISTINCT COALESCE(mf.id::text, 'p' || p.id::text)) as media_count
-			FROM messages m
-			LEFT JOIN media_files mf ON mf.message_id = m.id
-			LEFT JOIN photos p ON p.message_id = m.id
-			WHERE m.chat_id = $1
-				AND (mf.id IS NOT NULL OR p.id IS NOT NULL)
-			GROUP BY DATE(m.date AT TIME ZONE $2)
-			ORDER BY activity_date
-		`, chatID, tzName)
-	} else {
-		// Date-filtered query with timezone
-		rows, err = r.db.QueryContext(ctx, `
-			SELECT
-				DATE(m.date AT TIME ZONE $4) as activity_date,
-				COUNT(DISTINCT COALESCE(mf.id::text, 'p' || p.id::text)) as media_count
-			FROM messages m
-			LEFT JOIN media_files mf ON mf.message_id = m.id
-			LEFT JOIN photos p ON p.message_id = m.id
-			WHERE m.chat_id = $1
-				AND m.date >= $2
-				AND m.date < $3
-				AND (mf.id IS NOT NULL OR p.id IS NOT NULL)
-			GROUP BY DATE(m.date AT TIME ZONE $4)
-			ORDER BY activity_date
-		`, chatID, startDate, endDate, tzName)
-	}
+// GetUserRankingsTotal returns the total count of users for pagination.
+func (r *MiniAppRepository) GetUserRankingsTotal(ctx context.Context, chatID int64, startDate, endDate *time.Time) (int, error) {
+	return r.leaderboard.GetUserRankingsTotal(ctx, chatID, startDate, endDate)
+}
 
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+// GetTopReactions returns the top reactions used in a chat.
+func (r *MiniAppRepository) GetTopReactions(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]TopReaction, error) {
+	return r.leaderboard.GetTopReactions(ctx, chatID, limit, startDate, endDate)
+}
 
-	var activity []MediaActivity
-	for rows.Next() {
-		var date time.Time
-		var a MediaActivity
-		if err := rows.Scan(&date, &a.Count); err != nil {
-			return nil, err
-		}
-		a.Date = date.Format("2006-01-02")
-		activity = append(activity, a)
-	}
+// GetTopReactionGivers returns users who give the most reactions.
+func (r *MiniAppRepository) GetTopReactionGivers(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]ReactionUser, error) {
+	return r.leaderboard.GetTopReactionGivers(ctx, chatID, limit, startDate, endDate)
+}
 
-	return activity, rows.Err()
+// GetTopReactionReceivers returns users who receive the most reactions.
+func (r *MiniAppRepository) GetTopReactionReceivers(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]ReactionUser, error) {
+	return r.leaderboard.GetTopReactionReceivers(ctx, chatID, limit, startDate, endDate)
+}
+
+// GetTopReactorsToUser returns users who react most to a specific user's messages.
+func (r *MiniAppRepository) GetTopReactorsToUser(ctx context.Context, chatID, userID int64, limit int, startDate, endDate *time.Time) ([]TopInteractor, error) {
+	return r.leaderboard.GetTopReactorsToUser(ctx, chatID, userID, limit, startDate, endDate)
+}
+
+// GetTopReactedToByUser returns users whose messages a specific user reacts to most.
+func (r *MiniAppRepository) GetTopReactedToByUser(ctx context.Context, chatID, userID int64, limit int, startDate, endDate *time.Time) ([]TopInteractor, error) {
+	return r.leaderboard.GetTopReactedToByUser(ctx, chatID, userID, limit, startDate, endDate)
+}
+
+// GetTopRepliersToUser returns users who reply most to a specific user's messages.
+func (r *MiniAppRepository) GetTopRepliersToUser(ctx context.Context, chatID, userID int64, limit int, startDate, endDate *time.Time) ([]TopInteractor, error) {
+	return r.leaderboard.GetTopRepliersToUser(ctx, chatID, userID, limit, startDate, endDate)
+}
+
+// GetTopRepliedToByUser returns users that a specific user replies to most.
+func (r *MiniAppRepository) GetTopRepliedToByUser(ctx context.Context, chatID, userID int64, limit int, startDate, endDate *time.Time) ([]TopInteractor, error) {
+	return r.leaderboard.GetTopRepliedToByUser(ctx, chatID, userID, limit, startDate, endDate)
+}
+
+// GetTopReplySenders returns users who send the most replies in a chat.
+func (r *MiniAppRepository) GetTopReplySenders(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]ReactionUser, error) {
+	return r.leaderboard.GetTopReplySenders(ctx, chatID, limit, startDate, endDate)
+}
+
+// GetTopReplyReceivers returns users whose messages receive the most replies in a chat.
+func (r *MiniAppRepository) GetTopReplyReceivers(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]ReactionUser, error) {
+	return r.leaderboard.GetTopReplyReceivers(ctx, chatID, limit, startDate, endDate)
 }
 
 // GetTopMediaSenders returns users who send the most media in a chat.
 func (r *MiniAppRepository) GetTopMediaSenders(ctx context.Context, chatID int64, limit int, startDate, endDate *time.Time) ([]MediaUser, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-top-media-senders")
-		defer segment.End()
+	return r.leaderboard.GetTopMediaSenders(ctx, chatID, limit, startDate, endDate)
+}
+
+// =============================================================================
+// Heatmap delegation
+// =============================================================================
+
+// GetGroupHeatmap returns the activity heatmap for a chat.
+func (r *MiniAppRepository) GetGroupHeatmap(ctx context.Context, chatID int64, startDate, endDate *time.Time, tz *time.Location) (*HeatmapData, error) {
+	return r.heatmap.GetGroupHeatmap(ctx, chatID, startDate, endDate, tz)
+}
+
+// GetUserHeatmap returns the activity heatmap for a specific user.
+func (r *MiniAppRepository) GetUserHeatmap(ctx context.Context, chatID, userID int64, startDate, endDate *time.Time, tz *time.Location) (*HeatmapData, error) {
+	return r.heatmap.GetUserHeatmap(ctx, chatID, userID, startDate, endDate, tz)
+}
+
+// =============================================================================
+// Chat and user info (kept in main repository)
+// =============================================================================
+
+// GetUserPhotoObjectKey returns the largest profile photo object key for a user.
+func (r *MiniAppRepository) GetUserPhotoObjectKey(ctx context.Context, userID int64) (*string, error) {
+	defer nrutil.StartSegment(ctx, "db:mini-app-user-photo-key")()
+
+	var objectKey sql.NullString
+	err := r.db.QueryRowContext(ctx, `
+		SELECT minio_object_key
+		FROM user_profile_photos
+		WHERE user_id = $1
+		ORDER BY width DESC
+		LIMIT 1
+	`, userID).Scan(&objectKey)
+
+	if err == sql.ErrNoRows || !objectKey.Valid {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 
-	var rows *sql.Rows
-	var err error
+	return &objectKey.String, nil
+}
 
-	if startDate == nil && endDate == nil {
-		// All-time: use live query (no MV for per-user media stats)
-		rows, err = r.db.QueryContext(ctx, `
-			WITH user_media AS (
-				SELECT
-					m.user_id,
-					COUNT(DISTINCT COALESCE(mf.id::text, 'p' || p.id::text)) as media_count
-				FROM messages m
-				LEFT JOIN media_files mf ON mf.message_id = m.id
-				LEFT JOIN photos p ON p.message_id = m.id
-				WHERE m.chat_id = $1
-					AND m.user_id IS NOT NULL
-					AND (mf.id IS NOT NULL OR p.id IS NOT NULL)
-				GROUP BY m.user_id
-			)
-			SELECT
-				um.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				um.media_count,
-				ROW_NUMBER() OVER (ORDER BY um.media_count DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = um.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM user_media um
-			JOIN users u ON u.id = um.user_id
-			WHERE u.is_bot = false
-			ORDER BY um.media_count DESC
-			LIMIT $2
-		`, chatID, limit)
-	} else {
-		// Date-filtered
-		rows, err = r.db.QueryContext(ctx, `
-			WITH user_media AS (
-				SELECT
-					m.user_id,
-					COUNT(DISTINCT COALESCE(mf.id::text, 'p' || p.id::text)) as media_count
-				FROM messages m
-				LEFT JOIN media_files mf ON mf.message_id = m.id
-				LEFT JOIN photos p ON p.message_id = m.id
-				WHERE m.chat_id = $1
-					AND m.user_id IS NOT NULL
-					AND m.date >= $2
-					AND m.date < $3
-					AND (mf.id IS NOT NULL OR p.id IS NOT NULL)
-				GROUP BY m.user_id
-			)
-			SELECT
-				um.user_id,
-				u.first_name,
-				u.last_name,
-				u.username,
-				um.media_count,
-				ROW_NUMBER() OVER (ORDER BY um.media_count DESC) as rank,
-				(SELECT minio_object_key FROM user_profile_photos WHERE user_id = um.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
-			FROM user_media um
-			JOIN users u ON u.id = um.user_id
-			WHERE u.is_bot = false
-			ORDER BY um.media_count DESC
-			LIMIT $4
-		`, chatID, startDate, endDate, limit)
+// GetChatTitle returns the title of a chat.
+func (r *MiniAppRepository) GetChatTitle(ctx context.Context, chatID int64) (*string, error) {
+	defer nrutil.StartSegment(ctx, "db:mini-app-chat-title")()
+
+	var title sql.NullString
+	err := r.db.QueryRowContext(ctx, `
+		SELECT title
+		FROM chats
+		WHERE id = $1
+	`, chatID).Scan(&title)
+
+	if err == sql.ErrNoRows || !title.Valid {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 
+	return &title.String, nil
+}
+
+// GetChatUsers returns all non-bot users who have sent messages in a chat.
+func (r *MiniAppRepository) GetChatUsers(ctx context.Context, chatID int64) ([]ChatUser, error) {
+	defer nrutil.StartSegment(ctx, "db:mini-app-chat-users")()
+
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT
+			user_id,
+			first_name,
+			last_name,
+			username,
+			(SELECT minio_object_key FROM user_profile_photos WHERE user_id = mv_user_statistics.user_id ORDER BY width DESC LIMIT 1) as photo_object_key
+		FROM mv_user_statistics
+		WHERE chat_id = $1 AND is_bot = false
+		ORDER BY first_name, last_name
+	`, chatID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var users []MediaUser
+	var users []ChatUser
 	for rows.Next() {
-		var rank int64
-		var u MediaUser
-		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.MediaCount, &rank, &u.PhotoObjectKey); err != nil {
+		var u ChatUser
+		if err := rows.Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.PhotoObjectKey); err != nil {
 			return nil, err
 		}
-		u.Rank = int(rank)
 		users = append(users, u)
 	}
 
 	return users, rows.Err()
 }
 
+// GetUserInfo returns basic info for a specific user.
+func (r *MiniAppRepository) GetUserInfo(ctx context.Context, userID int64) (*ChatUser, error) {
+	defer nrutil.StartSegment(ctx, "db:mini-app-user-info")()
+
+	var u ChatUser
+	err := r.db.QueryRowContext(ctx, `
+		SELECT
+			id,
+			first_name,
+			last_name,
+			username,
+			(SELECT minio_object_key FROM user_profile_photos WHERE user_id = users.id ORDER BY width DESC LIMIT 1) as photo_object_key
+		FROM users
+		WHERE id = $1
+	`, userID).Scan(&u.UserID, &u.FirstName, &u.LastName, &u.Username, &u.PhotoObjectKey)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &u, nil
+}
+
+// =============================================================================
+// Settings (kept in main repository)
+// =============================================================================
+
 // GetChatTimezone returns the configured timezone for a chat, or nil if not set.
 func (r *MiniAppRepository) GetChatTimezone(ctx context.Context, chatID int64) (*string, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-chat-timezone")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:mini-app-chat-timezone")()
 
 	var timezone sql.NullString
 	err := r.db.QueryRowContext(ctx,
@@ -2362,11 +488,7 @@ func (r *MiniAppRepository) GetChatTimezone(ctx context.Context, chatID int64) (
 
 // SetChatTimezone sets the timezone for a chat. Only admins should call this.
 func (r *MiniAppRepository) SetChatTimezone(ctx context.Context, chatID int64, timezone string) error {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:mini-app-set-chat-timezone")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:mini-app-set-chat-timezone")()
 
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE chats SET timezone = $1, updated_at = NOW() WHERE id = $2`,

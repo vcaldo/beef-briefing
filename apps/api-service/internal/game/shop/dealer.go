@@ -3,11 +3,12 @@ package shop
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"beef-briefing/apps/api-service/internal/game/battle"
+	"beef-briefing/apps/api-service/internal/jsonutil"
+	"beef-briefing/apps/api-service/internal/nrutil"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
@@ -51,11 +52,7 @@ type CardStats struct {
 
 // DealCards fetches random cards from the current week for a chat
 func (d *Dealer) DealCards(ctx context.Context, chatID int64, count int) ([]*battle.ShopCard, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:deal-cards")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:deal-cards")()
 
 	// Query current week's cards with user info, randomly ordered
 	query := `
@@ -101,7 +98,7 @@ func (d *Dealer) DealCards(ctx context.Context, chatID int64, count int) ([]*bat
 
 		// Parse stats to get combat values
 		var stats CardStats
-		if err := json.Unmarshal(statsJSON, &stats); err != nil {
+		if err := jsonutil.Unmarshal(statsJSON, &stats); err != nil {
 			return nil, fmt.Errorf("failed to parse card stats: %w", err)
 		}
 
@@ -145,11 +142,7 @@ func (d *Dealer) DealCards(ctx context.Context, chatID int64, count int) ([]*bat
 
 // DealRerollCards fetches additional random cards excluding already seen ones
 func (d *Dealer) DealRerollCards(ctx context.Context, chatID int64, count int, excludeCardIDs []int64) ([]*battle.ShopCard, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:deal-reroll-cards")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:deal-reroll-cards")()
 
 	// Build exclusion list for query
 	excludeClause := ""
@@ -208,7 +201,7 @@ func (d *Dealer) DealRerollCards(ctx context.Context, chatID int64, count int, e
 		}
 
 		var stats CardStats
-		if err := json.Unmarshal(statsJSON, &stats); err != nil {
+		if err := jsonutil.Unmarshal(statsJSON, &stats); err != nil {
 			return nil, fmt.Errorf("failed to parse card stats: %w", err)
 		}
 
@@ -244,11 +237,7 @@ func (d *Dealer) DealRerollCards(ctx context.Context, chatID int64, count int, e
 
 // GetCardCount returns the number of cards available for a chat in the current week
 func (d *Dealer) GetCardCount(ctx context.Context, chatID int64) (int, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:count-cards")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:count-cards")()
 
 	query := `
 		SELECT COUNT(*)
@@ -272,11 +261,7 @@ func (d *Dealer) GetCardCount(ctx context.Context, chatID int64) (int, error) {
 
 // getUserPhotoURL fetches the user's profile photo URL as a presigned HTTPS URL
 func (d *Dealer) getUserPhotoURL(ctx context.Context, userID int64) (string, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:get-user-photo-url")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:get-user-photo-url")()
 
 	query := `
 		SELECT minio_object_key
@@ -311,11 +296,7 @@ func (d *Dealer) getUserPhotoURL(ctx context.Context, userID int64) (string, err
 
 // getCardImageURL fetches the user's card image URL for shop display
 func (d *Dealer) getCardImageURL(ctx context.Context, userID, chatID int64, theme string) string {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("service:get-card-image-url")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:get-card-image-url")()
 
 	if d.cardService == nil {
 		return ""

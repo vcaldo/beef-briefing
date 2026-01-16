@@ -222,7 +222,7 @@ func TestGetMatch_NotFound(t *testing.T) {
 	cleanupTables(t, db, "game_match_participants", "game_matches", "users", "chats")
 
 	ctx := context.Background()
-	nonExistentID := "match_999999999999"
+	nonExistentID := "00000000-0000-0000-0000-000000000000"
 
 	match, err := repo.GetMatch(ctx, nonExistentID)
 	if err != nil {

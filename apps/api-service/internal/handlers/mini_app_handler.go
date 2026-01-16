@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/httputil"
 	"beef-briefing/apps/api-service/internal/middleware"
 	"beef-briefing/apps/api-service/internal/repository"
@@ -511,7 +512,7 @@ func (h *MiniAppHandler) HandleGalleryImageURL(w http.ResponseWriter, r *http.Re
 
 	result, err := h.cardService.GetGalleryImageURL(ctx, imageID, expiresIn)
 	if err != nil {
-		if errors.Is(err, services.ErrCardImageNotFound) {
+		if errors.Is(err, apperror.ErrCardImageNotFound) {
 			httputil.RespondError(w, "image not found", http.StatusNotFound)
 			return
 		}

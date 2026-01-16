@@ -3,20 +3,17 @@ package services
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/storage"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
-
-// ErrPhotoNotFound is returned when no photo exists for a user or chat.
-var ErrPhotoNotFound = errors.New("photo not found")
 
 // ProfilePhotoService handles profile photo processing for users and chats.
 type ProfilePhotoService struct {
@@ -219,7 +216,7 @@ func (s *ProfilePhotoService) GetUserPhoto(ctx context.Context, userID int64, si
 	}
 
 	if photo == nil {
-		return "", ErrPhotoNotFound
+		return "", apperror.ErrPhotoNotFound
 	}
 
 	url, err := s.storageClient.GetPresignedURL(ctx, photo.MinIOObjectKey, time.Hour)
@@ -252,7 +249,7 @@ func (s *ProfilePhotoService) GetChatPhoto(ctx context.Context, chatID int64, si
 	}
 
 	if photo == nil {
-		return "", ErrPhotoNotFound
+		return "", apperror.ErrPhotoNotFound
 	}
 
 	url, err := s.storageClient.GetPresignedURL(ctx, photo.MinIOObjectKey, time.Hour)

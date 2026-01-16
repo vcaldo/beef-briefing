@@ -7,36 +7,47 @@ import (
 	"errors"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/repository"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
-// ErrCardNotFound is returned when a card doesn't exist.
-var ErrCardNotFound = errors.New("card not found")
-
-// ErrCardImageNotFound is returned when a card image doesn't exist.
-var ErrCardImageNotFound = errors.New("card image not found")
-
-// MinIOClient interface for generating presigned URLs.
-type MinIOClient interface {
-	GetPresignedURLSeconds(ctx context.Context, objectKey string, expirySeconds int) (string, error)
-}
-
 // CardService handles user card business logic.
 type CardService struct {
-	cardRepo    *repository.CardRepository
-	minioClient MinIOClient
+	cardRepo    repository.CardRepositoryInterface
+	minioClient MinIOClientInterface
 	nrApp       *newrelic.Application
 }
 
+// CardServiceDeps allows optional dependency injection for testing.
+// If nil is passed to NewCardService, default implementations are used.
+type CardServiceDeps struct {
+	CardRepo    repository.CardRepositoryInterface
+	MinIOClient MinIOClientInterface
+}
+
 // NewCardService creates a new CardService.
-func NewCardService(db *sql.DB, minioClient MinIOClient, nrApp *newrelic.Application) *CardService {
-	return &CardService{
-		cardRepo:    repository.NewCardRepository(db, nrApp),
+// Pass nil for deps to use default implementations (production use).
+// Pass a CardServiceDeps struct to inject mock implementations (testing use).
+func NewCardService(db *sql.DB, minioClient MinIOClientInterface, nrApp *newrelic.Application, deps *CardServiceDeps) *CardService {
+	s := &CardService{
 		minioClient: minioClient,
 		nrApp:       nrApp,
 	}
+
+	// Use injected dependencies if provided, otherwise use defaults
+	if deps != nil && deps.CardRepo != nil {
+		s.cardRepo = deps.CardRepo
+	} else {
+		s.cardRepo = repository.NewCardRepository(db, nrApp)
+	}
+
+	if deps != nil && deps.MinIOClient != nil {
+		s.minioClient = deps.MinIOClient
+	}
+
+	return s
 }
 
 // GetChatCardsRequest holds parameters for GetChatCards.
@@ -120,7 +131,7 @@ func (s *CardService) GetUserCard(
 	card, err := s.cardRepo.GetUserCard(ctx, userID, chatID, weekStart)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil, ErrCardNotFound
+			return nil, nil, apperror.ErrCardNotFound
 		}
 		return nil, nil, err
 	}
@@ -369,14 +380,14 @@ func (s *CardService) GetCardImageURL(
 	cardImage, err := s.cardRepo.GetCardImage(ctx, userID, chatID, weekStart, theme)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrCardImageNotFound
+			return nil, apperror.ErrCardImageNotFound
 		}
 		return nil, err
 	}
 
 	// Generate presigned URL
 	if s.minioClient == nil {
-		return nil, errors.New("storage client not configured")
+		return nil, apperror.ErrStorageClientNotConfigured
 	}
 
 	url, err := s.minioClient.GetPresignedURLSeconds(ctx, cardImage.StoragePath, expirySeconds)
@@ -524,14 +535,14 @@ func (s *CardService) GetGalleryImageURL(
 	image, err := s.cardRepo.GetGalleryImageByID(ctx, imageID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrCardImageNotFound
+			return nil, apperror.ErrCardImageNotFound
 		}
 		return nil, err
 	}
 
 	// Generate presigned URL
 	if s.minioClient == nil {
-		return nil, errors.New("storage client not configured")
+		return nil, apperror.ErrStorageClientNotConfigured
 	}
 
 	url, err := s.minioClient.GetPresignedURLSeconds(ctx, image.StoragePath, expirySeconds)

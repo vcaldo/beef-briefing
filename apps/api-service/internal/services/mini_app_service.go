@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -16,21 +15,12 @@ import (
 	"strings"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/middleware"
 	"beef-briefing/apps/api-service/internal/repository"
-	"beef-briefing/apps/api-service/internal/storage"
 	"beef-briefing/pkg/config"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
-)
-
-// Telegram init data validation errors
-var (
-	ErrMissingHash     = errors.New("missing hash in init data")
-	ErrInvalidHash     = errors.New("invalid hash")
-	ErrExpiredInitData = errors.New("init data expired")
-	ErrInvalidUserData = errors.New("invalid user data format")
-	ErrMissingUserID   = errors.New("missing user ID in init data")
 )
 
 // InitDataUser represents user data from Telegram init data
@@ -71,22 +61,48 @@ type ChatTimezoneResponse struct {
 
 // MiniAppService handles Mini App authentication and analytics
 type MiniAppService struct {
-	repo          *repository.MiniAppRepository
+	repo          repository.MiniAppRepositoryInterface
 	jwtAuth       *middleware.JWTAuth
 	botToken      string
 	nrApp         *newrelic.Application
-	storageClient *storage.MinIOClient
+	storageClient MinIOClientInterface
 	config        *config.Config
 }
 
-// NewMiniAppService creates a new MiniAppService
-func NewMiniAppService(db *sql.DB, jwtSecretKey, botToken string, nrApp *newrelic.Application, storageClient *storage.MinIOClient, cfg *config.Config) *MiniAppService {
+// MiniAppServiceDeps contains optional dependencies for MiniAppService.
+// When nil is passed for deps, the service creates default concrete implementations.
+// This allows tests to inject mock dependencies.
+type MiniAppServiceDeps struct {
+	Repo          repository.MiniAppRepositoryInterface
+	StorageClient MinIOClientInterface
+}
+
+// NewMiniAppService creates a new MiniAppService.
+// If deps is nil, default concrete implementations are created.
+// Pass non-nil deps for testing with mock implementations.
+func NewMiniAppService(db *sql.DB, jwtSecretKey, botToken string, nrApp *newrelic.Application, storageClient MinIOClientInterface, cfg *config.Config, deps *MiniAppServiceDeps) *MiniAppService {
+	var repo repository.MiniAppRepositoryInterface
+	var storageClientToUse MinIOClientInterface
+
+	if deps != nil {
+		repo = deps.Repo
+		storageClientToUse = deps.StorageClient
+	}
+
+	// Fall back to defaults if not provided via deps
+	if repo == nil {
+		repo = repository.NewMiniAppRepository(db, nrApp)
+	}
+	if storageClientToUse == nil {
+		storageClientToUse = storageClient
+	}
+
 	return &MiniAppService{
-		repo:          repository.NewMiniAppRepository(db, nrApp),
+		repo:          repo,
 		jwtAuth:       middleware.NewJWTAuth(jwtSecretKey),
 		botToken:      botToken,
 		nrApp:         nrApp,
-		storageClient: storageClient,
+		storageClient: storageClientToUse,
 		config:        cfg,
 	}
 }
@@ -116,7 +132,7 @@ func (s *MiniAppService) ValidateInitData(initData string, maxAgeSeconds int64) 
 	// Extract and remove hash
 	receivedHash := params.Get("hash")
 	if receivedHash == "" {
-		return nil, ErrMissingHash
+		return nil, apperror.ErrMissingHash
 	}
 	params.Del("hash")
 
@@ -145,7 +161,7 @@ func (s *MiniAppService) ValidateInitData(initData string, maxAgeSeconds int64) 
 
 	// Constant-time comparison
 	if !hmac.Equal([]byte(calculatedHash), []byte(receivedHash)) {
-		return nil, ErrInvalidHash
+		return nil, apperror.ErrInvalidHash
 	}
 
 	// Validate auth_date
@@ -156,7 +172,7 @@ func (s *MiniAppService) ValidateInitData(initData string, maxAgeSeconds int64) 
 	}
 
 	if time.Now().Unix()-authDate > maxAgeSeconds {
-		return nil, ErrExpiredInitData
+		return nil, apperror.ErrExpiredInitData
 	}
 
 	// Parse user object
@@ -167,11 +183,11 @@ func (s *MiniAppService) ValidateInitData(initData string, maxAgeSeconds int64) 
 
 	var userData InitDataUser
 	if err := json.Unmarshal([]byte(userStr), &userData); err != nil {
-		return nil, ErrInvalidUserData
+		return nil, apperror.ErrInvalidUserData
 	}
 
 	if userData.ID == 0 {
-		return nil, ErrMissingUserID
+		return nil, apperror.ErrMissingUserID
 	}
 
 	// Extract chat info if present
@@ -1009,7 +1025,7 @@ func (s *MiniAppService) SetChatTimezone(ctx context.Context, chatID int64, time
 	// Validate timezone is a valid IANA identifier
 	_, err := time.LoadLocation(timezone)
 	if err != nil {
-		return fmt.Errorf("invalid timezone: %s", timezone)
+		return fmt.Errorf("invalid timezone %q: %w", timezone, err)
 	}
 
 	return s.repo.SetChatTimezone(ctx, chatID, timezone)

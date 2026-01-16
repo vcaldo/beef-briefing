@@ -4,16 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/game/battle"
 	"beef-briefing/apps/api-service/internal/game/shop"
 	"beef-briefing/apps/api-service/internal/repository"
-	"beef-briefing/apps/api-service/internal/storage"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
@@ -25,33 +24,24 @@ const (
 	JoinWindowDuration   = 5 * time.Minute
 )
 
-// ArenaService errors
-var (
-	ErrNotEnoughCards        = errors.New("not enough cards in group (minimum 10 required)")
-	ErrMatchNotFound         = errors.New("match not found")
-	ErrMatchNotOpen          = errors.New("match is not open for joining")
-	ErrAlreadyJoined         = errors.New("already joined this match")
-	ErrNotParticipant        = errors.New("not a participant in this match")
-	ErrNotCreator            = errors.New("only the match creator can perform this action")
-	ErrMatchNotInShopPhase   = errors.New("match is not in shop phase")
-	ErrShopPhaseExpired      = errors.New("shop phase has expired")
-	ErrTeamAlreadySubmitted  = errors.New("team already submitted")
-	ErrInvalidCardIndex      = errors.New("invalid card index")
-	ErrNotEnoughCoins        = errors.New("not enough coins")
-	ErrTeamFull              = errors.New("team is full (max 3 cards)")
-	ErrCardAlreadyPurchased  = errors.New("card already purchased")
-	ErrActiveMatchExists     = errors.New("an active match already exists. Please wait for it to complete before creating a new one.")
-)
 
 // ArenaService handles arena game logic
 type ArenaService struct {
 	db            *sql.DB
-	gameRepo      *repository.GameRepository
+	gameRepo      repository.GameRepositoryInterface
 	dealer        *shop.Dealer
-	storageClient *storage.MinIOClient
-	cardService   *CardService
+	storageClient MinIOClientInterface
+	cardService   CardServiceInterface
 	nrApp         *newrelic.Application
 	matchMutexes  sync.Map // map[string]*sync.Mutex for per-match locking
+}
+
+// ArenaServiceDeps holds the dependencies for ArenaService.
+// This struct enables dependency injection for testing.
+type ArenaServiceDeps struct {
+	GameRepo      repository.GameRepositoryInterface
+	StorageClient MinIOClientInterface
+	CardService   CardServiceInterface
 }
 
 // validateShopPhaseAccess validates that a user can access the shop for a match.
@@ -66,21 +56,21 @@ func (s *ArenaService) validateShopPhaseAccess(ctx context.Context, matchID stri
 		return nil, nil, fmt.Errorf("failed to get match: %w", err)
 	}
 	if match == nil {
-		err := ErrMatchNotFound
+		err := apperror.ErrMatchNotFound
 		if txn := newrelic.FromContext(ctx); txn != nil {
 			txn.NoticeError(err)
 		}
 		return nil, nil, err
 	}
 	if match.Status != repository.MatchStatusShopPhase {
-		err := ErrMatchNotInShopPhase
+		err := apperror.ErrMatchNotInShopPhase
 		if txn := newrelic.FromContext(ctx); txn != nil {
 			txn.NoticeError(err)
 		}
 		return nil, nil, err
 	}
 	if checkDeadline && match.ShopPhaseDeadline != nil && time.Now().After(*match.ShopPhaseDeadline) {
-		err := ErrShopPhaseExpired
+		err := apperror.ErrShopPhaseExpired
 		if txn := newrelic.FromContext(ctx); txn != nil {
 			txn.NoticeError(err)
 		}
@@ -95,14 +85,14 @@ func (s *ArenaService) validateShopPhaseAccess(ctx context.Context, matchID stri
 		return nil, nil, fmt.Errorf("failed to get participant: %w", err)
 	}
 	if participant == nil {
-		err := ErrNotParticipant
+		err := apperror.ErrNotParticipant
 		if txn := newrelic.FromContext(ctx); txn != nil {
 			txn.NoticeError(err)
 		}
 		return nil, nil, err
 	}
 	if participant.Status == repository.ParticipantStatusReady {
-		err := ErrTeamAlreadySubmitted
+		err := apperror.ErrTeamAlreadySubmitted
 		if txn := newrelic.FromContext(ctx); txn != nil {
 			txn.NoticeError(err)
 		}
@@ -210,22 +200,37 @@ func recordTournamentEvent(nrApp *newrelic.Application, eventType string, tourna
 	nrApp.RecordCustomEvent("arena.tournament.event", params)
 }
 
-// NewArenaService creates a new arena service
+// NewArenaService creates a new ArenaService with all required dependencies.
+// For production use, pass nil for deps to use default dependencies.
+// For testing, provide mock implementations via deps.
 func NewArenaService(
 	db *sql.DB,
-	gameRepo *repository.GameRepository,
-	storageClient *storage.MinIOClient,
-	cardService *CardService,
+	storageClient MinIOClientInterface,
+	cardService CardServiceInterface,
 	nrApp *newrelic.Application,
+	deps *ArenaServiceDeps,
 ) *ArenaService {
-	return &ArenaService{
-		db:            db,
-		gameRepo:      gameRepo,
-		dealer:        shop.NewDealer(db, nrApp, storageClient, cardService),
-		storageClient: storageClient,
-		cardService:   cardService,
-		nrApp:         nrApp,
+	svc := &ArenaService{
+		db:    db,
+		nrApp: nrApp,
 	}
+
+	if deps != nil {
+		// Use provided dependencies (for testing)
+		svc.gameRepo = deps.GameRepo
+		svc.storageClient = deps.StorageClient
+		svc.cardService = deps.CardService
+	} else {
+		// Use default concrete implementations (for production)
+		svc.gameRepo = repository.NewGameRepository(db, nrApp)
+		svc.storageClient = storageClient
+		svc.cardService = cardService
+	}
+
+	// Create dealer with the resolved dependencies
+	svc.dealer = shop.NewDealer(db, nrApp, svc.storageClient, svc.cardService)
+
+	return svc
 }
 
 // MatchResponse represents a match with participant info
@@ -332,7 +337,7 @@ func (s *ArenaService) CreateMatch(ctx context.Context, chatID int64, creatorUse
 			(match.Status == repository.MatchStatusOpen ||
 				match.Status == repository.MatchStatusShopPhase ||
 				match.Status == repository.MatchStatusBattlePhase) {
-			return nil, ErrActiveMatchExists
+			return nil, apperror.ErrActiveMatchExists
 		}
 	}
 
@@ -342,7 +347,7 @@ func (s *ArenaService) CreateMatch(ctx context.Context, chatID int64, creatorUse
 		return nil, fmt.Errorf("failed to get card count: %w", err)
 	}
 	if cardCount < MinimumCardsRequired {
-		return nil, ErrNotEnoughCards
+		return nil, apperror.ErrNotEnoughCards
 	}
 
 	// Create match
@@ -386,7 +391,7 @@ func (s *ArenaService) GetMatch(ctx context.Context, matchID string) (*MatchResp
 		return nil, fmt.Errorf("failed to get match: %w", err)
 	}
 	if match == nil {
-		return nil, ErrMatchNotFound
+		return nil, apperror.ErrMatchNotFound
 	}
 
 	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
@@ -444,17 +449,17 @@ func (s *ArenaService) JoinMatch(ctx context.Context, matchID string, userID int
 		return nil, fmt.Errorf("failed to get match: %w", err)
 	}
 	if match == nil {
-		return nil, ErrMatchNotFound
+		return nil, apperror.ErrMatchNotFound
 	}
 
 	// Check match is open
 	if match.Status != repository.MatchStatusOpen {
-		return nil, ErrMatchNotOpen
+		return nil, apperror.ErrMatchNotOpen
 	}
 
 	// Check join deadline for regular matches
 	if match.JoinDeadline != nil && time.Now().After(*match.JoinDeadline) {
-		return nil, ErrMatchNotOpen
+		return nil, apperror.ErrMatchNotOpen
 	}
 
 	// Add participant
@@ -479,12 +484,12 @@ func (s *ArenaService) LeaveMatch(ctx context.Context, matchID string, userID in
 		return fmt.Errorf("failed to get match: %w", err)
 	}
 	if match == nil {
-		return ErrMatchNotFound
+		return apperror.ErrMatchNotFound
 	}
 
 	// Can only leave during open phase
 	if match.Status != repository.MatchStatusOpen {
-		return ErrMatchNotOpen
+		return apperror.ErrMatchNotOpen
 	}
 
 	return s.gameRepo.RemoveParticipant(ctx, matchID, userID)
@@ -503,17 +508,17 @@ func (s *ArenaService) StartMatch(ctx context.Context, matchID string, userID in
 		return nil, fmt.Errorf("failed to get match: %w", err)
 	}
 	if match == nil {
-		return nil, ErrMatchNotFound
+		return nil, apperror.ErrMatchNotFound
 	}
 
 	// Verify creator
 	if match.CreatorUserID == nil || *match.CreatorUserID != userID {
-		return nil, ErrNotCreator
+		return nil, apperror.ErrNotCreator
 	}
 
 	// Check match is open
 	if match.Status != repository.MatchStatusOpen {
-		return nil, ErrMatchNotOpen
+		return nil, apperror.ErrMatchNotOpen
 	}
 
 	// Get participant count
@@ -524,7 +529,7 @@ func (s *ArenaService) StartMatch(ctx context.Context, matchID string, userID in
 
 	// Need at least 2 participants
 	if count < 2 {
-		return nil, errors.New("need at least 2 participants to start")
+		return nil, apperror.ErrNotEnoughParticipants
 	}
 
 	// Determine format based on participant count
@@ -710,7 +715,7 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 		return nil, fmt.Errorf("failed to get match: %w", err)
 	}
 	if match == nil {
-		return nil, ErrMatchNotFound
+		return nil, apperror.ErrMatchNotFound
 	}
 
 	participant, err := s.gameRepo.GetParticipant(ctx, matchID, userID)
@@ -718,7 +723,7 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 		return nil, fmt.Errorf("failed to get participant: %w", err)
 	}
 	if participant == nil {
-		return nil, ErrNotParticipant
+		return nil, apperror.ErrNotParticipant
 	}
 
 	isReady := participant.Status == repository.ParticipantStatusReady
@@ -759,7 +764,7 @@ func (s *ArenaService) GetShop(ctx context.Context, matchID string, userID int64
 
 	// Check if we're in shop phase
 	if match.Status != repository.MatchStatusShopPhase {
-		return nil, fmt.Errorf("failed to get shop: %w", ErrMatchNotInShopPhase)
+		return nil, fmt.Errorf("failed to get shop: %w", apperror.ErrMatchNotInShopPhase)
 	}
 
 	// If user already submitted, return read-only state
@@ -872,16 +877,16 @@ func (s *ArenaService) BuyCard(ctx context.Context, matchID string, userID int64
 
 	// Validate purchase
 	if cardIndex < 0 || cardIndex >= len(cards) {
-		return nil, ErrInvalidCardIndex
+		return nil, apperror.ErrInvalidCardIndex
 	}
 	if cards[cardIndex] == nil || cards[cardIndex].IsPurchased {
-		return nil, ErrCardAlreadyPurchased
+		return nil, apperror.ErrCardAlreadyPurchased
 	}
 	if participant.CoinsRemaining < shop.CardCost {
-		return nil, ErrNotEnoughCoins
+		return nil, apperror.ErrNotEnoughCoins
 	}
 	if len(team) >= shop.TeamSize {
-		return nil, ErrTeamFull
+		return nil, apperror.ErrTeamFull
 	}
 
 	// Execute purchase
@@ -924,7 +929,7 @@ func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64)
 		return nil, err
 	}
 	if participant.CoinsRemaining < shop.RerollCost {
-		return nil, ErrNotEnoughCoins
+		return nil, apperror.ErrNotEnoughCoins
 	}
 
 	// Unmarshal team to check size for validation
@@ -935,13 +940,18 @@ func (s *ArenaService) Reroll(ctx context.Context, matchID string, userID int64)
 		}
 	}
 
+	// Reroll is only allowed before first purchase (team must be empty)
+	if len(currentTeam) > 0 {
+		return nil, fmt.Errorf("reroll not allowed after purchasing cards")
+	}
+
 	// Calculate coins needed to complete team
 	remainingCards := shop.TeamSize - len(currentTeam)
 	coinsNeededForCards := remainingCards * shop.CardCost
 
 	// Check if player can afford to complete team after reroll
 	if participant.CoinsRemaining < (shop.RerollCost + coinsNeededForCards) {
-		return nil, ErrNotEnoughCoins
+		return nil, apperror.ErrNotEnoughCoins
 	}
 
 	// Parse current cards
@@ -1015,7 +1025,7 @@ func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID i
 		return nil, err
 	}
 	if participant.CoinsRemaining < shop.UpgradeCost {
-		return nil, ErrNotEnoughCoins
+		return nil, apperror.ErrNotEnoughCoins
 	}
 
 	// Parse team
@@ -1032,11 +1042,11 @@ func (s *ArenaService) UpgradeCard(ctx context.Context, matchID string, userID i
 
 	// Check if player can afford to complete team after upgrade
 	if participant.CoinsRemaining < (shop.UpgradeCost + coinsNeededForCards) {
-		return nil, ErrNotEnoughCoins
+		return nil, apperror.ErrNotEnoughCoins
 	}
 
 	if teamSlot < 0 || teamSlot >= len(team) {
-		return nil, ErrInvalidCardIndex
+		return nil, apperror.ErrInvalidCardIndex
 	}
 
 	// Apply upgrade
@@ -1100,7 +1110,7 @@ func (s *ArenaService) SetTeamOrder(ctx context.Context, matchID string, userID 
 		}
 	}
 	if len(order) != len(team) {
-		return nil, errors.New("order length must match team size")
+		return nil, apperror.ErrInvalidTeamOrder
 	}
 
 	// Save state
@@ -1201,7 +1211,7 @@ func (s *ArenaService) StartBattle(ctx context.Context, matchID string) (*Battle
 		return nil, fmt.Errorf("failed to get match: %w", err)
 	}
 	if match == nil {
-		return nil, ErrMatchNotFound
+		return nil, apperror.ErrMatchNotFound
 	}
 
 	// Transition to battle phase
@@ -1489,7 +1499,7 @@ func (s *ArenaService) GetBattle(ctx context.Context, matchID string, userID int
 		return nil, fmt.Errorf("failed to get match: %w", err)
 	}
 	if match == nil {
-		return nil, ErrMatchNotFound
+		return nil, apperror.ErrMatchNotFound
 	}
 
 	// Verify participant
@@ -1498,7 +1508,7 @@ func (s *ArenaService) GetBattle(ctx context.Context, matchID string, userID int
 		return nil, fmt.Errorf("failed to get participant: %w", err)
 	}
 	if participant == nil {
-		return nil, ErrNotParticipant
+		return nil, apperror.ErrNotParticipant
 	}
 
 	rounds, err := s.gameRepo.GetMatchRounds(ctx, matchID)
@@ -1673,10 +1683,10 @@ func (s *ArenaService) AutoStartMatch(ctx context.Context, matchID string) (*Aut
 		return nil, fmt.Errorf("failed to get match: %w", err)
 	}
 	if match == nil {
-		return nil, ErrMatchNotFound
+		return nil, apperror.ErrMatchNotFound
 	}
 	if match.Status != repository.MatchStatusOpen {
-		return nil, ErrMatchNotOpen
+		return nil, apperror.ErrMatchNotOpen
 	}
 
 	participantCount, err := s.gameRepo.GetParticipantCount(ctx, matchID)
@@ -1768,10 +1778,10 @@ func (s *ArenaService) ForceSubmitTeams(ctx context.Context, matchID string) (*F
 		return nil, fmt.Errorf("failed to get match: %w", err)
 	}
 	if match == nil {
-		return nil, ErrMatchNotFound
+		return nil, apperror.ErrMatchNotFound
 	}
 	if match.Status != repository.MatchStatusShopPhase {
-		return nil, ErrMatchNotInShopPhase
+		return nil, apperror.ErrMatchNotInShopPhase
 	}
 
 	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
@@ -1914,16 +1924,6 @@ func (s *ArenaService) forceSubmitTeam(ctx context.Context, matchID string, p *r
 // RANKED TOURNAMENT METHODS
 // =====================================================
 
-// Tournament errors
-var (
-	ErrTournamentNotFound           = errors.New("tournament not found")
-	ErrTournamentNotOpen            = errors.New("tournament is not open for registration")
-	ErrTournamentRegistrationClosed = errors.New("tournament registration has closed")
-	ErrAlreadyRegistered            = errors.New("already registered for this tournament")
-	ErrNotRegistered                = errors.New("not registered for this tournament")
-	ErrNoParticipants               = errors.New("no participants registered")
-)
-
 // TournamentResponse represents a tournament with participant info
 type TournamentResponse struct {
 	*repository.RankedTournament
@@ -2011,7 +2011,7 @@ func (s *ArenaService) GetTournamentByID(ctx context.Context, tournamentID int64
 		return nil, fmt.Errorf("failed to get tournament: %w", err)
 	}
 	if tournament == nil {
-		return nil, ErrTournamentNotFound
+		return nil, apperror.ErrTournamentNotFound
 	}
 
 	participants, err := s.gameRepo.GetTournamentParticipants(ctx, tournament.ID)
@@ -2047,15 +2047,15 @@ func (s *ArenaService) JoinTournament(ctx context.Context, tournamentID int64, u
 		return nil, fmt.Errorf("failed to get tournament: %w", err)
 	}
 	if tournament == nil {
-		return nil, ErrTournamentNotFound
+		return nil, apperror.ErrTournamentNotFound
 	}
 
 	// Check tournament is open
 	if tournament.Status != repository.TournamentStatusOpen {
 		if tournament.Status == repository.TournamentStatusScheduled {
-			return nil, ErrTournamentNotOpen
+			return nil, apperror.ErrTournamentNotOpen
 		}
-		return nil, ErrTournamentRegistrationClosed
+		return nil, apperror.ErrTournamentRegistrationClosed
 	}
 
 	// Check if already registered
@@ -2064,7 +2064,7 @@ func (s *ArenaService) JoinTournament(ctx context.Context, tournamentID int64, u
 		return nil, fmt.Errorf("failed to check participant: %w", err)
 	}
 	if isParticipant {
-		return nil, ErrAlreadyRegistered
+		return nil, apperror.ErrAlreadyRegistered
 	}
 
 	// Add participant
@@ -2090,12 +2090,12 @@ func (s *ArenaService) LeaveTournament(ctx context.Context, tournamentID int64, 
 		return nil, fmt.Errorf("failed to get tournament: %w", err)
 	}
 	if tournament == nil {
-		return nil, ErrTournamentNotFound
+		return nil, apperror.ErrTournamentNotFound
 	}
 
 	// Check tournament is still open
 	if tournament.Status != repository.TournamentStatusOpen {
-		return nil, ErrTournamentRegistrationClosed
+		return nil, apperror.ErrTournamentRegistrationClosed
 	}
 
 	// Check if registered
@@ -2104,7 +2104,7 @@ func (s *ArenaService) LeaveTournament(ctx context.Context, tournamentID int64, 
 		return nil, fmt.Errorf("failed to check participant: %w", err)
 	}
 	if !isParticipant {
-		return nil, ErrNotRegistered
+		return nil, apperror.ErrNotRegistered
 	}
 
 	// Remove participant
@@ -2140,7 +2140,7 @@ func (s *ArenaService) CloseAndStartTournament(ctx context.Context, tournamentID
 		return nil, fmt.Errorf("failed to get tournament: %w", err)
 	}
 	if tournament == nil {
-		return nil, ErrTournamentNotFound
+		return nil, apperror.ErrTournamentNotFound
 	}
 
 	// Check tournament is open

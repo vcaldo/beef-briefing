@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/httputil"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
@@ -78,7 +79,7 @@ func (h *CardHandler) HandleGetUserCard(w http.ResponseWriter, r *http.Request) 
 	// Get card from service
 	card, user, err := h.cardService.GetUserCard(ctx, userID, chatID, weekStart)
 	if err != nil {
-		if errors.Is(err, services.ErrCardNotFound) {
+		if errors.Is(err, apperror.ErrCardNotFound) {
 			httputil.RespondError(w, "card not found", http.StatusNotFound)
 			return
 		}
@@ -337,7 +338,7 @@ func (h *CardHandler) HandleGetCardImage(w http.ResponseWriter, r *http.Request)
 	// Get card image URL from service
 	result, err := h.cardService.GetCardImageURL(ctx, userID, chatID, weekStart, theme, expirySeconds)
 	if err != nil {
-		if errors.Is(err, services.ErrCardImageNotFound) {
+		if errors.Is(err, apperror.ErrCardImageNotFound) {
 			httputil.RespondError(w, "card image not found", http.StatusNotFound)
 			return
 		}

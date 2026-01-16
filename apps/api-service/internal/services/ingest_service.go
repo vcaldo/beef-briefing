@@ -44,29 +44,56 @@ import (
 // IngestService handles the business logic for processing Telegram updates.
 type IngestService struct {
 	db            *sql.DB
-	storageClient *storage.MinIOClient
+	storageClient MinIOClientInterface
 	nrApp         *newrelic.Application
-	updateRepo    *repository.UpdateRepository
-	chatRepo      *repository.ChatRepository
-	userRepo      *repository.UserRepository
-	messageRepo   *repository.MessageRepository
-	reactionRepo  *repository.ReactionRepository
-	mediaRepo     *repository.MediaRepository
+	updateRepo    repository.UpdateRepositoryInterface
+	chatRepo      repository.ChatRepositoryInterface
+	userRepo      repository.UserRepositoryInterface
+	messageRepo   repository.MessageRepositoryInterface
+	reactionRepo  repository.ReactionRepositoryInterface
+	mediaRepo     repository.MediaRepositoryInterface
+}
+
+// IngestServiceDeps holds the repository dependencies for IngestService.
+// This struct enables dependency injection for testing.
+type IngestServiceDeps struct {
+	UpdateRepo   repository.UpdateRepositoryInterface
+	ChatRepo     repository.ChatRepositoryInterface
+	UserRepo     repository.UserRepositoryInterface
+	MessageRepo  repository.MessageRepositoryInterface
+	ReactionRepo repository.ReactionRepositoryInterface
+	MediaRepo    repository.MediaRepositoryInterface
 }
 
 // NewIngestService creates a new IngestService with all required dependencies.
-func NewIngestService(db *sql.DB, storageClient *storage.MinIOClient, nrApp *newrelic.Application) *IngestService {
-	return &IngestService{
+// For production use, pass nil for deps to use default repositories.
+// For testing, provide mock implementations via deps.
+func NewIngestService(db *sql.DB, storageClient MinIOClientInterface, nrApp *newrelic.Application, deps *IngestServiceDeps) *IngestService {
+	svc := &IngestService{
 		db:            db,
 		storageClient: storageClient,
 		nrApp:         nrApp,
-		updateRepo:    repository.NewUpdateRepository(db, nrApp),
-		chatRepo:      repository.NewChatRepository(db, nrApp),
-		userRepo:      repository.NewUserRepository(db, nrApp),
-		messageRepo:   repository.NewMessageRepository(db, nrApp),
-		reactionRepo:  repository.NewReactionRepository(db, nrApp),
-		mediaRepo:     repository.NewMediaRepository(db, nrApp),
 	}
+
+	if deps != nil {
+		// Use provided dependencies (for testing)
+		svc.updateRepo = deps.UpdateRepo
+		svc.chatRepo = deps.ChatRepo
+		svc.userRepo = deps.UserRepo
+		svc.messageRepo = deps.MessageRepo
+		svc.reactionRepo = deps.ReactionRepo
+		svc.mediaRepo = deps.MediaRepo
+	} else {
+		// Use default concrete implementations (for production)
+		svc.updateRepo = repository.NewUpdateRepository(db, nrApp)
+		svc.chatRepo = repository.NewChatRepository(db, nrApp)
+		svc.userRepo = repository.NewUserRepository(db, nrApp)
+		svc.messageRepo = repository.NewMessageRepository(db, nrApp)
+		svc.reactionRepo = repository.NewReactionRepository(db, nrApp)
+		svc.mediaRepo = repository.NewMediaRepository(db, nrApp)
+	}
+
+	return svc
 }
 
 // ProcessUpdate handles a Telegram update within a database transaction.

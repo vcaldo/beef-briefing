@@ -319,6 +319,23 @@ go-fmt-check: ## Check if Go code is formatted
 	@echo "All files properly formatted!"
 
 # =============================================================================
+# GO TEST (go-test-*)
+# =============================================================================
+go-test: ## Run all Go tests
+	cd $(API_DIR) && go test ./...
+
+go-test-v: ## Run tests with verbose output
+	cd $(API_DIR) && go test -v ./...
+
+go-test-cover: ## Run tests with coverage report
+	cd $(API_DIR) && go test -coverprofile=coverage.out ./...
+	cd $(API_DIR) && go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: $(API_DIR)/coverage.html"
+
+go-test-race: ## Run tests with race detector
+	cd $(API_DIR) && go test -race ./...
+
+# =============================================================================
 # SECRETS (secrets-*)
 # =============================================================================
 secrets-traefik-password: ## Generate Traefik dashboard password
@@ -795,6 +812,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	docker-shell-newrelic \
 	go-build go-build-api go-build-bot go-build-import-cli go-build-import-cli-prod go-clean \
 	go-fmt go-fmt-check \
+	go-test go-test-v go-test-cover go-test-race \
 	secrets-traefik-password secrets-service-api secrets-card-renderer secrets-jwt \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \

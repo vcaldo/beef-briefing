@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/game/shop"
 	"beef-briefing/apps/api-service/internal/httputil"
 	"beef-briefing/apps/api-service/internal/middleware"
@@ -107,7 +108,7 @@ func extractTournamentIDFromURL(r *http.Request) (string, error) {
 // For expected shop-phase errors (team submitted, match not in shop), logs at DEBUG level to reduce log noise.
 func logAndNoticeError(ctx context.Context, msg string, err error) {
 	// Log expected errors at DEBUG to reduce noise; unexpected errors at ERROR level
-	isExpectedError := err == services.ErrTeamAlreadySubmitted || err == services.ErrMatchNotInShopPhase
+	isExpectedError := err == apperror.ErrTeamAlreadySubmitted || err == apperror.ErrMatchNotInShopPhase
 	if isExpectedError {
 		slog.Debug(msg, "error", err)
 	} else {
@@ -127,39 +128,39 @@ func handleServiceError(ctx context.Context, w http.ResponseWriter, err error, e
 
 	switch err {
 	// Match/participant errors
-	case services.ErrMatchNotFound:
+	case apperror.ErrMatchNotFound:
 		httputil.RespondError(w, "match not found", http.StatusNotFound)
-	case services.ErrNotParticipant:
+	case apperror.ErrNotParticipant:
 		httputil.RespondError(w, "not a participant in this match", http.StatusForbidden)
-	case services.ErrNotCreator:
+	case apperror.ErrNotCreator:
 		httputil.RespondError(w, "only the match creator can perform this action", http.StatusForbidden)
-	case services.ErrAlreadyJoined:
+	case apperror.ErrAlreadyJoined:
 		httputil.RespondError(w, "already joined this match", http.StatusBadRequest)
 
 	// Match state errors
-	case services.ErrMatchNotInShopPhase:
+	case apperror.ErrMatchNotInShopPhase:
 		httputil.RespondError(w, "match is not in shop phase", http.StatusBadRequest)
-	case services.ErrShopPhaseExpired:
+	case apperror.ErrShopPhaseExpired:
 		httputil.RespondError(w, "shop phase has expired", http.StatusBadRequest)
-	case services.ErrMatchNotOpen:
+	case apperror.ErrMatchNotOpen:
 		httputil.RespondError(w, "match is not open for joining", http.StatusBadRequest)
 
 	// Shop/team errors
-	case services.ErrTeamAlreadySubmitted:
+	case apperror.ErrTeamAlreadySubmitted:
 		httputil.RespondError(w, "team already submitted", http.StatusBadRequest)
-	case services.ErrTeamFull:
+	case apperror.ErrTeamFull:
 		httputil.RespondError(w, "team is full (max 3 cards)", http.StatusBadRequest)
-	case services.ErrInvalidCardIndex:
+	case apperror.ErrInvalidCardIndex:
 		httputil.RespondError(w, "invalid card index", http.StatusBadRequest)
 
 	// Card/coin errors
-	case services.ErrCardAlreadyPurchased:
+	case apperror.ErrCardAlreadyPurchased:
 		httputil.RespondError(w, "card already purchased", http.StatusBadRequest)
-	case services.ErrNotEnoughCoins:
+	case apperror.ErrNotEnoughCoins:
 		httputil.RespondError(w, "not enough coins", http.StatusBadRequest)
-	case services.ErrNotEnoughCards:
+	case apperror.ErrNotEnoughCards:
 		httputil.RespondError(w, "not enough cards in group (minimum 10 required)", http.StatusBadRequest)
-	case services.ErrActiveMatchExists:
+	case apperror.ErrActiveMatchExists:
 		httputil.RespondError(w, "an active match already exists. Please wait for it to complete before creating a new one.", http.StatusBadRequest)
 
 	// Default: unknown error
@@ -1369,9 +1370,9 @@ func (h *ArenaHandler) HandleBotAutoStartMatch(w http.ResponseWriter, r *http.Re
 			txn.NoticeError(err)
 		}
 		switch err {
-		case services.ErrMatchNotFound:
+		case apperror.ErrMatchNotFound:
 			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrMatchNotOpen:
+		case apperror.ErrMatchNotOpen:
 			httputil.RespondError(w, "match is not in open state", http.StatusBadRequest)
 		default:
 			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
@@ -1405,9 +1406,9 @@ func (h *ArenaHandler) HandleBotForceSubmitTeams(w http.ResponseWriter, r *http.
 			txn.NoticeError(err)
 		}
 		switch err {
-		case services.ErrMatchNotFound:
+		case apperror.ErrMatchNotFound:
 			httputil.RespondError(w, "match not found", http.StatusNotFound)
-		case services.ErrMatchNotInShopPhase:
+		case apperror.ErrMatchNotInShopPhase:
 			httputil.RespondError(w, "match is not in shop phase", http.StatusBadRequest)
 		default:
 			httputil.RespondError(w, err.Error(), http.StatusInternalServerError)
@@ -1507,7 +1508,7 @@ func (h *ArenaHandler) HandleBotGetTournament(w http.ResponseWriter, r *http.Req
 			txn.NoticeError(err)
 		}
 		switch err {
-		case services.ErrTournamentNotFound:
+		case apperror.ErrTournamentNotFound:
 			httputil.RespondError(w, "tournament not found", http.StatusNotFound)
 		default:
 			httputil.RespondError(w, err.Error(), http.StatusInternalServerError)
@@ -1649,11 +1650,11 @@ func (h *ArenaHandler) HandleBotJoinTournament(w http.ResponseWriter, r *http.Re
 			txn.NoticeError(err)
 		}
 		switch err {
-		case services.ErrTournamentNotOpen:
+		case apperror.ErrTournamentNotOpen:
 			httputil.RespondError(w, "tournament is not open for registration", http.StatusBadRequest)
-		case services.ErrTournamentRegistrationClosed:
+		case apperror.ErrTournamentRegistrationClosed:
 			httputil.RespondError(w, "tournament registration has closed", http.StatusBadRequest)
-		case services.ErrAlreadyRegistered:
+		case apperror.ErrAlreadyRegistered:
 			httputil.RespondError(w, "already registered for this tournament", http.StatusConflict)
 		default:
 			httputil.RespondError(w, err.Error(), http.StatusInternalServerError)
@@ -1716,9 +1717,9 @@ func (h *ArenaHandler) HandleBotLeaveTournament(w http.ResponseWriter, r *http.R
 			txn.NoticeError(err)
 		}
 		switch err {
-		case services.ErrTournamentRegistrationClosed:
+		case apperror.ErrTournamentRegistrationClosed:
 			httputil.RespondError(w, "tournament registration has closed", http.StatusBadRequest)
-		case services.ErrNotRegistered:
+		case apperror.ErrNotRegistered:
 			httputil.RespondError(w, "not registered for this tournament", http.StatusBadRequest)
 		default:
 			httputil.RespondError(w, err.Error(), http.StatusInternalServerError)
@@ -1786,7 +1787,7 @@ func (h *ArenaHandler) HandleBotCloseTournament(w http.ResponseWriter, r *http.R
 			txn.NoticeError(err)
 		}
 		switch err {
-		case services.ErrTournamentNotFound:
+		case apperror.ErrTournamentNotFound:
 			httputil.RespondError(w, "tournament not found", http.StatusNotFound)
 		default:
 			httputil.RespondError(w, err.Error(), http.StatusInternalServerError)

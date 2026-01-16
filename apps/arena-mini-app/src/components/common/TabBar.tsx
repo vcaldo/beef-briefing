@@ -31,7 +31,8 @@ const LobbyIcon = () => (
   </svg>
 )
 
-const ShopIcon = () => (
+// Exported for use in LobbyPage "Continue to Shop" button
+export const ShopIcon = () => (
   <svg
     width="24"
     height="24"
@@ -93,12 +94,11 @@ const StatsIcon = () => (
 
 /**
  * Tab configuration for arena mini-app navigation
- * 3 tabs: Lobby, Shop, Stats
- * Battle screen is only accessible via automatic transition from shop phase
+ * 2 tabs: Lobby, Stats
+ * Shop and Battle screens are only accessible via automatic transition during active match
  */
 const TABS: Tab[] = [
   { id: 'lobby', label: 'Lobby', icon: <LobbyIcon /> },
-  { id: 'shop', label: 'Shop', icon: <ShopIcon /> },
   { id: 'stats', label: 'Stats', icon: <StatsIcon /> },
 ]
 
@@ -111,7 +111,7 @@ interface TabBarProps {
 
 /**
  * Bottom navigation bar for arena mini-app.
- * Fixed position at bottom of screen with 4 tabs.
+ * Fixed position at bottom of screen with 2 tabs.
  * Uses CSS classes from global.css for styling.
  */
 export function TabBar({ activeTab, onTabChange }: TabBarProps) {

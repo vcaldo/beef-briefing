@@ -670,9 +670,9 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
               <div className="h2h-player you">You</div>
               <div className="h2h-vs">VS</div>
               <div className="h2h-player opponent">
-                {h2hData.opponent_name}
-                {h2hData.opponent_username && (
-                  <span className="h2h-username">@{h2hData.opponent_username}</span>
+                {h2hData.record.opponent.first_name}
+                {h2hData.record.opponent.username && (
+                  <span className="h2h-username">@{h2hData.record.opponent.username}</span>
                 )}
               </div>
             </div>

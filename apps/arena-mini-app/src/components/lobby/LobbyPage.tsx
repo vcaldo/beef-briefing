@@ -48,6 +48,8 @@ export function LobbyPage({
   // Refs for cleanup and preventing stale closures
   const pollIntervalRef = useRef<number | null>(null)
   const isMountedRef = useRef(true)
+  // Track whether initial fetch is complete - used to distinguish page reload from real-time transitions
+  const initialFetchDoneRef = useRef(false)
 
   // Find user's active match from the list
   const findUserMatch = useCallback(
@@ -93,15 +95,21 @@ export function LobbyPage({
 
       // CRITICAL: Detect phase transition to trigger navigation
       // This happens when match creator clicks "Start" or auto-start triggers
+      // Only auto-navigate on REAL-TIME transitions, not on page reload
       if (userMatch && userMatch.status === 'shop_phase') {
-        addPageAction('match_phase_transition', {
-          match_id: userMatch.id,
-          from_status: activeMatch?.status || 'open',
-          to_status: 'shop_phase',
-        })
-        onMatchChange(userMatch)
-        onNavigateToShop() // Navigate to Shop tab automatically
-        return
+        if (initialFetchDoneRef.current) {
+          // Real-time transition - auto-navigate to shop
+          addPageAction('match_phase_transition', {
+            match_id: userMatch.id,
+            from_status: activeMatch?.status || 'open',
+            to_status: 'shop_phase',
+          })
+          onMatchChange(userMatch)
+          onNavigateToShop()
+          return
+        }
+        // Initial load during shop_phase - let user see lobby with "Continue to Shop" button
+        // (handled by active match card display below)
       }
 
       // Handle battle_phase - user may have refreshed during battle
@@ -127,6 +135,12 @@ export function LobbyPage({
           match_count: fetchedMatches.length,
           has_active_match: !!userMatch,
         })
+      }
+
+      // Mark initial fetch as complete after first successful load
+      // This enables auto-navigation for subsequent real-time transitions
+      if (!initialFetchDoneRef.current) {
+        initialFetchDoneRef.current = true
       }
     } catch (err) {
       if (!isMountedRef.current) return

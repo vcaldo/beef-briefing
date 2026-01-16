@@ -73,6 +73,12 @@ export function BattlePage({
       setError(null)
 
       const data = await apiClient.getBattle(matchId)
+
+      // Validate required data is present
+      if (!data.team_a_final?.cards || !data.team_b_final?.cards) {
+        throw new Error('Battle data is incomplete - missing team cards')
+      }
+
       setBattleData(data)
 
       // Initialize card states from initial team data
@@ -309,7 +315,7 @@ export function BattlePage({
 
   // Reset playback
   const resetPlayback = useCallback(() => {
-    if (!battleData) return
+    if (!battleData?.team_a_final?.cards || !battleData?.team_b_final?.cards) return
 
     setCurrentEventIndex(-1)
     setIsPlaying(false)
@@ -488,7 +494,7 @@ export function BattlePage({
         <div className="battle-team team-a">
           <div className="team-label">{battleData.player_a_name}</div>
           <div className="team-cards">
-            {battleData.team_a_final.cards.map((card) =>
+            {(battleData.team_a_final?.cards ?? []).map((card) =>
               renderBattleCard(card.card_id, battleData.player_a_id, card)
             )}
           </div>
@@ -501,7 +507,7 @@ export function BattlePage({
         <div className="battle-team team-b">
           <div className="team-label">{battleData.player_b_name}</div>
           <div className="team-cards">
-            {battleData.team_b_final.cards.map((card) =>
+            {(battleData.team_b_final?.cards ?? []).map((card) =>
               renderBattleCard(card.card_id, battleData.player_b_id, card)
             )}
           </div>

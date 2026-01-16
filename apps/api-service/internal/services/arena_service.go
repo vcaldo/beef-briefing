@@ -295,13 +295,21 @@ type EnhancedShopResponse struct {
 	Affordability        ShopAffordability     `json:"affordability"`
 }
 
-// BattleResponse represents battle results
+// BattleResponse represents battle results in the format the frontend expects
 type BattleResponse struct {
-	MatchID    string                   `json:"match_id"`
-	Status     string                   `json:"status"`
-	Rounds     []*repository.MatchRound `json:"rounds"`
-	WinnerID   *int64                   `json:"winner_id,omitempty"`
-	IsComplete bool                     `json:"is_complete"`
+	MatchID     string               `json:"match_id"`
+	WinnerID    *int64               `json:"winner_id,omitempty"`
+	IsDraw      bool                 `json:"is_draw"`
+	Events      []battle.BattleEvent `json:"events"`
+	NumRounds   int                  `json:"num_rounds"`
+	TeamADamage int                  `json:"team_a_damage"`
+	TeamBDamage int                  `json:"team_b_damage"`
+	TeamAFinal  *battle.Team         `json:"team_a_final"`
+	TeamBFinal  *battle.Team         `json:"team_b_final"`
+	PlayerAID   int64                `json:"player_a_id"`
+	PlayerBID   int64                `json:"player_b_id"`
+	PlayerAName string               `json:"player_a_name"`
+	PlayerBName string               `json:"player_b_name"`
 }
 
 // CreateMatch creates a new regular match
@@ -1373,14 +1381,20 @@ func (s *ArenaService) runBattle(ctx context.Context, matchID string, pA, pB *re
 	// Complete match for 1v1
 	s.gameRepo.CompleteMatch(ctx, matchID, result.WinnerID)
 
-	rounds, _ := s.gameRepo.GetMatchRounds(ctx, matchID)
-
 	return &BattleResponse{
-		MatchID:    matchID,
-		Status:     string(repository.MatchStatusCompleted),
-		Rounds:     rounds,
-		WinnerID:   result.WinnerID,
-		IsComplete: true,
+		MatchID:     matchID,
+		WinnerID:    result.WinnerID,
+		IsDraw:      result.IsDraw,
+		Events:      result.Events,
+		NumRounds:   result.NumRounds,
+		TeamADamage: result.TeamADamage,
+		TeamBDamage: result.TeamBDamage,
+		TeamAFinal:  result.TeamAFinal,
+		TeamBFinal:  result.TeamBFinal,
+		PlayerAID:   pA.UserID,
+		PlayerBID:   pB.UserID,
+		PlayerAName: ownerNameA,
+		PlayerBName: ownerNameB,
 	}, nil
 }
 
@@ -1451,14 +1465,14 @@ func (s *ArenaService) runArena(ctx context.Context, matchID string, participant
 	// Record arena completion metric
 	recordBattleCompletion(s.nrApp, matchID, "arena", winnerID, false, roundNumber, 0, 0)
 
-	rounds, _ := s.gameRepo.GetMatchRounds(ctx, matchID)
-
+	// Arena format returns minimal response (multi-player tournaments)
+	// The Mini App doesn't use arena format - it uses 1v1
 	return &BattleResponse{
-		MatchID:    matchID,
-		Status:     string(repository.MatchStatusCompleted),
-		Rounds:     rounds,
-		WinnerID:   winnerID,
-		IsComplete: true,
+		MatchID:   matchID,
+		WinnerID:  winnerID,
+		IsDraw:    false,
+		Events:    []battle.BattleEvent{},
+		NumRounds: roundNumber,
 	}, nil
 }
 
@@ -1492,12 +1506,74 @@ func (s *ArenaService) GetBattle(ctx context.Context, matchID string, userID int
 		return nil, fmt.Errorf("failed to get rounds: %w", err)
 	}
 
+	// No rounds yet - return minimal response
+	if len(rounds) == 0 {
+		return &BattleResponse{
+			MatchID: matchID,
+			Events:  []battle.BattleEvent{},
+		}, nil
+	}
+
+	// Get the first round (for 1v1 matches, there's only one round)
+	round := rounds[0]
+
+	// Parse teams from stored JSON
+	var teamACards, teamBCards []*battle.Card
+	if err := json.Unmarshal(round.PlayerATeam, &teamACards); err != nil {
+		return nil, fmt.Errorf("failed to parse team A: %w", err)
+	}
+	if err := json.Unmarshal(round.PlayerBTeam, &teamBCards); err != nil {
+		return nil, fmt.Errorf("failed to parse team B: %w", err)
+	}
+
+	// Parse battle events
+	var events []battle.BattleEvent
+	if err := json.Unmarshal(round.BattleLog, &events); err != nil {
+		return nil, fmt.Errorf("failed to parse battle log: %w", err)
+	}
+
+	// Get participant names
+	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	// Build name lookup map
+	nameMap := make(map[int64]string)
+	for _, p := range participants {
+		name := p.FirstName
+		if name == "" {
+			name = p.Username
+		}
+		nameMap[p.UserID] = name
+	}
+
+	// Build teams with owner info
+	teamAFinal := &battle.Team{
+		OwnerID:   round.PlayerAID,
+		OwnerName: nameMap[round.PlayerAID],
+		Cards:     teamACards,
+	}
+	teamBFinal := &battle.Team{
+		OwnerID:   round.PlayerBID,
+		OwnerName: nameMap[round.PlayerBID],
+		Cards:     teamBCards,
+	}
+
 	return &BattleResponse{
-		MatchID:    matchID,
-		Status:     string(match.Status),
-		Rounds:     rounds,
-		WinnerID:   match.WinnerUserID,
-		IsComplete: match.Status == repository.MatchStatusCompleted,
+		MatchID:     matchID,
+		WinnerID:    round.WinnerID,
+		IsDraw:      round.IsDraw,
+		Events:      events,
+		NumRounds:   round.TotalRounds,
+		TeamADamage: round.PlayerADmg,
+		TeamBDamage: round.PlayerBDmg,
+		TeamAFinal:  teamAFinal,
+		TeamBFinal:  teamBFinal,
+		PlayerAID:   round.PlayerAID,
+		PlayerBID:   round.PlayerBID,
+		PlayerAName: nameMap[round.PlayerAID],
+		PlayerBName: nameMap[round.PlayerBID],
 	}, nil
 }
 

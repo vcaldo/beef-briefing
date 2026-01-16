@@ -177,7 +177,6 @@ func TestCreateMatch(t *testing.T) {
 func TestGetMatch_Found(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(t, db)
-	defer cleanupTables(t, db, "game_match_participants", "game_matches", "users", "chats")
 
 	repo := NewGameRepository(db, nil)
 	cleanupTables(t, db, "game_match_participants", "game_matches", "users", "chats")

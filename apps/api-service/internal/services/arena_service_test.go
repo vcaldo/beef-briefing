@@ -720,6 +720,7 @@ func setupArenaTestDB(t *testing.T) *testutil.TestDB {
 		"game_match_rounds",
 		"game_matches",
 		"ml_user_cards",
+		"chats",
 	}
 
 	for _, table := range tablesToCleanup {
@@ -734,7 +735,6 @@ func setupArenaTestDB(t *testing.T) *testutil.TestDB {
 	_, err := tdb.DB.ExecContext(ctx, `
 		INSERT INTO chats (id, type, title)
 		VALUES ($1, 'supergroup', 'Arena Test Group')
-		ON CONFLICT (id) DO NOTHING
 	`, testChatID)
 	if err != nil {
 		t.Fatalf("failed to create test chat: %v", err)

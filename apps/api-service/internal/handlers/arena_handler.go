@@ -143,17 +143,6 @@ func extractMatchIDFromURL(r *http.Request) (string, error) {
 	return matchID, nil
 }
 
-// extractTournamentIDFromURL extracts the tournament ID from URL parameters.
-// Returns a string error if the ID is missing or invalid.
-func extractTournamentIDFromURL(r *http.Request) (string, error) {
-	vars := mux.Vars(r)
-	tournamentID := vars["tournament_id"]
-	if tournamentID == "" {
-		return "", fmt.Errorf("tournament id is required")
-	}
-	return tournamentID, nil
-}
-
 // logAndNoticeError logs an error and notifies New Relic of the error.
 // This consolidates the error logging and New Relic tracking pattern that appears throughout handlers.
 // For expected shop-phase errors (team submitted, match not in shop), logs at DEBUG level to reduce log noise.

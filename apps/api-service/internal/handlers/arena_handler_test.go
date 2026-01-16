@@ -268,43 +268,6 @@ func TestJWTMiddleware_ExpiredToken(t *testing.T) {
 // Arena Handler HTTP Status Tests
 // =============================================================================
 
-// setupArenaHandlerTest creates an ArenaHandler with mocked dependencies for testing
-func setupArenaHandlerTest(t *testing.T) (*ArenaHandler, *mockArenaService, *middleware.JWTAuth) {
-	mockService := newMockArenaService()
-	cfg := &config.Config{}
-	handler := &ArenaHandler{
-		service: nil, // Will use mock service via wrapper
-		config:  cfg,
-	}
-
-	secretKey := "test-jwt-secret-key-for-testing"
-	jwtAuth := middleware.NewJWTAuth(secretKey)
-
-	return handler, mockService, jwtAuth
-}
-
-// mockArenaService is a mock implementation of ArenaService for handler tests
-type mockArenaService struct {
-	// Match storage
-	matches      map[string]*services.MatchResponse
-
-	// Error injection
-	createMatchError     error
-	getMatchError        error
-	getActiveMatchesError error
-	joinMatchError       error
-
-	// Response injection
-	createMatchResponse *services.MatchResponse
-	getMatchResponse    *services.MatchResponse
-}
-
-func newMockArenaService() *mockArenaService {
-	return &mockArenaService{
-		matches: make(map[string]*services.MatchResponse),
-	}
-}
-
 // Note: TestCreateMatch_Returns201OnSuccess is a complex integration test that
 // requires proper database seeding. The arena service tests (arena_service_test.go)
 // already cover this scenario comprehensively with TestCreateMatch_Success.

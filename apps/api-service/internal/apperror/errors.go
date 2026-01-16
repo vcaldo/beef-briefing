@@ -16,7 +16,7 @@ var (
 	ErrAlreadyJoined     = errors.New("already joined this match")
 	ErrNotParticipant    = errors.New("not a participant in this match")
 	ErrNotCreator        = errors.New("only the match creator can perform this action")
-	ErrActiveMatchExists = errors.New("an active match already exists. Please wait for it to complete before creating a new one.")
+	ErrActiveMatchExists = errors.New("an active match already exists; please wait for it to complete before creating a new one")
 )
 
 // Card and deck errors

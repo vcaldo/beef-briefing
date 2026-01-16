@@ -636,8 +636,7 @@ func (m *mockGameRepository) GetUserProfile(ctx context.Context, chatID, userID 
 // mockCardService is a mock implementation of CardServiceInterface for testing.
 // This implements the full CardServiceInterface defined in interfaces.go.
 type mockCardService struct {
-	cardCount      int
-	cardCountError error
+	cardCount int
 }
 
 func newMockCardService(cardCount int) *mockCardService {
@@ -2813,13 +2812,13 @@ func TestExecuteBattle_Arena(t *testing.T) {
 
 	// Verify all rounds have battle data
 	for _, round := range rounds {
-		if round.BattleLog == nil || len(round.BattleLog) == 0 {
+		if len(round.BattleLog) == 0 {
 			t.Errorf("round %d has empty battle log", round.RoundNumber)
 		}
-		if round.PlayerATeam == nil || len(round.PlayerATeam) == 0 {
+		if len(round.PlayerATeam) == 0 {
 			t.Errorf("round %d has empty player A team", round.RoundNumber)
 		}
-		if round.PlayerBTeam == nil || len(round.PlayerBTeam) == 0 {
+		if len(round.PlayerBTeam) == 0 {
 			t.Errorf("round %d has empty player B team", round.RoundNumber)
 		}
 		if round.TotalRounds <= 0 {

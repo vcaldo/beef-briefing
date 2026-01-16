@@ -335,6 +335,12 @@ go-test-cover: ## Run tests with coverage report
 go-test-race: ## Run tests with race detector
 	cd $(API_DIR) && go test -race ./...
 
+go-lint: ## Run staticcheck linter on api-service
+	cd $(API_DIR) && staticcheck ./...
+
+go-vet: ## Run go vet on api-service
+	cd $(API_DIR) && go vet ./...
+
 # =============================================================================
 # SECRETS (secrets-*)
 # =============================================================================
@@ -812,7 +818,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	docker-shell-newrelic \
 	go-build go-build-api go-build-bot go-build-import-cli go-build-import-cli-prod go-clean \
 	go-fmt go-fmt-check \
-	go-test go-test-v go-test-cover go-test-race \
+	go-test go-test-v go-test-cover go-test-race go-lint go-vet \
 	secrets-traefik-password secrets-service-api secrets-card-renderer secrets-jwt \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \

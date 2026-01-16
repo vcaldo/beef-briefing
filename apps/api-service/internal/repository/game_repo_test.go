@@ -106,6 +106,8 @@ func TestCreateMatch(t *testing.T) {
 	repo := NewGameRepository(db, nil)
 
 	t.Run("CreateRegularMatch", func(t *testing.T) {
+		cleanupTables(t, db, "game_match_participants", "game_matches", "users", "chats")
+
 		ctx := context.Background()
 		chatID := int64(-1002345678901)
 		creatorUserID := int64(12345)

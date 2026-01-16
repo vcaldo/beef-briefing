@@ -38,6 +38,9 @@ type MockMinIOClient struct {
 
 	// GetPresignedURLCalls tracks the number of times GetPresignedURL was called.
 	GetPresignedURLCalls int
+
+	// GetPresignedURLSecondsCalls tracks the number of times GetPresignedURLSeconds was called.
+	GetPresignedURLSecondsCalls int
 }
 
 // MockObject represents an object stored in the mock storage.
@@ -128,6 +131,10 @@ func (m *MockMinIOClient) GetPresignedURL(ctx context.Context, objectKey string,
 // GetPresignedURLSeconds is a convenience wrapper that takes expiry in seconds.
 // Implements the services.MinIOClient interface.
 func (m *MockMinIOClient) GetPresignedURLSeconds(ctx context.Context, objectKey string, expirySeconds int) (string, error) {
+	m.mu.Lock()
+	m.GetPresignedURLSecondsCalls++
+	m.mu.Unlock()
+
 	expiry := time.Duration(expirySeconds) * time.Second
 	return m.GetPresignedURL(ctx, objectKey, expiry)
 }
@@ -141,6 +148,7 @@ func (m *MockMinIOClient) Reset() {
 	m.UploadCalls = 0
 	m.GetObjectCalls = 0
 	m.GetPresignedURLCalls = 0
+	m.GetPresignedURLSecondsCalls = 0
 	m.UploadError = nil
 	m.GetObjectError = nil
 	m.GetPresignedURLError = nil

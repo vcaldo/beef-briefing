@@ -750,6 +750,19 @@ func setupArenaTestDB(t *testing.T) *testutil.TestDB {
 func seedTestCards(t *testing.T, db *testutil.TestDB, count int) {
 	ctx := context.Background()
 
+	// Cleanup existing test data to prevent conflicts from previous test runs
+	// Delete cards for user ID range 900001000 and up
+	_, err := db.DB.ExecContext(ctx, "DELETE FROM ml_user_cards WHERE user_id >= 900001000")
+	if err != nil {
+		t.Logf("warning: failed to cleanup ml_user_cards: %v", err)
+	}
+
+	// Delete users for user ID range 900001000 and up
+	_, err = db.DB.ExecContext(ctx, "DELETE FROM users WHERE id >= 900001000")
+	if err != nil {
+		t.Logf("warning: failed to cleanup users: %v", err)
+	}
+
 	// Get current week start (Monday) and end (Sunday)
 	now := time.Now()
 	weekday := int(now.Weekday())

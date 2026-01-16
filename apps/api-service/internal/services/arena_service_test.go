@@ -755,6 +755,27 @@ func setupArenaTestDB(t *testing.T) *testutil.TestDB {
 	return tdb
 }
 
+// cleanupArenaTables cleans up all arena-related tables to prevent parallel test interference
+func cleanupArenaTables(t *testing.T, tdb *testutil.TestDB) {
+	ctx := context.Background()
+	tablesToCleanup := []string{
+		"game_match_rounds",
+		"game_match_participants",
+		"game_matches",
+		"ml_user_card_images",
+		"ml_user_cards",
+		"users",
+		"chats",
+	}
+
+	for _, table := range tablesToCleanup {
+		_, err := tdb.DB.ExecContext(ctx, fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
+		if err != nil {
+			t.Logf("Warning: failed to truncate table %s: %v", table, err)
+		}
+	}
+}
+
 // seedTestCards creates test cards in the database for arena testing.
 // Creates count cards for the test chat with valid combat stats.
 func seedTestCards(t *testing.T, db *testutil.TestDB, count int) {
@@ -843,6 +864,7 @@ func cleanupArenaTestData(t *testing.T, db *testutil.TestDB) {
 func TestCreateMatch_Success(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	// Seed 15 cards (more than minimum 10)
 	seedTestCards(t, tdb, 15)
@@ -908,6 +930,7 @@ func TestCreateMatch_Success(t *testing.T) {
 func TestCreateMatch_NotEnoughCards(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	// Seed only 5 cards (less than minimum 10)
 	seedTestCards(t, tdb, 5)
@@ -944,6 +967,7 @@ func TestCreateMatch_NotEnoughCards(t *testing.T) {
 func TestCreateMatch_ActiveMatchExists(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -981,6 +1005,7 @@ func TestCreateMatch_ActiveMatchExists(t *testing.T) {
 func TestJoinMatch_Success(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -1019,6 +1044,7 @@ func TestJoinMatch_Success(t *testing.T) {
 func TestJoinMatch_NotOpen(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -1059,6 +1085,7 @@ func TestJoinMatch_NotOpen(t *testing.T) {
 func TestStartMatch_Success(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -1112,6 +1139,7 @@ func TestStartMatch_Success(t *testing.T) {
 func TestStartMatch_NotCreator(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -1154,6 +1182,7 @@ func TestStartMatch_NotCreator(t *testing.T) {
 func TestStartMatch_NotEnoughParticipants(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -1195,6 +1224,7 @@ func TestStartMatch_NotEnoughParticipants(t *testing.T) {
 func TestGetShop_Success(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -1333,6 +1363,7 @@ func TestGetShop_Success(t *testing.T) {
 func TestGetShop_AfterTeamSubmitted(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -1487,6 +1518,7 @@ func TestGetShop_AfterTeamSubmitted(t *testing.T) {
 func TestBuyCard_Success(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -1628,6 +1660,7 @@ func TestBuyCard_Success(t *testing.T) {
 func TestBuyCard_NotEnoughCoins(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -1726,6 +1759,7 @@ func TestBuyCard_NotEnoughCoins(t *testing.T) {
 func TestBuyCard_TeamFull(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -1851,6 +1885,7 @@ func TestBuyCard_TeamFull(t *testing.T) {
 func TestReroll_Success(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -2011,6 +2046,7 @@ func TestReroll_Success(t *testing.T) {
 func TestReroll_AfterPurchase(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -2126,6 +2162,7 @@ func TestReroll_AfterPurchase(t *testing.T) {
 func TestSubmitTeam_Success(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -2352,6 +2389,7 @@ func TestSubmitTeam_Success(t *testing.T) {
 func TestExecuteBattle_1v1(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	seedTestCards(t, tdb, 15)
 	defer cleanupArenaTestData(t, tdb)
@@ -2635,6 +2673,7 @@ func TestExecuteBattle_1v1(t *testing.T) {
 func TestExecuteBattle_Arena(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
 
 	// Seed 20 cards (enough for 3 players with different card pools)
 	seedTestCards(t, tdb, 20)

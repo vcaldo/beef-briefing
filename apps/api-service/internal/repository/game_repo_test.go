@@ -324,6 +324,7 @@ func TestAddParticipant(t *testing.T) {
 func TestGetParticipants(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(t, db)
+	defer cleanupTables(t, db, "game_match_rounds", "game_match_participants", "game_matches", "users", "chats")
 
 	repo := NewGameRepository(db, nil)
 	cleanupTables(t, db, "game_match_participants", "game_matches", "users")
@@ -384,6 +385,7 @@ func TestGetParticipants(t *testing.T) {
 func TestCreateRound(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(t, db)
+	defer cleanupTables(t, db, "game_match_rounds", "game_match_participants", "game_matches", "users", "chats")
 
 	repo := NewGameRepository(db, nil)
 	cleanupTables(t, db, "game_match_rounds", "game_match_participants", "game_matches", "users", "chats")

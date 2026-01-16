@@ -329,6 +329,144 @@ apps/api-service/
 └── Dockerfile
 ```
 
+## Concurrency Patterns
+
+The API service uses several concurrency patterns for thread-safe operation. All patterns have been verified with Go's race detector (`go test -race`).
+
+### 1. Per-Match Mutex (Battle Coordination)
+
+**Location:** `internal/services/battle_service.go:25`
+
+When multiple participants submit their teams simultaneously, the `CheckAndStartBattle` method uses per-match mutexes to prevent race conditions:
+
+```go
+type BattleService struct {
+    matchMutexes sync.Map // map[string]*sync.Mutex for per-match locking
+}
+
+func (s *BattleService) CheckAndStartBattle(ctx context.Context, matchID string) {
+    mutexInterface, _ := s.matchMutexes.LoadOrStore(matchID, &sync.Mutex{})
+    mutex := mutexInterface.(*sync.Mutex)
+    mutex.Lock()
+    defer mutex.Unlock()
+    // ... check and start battle
+}
+```
+
+**Why sync.Map:** Each match needs its own lock, but we don't know which matches will be active. `sync.Map` provides efficient concurrent access with `LoadOrStore` for atomic "get or create" semantics.
+
+**Cleanup:** Mutex entries are intentionally NOT deleted after use. Deleting while other goroutines may be waiting on `LoadOrStore` creates a race condition. Since match IDs are unique UUIDs and battles only happen once, the memory overhead is negligible.
+
+### 2. Background Goroutine with Timeout
+
+**Location:** `internal/services/arena_shop_delegation.go:46-50`
+
+When a player submits their team, we check if all players are ready and potentially start the battle. This happens asynchronously to avoid blocking the HTTP response:
+
+```go
+func (s *ArenaService) SubmitTeam(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
+    // ... submit team
+
+    // Create detached context with timeout for background work
+    asyncCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    go func() {
+        defer cancel()
+        s.checkAndStartBattle(asyncCtx, matchID)
+    }()
+
+    return s.shopService.GetShop(ctx, matchID, userID)
+}
+```
+
+**Why detached context:** The HTTP request context may be cancelled after the response is sent. Using `context.Background()` with a timeout ensures the background work completes independently.
+
+**Timeout:** 10-second timeout prevents goroutines from hanging indefinitely if something goes wrong.
+
+### 3. Transaction Helper (Database Operations)
+
+**Location:** `internal/dbutil/transaction.go`
+
+A helper function encapsulates the commit/rollback pattern with panic recovery:
+
+```go
+func WithTransaction(ctx context.Context, db *sql.DB, fn func(*sql.Tx) error) error {
+    tx, err := db.BeginTx(ctx, nil)
+    if err != nil {
+        return err
+    }
+    defer func() {
+        if p := recover(); p != nil {
+            tx.Rollback()
+            panic(p)
+        }
+    }()
+    if err := fn(tx); err != nil {
+        tx.Rollback()
+        return err
+    }
+    return tx.Commit()
+}
+```
+
+**Panic recovery:** If the callback panics, the transaction is rolled back before re-panicking. This prevents leaving transactions in an inconsistent state.
+
+### 4. Service-Level Transaction Management
+
+Services that need atomic operations manage their own transactions:
+
+**Pattern 1: Defer Rollback** (`internal/services/ingest_service.go:104-142`)
+```go
+tx, err := s.db.BeginTx(ctx, nil)
+if err != nil {
+    return err
+}
+defer tx.Rollback() // Safe: no-op after successful commit
+
+// ... operations using tx ...
+
+return tx.Commit()
+```
+
+**Pattern 2: Optional External Transaction** (`internal/repository/ml_repo.go`)
+```go
+func (r *MLRepo) StoreSentiment(ctx context.Context, results []SentimentResult, dbtx DBTX) error {
+    // If no external transaction provided, create internal one
+    if dbtx == nil {
+        tx, err := r.db.BeginTx(ctx, nil)
+        if err != nil {
+            return err
+        }
+        defer tx.Rollback()
+        dbtx = tx
+        // ... operations ...
+        return tx.Commit()
+    }
+    // Use provided transaction (caller manages commit/rollback)
+    // ... operations ...
+    return nil
+}
+```
+
+This allows both standalone use and composition into larger transactions.
+
+### Thread Safety Summary
+
+| Component | Pattern | Purpose |
+|-----------|---------|---------|
+| `BattleService.matchMutexes` | `sync.Map` of `*sync.Mutex` | Serialize battle start per match |
+| `SubmitTeam` | Background goroutine + timeout | Non-blocking async battle check |
+| `WithTransaction` | Defer + panic recovery | Safe transaction lifecycle |
+| Repository methods | DBTX interface | Flexible transaction composition |
+
+### No Deadlocks
+
+The codebase has been audited for deadlock potential:
+
+1. **Single lock family:** Only `matchMutexes` exists; no AB/BA lock ordering possible
+2. **Short transactions:** All DB transactions complete quickly (no long-running locks)
+3. **No nested transactions:** Transactions don't call methods that start new transactions
+4. **Context timeouts:** All background work has timeout protection
+
 ## Troubleshooting
 
 ### 401 Unauthorized

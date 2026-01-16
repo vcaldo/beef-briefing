@@ -352,8 +352,7 @@ func (s *BattleService) runArena(ctx context.Context, matchID string, participan
 	// Record arena completion metric
 	recordBattleCompletion(s.nrApp, matchID, "arena", winnerID, false, roundNumber, 0, 0)
 
-	// Arena format returns minimal response (multi-player tournaments)
-	// The Mini App doesn't use arena format - it uses 1v1
+	// Arena format returns summary response (no detailed battle events for replay)
 	return &BattleResponse{
 		MatchID:   matchID,
 		WinnerID:  winnerID,

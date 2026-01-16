@@ -585,7 +585,8 @@ type ForceSubmitResult struct {
 }
 
 // ForceSubmitTeams auto-assigns teams for participants who haven't submitted.
-// Uses a greedy strategy: auto-buys the 3 highest-ATK cards available.
+// Uses a greedy strategy: auto-buys the highest-ATK cards available.
+// Falls back to any available card if not enough high-ATK cards remain.
 // Called when shop phase deadline expires. Starts battle immediately after all teams are ready.
 // Returns list of user IDs that were force-submitted and whether battle was started.
 func (s *ArenaService) ForceSubmitTeams(ctx context.Context, matchID string) (*ForceSubmitResult, error) {

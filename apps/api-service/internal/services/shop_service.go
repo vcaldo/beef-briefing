@@ -440,7 +440,8 @@ func (s *ShopService) BuyCard(ctx context.Context, matchID string, userID int64,
 	return s.GetShop(ctx, matchID, userID)
 }
 
-// Reroll replaces unpurchased cards with new ones.
+// Reroll replaces all shop cards with new ones, only available before first card purchase.
+// Requires coins for both the reroll cost and enough to complete the full team after.
 func (s *ShopService) Reroll(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
 	defer nrutil.StartSegment(ctx, "service:shop:reroll")()
 
@@ -480,7 +481,7 @@ func (s *ShopService) Reroll(ctx context.Context, matchID string, userID int64) 
 		return nil, fmt.Errorf("failed to parse shop cards: %w", err)
 	}
 
-	// Get IDs of already purchased cards to exclude
+	// Get all current card IDs to exclude from reroll (ensures fresh cards)
 	excludeIDs := make([]int64, 0)
 	unpurchasedCount := 0
 	for _, card := range cards {
@@ -652,8 +653,8 @@ func (s *ShopService) SetTeamOrder(ctx context.Context, matchID string, userID i
 	return s.GetShop(ctx, matchID, userID)
 }
 
-// SubmitTeam submits the team for battle.
-// Note: This method does NOT trigger checkAndStartBattle - that responsibility remains with the caller (ArenaService).
+// SubmitTeam marks the participant's team as ready for battle.
+// The caller (ArenaService.SubmitTeam) triggers checkAndStartBattle after this returns.
 func (s *ShopService) SubmitTeam(ctx context.Context, matchID string, userID int64) error {
 	defer nrutil.StartSegment(ctx, "service:shop:submit-team")()
 

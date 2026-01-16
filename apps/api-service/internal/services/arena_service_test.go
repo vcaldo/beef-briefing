@@ -721,6 +721,7 @@ func setupArenaTestDB(t *testing.T) *testutil.TestDB {
 		"game_matches",
 		"ml_user_cards",
 		"chats",
+		"users",
 	}
 
 	for _, table := range tablesToCleanup {
@@ -745,8 +746,7 @@ func setupArenaTestDB(t *testing.T) *testutil.TestDB {
 		_, err := tdb.DB.ExecContext(ctx, `
 			INSERT INTO users (id, first_name, username, is_bot)
 			VALUES ($1, $2, $3, false)
-			ON CONFLICT (id) DO NOTHING
-		`, userID, "TestUser"+string(rune('A'+i)), "testuser"+string(rune('a'+i)))
+		`, userID, fmt.Sprintf("TestUser%c", 'A'+i), fmt.Sprintf("testuser%c", 'a'+i))
 		if err != nil {
 			t.Fatalf("failed to create test user %d: %v", userID, err)
 		}

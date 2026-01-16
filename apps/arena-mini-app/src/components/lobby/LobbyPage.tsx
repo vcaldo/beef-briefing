@@ -393,7 +393,11 @@ export function LobbyPage({
             <div className="match-card-header">
               <span className="match-card-badge">Your Match</span>
               <span className={`match-card-status status-${activeMatch.status}`}>
-                {activeMatch.status === 'open' ? 'Waiting for players' : activeMatch.status.replace('_', ' ')}
+                {activeMatch.status === 'open'
+                  ? 'Waiting for players'
+                  : activeMatch.status === 'shop_phase'
+                    ? 'Shopping Phase'
+                    : activeMatch.status.replace('_', ' ')}
               </span>
             </div>
 
@@ -439,24 +443,36 @@ export function LobbyPage({
             </div>
 
             <div className="match-card-actions">
-              {/* Leave button */}
-              <button
-                className="btn-secondary"
-                onClick={() => handleLeaveMatch(activeMatch.id)}
-                disabled={actionLoading !== null}
-              >
-                {actionLoading === 'leave' ? <LoadingSpinner size="sm" inline /> : 'Leave Match'}
-              </button>
-
-              {/* Start early button (creator only with 2+ players) */}
-              {canStartEarly && (
+              {activeMatch.status === 'shop_phase' ? (
+                /* Continue to Shop button for shop_phase */
                 <button
-                  className="btn-primary"
-                  onClick={() => handleStartMatch(activeMatch.id)}
-                  disabled={actionLoading !== null}
+                  className="btn-primary btn-lg"
+                  onClick={onNavigateToShop}
                 >
-                  {actionLoading === 'start' ? <LoadingSpinner size="sm" inline /> : 'Start Now'}
+                  Continue to Shop
                 </button>
+              ) : (
+                <>
+                  {/* Leave button */}
+                  <button
+                    className="btn-secondary"
+                    onClick={() => handleLeaveMatch(activeMatch.id)}
+                    disabled={actionLoading !== null}
+                  >
+                    {actionLoading === 'leave' ? <LoadingSpinner size="sm" inline /> : 'Leave Match'}
+                  </button>
+
+                  {/* Start early button (creator only with 2+ players) */}
+                  {canStartEarly && (
+                    <button
+                      className="btn-primary"
+                      onClick={() => handleStartMatch(activeMatch.id)}
+                      disabled={actionLoading !== null}
+                    >
+                      {actionLoading === 'start' ? <LoadingSpinner size="sm" inline /> : 'Start Now'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>

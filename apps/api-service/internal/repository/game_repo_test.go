@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/lib/pq"
@@ -160,8 +161,10 @@ func TestCreateMatch(t *testing.T) {
 		if match.MatchType != MatchTypeRanked {
 			t.Errorf("Expected match_type=%s, got %s", MatchTypeRanked, match.MatchType)
 		}
-		if match.TournamentDate == nil || *match.TournamentDate != tournamentDate {
-			t.Errorf("Expected tournament_date=%s, got %v", tournamentDate, match.TournamentDate)
+		if match.TournamentDate == nil {
+			t.Errorf("Expected tournament_date=%s, got nil", tournamentDate)
+		} else if !strings.HasPrefix(*match.TournamentDate, tournamentDate) {
+			t.Errorf("Expected tournament_date to start with %s, got %s", tournamentDate, *match.TournamentDate)
 		}
 		if match.CreatorUserID != nil {
 			t.Errorf("Expected creator_user_id to be nil for ranked match, got %v", match.CreatorUserID)

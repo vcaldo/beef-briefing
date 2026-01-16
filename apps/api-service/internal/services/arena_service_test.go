@@ -773,6 +773,16 @@ func seedTestCards(t *testing.T, db *testutil.TestDB, count int) {
 		t.Logf("warning: failed to cleanup users: %v", err)
 	}
 
+	// Ensure test chat exists (may have been deleted by parallel test's TRUNCATE CASCADE)
+	_, err = db.DB.ExecContext(ctx, `
+		INSERT INTO chats (id, type, title)
+		VALUES ($1, 'supergroup', 'Arena Test Group')
+		ON CONFLICT (id) DO NOTHING
+	`, testChatID)
+	if err != nil {
+		t.Fatalf("failed to ensure test chat exists: %v", err)
+	}
+
 	// Get current week start (Monday) and end (Sunday)
 	now := time.Now()
 	weekday := int(now.Weekday())

@@ -408,6 +408,9 @@ func TestCreateRound(t *testing.T) {
 	// Create test team data
 	playerAID := int64(12345)
 	playerBID := int64(67890)
+	insertTestUser(t, db, playerAID, "PlayerA")
+	insertTestUser(t, db, playerBID, "PlayerB")
+
 	playerATeam := json.RawMessage(`[{"id":1,"name":"Card A","atk":10,"hp":30}]`)
 	playerBTeam := json.RawMessage(`[{"id":2,"name":"Card B","atk":15,"hp":25}]`)
 	battleLog := json.RawMessage(`[{"type":"attack","attacker_id":1,"target_id":2}]`)

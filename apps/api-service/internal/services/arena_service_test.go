@@ -790,8 +790,7 @@ func seedTestCards(t *testing.T, db *testutil.TestDB, count int) {
 		_, err := db.DB.ExecContext(ctx, `
 			INSERT INTO users (id, first_name, is_bot)
 			VALUES ($1, $2, false)
-			ON CONFLICT (id) DO NOTHING
-		`, userID, "CardUser"+string(rune('A'+i%26)))
+		`, userID, fmt.Sprintf("CardUser%c", 'A'+i%26))
 		if err != nil {
 			t.Fatalf("failed to create card user %d: %v", userID, err)
 		}

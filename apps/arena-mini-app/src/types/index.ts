@@ -754,11 +754,29 @@ export interface HistoryResponse {
 }
 
 /**
+ * Opponent information in H2H record.
+ *
+ * @see {@link H2HRecord} Parent record containing opponent
+ */
+export interface H2HOpponent {
+  /** Opponent's user ID */
+  user_id: number
+  /** Opponent's display name */
+  first_name: string
+  /** Opponent's username (optional) */
+  username?: string
+}
+
+/**
  * Head-to-head record against a specific opponent.
  *
- * @see {@link H2HResponse} Full response with opponent info
+ * Contains opponent info and win/loss statistics.
+ *
+ * @see {@link H2HResponse} Full response wrapper
  */
 export interface H2HRecord {
+  /** Opponent information */
+  opponent: H2HOpponent
   /** Wins against this opponent */
   wins: number
   /** Losses against this opponent */
@@ -776,24 +794,21 @@ export interface H2HRecord {
 /**
  * Head-to-head response from getH2H endpoint.
  *
- * Contains opponent info and complete win/loss record.
+ * Contains the win/loss record with nested opponent info and recent matches.
  *
  * @example
  * // Display H2H summary
  * const { record } = h2hData;
+ * console.log(`vs ${record.opponent.first_name}`);
  * console.log(`${record.wins} W / ${record.draws} D / ${record.losses} L`);
  *
- * @see {@link H2HRecord} Win/loss record structure
+ * @see {@link H2HRecord} Record structure with opponent info
  */
 export interface H2HResponse {
-  /** Opponent's user ID */
-  opponent_id: number
-  /** Opponent's display name */
-  opponent_name: string
-  /** Opponent's username (optional) */
-  opponent_username?: string
-  /** Win/loss/draw record */
+  /** Win/loss/draw record with opponent info */
   record: H2HRecord
+  /** Recent matches against this opponent */
+  recent_matches: MatchHistoryEntry[]
 }
 
 /**

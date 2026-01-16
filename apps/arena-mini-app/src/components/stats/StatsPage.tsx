@@ -578,10 +578,10 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
                 <div
                   key={match.match_id}
                   className={`history-item ${getResultClass(match.result)}`}
-                  onClick={() => handleSelectOpponent(match.opponent_id)}
+                  onClick={() => handleSelectOpponent(match.opponent.user_id)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleSelectOpponent(match.opponent_id))}
+                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleSelectOpponent(match.opponent.user_id))}
                 >
                   <div className="history-result">
                     <span className={`result-badge ${match.result}`}>
@@ -589,26 +589,13 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
                     </span>
                   </div>
                   <div className="history-details">
-                    <div className="history-opponent">vs {match.opponent_name}</div>
+                    <div className="history-opponent">vs {match.opponent.first_name}</div>
                     <div className="history-meta">
                       <span className="history-type">
                         {match.match_type === 'ranked' ? '🏆' : '⚔️'}
                       </span>
-                      <span className="history-date">{formatDate(match.played_at)}</span>
+                      <span className="history-date">{formatDate(match.completed_at)}</span>
                     </div>
-                  </div>
-                  <div className="history-stats">
-                    <span className="damage-dealt" title="Damage dealt">
-                      ⚔️ {match.damage_dealt}
-                    </span>
-                    <span className="damage-received" title="Damage received">
-                      💔 {match.damage_received}
-                    </span>
-                    {match.rating_change !== undefined && match.rating_change !== 0 && (
-                      <span className={`rating-change ${match.rating_change > 0 ? 'positive' : 'negative'}`}>
-                        {match.rating_change > 0 ? '+' : ''}{match.rating_change}
-                      </span>
-                    )}
                   </div>
                 </div>
               ))}

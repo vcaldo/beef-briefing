@@ -113,19 +113,6 @@ type MatchResponse struct {
 	CardCount    int                               `json:"card_count"`
 }
 
-// ShopResponse represents the shop state for a player
-type ShopResponse struct {
-	MatchID       string             `json:"match_id"`
-	Status        string             `json:"status"`
-	Coins         int                `json:"coins"`
-	Cards         []*battle.ShopCard `json:"cards"`
-	Team          []*battle.Card     `json:"team"`
-	TeamOrder     []int              `json:"team_order"`
-	IsReady       bool               `json:"is_ready"`
-	Deadline      *time.Time         `json:"deadline,omitempty"`
-	TimeRemaining int                `json:"time_remaining_seconds"`
-}
-
 // ShopAffordability represents what actions a player can afford
 type ShopAffordability struct {
 	CanBuy               bool    `json:"can_buy"`

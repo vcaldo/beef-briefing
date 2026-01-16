@@ -44,7 +44,7 @@ services:
       LOG_LEVEL: info
       # Mini App authentication
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      CORS_ORIGINS: https://leaderboard.${DOMAIN_NAME},https://deck.${DOMAIN_NAME}
+      CORS_ORIGINS: https://leaderboard.${DOMAIN_NAME},https://deck.${DOMAIN_NAME},https://arena.${DOMAIN_NAME}
       ADMIN_USER_IDS: ${ADMIN_USER_IDS}
     volumes:
       - ./secrets/apps/api-service:/app/secrets:ro
@@ -128,7 +128,7 @@ services:
       # Mini App authentication
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      CORS_ORIGINS: https://deck.${DOMAIN_NAME},https://leaderboard.${DOMAIN_NAME}
+      CORS_ORIGINS: https://deck.${DOMAIN_NAME},https://leaderboard.${DOMAIN_NAME},https://arena.${DOMAIN_NAME}
     volumes:
       - ./secrets/apps/card-renderer:/app/secrets:ro
     depends_on:
@@ -189,6 +189,29 @@ services:
       - "traefik.http.routers.leaderboard-mini-app.entrypoints=websecure"
       - "traefik.http.routers.leaderboard-mini-app.tls.certresolver=letsencrypt"
       - "traefik.http.services.leaderboard-mini-app.loadbalancer.server.port=80"
+    restart: unless-stopped
+
+  arena-mini-app:
+    build:
+      context: ..
+      dockerfile: apps/arena-mini-app/Dockerfile
+      args:
+        VITE_API_URL: https://api.${DOMAIN_NAME}
+        VITE_CARD_API_URL: https://cards-api.${DOMAIN_NAME}
+        VITE_NEW_RELIC_BROWSER_ACCOUNT_ID: ${NEW_RELIC_ACCOUNT_ID:-}
+        VITE_NEW_RELIC_BROWSER_APP_ID: ${NEW_RELIC_BROWSER_ARENA_APP_ID:-}
+        VITE_NEW_RELIC_BROWSER_LICENSE_KEY: ${NEW_RELIC_BROWSER_LICENSE_KEY:-}
+        VITE_ENVIRONMENT: production
+    image: beef-briefing/arena-mini-app:${IMAGE_TAG}
+    container_name: beef-arena-mini-app-prod
+    networks:
+      - beef-prod-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.arena-mini-app.rule=Host(`arena.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.arena-mini-app.entrypoints=websecure"
+      - "traefik.http.routers.arena-mini-app.tls.certresolver=letsencrypt"
+      - "traefik.http.services.arena-mini-app.loadbalancer.server.port=80"
     restart: unless-stopped
 
   traefik:

@@ -1,2 +1,2 @@
 // Telegram SDK initialization
-export { initializeTelegramSDK } from './initTelegram';
+export { initializeTelegramSDK, isSDKInitialized } from './initTelegram';

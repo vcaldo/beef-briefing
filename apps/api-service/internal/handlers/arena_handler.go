@@ -865,10 +865,13 @@ func (h *ArenaHandler) HandleGetH2H(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type H2HResponse struct {
-		Opponent    OpponentInfo `json:"opponent"`
-		Wins        int          `json:"wins"`
-		Losses      int          `json:"losses"`
-		LastMatchAt *string      `json:"last_match_at,omitempty"`
+		Opponent     OpponentInfo `json:"opponent"`
+		Wins         int          `json:"wins"`
+		Losses       int          `json:"losses"`
+		Draws        int          `json:"draws"`
+		TotalMatches int          `json:"total_matches"`
+		WinRate      float64      `json:"win_rate"`
+		LastPlayed   *string      `json:"last_played,omitempty"`
 	}
 
 	type RecentMatchResponse struct {
@@ -886,18 +889,27 @@ func (h *ArenaHandler) HandleGetH2H(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if record != nil {
+		totalMatches := record.Wins + record.Losses + record.Draws
+		var winRate float64
+		if totalMatches > 0 {
+			winRate = float64(record.Wins) / float64(totalMatches)
+		}
+
 		response.Record = &H2HResponse{
 			Opponent: OpponentInfo{
 				UserID:    record.OpponentID,
 				FirstName: record.OpponentName,
 				Username:  record.OpponentUser,
 			},
-			Wins:   record.Wins,
-			Losses: record.Losses,
+			Wins:         record.Wins,
+			Losses:       record.Losses,
+			Draws:        record.Draws,
+			TotalMatches: totalMatches,
+			WinRate:      winRate,
 		}
 		if record.LastMatchAt != nil {
 			t := record.LastMatchAt.Format(time.RFC3339)
-			response.Record.LastMatchAt = &t
+			response.Record.LastPlayed = &t
 		}
 	}
 
@@ -993,6 +1005,9 @@ func (h *ArenaHandler) HandleGetProfile(w http.ResponseWriter, r *http.Request) 
 		Username                string  `json:"username,omitempty"`
 		RankedWins              int     `json:"ranked_wins"`
 		RankedLosses            int     `json:"ranked_losses"`
+		RankedDraws             int     `json:"ranked_draws"`
+		RankedMatches           int     `json:"ranked_matches"`
+		RankedWinRate           float64 `json:"ranked_win_rate"`
 		RankedTournamentsPlayed int     `json:"ranked_tournaments_played"`
 		RankedTournamentsWon    int     `json:"ranked_tournaments_won"`
 		RankedCurrentStreak     int     `json:"ranked_current_streak"`
@@ -1000,13 +1015,34 @@ func (h *ArenaHandler) HandleGetProfile(w http.ResponseWriter, r *http.Request) 
 		RankedRank              int     `json:"ranked_rank"`
 		RegularWins             int     `json:"regular_wins"`
 		RegularLosses           int     `json:"regular_losses"`
+		RegularDraws            int     `json:"regular_draws"`
 		RegularMatchesPlayed    int     `json:"regular_matches_played"`
+		RegularWinRate          float64 `json:"regular_win_rate"`
 		RegularCurrentStreak    int     `json:"regular_current_streak"`
 		RegularBestStreak       int     `json:"regular_best_streak"`
 		RegularRank             int     `json:"regular_rank"`
+		TotalMatches            int     `json:"total_matches"`
+		TotalWins               int     `json:"total_wins"`
+		TotalDamageDealt        int     `json:"total_damage_dealt"`
 		FirstMatchAt            *string `json:"first_match_at,omitempty"`
 		LastMatchAt             *string `json:"last_match_at,omitempty"`
 	}
+
+	// Calculate derived fields
+	rankedMatches := profile.RankedWins + profile.RankedLosses + profile.RankedDraws
+	var rankedWinRate float64
+	if rankedMatches > 0 {
+		rankedWinRate = float64(profile.RankedWins) / float64(rankedMatches)
+	}
+
+	regularMatches := profile.RegularWins + profile.RegularLosses + profile.RegularDraws
+	var regularWinRate float64
+	if regularMatches > 0 {
+		regularWinRate = float64(profile.RegularWins) / float64(regularMatches)
+	}
+
+	totalMatches := rankedMatches + regularMatches
+	totalWins := profile.RankedWins + profile.RegularWins
 
 	profileResp := ProfileStatsResponse{
 		UserID:                  profile.UserID,
@@ -1014,6 +1050,9 @@ func (h *ArenaHandler) HandleGetProfile(w http.ResponseWriter, r *http.Request) 
 		Username:                profile.Username,
 		RankedWins:              profile.RankedWins,
 		RankedLosses:            profile.RankedLosses,
+		RankedDraws:             profile.RankedDraws,
+		RankedMatches:           rankedMatches,
+		RankedWinRate:           rankedWinRate,
 		RankedTournamentsPlayed: profile.RankedTournamentsPlayed,
 		RankedTournamentsWon:    profile.RankedTournamentsWon,
 		RankedCurrentStreak:     profile.RankedCurrentStreak,
@@ -1021,10 +1060,15 @@ func (h *ArenaHandler) HandleGetProfile(w http.ResponseWriter, r *http.Request) 
 		RankedRank:              profile.RankedRank,
 		RegularWins:             profile.RegularWins,
 		RegularLosses:           profile.RegularLosses,
+		RegularDraws:            profile.RegularDraws,
 		RegularMatchesPlayed:    profile.RegularMatchesPlayed,
+		RegularWinRate:          regularWinRate,
 		RegularCurrentStreak:    profile.RegularCurrentStreak,
 		RegularBestStreak:       profile.RegularBestStreak,
 		RegularRank:             profile.RegularRank,
+		TotalMatches:            totalMatches,
+		TotalWins:               totalWins,
+		TotalDamageDealt:        0, // Not tracked in current schema
 	}
 	if profile.FirstMatchAt != nil {
 		t := profile.FirstMatchAt.Format(time.RFC3339)

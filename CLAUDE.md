@@ -21,12 +21,13 @@ A Go-based Telegram bot system for managing beef briefing subscriptions with RES
 
 **Go Services:**
 
-1. **api-service** (port 8080): Central REST API with 26 endpoints across 6 categories
+1. **api-service** (port 8080): Central REST API with 26+ endpoints across 6 categories
    - **Ingest**: Multipart uploads with JSON metadata + binary files, SHA256 deduplication
    - **Profile Photos**: Upload/retrieve user and chat profile photos
    - **ML Analytics**: Batch message processing for ML pipeline
    - **Cards**: Weekly user stats cards with presigned image URLs
-   - **Mini App**: JWT-authenticated endpoints for deck-mini-app and leaderboard-mini-app
+   - **Mini App**: JWT-authenticated endpoints for deck-mini-app, leaderboard-mini-app, and arena-mini-app
+   - **Arena**: Match management, shop phase, battle results, leaderboards (18 endpoints)
    - **Auth**: API Key (internal services) and JWT (Mini Apps) authentication
 
 2. **telegram-bot**: Telegram bot that listens to group messages and forwards to API
@@ -79,6 +80,7 @@ Internet (443/80) → Traefik (SSL termination)
                          ├─→ cards-api.{domain} → Card Renderer (8051)
                          ├─→ leaderboard.{domain} → Leaderboard Mini App
                          ├─→ deck.{domain} → Deck Mini App
+                         ├─→ arena.{domain} → Arena Mini App
                          └─→ {domain}/dashboard → Traefik Dashboard
 
 Internal Docker Network:
@@ -426,6 +428,39 @@ SELECT id, title FROM chats WHERE title ILIKE '%group name%';
 
 Tournaments run **only if both global AND group settings are enabled**.
 
+### Arena Mini App
+
+Turn-based card battle arena where users build teams from weekly stats cards and compete. See [arena-mini-app README](apps/arena-mini-app/README.md) for full documentation.
+
+**Game Economy**:
+| Resource | Cost | Description |
+|----------|------|-------------|
+| Starting coins | 10 | Coins at match start |
+| Card purchase | 3 | Buy a card from shop |
+| Reroll | 1 | Refresh shop (before first buy only) |
+| Upgrade | 1 | +3 ATK or +3 HP per upgrade |
+| Team size | 3 | Cards required for battle |
+
+**Polling Intervals**:
+- Lobby (no match): 3s polling `/matches`
+- Lobby (in match): 2s polling `/match/{id}`
+- Shop: 3s polling `/shop` (continues after team submission)
+- Battle/Stats: No polling (single fetch)
+
+**Critical Implementation Notes**:
+- **React error #310**: Prevented by awaiting SDK init before render and initializing timer state to `0`
+- **Reroll mechanic**: Permanently disabled after first card purchase (not per-round)
+- **Shop polling**: Must continue after team submission to detect battle phase transition
+- **Compact cards**: Use `placeholder_positions` metadata for stat overlay positioning
+
+**Development**:
+```bash
+cd apps/arena-mini-app
+pnpm install
+pnpm run dev     # Dev server on port 5175
+pnpm run build   # Production build
+```
+
 ## Import CLI Usage
 
 Import Telegram Desktop exports into the system:
@@ -518,7 +553,8 @@ beef-briefing/
 │   ├── card-renderer/     # Card image renderer (Python/Playwright)
 │   ├── ml-processor/      # ML pipeline for message analysis
 │   ├── leaderboard-mini-app/  # Telegram Mini App for leaderboard
-│   ├── deck-mini-app/     # Telegram Mini App for deck
+│   ├── deck-mini-app/     # Telegram Mini App for deck viewing
+│   ├── arena-mini-app/    # Telegram Mini App for card battle arena
 │   └── import-cli/        # CLI for importing Telegram exports
 ├── infrastructure/
 │   ├── docker-compose.dev.yml     # Development environment

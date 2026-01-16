@@ -1337,6 +1337,7 @@ type H2HRecord struct {
 	OpponentUser string     `json:"opponent_username,omitempty"`
 	Wins         int        `json:"wins"`
 	Losses       int        `json:"losses"`
+	Draws        int        `json:"draws"`
 	LastMatchAt  *time.Time `json:"last_match_at,omitempty"`
 }
 
@@ -1388,10 +1389,12 @@ func (r *GameRepository) GetH2HRecord(ctx context.Context, chatID, userID, oppon
 		var h2hData struct {
 			Wins   int `json:"wins"`
 			Losses int `json:"losses"`
+			Draws  int `json:"draws"`
 		}
 		if err := json.Unmarshal(h2hJSON, &h2hData); err == nil {
 			record.Wins = h2hData.Wins
 			record.Losses = h2hData.Losses
+			record.Draws = h2hData.Draws
 		}
 	}
 

@@ -12,8 +12,8 @@ import './styles/global.css'
 
 // Initialize app
 async function initApp() {
-  // Initialize Telegram Mini App SDK
-  initializeTelegramSDK()
+  // Initialize Telegram Mini App SDK - MUST await to prevent React error #310
+  await initializeTelegramSDK()
 
   // Render app
   createRoot(document.getElementById('root')!).render(

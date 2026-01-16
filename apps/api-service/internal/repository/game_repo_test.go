@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
@@ -457,15 +456,20 @@ func TestCreateRound(t *testing.T) {
 func TestUpdateLeaderboard(t *testing.T) {
 	db := setupTestDB(t)
 	defer teardownTestDB(t, db)
-	defer cleanupTables(t, db, "game_leaderboard")
+	defer cleanupTables(t, db, "game_leaderboard", "users", "chats")
 
 	repo := NewGameRepository(db, nil)
-	cleanupTables(t, db, "game_leaderboard")
+	cleanupTables(t, db, "game_leaderboard", "users", "chats")
 
 	ctx := context.Background()
 	userID := int64(12345)
 	chatID := int64(-1002345678901)
 	opponentID := int64(67890)
+
+	// Insert required foreign key data
+	insertTestChat(t, db, chatID)
+	insertTestUser(t, db, userID, "User")
+	insertTestUser(t, db, opponentID, "Opponent")
 
 	// Record a win
 	err := repo.UpdateLeaderboard(ctx, userID, chatID, MatchTypeRanked, true, &opponentID, false, false)
@@ -475,12 +479,12 @@ func TestUpdateLeaderboard(t *testing.T) {
 
 	// Verify leaderboard entry was created
 	var rankedWins, rankedCurrentStreak int
-	var h2h pq.Int64Array
+	var h2hJSON []byte
 	err = db.QueryRow(`
 		SELECT ranked_wins, ranked_current_streak, head_to_head
 		FROM game_leaderboard
 		WHERE user_id = $1 AND chat_id = $2
-	`, userID, chatID).Scan(&rankedWins, &rankedCurrentStreak, &h2h)
+	`, userID, chatID).Scan(&rankedWins, &rankedCurrentStreak, &h2hJSON)
 	if err != nil {
 		t.Fatalf("Failed to query leaderboard: %v", err)
 	}

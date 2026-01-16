@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,38 +14,41 @@ import (
 	"beef-briefing/apps/api-service/internal/testutil"
 )
 
-// mockGameRepository is a mock implementation of GameRepositoryInterface for testing
+// mockGameRepository is a mock implementation of GameRepositoryInterface for testing.
+// It is thread-safe and can be used in concurrent test scenarios.
 type mockGameRepository struct {
+	mu sync.RWMutex // protects all fields below
+
 	// Match storage
 	matches      map[string]*repository.Match
 	participants map[string]map[int64]*repository.Participant // matchID -> userID -> participant
 	rounds       map[string][]*repository.MatchRound          // matchID -> rounds
 
 	// Call tracking
-	createMatchCalls        int
-	getMatchCalls           int
-	getActiveMatchesCalls   int
-	addParticipantCalls     int
-	getParticipantCalls     int
-	removeParticipantCalls  int
-	startShopPhaseCalls     int
-	startBattlePhaseCalls   int
-	completeMatchCalls      int
-	submitTeamCalls         int
+	createMatchCalls           int
+	getMatchCalls              int
+	getActiveMatchesCalls      int
+	addParticipantCalls        int
+	getParticipantCalls        int
+	removeParticipantCalls     int
+	startShopPhaseCalls        int
+	startBattlePhaseCalls      int
+	completeMatchCalls         int
+	submitTeamCalls            int
 	updateParticipantShopCalls int
-	createRoundCalls        int
+	createRoundCalls           int
 
 	// Error injection
-	createMatchError        error
-	getMatchError           error
-	getActiveMatchesError   error
-	addParticipantError     error
-	getParticipantError     error
-	removeParticipantError  error
-	startShopPhaseError     error
-	startBattlePhaseError   error
-	completeMatchError      error
-	submitTeamError         error
+	createMatchError           error
+	getMatchError              error
+	getActiveMatchesError      error
+	addParticipantError        error
+	getParticipantError        error
+	removeParticipantError     error
+	startShopPhaseError        error
+	startBattlePhaseError      error
+	completeMatchError         error
+	submitTeamError            error
 	updateParticipantShopError error
 }
 
@@ -56,8 +60,92 @@ func newMockGameRepository() *mockGameRepository {
 	}
 }
 
+// copyMatch creates a deep copy of a Match to prevent data races
+// when multiple goroutines access the same match data.
+func copyMatch(m *repository.Match) *repository.Match {
+	if m == nil {
+		return nil
+	}
+	cp := *m
+	// Deep copy pointer fields
+	if m.Format != nil {
+		format := *m.Format
+		cp.Format = &format
+	}
+	if m.JoinDeadline != nil {
+		t := *m.JoinDeadline
+		cp.JoinDeadline = &t
+	}
+	if m.ShopPhaseStartedAt != nil {
+		t := *m.ShopPhaseStartedAt
+		cp.ShopPhaseStartedAt = &t
+	}
+	if m.ShopPhaseDeadline != nil {
+		t := *m.ShopPhaseDeadline
+		cp.ShopPhaseDeadline = &t
+	}
+	if m.BattleStartedAt != nil {
+		t := *m.BattleStartedAt
+		cp.BattleStartedAt = &t
+	}
+	if m.CompletedAt != nil {
+		t := *m.CompletedAt
+		cp.CompletedAt = &t
+	}
+	if m.TournamentDate != nil {
+		s := *m.TournamentDate
+		cp.TournamentDate = &s
+	}
+	if m.CreatorUserID != nil {
+		id := *m.CreatorUserID
+		cp.CreatorUserID = &id
+	}
+	if m.WinnerUserID != nil {
+		id := *m.WinnerUserID
+		cp.WinnerUserID = &id
+	}
+	return &cp
+}
+
+// copyParticipant creates a deep copy of a Participant to prevent data races
+// when multiple goroutines access the same participant data.
+func copyParticipant(p *repository.Participant) *repository.Participant {
+	if p == nil {
+		return nil
+	}
+	cp := *p
+	// Deep copy pointer fields
+	if p.ShopCards != nil {
+		cards := make(json.RawMessage, len(*p.ShopCards))
+		copy(cards, *p.ShopCards)
+		cp.ShopCards = &cards
+	}
+	if p.Team != nil {
+		team := make(json.RawMessage, len(*p.Team))
+		copy(team, *p.Team)
+		cp.Team = &team
+	}
+	if p.TeamOrder != nil {
+		order := make([]int64, len(p.TeamOrder))
+		copy(order, p.TeamOrder)
+		cp.TeamOrder = order
+	}
+	if p.TeamSubmittedAt != nil {
+		t := *p.TeamSubmittedAt
+		cp.TeamSubmittedAt = &t
+	}
+	if p.Placement != nil {
+		pl := *p.Placement
+		cp.Placement = &pl
+	}
+	return &cp
+}
+
 // CreateMatch creates a new match in the mock repository
 func (m *mockGameRepository) CreateMatch(ctx context.Context, chatID int64, matchType repository.MatchType, creatorUserID *int64, tournamentDate *string) (*repository.Match, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.createMatchCalls++
 	if m.createMatchError != nil {
 		return nil, m.createMatchError
@@ -89,16 +177,24 @@ func (m *mockGameRepository) CreateMatch(ctx context.Context, chatID int64, matc
 }
 
 // GetMatch retrieves a match by ID
+// Returns a deep copy to prevent data races when multiple goroutines access the match.
 func (m *mockGameRepository) GetMatch(ctx context.Context, matchID string) (*repository.Match, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.getMatchCalls++
 	if m.getMatchError != nil {
 		return nil, m.getMatchError
 	}
-	return m.matches[matchID], nil
+	return copyMatch(m.matches[matchID]), nil
 }
 
 // GetActiveMatches retrieves active matches for a chat
+// Returns deep copies to prevent data races.
 func (m *mockGameRepository) GetActiveMatches(ctx context.Context, chatID int64) ([]*repository.Match, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.getActiveMatchesCalls++
 	if m.getActiveMatchesError != nil {
 		return nil, m.getActiveMatchesError
@@ -110,18 +206,22 @@ func (m *mockGameRepository) GetActiveMatches(ctx context.Context, chatID int64)
 			(match.Status == repository.MatchStatusOpen ||
 				match.Status == repository.MatchStatusShopPhase ||
 				match.Status == repository.MatchStatusBattlePhase) {
-			matches = append(matches, match)
+			matches = append(matches, copyMatch(match))
 		}
 	}
 	return matches, nil
 }
 
 // GetMatchesByStatus retrieves matches by status
+// Returns deep copies to prevent data races.
 func (m *mockGameRepository) GetMatchesByStatus(ctx context.Context, status repository.MatchStatus) ([]*repository.Match, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	var matches []*repository.Match
 	for _, match := range m.matches {
 		if match.Status == status {
-			matches = append(matches, match)
+			matches = append(matches, copyMatch(match))
 		}
 	}
 	return matches, nil
@@ -129,6 +229,9 @@ func (m *mockGameRepository) GetMatchesByStatus(ctx context.Context, status repo
 
 // UpdateMatchStatus updates a match status
 func (m *mockGameRepository) UpdateMatchStatus(ctx context.Context, matchID string, status repository.MatchStatus) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	match := m.matches[matchID]
 	if match == nil {
 		return errors.New("match not found")
@@ -139,6 +242,9 @@ func (m *mockGameRepository) UpdateMatchStatus(ctx context.Context, matchID stri
 
 // UpdateMatchFormat updates a match format
 func (m *mockGameRepository) UpdateMatchFormat(ctx context.Context, matchID string, format repository.MatchFormat) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	match := m.matches[matchID]
 	if match == nil {
 		return errors.New("match not found")
@@ -149,6 +255,9 @@ func (m *mockGameRepository) UpdateMatchFormat(ctx context.Context, matchID stri
 
 // StartShopPhase transitions match to shop phase
 func (m *mockGameRepository) StartShopPhase(ctx context.Context, matchID string, format repository.MatchFormat, deadline time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.startShopPhaseCalls++
 	if m.startShopPhaseError != nil {
 		return m.startShopPhaseError
@@ -169,6 +278,9 @@ func (m *mockGameRepository) StartShopPhase(ctx context.Context, matchID string,
 
 // StartBattlePhase transitions match to battle phase
 func (m *mockGameRepository) StartBattlePhase(ctx context.Context, matchID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.startBattlePhaseCalls++
 	if m.startBattlePhaseError != nil {
 		return m.startBattlePhaseError
@@ -187,6 +299,9 @@ func (m *mockGameRepository) StartBattlePhase(ctx context.Context, matchID strin
 
 // CompleteMatch completes a match with optional winner
 func (m *mockGameRepository) CompleteMatch(ctx context.Context, matchID string, winnerUserID *int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.completeMatchCalls++
 	if m.completeMatchError != nil {
 		return m.completeMatchError
@@ -206,6 +321,9 @@ func (m *mockGameRepository) CompleteMatch(ctx context.Context, matchID string, 
 
 // CancelMatch cancels a match
 func (m *mockGameRepository) CancelMatch(ctx context.Context, matchID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	match := m.matches[matchID]
 	if match == nil {
 		return errors.New("match not found")
@@ -217,6 +335,9 @@ func (m *mockGameRepository) CancelMatch(ctx context.Context, matchID string) er
 
 // AddParticipant adds a participant to a match
 func (m *mockGameRepository) AddParticipant(ctx context.Context, matchID string, userID int64) (*repository.Participant, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.addParticipantCalls++
 	if m.addParticipantError != nil {
 		return nil, m.addParticipantError
@@ -244,7 +365,11 @@ func (m *mockGameRepository) AddParticipant(ctx context.Context, matchID string,
 }
 
 // GetParticipant retrieves a participant
+// Returns a deep copy to prevent data races when multiple goroutines access the participant.
 func (m *mockGameRepository) GetParticipant(ctx context.Context, matchID string, userID int64) (*repository.Participant, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.getParticipantCalls++
 	if m.getParticipantError != nil {
 		return nil, m.getParticipantError
@@ -253,19 +378,25 @@ func (m *mockGameRepository) GetParticipant(ctx context.Context, matchID string,
 	if m.participants[matchID] == nil {
 		return nil, nil
 	}
-	return m.participants[matchID][userID], nil
+	return copyParticipant(m.participants[matchID][userID]), nil
 }
 
 // GetMatchParticipants retrieves all participants for a match with user info
+// Returns deep copies to prevent data races.
 func (m *mockGameRepository) GetMatchParticipants(ctx context.Context, matchID string) ([]*repository.ParticipantWithUser, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	if m.participants[matchID] == nil {
 		return []*repository.ParticipantWithUser{}, nil
 	}
 
 	var result []*repository.ParticipantWithUser
 	for _, p := range m.participants[matchID] {
+		// Copy the participant to prevent races
+		pCopy := copyParticipant(p)
 		pwu := &repository.ParticipantWithUser{
-			Participant: *p,
+			Participant: *pCopy,
 			FirstName:   "Test User",
 			Username:    "testuser",
 		}
@@ -276,6 +407,9 @@ func (m *mockGameRepository) GetMatchParticipants(ctx context.Context, matchID s
 
 // RemoveParticipant removes a participant from a match
 func (m *mockGameRepository) RemoveParticipant(ctx context.Context, matchID string, userID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.removeParticipantCalls++
 	if m.removeParticipantError != nil {
 		return m.removeParticipantError
@@ -289,6 +423,9 @@ func (m *mockGameRepository) RemoveParticipant(ctx context.Context, matchID stri
 
 // UpdateParticipantShop updates participant shop state
 func (m *mockGameRepository) UpdateParticipantShop(ctx context.Context, matchID string, userID int64, coins int, shopCards, team json.RawMessage, teamOrder []int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.updateParticipantShopCalls++
 	if m.updateParticipantShopError != nil {
 		return m.updateParticipantShopError
@@ -313,6 +450,9 @@ func (m *mockGameRepository) UpdateParticipantShop(ctx context.Context, matchID 
 
 // SubmitTeam marks participant as ready
 func (m *mockGameRepository) SubmitTeam(ctx context.Context, matchID string, userID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.submitTeamCalls++
 	if m.submitTeamError != nil {
 		return m.submitTeamError
@@ -334,6 +474,9 @@ func (m *mockGameRepository) SubmitTeam(ctx context.Context, matchID string, use
 
 // GetParticipantCount returns the number of participants in a match
 func (m *mockGameRepository) GetParticipantCount(ctx context.Context, matchID string) (int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	if m.participants[matchID] == nil {
 		return 0, nil
 	}
@@ -342,6 +485,9 @@ func (m *mockGameRepository) GetParticipantCount(ctx context.Context, matchID st
 
 // GetReadyParticipantCount returns the number of ready participants
 func (m *mockGameRepository) GetReadyParticipantCount(ctx context.Context, matchID string) (int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	if m.participants[matchID] == nil {
 		return 0, nil
 	}

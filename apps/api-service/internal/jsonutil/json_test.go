@@ -69,9 +69,9 @@ func TestErrorWrapping(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
-	// Verify error is wrapped (can be unwrapped)
-	var underlying error
-	if !errors.As(err, &underlying) {
-		t.Fatal("error should be wrappable")
+	// Verify error is wrapped by checking it can be unwrapped
+	unwrapped := errors.Unwrap(err)
+	if unwrapped == nil {
+		t.Fatal("error should be wrapped and unwrappable")
 	}
 }

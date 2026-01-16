@@ -116,7 +116,7 @@ func WithTestTransaction(t *testing.T, db *sql.DB, fn func(tx *sql.Tx)) {
 
 // WithTestTransactionContext is like WithTestTransaction but accepts a context.
 // The context can be used to control timeouts and cancellation.
-func WithTestTransactionContext(t *testing.T, ctx context.Context, db *sql.DB, fn func(ctx context.Context, tx *sql.Tx)) {
+func WithTestTransactionContext(ctx context.Context, t *testing.T, db *sql.DB, fn func(ctx context.Context, tx *sql.Tx)) {
 	t.Helper()
 
 	tx, err := db.BeginTx(ctx, nil)

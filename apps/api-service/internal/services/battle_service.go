@@ -63,6 +63,13 @@ func recordBattleCompletion(nrApp *newrelic.Application, matchID string, format 
 
 // CheckAndStartBattle checks if all participants are ready and starts battle.
 // Uses per-match mutex to prevent race conditions when multiple participants submit simultaneously.
+//
+// Note on sync.Map cleanup: We intentionally do NOT delete map entries after use.
+// Deleting while other goroutines may be waiting on LoadOrStore creates a race condition
+// where a new mutex could be created for the same match, allowing concurrent execution.
+// Since match IDs are unique UUIDs and battles only happen once per match, letting entries
+// persist is safe. For long-running services, periodic cleanup could be added if memory
+// becomes a concern, but the overhead is negligible (one mutex per completed match).
 func (s *BattleService) CheckAndStartBattle(ctx context.Context, matchID string) {
 	// Get or create mutex for this match to prevent race condition
 	mutexInterface, _ := s.matchMutexes.LoadOrStore(matchID, &sync.Mutex{})
@@ -70,7 +77,6 @@ func (s *BattleService) CheckAndStartBattle(ctx context.Context, matchID string)
 
 	mutex.Lock()
 	defer mutex.Unlock()
-	defer s.matchMutexes.Delete(matchID) // Cleanup after
 
 	total, _ := s.gameRepo.GetParticipantCount(ctx, matchID)
 	ready, _ := s.gameRepo.GetReadyParticipantCount(ctx, matchID)

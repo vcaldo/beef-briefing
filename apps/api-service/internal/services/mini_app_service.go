@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -16,7 +15,9 @@ import (
 	"time"
 
 	"beef-briefing/apps/api-service/internal/apperror"
+	"beef-briefing/apps/api-service/internal/jsonutil"
 	"beef-briefing/apps/api-service/internal/middleware"
+	"beef-briefing/apps/api-service/internal/nrutil"
 	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/pkg/config"
 
@@ -182,7 +183,7 @@ func (s *MiniAppService) ValidateInitData(initData string, maxAgeSeconds int64) 
 	}
 
 	var userData InitDataUser
-	if err := json.Unmarshal([]byte(userStr), &userData); err != nil {
+	if err := jsonutil.Unmarshal([]byte(userStr), &userData); err != nil {
 		return nil, apperror.ErrInvalidUserData
 	}
 
@@ -196,7 +197,7 @@ func (s *MiniAppService) ValidateInitData(initData string, maxAgeSeconds int64) 
 		var chatData struct {
 			ID int64 `json:"id"`
 		}
-		if err := json.Unmarshal([]byte(chatStr), &chatData); err == nil && chatData.ID != 0 {
+		if err := jsonutil.Unmarshal([]byte(chatStr), &chatData); err == nil && chatData.ID != 0 {
 			chatID = &chatData.ID
 		}
 	}
@@ -222,10 +223,7 @@ func (s *MiniAppService) ValidateInitData(initData string, maxAgeSeconds int64) 
 
 // Authenticate validates init data and returns a JWT token
 func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*AuthResponse, error) {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:authenticate")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:authenticate")()
 
 	validated, err := s.ValidateInitData(initData, 86400) // 24 hours max age
 	if err != nil {
@@ -275,10 +273,7 @@ func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*Au
 
 // GetOverviewStats returns overview statistics for a chat with trend indicators
 func (s *MiniAppService) GetOverviewStats(ctx context.Context, chatID int64, period string, tz *time.Location) (*repository.OverviewStats, error) {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:overview-stats")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:overview-stats")()
 
 	startDate, endDate := getPeriodDates(period, tz)
 	stats, err := s.repo.GetOverviewStats(ctx, chatID, startDate, endDate)
@@ -308,10 +303,7 @@ func (s *MiniAppService) GetOverviewStats(ctx context.Context, chatID int64, per
 
 // GetDailyActivity returns daily activity for a chat
 func (s *MiniAppService) GetDailyActivity(ctx context.Context, chatID int64, period string, tz *time.Location) ([]repository.DailyActivity, error) {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:daily-activity")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:daily-activity")()
 
 	startDate, endDate := getPeriodDates(period, tz)
 	return s.repo.GetDailyActivity(ctx, chatID, startDate, endDate, tz)
@@ -330,10 +322,7 @@ type UserRankingWithPhoto struct {
 
 // GetUserRankings returns user rankings for a chat
 func (s *MiniAppService) GetUserRankings(ctx context.Context, chatID int64, metric, period string, page, limit int, tz *time.Location) ([]UserRankingWithPhoto, int, error) {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:user-rankings")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:user-rankings")()
 
 	startDate, endDate := getPeriodDates(period, tz)
 	offset := (page - 1) * limit
@@ -521,10 +510,7 @@ type ReactionsOverviewResponse struct {
 
 // GetReactionsOverview returns top reactions, givers, and receivers for a chat
 func (s *MiniAppService) GetReactionsOverview(ctx context.Context, chatID int64, period string, limit int, tz *time.Location) (*ReactionsOverviewResponse, error) {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:reactions-overview")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:reactions-overview")()
 
 	startDate, endDate := getPeriodDates(period, tz)
 
@@ -591,10 +577,7 @@ type RepliesOverviewResponse struct {
 
 // GetRepliesOverview returns top reply senders and receivers for a chat
 func (s *MiniAppService) GetRepliesOverview(ctx context.Context, chatID int64, period string, limit int, tz *time.Location) (*RepliesOverviewResponse, error) {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:replies-overview")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:replies-overview")()
 
 	startDate, endDate := getPeriodDates(period, tz)
 
@@ -656,10 +639,7 @@ type ProfileResponse struct {
 
 // GetUserProfile returns personal stats and top interactors for a user
 func (s *MiniAppService) GetUserProfile(ctx context.Context, chatID, userID int64, period string, tz *time.Location) (*ProfileResponse, error) {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:user-profile")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:user-profile")()
 
 	startDate, endDate := getPeriodDates(period, tz)
 
@@ -808,10 +788,7 @@ type HeatmapResponse struct {
 
 // GetHeatmapData returns group and optionally user heatmap data
 func (s *MiniAppService) GetHeatmapData(ctx context.Context, chatID int64, userID *int64, period string, tz *time.Location) (*HeatmapResponse, error) {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:heatmap")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:heatmap")()
 
 	// Convert period to date range for both group and user heatmaps
 	startDate, endDate := getPeriodDates(period, tz)
@@ -854,10 +831,7 @@ type ChatUserWithPhoto struct {
 
 // GetChatUsers returns all non-bot users in a chat for admin user selection
 func (s *MiniAppService) GetChatUsers(ctx context.Context, chatID int64) ([]ChatUserWithPhoto, error) {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:chat-users")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:chat-users")()
 
 	users, err := s.repo.GetChatUsers(ctx, chatID)
 	if err != nil {
@@ -880,10 +854,7 @@ func (s *MiniAppService) GetChatUsers(ctx context.Context, chatID int64) ([]Chat
 
 // GetUserInfo returns basic user info for displaying impersonated user
 func (s *MiniAppService) GetUserInfo(ctx context.Context, userID int64) (*ChatUserWithPhoto, error) {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:user-info")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:user-info")()
 
 	user, err := s.repo.GetUserInfo(ctx, userID)
 	if err != nil {
@@ -920,10 +891,7 @@ type MediaOverviewResponse struct {
 
 // GetMediaOverview returns comprehensive media statistics for a chat
 func (s *MiniAppService) GetMediaOverview(ctx context.Context, chatID int64, period string, limit int, tz *time.Location) (*MediaOverviewResponse, error) {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:media-overview")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:media-overview")()
 
 	startDate, endDate := getPeriodDates(period, tz)
 
@@ -999,10 +967,7 @@ func (s *MiniAppService) GetMediaOverview(ctx context.Context, chatID int64, per
 
 // GetChatTimezone returns the stored timezone for a chat
 func (s *MiniAppService) GetChatTimezone(ctx context.Context, chatID int64) (*ChatTimezoneResponse, error) {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:get-chat-timezone")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:get-chat-timezone")()
 
 	tz, err := s.repo.GetChatTimezone(ctx, chatID)
 	if err != nil {
@@ -1017,10 +982,7 @@ func (s *MiniAppService) GetChatTimezone(ctx context.Context, chatID int64) (*Ch
 
 // SetChatTimezone sets the timezone for a chat (admin only)
 func (s *MiniAppService) SetChatTimezone(ctx context.Context, chatID int64, timezone string) error {
-	if txn := newrelic.FromContext(ctx); txn != nil {
-		segment := txn.StartSegment("service:mini-app:set-chat-timezone")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:mini-app:set-chat-timezone")()
 
 	// Validate timezone is a valid IANA identifier
 	_, err := time.LoadLocation(timezone)

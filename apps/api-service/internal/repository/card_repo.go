@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/nrutil"
+
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
@@ -83,11 +85,7 @@ func (r *CardRepository) GetUserCard(
 	chatID int64,
 	weekStart *time.Time,
 ) (*UserCard, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:card-get-user")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:card-get-user")()
 
 	var query string
 	var args []interface{}
@@ -140,11 +138,7 @@ func (r *CardRepository) GetUserCard(
 
 // GetUserInfo retrieves user display info.
 func (r *CardRepository) GetUserInfo(ctx context.Context, userID int64) (*CardUser, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:card-get-user-info")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:card-get-user-info")()
 
 	query := `
 		SELECT id, first_name, COALESCE(last_name, ''), COALESCE(username, '')
@@ -184,11 +178,7 @@ func (r *CardRepository) GetChatCards(
 	ctx context.Context,
 	q ChatCardsQuery,
 ) ([]CardWithUser, int, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:card-get-chat")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:card-get-chat")()
 
 	// Determine week to query
 	var weekStart time.Time
@@ -279,11 +269,7 @@ func (r *CardRepository) GetUserHistory(
 	chatID int64,
 	limit int,
 ) ([]UserCard, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:card-get-history")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:card-get-history")()
 
 	query := `
 		SELECT id, user_id, chat_id, week_start, week_end,
@@ -338,11 +324,7 @@ func (r *CardRepository) GetAvailableWeeks(
 	ctx context.Context,
 	chatID int64,
 ) ([]WeekInfo, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:card-get-weeks")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:card-get-weeks")()
 
 	query := `
 		SELECT week_start, week_end, COUNT(*) as card_count
@@ -398,11 +380,7 @@ func (r *CardRepository) GetCardImage(
 	weekStart *time.Time,
 	theme string,
 ) (*CardImage, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:card-get-image")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:card-get-image")()
 
 	if theme == "" {
 		theme = "gaming"
@@ -462,11 +440,7 @@ type GalleryImage struct {
 
 // GetGalleryWeeks returns weeks with generated card images for a chat.
 func (r *CardRepository) GetGalleryWeeks(ctx context.Context, chatID int64) ([]string, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:gallery-get-weeks")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:gallery-get-weeks")()
 
 	query := `
 		SELECT DISTINCT week_start
@@ -505,11 +479,7 @@ func (r *CardRepository) GetGalleryImages(
 	userID *int64,
 	theme *string,
 ) ([]GalleryImage, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:gallery-get-images")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:gallery-get-images")()
 
 	// Build query with optional filters
 	query := `
@@ -558,11 +528,7 @@ func (r *CardRepository) GetGalleryImages(
 
 // GetGalleryImageByID returns a single gallery image by ID.
 func (r *CardRepository) GetGalleryImageByID(ctx context.Context, imageID int64) (*GalleryImage, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:gallery-get-image-by-id")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:gallery-get-image-by-id")()
 
 	query := `
 		SELECT id, user_id, chat_id, week_start, storage_path, theme, generated_at

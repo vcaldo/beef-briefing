@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"beef-briefing/apps/api-service/internal/nrutil"
+
 	"github.com/lib/pq"
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
@@ -88,11 +90,7 @@ type MessageTopicResult struct {
 
 // GetUnprocessedMessages fetches messages that haven't been processed by ML.
 func (r *MLRepository) GetUnprocessedMessages(ctx context.Context, limit int) ([]UnprocessedMessage, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:ml-get-unprocessed")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:ml-get-unprocessed")()
 
 	query := `
 		SELECT m.id, m.message_id, m.chat_id, m.user_id,
@@ -135,11 +133,7 @@ func (r *MLRepository) GetUnprocessedMessages(ctx context.Context, limit int) ([
 
 // GetProcessingStats returns statistics about ML processing.
 func (r *MLRepository) GetProcessingStats(ctx context.Context) (map[string]int64, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:ml-get-stats")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:ml-get-stats")()
 
 	stats := make(map[string]int64)
 
@@ -229,373 +223,421 @@ func (r *MLRepository) GetProcessingStats(ctx context.Context) (map[string]int64
 }
 
 // SaveSentimentResults saves sentiment analysis results in batch.
-func (r *MLRepository) SaveSentimentResults(ctx context.Context, results []SentimentResult) error {
+// If dbtx is nil, a new transaction is created and committed internally.
+// If dbtx is provided, the caller is responsible for transaction management.
+func (r *MLRepository) SaveSentimentResults(ctx context.Context, results []SentimentResult, dbtx ...DBTX) error {
 	if len(results) == 0 {
 		return nil
 	}
 
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:ml-save-sentiment")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:ml-save-sentiment")()
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO ml_sentiment (message_id, chat_id, label, score_positive, score_neutral, score_negative, confidence)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (message_id) DO UPDATE SET
-			label = EXCLUDED.label,
-			score_positive = EXCLUDED.score_positive,
-			score_neutral = EXCLUDED.score_neutral,
-			score_negative = EXCLUDED.score_negative,
-			confidence = EXCLUDED.confidence,
-			created_at = NOW()
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
-
-	for _, r := range results {
-		_, err := stmt.ExecContext(ctx, r.MessageID, r.ChatID, r.Label, r.ScorePositive, r.ScoreNeutral, r.ScoreNegative, r.Confidence)
+	// Determine which executor to use
+	var executor DBTX
+	var needsCommit bool
+	if len(dbtx) > 0 && dbtx[0] != nil {
+		executor = dbtx[0]
+		needsCommit = false
+	} else {
+		tx, err := r.db.BeginTx(ctx, nil)
 		if err != nil {
-			return fmt.Errorf("failed to insert sentiment for message %d: %w", r.MessageID, err)
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer tx.Rollback()
+		executor = tx
+		needsCommit = true
+	}
+
+	for _, result := range results {
+		_, err := executor.ExecContext(ctx, `
+			INSERT INTO ml_sentiment (message_id, chat_id, label, score_positive, score_neutral, score_negative, confidence)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			ON CONFLICT (message_id) DO UPDATE SET
+				label = EXCLUDED.label,
+				score_positive = EXCLUDED.score_positive,
+				score_neutral = EXCLUDED.score_neutral,
+				score_negative = EXCLUDED.score_negative,
+				confidence = EXCLUDED.confidence,
+				created_at = NOW()
+		`, result.MessageID, result.ChatID, result.Label, result.ScorePositive, result.ScoreNeutral, result.ScoreNegative, result.Confidence)
+		if err != nil {
+			return fmt.Errorf("failed to insert sentiment for message %d: %w", result.MessageID, err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	if needsCommit {
+		if tx, ok := executor.(*sql.Tx); ok {
+			if err := tx.Commit(); err != nil {
+				return fmt.Errorf("failed to commit transaction: %w", err)
+			}
+		}
 	}
 
 	return nil
 }
 
 // SaveToxicityResults saves toxicity detection results in batch.
-func (r *MLRepository) SaveToxicityResults(ctx context.Context, results []ToxicityResult) error {
+// If dbtx is nil, a new transaction is created and committed internally.
+// If dbtx is provided, the caller is responsible for transaction management.
+func (r *MLRepository) SaveToxicityResults(ctx context.Context, results []ToxicityResult, dbtx ...DBTX) error {
 	if len(results) == 0 {
 		return nil
 	}
 
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:ml-save-toxicity")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:ml-save-toxicity")()
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO ml_toxicity (message_id, chat_id, is_toxic, label, score)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (message_id) DO UPDATE SET
-			is_toxic = EXCLUDED.is_toxic,
-			label = EXCLUDED.label,
-			score = EXCLUDED.score,
-			created_at = NOW()
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
-
-	for _, r := range results {
-		_, err := stmt.ExecContext(ctx, r.MessageID, r.ChatID, r.IsToxic, r.Label, r.Score)
+	// Determine which executor to use
+	var executor DBTX
+	var needsCommit bool
+	if len(dbtx) > 0 && dbtx[0] != nil {
+		executor = dbtx[0]
+		needsCommit = false
+	} else {
+		tx, err := r.db.BeginTx(ctx, nil)
 		if err != nil {
-			return fmt.Errorf("failed to insert toxicity for message %d: %w", r.MessageID, err)
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer tx.Rollback()
+		executor = tx
+		needsCommit = true
+	}
+
+	for _, result := range results {
+		_, err := executor.ExecContext(ctx, `
+			INSERT INTO ml_toxicity (message_id, chat_id, is_toxic, label, score)
+			VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (message_id) DO UPDATE SET
+				is_toxic = EXCLUDED.is_toxic,
+				label = EXCLUDED.label,
+				score = EXCLUDED.score,
+				created_at = NOW()
+		`, result.MessageID, result.ChatID, result.IsToxic, result.Label, result.Score)
+		if err != nil {
+			return fmt.Errorf("failed to insert toxicity for message %d: %w", result.MessageID, err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	if needsCommit {
+		if tx, ok := executor.(*sql.Tx); ok {
+			if err := tx.Commit(); err != nil {
+				return fmt.Errorf("failed to commit transaction: %w", err)
+			}
+		}
 	}
 
 	return nil
 }
 
 // MarkMessagesProcessed marks messages as processed by ML.
-func (r *MLRepository) MarkMessagesProcessed(ctx context.Context, messageIDs []int64, chatIDs []int64, version string) error {
+// If dbtx is nil, a new transaction is created and committed internally.
+// If dbtx is provided, the caller is responsible for transaction management.
+func (r *MLRepository) MarkMessagesProcessed(ctx context.Context, messageIDs []int64, chatIDs []int64, version string, dbtx ...DBTX) error {
 	if len(messageIDs) == 0 {
 		return nil
 	}
 
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:ml-mark-processed")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:ml-mark-processed")()
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+	// Determine which executor to use
+	var executor DBTX
+	var needsCommit bool
+	if len(dbtx) > 0 && dbtx[0] != nil {
+		executor = dbtx[0]
+		needsCommit = false
+	} else {
+		tx, err := r.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer tx.Rollback()
+		executor = tx
+		needsCommit = true
 	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO ml_processing_state (message_id, chat_id, processor_version)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (message_id) DO UPDATE SET
-			processor_version = EXCLUDED.processor_version,
-			processed_at = NOW()
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
 
 	for i, msgID := range messageIDs {
 		chatID := chatIDs[i]
-		_, err := stmt.ExecContext(ctx, msgID, chatID, version)
+		_, err := executor.ExecContext(ctx, `
+			INSERT INTO ml_processing_state (message_id, chat_id, processor_version)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (message_id) DO UPDATE SET
+				processor_version = EXCLUDED.processor_version,
+				processed_at = NOW()
+		`, msgID, chatID, version)
 		if err != nil {
 			return fmt.Errorf("failed to mark message %d as processed: %w", msgID, err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	if needsCommit {
+		if tx, ok := executor.(*sql.Tx); ok {
+			if err := tx.Commit(); err != nil {
+				return fmt.Errorf("failed to commit transaction: %w", err)
+			}
+		}
 	}
 
 	return nil
 }
 
 // SaveTopics saves or updates topic clusters for a chat.
-func (r *MLRepository) SaveTopics(ctx context.Context, chatID int64, topics map[int][]string) error {
+// If dbtx is nil, a new transaction is created and committed internally.
+// If dbtx is provided, the caller is responsible for transaction management.
+func (r *MLRepository) SaveTopics(ctx context.Context, chatID int64, topics map[int][]string, dbtx ...DBTX) error {
 	if len(topics) == 0 {
 		return nil
 	}
 
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:ml-save-topics")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:ml-save-topics")()
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+	// Determine which executor to use
+	var executor DBTX
+	var needsCommit bool
+	if len(dbtx) > 0 && dbtx[0] != nil {
+		executor = dbtx[0]
+		needsCommit = false
+	} else {
+		tx, err := r.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer tx.Rollback()
+		executor = tx
+		needsCommit = true
 	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO ml_topics (chat_id, topic_id, keywords)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (chat_id, topic_id) DO UPDATE SET
-			keywords = EXCLUDED.keywords,
-			updated_at = NOW()
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
 
 	for topicID, keywords := range topics {
-		_, err := stmt.ExecContext(ctx, chatID, topicID, pq.Array(keywords))
+		_, err := executor.ExecContext(ctx, `
+			INSERT INTO ml_topics (chat_id, topic_id, keywords)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (chat_id, topic_id) DO UPDATE SET
+				keywords = EXCLUDED.keywords,
+				updated_at = NOW()
+		`, chatID, topicID, pq.Array(keywords))
 		if err != nil {
 			return fmt.Errorf("failed to save topic %d: %w", topicID, err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	if needsCommit {
+		if tx, ok := executor.(*sql.Tx); ok {
+			if err := tx.Commit(); err != nil {
+				return fmt.Errorf("failed to commit transaction: %w", err)
+			}
+		}
 	}
 
 	return nil
 }
 
 // SaveHumorResults saves humor detection results in batch.
-func (r *MLRepository) SaveHumorResults(ctx context.Context, results []HumorResult) error {
+// If dbtx is nil, a new transaction is created and committed internally.
+// If dbtx is provided, the caller is responsible for transaction management.
+func (r *MLRepository) SaveHumorResults(ctx context.Context, results []HumorResult, dbtx ...DBTX) error {
 	if len(results) == 0 {
 		return nil
 	}
 
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:ml-save-humor")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:ml-save-humor")()
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO ml_humor (message_id, chat_id, is_humorous, humor_type, score)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (message_id) DO UPDATE SET
-			is_humorous = EXCLUDED.is_humorous,
-			humor_type = EXCLUDED.humor_type,
-			score = EXCLUDED.score,
-			created_at = NOW()
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
-
-	for _, r := range results {
-		humorType := sql.NullString{String: r.HumorType, Valid: r.HumorType != ""}
-		_, err := stmt.ExecContext(ctx, r.MessageID, r.ChatID, r.IsHumorous, humorType, r.Score)
+	// Determine which executor to use
+	var executor DBTX
+	var needsCommit bool
+	if len(dbtx) > 0 && dbtx[0] != nil {
+		executor = dbtx[0]
+		needsCommit = false
+	} else {
+		tx, err := r.db.BeginTx(ctx, nil)
 		if err != nil {
-			return fmt.Errorf("failed to insert humor for message %d: %w", r.MessageID, err)
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer tx.Rollback()
+		executor = tx
+		needsCommit = true
+	}
+
+	for _, result := range results {
+		humorType := sql.NullString{String: result.HumorType, Valid: result.HumorType != ""}
+		_, err := executor.ExecContext(ctx, `
+			INSERT INTO ml_humor (message_id, chat_id, is_humorous, humor_type, score)
+			VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (message_id) DO UPDATE SET
+				is_humorous = EXCLUDED.is_humorous,
+				humor_type = EXCLUDED.humor_type,
+				score = EXCLUDED.score,
+				created_at = NOW()
+		`, result.MessageID, result.ChatID, result.IsHumorous, humorType, result.Score)
+		if err != nil {
+			return fmt.Errorf("failed to insert humor for message %d: %w", result.MessageID, err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	if needsCommit {
+		if tx, ok := executor.(*sql.Tx); ok {
+			if err := tx.Commit(); err != nil {
+				return fmt.Errorf("failed to commit transaction: %w", err)
+			}
+		}
 	}
 
 	return nil
 }
 
 // SaveQuestionResults saves question detection results in batch.
-func (r *MLRepository) SaveQuestionResults(ctx context.Context, results []QuestionResult) error {
+// If dbtx is nil, a new transaction is created and committed internally.
+// If dbtx is provided, the caller is responsible for transaction management.
+func (r *MLRepository) SaveQuestionResults(ctx context.Context, results []QuestionResult, dbtx ...DBTX) error {
 	if len(results) == 0 {
 		return nil
 	}
 
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:ml-save-questions")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:ml-save-questions")()
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO ml_questions (message_id, chat_id, is_question, question_type, score)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (message_id) DO UPDATE SET
-			is_question = EXCLUDED.is_question,
-			question_type = EXCLUDED.question_type,
-			score = EXCLUDED.score,
-			created_at = NOW()
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
-
-	for _, r := range results {
-		questionType := sql.NullString{String: r.QuestionType, Valid: r.QuestionType != ""}
-		_, err := stmt.ExecContext(ctx, r.MessageID, r.ChatID, r.IsQuestion, questionType, r.Score)
+	// Determine which executor to use
+	var executor DBTX
+	var needsCommit bool
+	if len(dbtx) > 0 && dbtx[0] != nil {
+		executor = dbtx[0]
+		needsCommit = false
+	} else {
+		tx, err := r.db.BeginTx(ctx, nil)
 		if err != nil {
-			return fmt.Errorf("failed to insert question for message %d: %w", r.MessageID, err)
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer tx.Rollback()
+		executor = tx
+		needsCommit = true
+	}
+
+	for _, result := range results {
+		questionType := sql.NullString{String: result.QuestionType, Valid: result.QuestionType != ""}
+		_, err := executor.ExecContext(ctx, `
+			INSERT INTO ml_questions (message_id, chat_id, is_question, question_type, score)
+			VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (message_id) DO UPDATE SET
+				is_question = EXCLUDED.is_question,
+				question_type = EXCLUDED.question_type,
+				score = EXCLUDED.score,
+				created_at = NOW()
+		`, result.MessageID, result.ChatID, result.IsQuestion, questionType, result.Score)
+		if err != nil {
+			return fmt.Errorf("failed to insert question for message %d: %w", result.MessageID, err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	if needsCommit {
+		if tx, ok := executor.(*sql.Tx); ok {
+			if err := tx.Commit(); err != nil {
+				return fmt.Errorf("failed to commit transaction: %w", err)
+			}
+		}
 	}
 
 	return nil
 }
 
 // SaveNERResults saves named entity recognition results in batch.
-func (r *MLRepository) SaveNERResults(ctx context.Context, results []NERResult) error {
+// If dbtx is nil, a new transaction is created and committed internally.
+// If dbtx is provided, the caller is responsible for transaction management.
+func (r *MLRepository) SaveNERResults(ctx context.Context, results []NERResult, dbtx ...DBTX) error {
 	if len(results) == 0 {
 		return nil
 	}
 
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:ml-save-ner")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:ml-save-ner")()
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO ml_ner (message_id, chat_id, entity_type, entity_text, start_pos, end_pos, confidence)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (message_id, entity_type, entity_text, COALESCE(start_pos, -1)) DO UPDATE SET
-			confidence = EXCLUDED.confidence,
-			created_at = NOW()
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
-
-	for _, r := range results {
-		var startPos, endPos sql.NullInt32
-		if r.StartPos != nil {
-			startPos = sql.NullInt32{Int32: int32(*r.StartPos), Valid: true}
-		}
-		if r.EndPos != nil {
-			endPos = sql.NullInt32{Int32: int32(*r.EndPos), Valid: true}
-		}
-		_, err := stmt.ExecContext(ctx, r.MessageID, r.ChatID, r.EntityType, r.EntityText, startPos, endPos, r.Confidence)
+	// Determine which executor to use
+	var executor DBTX
+	var needsCommit bool
+	if len(dbtx) > 0 && dbtx[0] != nil {
+		executor = dbtx[0]
+		needsCommit = false
+	} else {
+		tx, err := r.db.BeginTx(ctx, nil)
 		if err != nil {
-			return fmt.Errorf("failed to insert NER for message %d: %w", r.MessageID, err)
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer tx.Rollback()
+		executor = tx
+		needsCommit = true
+	}
+
+	for _, result := range results {
+		var startPos, endPos sql.NullInt32
+		if result.StartPos != nil {
+			startPos = sql.NullInt32{Int32: int32(*result.StartPos), Valid: true}
+		}
+		if result.EndPos != nil {
+			endPos = sql.NullInt32{Int32: int32(*result.EndPos), Valid: true}
+		}
+		_, err := executor.ExecContext(ctx, `
+			INSERT INTO ml_ner (message_id, chat_id, entity_type, entity_text, start_pos, end_pos, confidence)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			ON CONFLICT (message_id, entity_type, entity_text, COALESCE(start_pos, -1)) DO UPDATE SET
+				confidence = EXCLUDED.confidence,
+				created_at = NOW()
+		`, result.MessageID, result.ChatID, result.EntityType, result.EntityText, startPos, endPos, result.Confidence)
+		if err != nil {
+			return fmt.Errorf("failed to insert NER for message %d: %w", result.MessageID, err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	if needsCommit {
+		if tx, ok := executor.(*sql.Tx); ok {
+			if err := tx.Commit(); err != nil {
+				return fmt.Errorf("failed to commit transaction: %w", err)
+			}
+		}
 	}
 
 	return nil
 }
 
 // SaveMessageTopics saves message-to-topic assignments in batch.
-func (r *MLRepository) SaveMessageTopics(ctx context.Context, results []MessageTopicResult) error {
+// If dbtx is nil, a new transaction is created and committed internally.
+// If dbtx is provided, the caller is responsible for transaction management.
+func (r *MLRepository) SaveMessageTopics(ctx context.Context, results []MessageTopicResult, dbtx ...DBTX) error {
 	if len(results) == 0 {
 		return nil
 	}
 
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:ml-save-message-topics")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:ml-save-message-topics")()
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO ml_message_topics (message_id, chat_id, topic_id, similarity)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (message_id) DO UPDATE SET
-			topic_id = EXCLUDED.topic_id,
-			similarity = EXCLUDED.similarity,
-			created_at = NOW()
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
-
-	for _, r := range results {
-		_, err := stmt.ExecContext(ctx, r.MessageID, r.ChatID, r.TopicID, r.Similarity)
+	// Determine which executor to use
+	var executor DBTX
+	var needsCommit bool
+	if len(dbtx) > 0 && dbtx[0] != nil {
+		executor = dbtx[0]
+		needsCommit = false
+	} else {
+		tx, err := r.db.BeginTx(ctx, nil)
 		if err != nil {
-			return fmt.Errorf("failed to insert topic for message %d: %w", r.MessageID, err)
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer tx.Rollback()
+		executor = tx
+		needsCommit = true
+	}
+
+	for _, result := range results {
+		_, err := executor.ExecContext(ctx, `
+			INSERT INTO ml_message_topics (message_id, chat_id, topic_id, similarity)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (message_id) DO UPDATE SET
+				topic_id = EXCLUDED.topic_id,
+				similarity = EXCLUDED.similarity,
+				created_at = NOW()
+		`, result.MessageID, result.ChatID, result.TopicID, result.Similarity)
+		if err != nil {
+			return fmt.Errorf("failed to insert topic for message %d: %w", result.MessageID, err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	if needsCommit {
+		if tx, ok := executor.(*sql.Tx); ok {
+			if err := tx.Commit(); err != nil {
+				return fmt.Errorf("failed to commit transaction: %w", err)
+			}
+		}
 	}
 
 	return nil

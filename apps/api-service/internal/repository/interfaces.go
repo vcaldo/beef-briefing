@@ -95,17 +95,20 @@ type CardRepositoryInterface interface {
 }
 
 // MLRepositoryInterface defines methods for ML analytics operations.
+// Methods that perform batch writes accept an optional DBTX parameter for transaction management:
+// - If dbtx is nil/omitted, a new transaction is created and committed internally
+// - If dbtx is provided, the caller is responsible for transaction management
 type MLRepositoryInterface interface {
 	GetUnprocessedMessages(ctx context.Context, limit int) ([]UnprocessedMessage, error)
 	GetProcessingStats(ctx context.Context) (map[string]int64, error)
-	SaveSentimentResults(ctx context.Context, results []SentimentResult) error
-	SaveToxicityResults(ctx context.Context, results []ToxicityResult) error
-	SaveHumorResults(ctx context.Context, results []HumorResult) error
-	SaveQuestionResults(ctx context.Context, results []QuestionResult) error
-	SaveNERResults(ctx context.Context, results []NERResult) error
-	SaveTopics(ctx context.Context, chatID int64, topics map[int][]string) error
-	SaveMessageTopics(ctx context.Context, results []MessageTopicResult) error
-	MarkMessagesProcessed(ctx context.Context, messageIDs []int64, chatIDs []int64, version string) error
+	SaveSentimentResults(ctx context.Context, results []SentimentResult, dbtx ...DBTX) error
+	SaveToxicityResults(ctx context.Context, results []ToxicityResult, dbtx ...DBTX) error
+	SaveHumorResults(ctx context.Context, results []HumorResult, dbtx ...DBTX) error
+	SaveQuestionResults(ctx context.Context, results []QuestionResult, dbtx ...DBTX) error
+	SaveNERResults(ctx context.Context, results []NERResult, dbtx ...DBTX) error
+	SaveTopics(ctx context.Context, chatID int64, topics map[int][]string, dbtx ...DBTX) error
+	SaveMessageTopics(ctx context.Context, results []MessageTopicResult, dbtx ...DBTX) error
+	MarkMessagesProcessed(ctx context.Context, messageIDs []int64, chatIDs []int64, version string, dbtx ...DBTX) error
 }
 
 // GameRepositoryInterface defines methods for arena game operations.

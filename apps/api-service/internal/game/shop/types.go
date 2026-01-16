@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"beef-briefing/apps/api-service/internal/game/battle"
+	"beef-briefing/apps/api-service/internal/jsonutil"
 )
 
 // Economy constants
@@ -211,15 +212,15 @@ func (s *ShopState) Submit() error {
 
 // ToJSON serializes the shop state
 func (s *ShopState) ToJSON() (json.RawMessage, error) {
-	return json.Marshal(s)
+	return jsonutil.Marshal(s)
 }
 
 // TeamToJSON serializes just the team for database storage
 func (s *ShopState) TeamToJSON() (json.RawMessage, error) {
-	return json.Marshal(s.Team)
+	return jsonutil.Marshal(s.Team)
 }
 
 // ShopCardsToJSON serializes the shop cards for database storage
 func (s *ShopState) ShopCardsToJSON() (json.RawMessage, error) {
-	return json.Marshal(s.Cards)
+	return jsonutil.Marshal(s.Cards)
 }

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -10,6 +9,7 @@ import (
 
 	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/httputil"
+	"beef-briefing/apps/api-service/internal/jsonutil"
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
@@ -67,7 +67,7 @@ func (h *ProfilePhotoHandler) HandleUserPhotos(w http.ResponseWriter, r *http.Re
 	}
 
 	var req models.UserProfilePhotosRequest
-	if err := json.Unmarshal([]byte(metadataJSON), &req); err != nil {
+	if err := jsonutil.Unmarshal([]byte(metadataJSON), &req); err != nil {
 		slog.Error("failed to decode metadata", "error", err)
 		if txn != nil {
 			txn.NoticeError(err)
@@ -134,7 +134,7 @@ func (h *ProfilePhotoHandler) HandleChatPhotos(w http.ResponseWriter, r *http.Re
 	}
 
 	var req models.ChatProfilePhotosRequest
-	if err := json.Unmarshal([]byte(metadataJSON), &req); err != nil {
+	if err := jsonutil.Unmarshal([]byte(metadataJSON), &req); err != nil {
 		slog.Error("failed to decode metadata", "error", err)
 		if txn != nil {
 			txn.NoticeError(err)

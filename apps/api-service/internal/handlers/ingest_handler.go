@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 
 	"beef-briefing/apps/api-service/internal/httputil"
+	"beef-briefing/apps/api-service/internal/jsonutil"
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/pkg/config"
@@ -55,7 +55,7 @@ func (h *IngestHandler) HandleIngest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var update models.Update
-	if err := json.Unmarshal([]byte(updateJSON), &update); err != nil {
+	if err := jsonutil.Unmarshal([]byte(updateJSON), &update); err != nil {
 		slog.Error("failed to decode update", "error", err)
 		if txn != nil {
 			txn.NoticeError(err)

@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/nrutil"
+
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/newrelic/go-agent/v3/newrelic"
@@ -79,11 +81,7 @@ func GenerateObjectKey(mediaType, fileHash string) string {
 // UploadMedia uploads media file to MinIO using content-addressable storage.
 // Returns the object key and file hash. Deduplicates files with same hash.
 func (mc *MinIOClient) UploadMedia(ctx context.Context, fileID string, data []byte, mimeType string, mediaType string) (string, string, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("storage:upload-media")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "storage:upload-media")()
 
 	// Compute SHA256 hash of file content
 	fileHash := ComputeFileHash(data)
@@ -116,9 +114,7 @@ func (mc *MinIOClient) UploadMedia(ctx context.Context, fileID string, data []by
 		},
 	)
 	if err != nil {
-		if txn != nil {
-			txn.NoticeError(err)
-		}
+		nrutil.NoticeError(ctx, err)
 		return "", "", fmt.Errorf("failed to upload to MinIO: %w", err)
 	}
 
@@ -141,17 +137,11 @@ func (mc *MinIOClient) GetObjectURL(objectKey string) string {
 // Returns the object reader, content length, content type, and error.
 // The caller is responsible for closing the returned reader.
 func (mc *MinIOClient) GetObject(ctx context.Context, objectKey string) (io.ReadCloser, int64, string, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("storage:get-object")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "storage:get-object")()
 
 	obj, err := mc.client.GetObject(ctx, mc.bucket, objectKey, minio.GetObjectOptions{})
 	if err != nil {
-		if txn != nil {
-			txn.NoticeError(err)
-		}
+		nrutil.NoticeError(ctx, err)
 		return nil, 0, "", fmt.Errorf("failed to get object from MinIO: %w", err)
 	}
 
@@ -159,9 +149,7 @@ func (mc *MinIOClient) GetObject(ctx context.Context, objectKey string) (io.Read
 	info, err := obj.Stat()
 	if err != nil {
 		obj.Close()
-		if txn != nil {
-			txn.NoticeError(err)
-		}
+		nrutil.NoticeError(ctx, err)
 		return nil, 0, "", fmt.Errorf("failed to stat object: %w", err)
 	}
 
@@ -176,17 +164,11 @@ func (mc *MinIOClient) GetObject(ctx context.Context, objectKey string) (io.Read
 
 // GetPresignedURL generates a time-limited URL for accessing an object.
 func (mc *MinIOClient) GetPresignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("storage:get-presigned-url")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "storage:get-presigned-url")()
 
 	url, err := mc.client.PresignedGetObject(ctx, mc.bucket, objectKey, expiry, nil)
 	if err != nil {
-		if txn != nil {
-			txn.NoticeError(err)
-		}
+		nrutil.NoticeError(ctx, err)
 		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
 

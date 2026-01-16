@@ -1,6 +1,10 @@
 package battle
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"beef-briefing/apps/api-service/internal/jsonutil"
+)
 
 // EventType represents the type of battle event for replay
 type EventType string
@@ -179,12 +183,12 @@ type Result struct {
 
 // ToJSON serializes the result to JSON
 func (r *Result) ToJSON() (json.RawMessage, error) {
-	return json.Marshal(r)
+	return jsonutil.Marshal(r)
 }
 
 // EventsToJSON serializes just the events for storage
 func (r *Result) EventsToJSON() (json.RawMessage, error) {
-	return json.Marshal(r.Events)
+	return jsonutil.Marshal(r.Events)
 }
 
 // ShopCard represents a card available in the shop

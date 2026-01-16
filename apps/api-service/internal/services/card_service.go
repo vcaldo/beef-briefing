@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"beef-briefing/apps/api-service/internal/apperror"
+	"beef-briefing/apps/api-service/internal/jsonutil"
+	"beef-briefing/apps/api-service/internal/nrutil"
 	"beef-briefing/apps/api-service/internal/repository"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
@@ -121,11 +123,7 @@ func (s *CardService) GetUserCard(
 	chatID int64,
 	weekStart *time.Time,
 ) (*repository.UserCard, *repository.CardUser, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("service:GetUserCard")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:GetUserCard")()
 
 	// Get card from repository
 	card, err := s.cardRepo.GetUserCard(ctx, userID, chatID, weekStart)
@@ -151,11 +149,7 @@ func (s *CardService) GetChatCards(
 	ctx context.Context,
 	req GetChatCardsRequest,
 ) (*GetChatCardsResponse, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("service:GetChatCards")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:GetChatCards")()
 
 	// Validate sort field
 	validSortFields := map[string]bool{
@@ -217,11 +211,7 @@ func (s *CardService) GetUserHistory(
 	chatID int64,
 	limit int,
 ) (*UserHistoryResponse, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("service:GetUserHistory")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:GetUserHistory")()
 
 	// Get user info
 	user, err := s.cardRepo.GetUserInfo(ctx, userID)
@@ -328,7 +318,7 @@ func (s *CardService) calculateHistorySummary(cards []repository.UserCard) UserS
 // extractMoodScore attempts to get mood score from stats JSON.
 func extractMoodScore(statsJSON json.RawMessage) float64 {
 	var stats map[string]interface{}
-	if err := json.Unmarshal(statsJSON, &stats); err != nil {
+	if err := jsonutil.Unmarshal(statsJSON, &stats); err != nil {
 		return 0
 	}
 
@@ -366,11 +356,7 @@ func (s *CardService) GetCardImageURL(
 	theme string,
 	expirySeconds int,
 ) (*CardImageURLResponse, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("service:GetCardImageURL")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:GetCardImageURL")()
 
 	if expirySeconds <= 0 {
 		expirySeconds = 3600 // Default 1 hour
@@ -459,11 +445,7 @@ type GalleryImageURLResponse struct {
 
 // GetGalleryWeeks returns weeks with generated card images for a chat.
 func (s *CardService) GetGalleryWeeks(ctx context.Context, chatID int64) (*GalleryWeeksResponse, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("service:GetGalleryWeeks")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:GetGalleryWeeks")()
 
 	weeks, err := s.cardRepo.GetGalleryWeeks(ctx, chatID)
 	if err != nil {
@@ -481,11 +463,7 @@ func (s *CardService) GetGalleryImages(
 	userID *int64,
 	theme *string,
 ) (*GalleryImagesResponse, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("service:GetGalleryImages")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:GetGalleryImages")()
 
 	images, err := s.cardRepo.GetGalleryImages(ctx, chatID, weekStart, userID, theme)
 	if err != nil {
@@ -518,11 +496,7 @@ func (s *CardService) GetGalleryImageURL(
 	imageID int64,
 	expirySeconds int,
 ) (*GalleryImageURLResponse, error) {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("service:GetGalleryImageURL")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "service:GetGalleryImageURL")()
 
 	if expirySeconds <= 0 {
 		expirySeconds = 3600 // Default 1 hour

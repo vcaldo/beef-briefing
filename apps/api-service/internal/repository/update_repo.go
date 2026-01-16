@@ -3,8 +3,10 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
+
+	"beef-briefing/apps/api-service/internal/jsonutil"
+	"beef-briefing/apps/api-service/internal/nrutil"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
@@ -20,13 +22,9 @@ func NewUpdateRepository(db *sql.DB, nrApp *newrelic.Application) *UpdateReposit
 
 // InsertUpdate inserts a new update record
 func (r *UpdateRepository) InsertUpdate(ctx context.Context, tx *sql.Tx, updateID int64, updateType string, rawData interface{}) error {
-	txn := newrelic.FromContext(ctx)
-	if txn != nil {
-		segment := txn.StartSegment("db:insert-update")
-		defer segment.End()
-	}
+	defer nrutil.StartSegment(ctx, "db:insert-update")()
 
-	rawJSON, err := json.Marshal(rawData)
+	rawJSON, err := jsonutil.Marshal(rawData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal raw data: %w", err)
 	}

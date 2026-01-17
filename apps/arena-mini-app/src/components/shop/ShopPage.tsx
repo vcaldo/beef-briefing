@@ -82,8 +82,11 @@ export function ShopPage({
     if (!isDraggingRef.current && teamCards.length > 0) {
       if (teamOrder.length === teamCards.length) {
         // Reorder cards according to team_order (battle order)
-        const orderedTeam = teamOrder.map((posIdx: number) => teamCards[posIdx])
-        setLocalTeamOrder(orderedTeam)
+        // Filter out undefined values in case of stale/invalid indices
+        const orderedTeam = teamOrder
+          .map((posIdx: number) => teamCards[posIdx])
+          .filter((card: EnhancedTeamCard | undefined): card is EnhancedTeamCard => card !== undefined)
+        setLocalTeamOrder(orderedTeam.length > 0 ? orderedTeam : teamCards)
       } else {
         setLocalTeamOrder(teamCards)
       }
@@ -460,7 +463,7 @@ export function ShopPage({
                 <Reorder.Item
                   key={card.card_id}
                   value={card}
-                  className={`team-slot filled ${actionLoading === 'reorder' ? 'dragging' : ''}`}
+                  className="team-slot filled"
                   drag={!isSubmitted}
                   onDragStart={() => { isDraggingRef.current = true }}
                   onDragEnd={handleDragEnd}

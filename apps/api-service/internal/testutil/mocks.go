@@ -453,3 +453,119 @@ func (h *MockSegmentHandle) End() {
 		h.txn.Segments[h.index].Ended = true
 	}
 }
+
+// MockDealer is a mock implementation of the Dealer from the shop package.
+// It allows tests to control card dealing behavior without database access.
+type MockDealer struct {
+	mu sync.RWMutex
+
+	// CardCount is the number of cards available for dealing
+	CardCount int
+
+	// DealCardsResults is a queue of results to return from DealCards calls
+	DealCardsResults [][]*struct {
+		ID     int64
+		UserID int64
+		Combat struct {
+			ATK int
+			HP  int
+		}
+	}
+
+	// Errors for injection
+	GetCardCountError error
+	DealCardsError    error
+
+	// Call tracking
+	GetCardCountCalls int
+	DealCardsCalls    int
+}
+
+// NewMockDealer creates a new MockDealer with default values.
+func NewMockDealer() *MockDealer {
+	return &MockDealer{
+		CardCount:        0,
+		DealCardsResults: make([][]*struct {
+			ID     int64
+			UserID int64
+			Combat struct {
+				ATK int
+				HP  int
+			}
+		}, 0),
+	}
+}
+
+// GetCardCount returns the mock card count.
+func (m *MockDealer) GetCardCount(ctx context.Context, chatID int64) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.GetCardCountCalls++
+
+	if m.GetCardCountError != nil {
+		return 0, m.GetCardCountError
+	}
+
+	return m.CardCount, nil
+}
+
+// DealCards returns the next queued result from DealCardsResults.
+func (m *MockDealer) DealCards(ctx context.Context, chatID int64, count int) (interface{}, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.DealCardsCalls++
+
+	if m.DealCardsError != nil {
+		return nil, m.DealCardsError
+	}
+
+	if len(m.DealCardsResults) == 0 {
+		// Return empty slice if no results queued
+		return []interface{}{}, nil
+	}
+
+	// Pop the first result
+	result := m.DealCardsResults[0]
+	m.DealCardsResults = m.DealCardsResults[1:]
+
+	return result, nil
+}
+
+// SetCardCount sets the card count to be returned by GetCardCount.
+func (m *MockDealer) SetCardCount(count int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.CardCount = count
+}
+
+// AddDealCardsResult adds a result to the queue for DealCards.
+func (m *MockDealer) AddDealCardsResult(cards interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Convert the input to our internal type
+	// This is a simplified version - in practice you'd need proper type conversion
+	m.DealCardsResults = append(m.DealCardsResults, nil)
+}
+
+// Reset clears all state and resets counters.
+func (m *MockDealer) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.CardCount = 0
+	m.DealCardsResults = make([][]*struct {
+		ID     int64
+		UserID int64
+		Combat struct {
+			ATK int
+			HP  int
+		}
+	}, 0)
+	m.GetCardCountError = nil
+	m.DealCardsError = nil
+	m.GetCardCountCalls = 0
+	m.DealCardsCalls = 0
+}

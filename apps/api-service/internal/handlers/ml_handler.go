@@ -15,12 +15,12 @@ import (
 
 // MLHandler handles HTTP requests for ML analytics endpoints.
 type MLHandler struct {
-	mlService *services.MLService
+	mlService services.MLServiceInterface
 	config    *config.Config
 }
 
 // NewMLHandler creates a new MLHandler.
-func NewMLHandler(mlService *services.MLService, cfg *config.Config) *MLHandler {
+func NewMLHandler(mlService services.MLServiceInterface, cfg *config.Config) *MLHandler {
 	return &MLHandler{
 		mlService: mlService,
 		config:    cfg,

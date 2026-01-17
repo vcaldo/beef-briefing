@@ -158,6 +158,24 @@ type CardServiceInterface interface {
 }
 
 // =============================================================================
+// ML SERVICE INTERFACE
+// =============================================================================
+
+// MLServiceInterface defines methods for ML analytics operations.
+// The ML service handles unprocessed messages retrieval, ML results storage,
+// and processing statistics.
+type MLServiceInterface interface {
+	// GetUnprocessedMessages retrieves messages that haven't been processed by ML analyzers.
+	GetUnprocessedMessages(ctx context.Context, limit int) (*GetMessagesResponse, error)
+
+	// SaveResults saves ML analysis results for messages.
+	SaveResults(ctx context.Context, req *SaveResultsRequest) error
+
+	// GetProcessingStats retrieves statistics about ML processing progress.
+	GetProcessingStats(ctx context.Context) (*ProcessingStats, error)
+}
+
+// =============================================================================
 // SUPPORTING INTERFACES
 // =============================================================================
 

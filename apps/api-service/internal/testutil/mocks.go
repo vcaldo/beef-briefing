@@ -627,3 +627,4 @@ func (m *MockIngestService) Reset() {
 	m.LastFiles = make(map[string][]byte)
 	m.ProcessUpdateError = nil
 }
+

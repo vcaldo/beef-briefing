@@ -543,6 +543,315 @@ curl -X POST http://localhost:8080/api/v1/ingest \
 # Check logs: make logs-bot
 ```
 
+### Testing Patterns
+
+The codebase uses comprehensive test patterns across three layers: Repository, Service, and Handler. Below are the established patterns for writing new tests.
+
+#### Running Tests
+
+```bash
+cd apps/api-service
+
+# Run all tests (parallel by default)
+go test ./...
+
+# Run tests sequentially (to catch flakiness/race conditions)
+go test -p 1 ./...
+
+# Run with race detector enabled
+go test -race ./...
+
+# Run specific test package
+go test -v ./internal/repository
+
+# Run specific test
+go test -v -run TestFunctionName ./internal/repository
+
+# Generate coverage report
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+go tool cover -func=coverage.out | grep "total:"
+```
+
+#### Repository Layer Testing
+
+Repository tests use **real PostgreSQL database** with transaction-based isolation. This ensures tests are realistic and catch database-specific issues.
+
+**Key Patterns:**
+
+1. **Database Setup & Teardown**:
+   ```go
+   func TestRepositoryMethod(t *testing.T) {
+       db := testutil.SetupTestDB()
+       defer testutil.TeardownTestDB(db)
+
+       // Test code...
+   }
+   ```
+
+2. **Transaction Isolation**:
+   ```go
+   tx := db.BeginTx(context.Background(), nil)
+   defer tx.Rollback()
+
+   repo := repository.NewUserRepository(tx)
+   // Test using repo
+   // Transaction automatically rolls back, no cleanup needed
+   ```
+
+3. **Direct Database Verification**:
+   ```go
+   // After operation, verify directly in DB
+   var user User
+   err := db.QueryRow("SELECT id, first_name FROM users WHERE id = $1", userID).
+       Scan(&user.ID, &user.FirstName)
+   if err != nil {
+       t.Fatalf("User not found in database: %v", err)
+   }
+   ```
+
+4. **NULL Value Handling**:
+   - Empty strings (`""`) are stored as SQL `NULL` for optional fields
+   - Use `sql.NullString` for fields that might be NULL
+   - Test both populated and NULL scenarios
+
+5. **Table-Driven Tests**:
+   ```go
+   tests := []struct {
+       name    string
+       input   interface{}
+       want    interface{}
+       wantErr bool
+   }{
+       {"Case 1", inputA, expectedA, false},
+       {"Case 2", inputB, expectedB, true},
+   }
+
+   for _, tt := range tests {
+       t.Run(tt.name, func(t *testing.T) {
+           // Test logic
+       })
+   }
+   ```
+
+**Example Test Files**:
+- `internal/repository/helpers_test.go` - NULL conversion functions (100% coverage)
+- `internal/repository/user_repo_test.go` - User CRUD operations (83.3% coverage)
+- `internal/repository/message_repo_test.go` - Message operations (93.5% coverage)
+- `internal/repository/media_repo_test.go` - Media handling (81.4% coverage)
+
+#### Service Layer Testing
+
+Service tests use **mocked repositories** via interfaces. This isolates business logic from database concerns.
+
+**Key Patterns:**
+
+1. **Mock Setup**:
+   ```go
+   mockRepo := new(MockRepository)
+   service := NewService(mockRepo)
+   ```
+
+2. **Mock Expectations**:
+   ```go
+   mockRepo.On("GetUser", mock.MatchedBy(func(ctx context.Context) bool {
+       return true
+   }), userID).Return(&user, nil)
+
+   // Test code
+
+   mockRepo.AssertExpectations(t)
+   ```
+
+3. **Error Scenarios**:
+   ```go
+   mockRepo.On("GetUser", mock.Anything, -1).
+       Return(nil, errors.New("user not found"))
+   ```
+
+4. **Dependency Injection**:
+   ```go
+   type Service struct {
+       repo RepositoryInterface  // Interface, not concrete type
+   }
+
+   func NewService(repo RepositoryInterface) *Service {
+       return &Service{repo: repo}
+   }
+   ```
+
+**Example Test Files**:
+- `internal/services/ml_service_test.go` - ML processing (87.8% coverage)
+- `internal/services/match_service_test.go` - Game match logic
+- `internal/services/tournament_service_test.go` - Tournament management
+
+#### Handler Layer Testing
+
+Handler tests use **HTTP testing** with mocked services via `httptest`.
+
+**Key Patterns:**
+
+1. **HTTP Request/Response**:
+   ```go
+   req, _ := http.NewRequest("GET", "/api/v1/cards/123?chat_id=456", nil)
+   rec := httptest.NewRecorder()
+
+   handler.GetCard(rec, req)
+
+   if rec.Code != http.StatusOK {
+       t.Errorf("Expected 200, got %d", rec.Code)
+   }
+   ```
+
+2. **Mock Service Setup**:
+   ```go
+   mockService := new(MockCardService)
+   handler := NewCardHandler(mockService)
+   ```
+
+3. **JSON Response Validation**:
+   ```go
+   var resp CardResponse
+   json.Unmarshal(rec.Body.Bytes(), &resp)
+   ```
+
+4. **Authentication Testing**:
+   ```go
+   // Test missing auth header
+   req, _ := http.NewRequest("POST", "/api/v1/ingest", nil)
+   rec := httptest.NewRecorder()
+   handler.IngestUpdate(rec, req)
+   // Should return 401
+   ```
+
+**Example Test Files**:
+- `internal/handlers/card_handler_test.go` - Card endpoints (76.5% coverage)
+- `internal/handlers/arena_handler_test.go` - Arena game endpoints (59% coverage)
+- `internal/handlers/mini_app_handler_test.go` - Mini app endpoints
+
+#### Test Utilities (testutil package)
+
+The `testutil` package provides helper functions for test setup/teardown:
+
+```go
+// Database helpers
+testutil.SetupTestDB() *sql.DB         // Returns test DB connection
+testutil.TeardownTestDB(*sql.DB)       // Closes connection
+
+// Sample data factories
+testutil.SampleUser() User             // Returns test user
+testutil.SampleChat() Chat             // Returns test chat
+testutil.SampleMessage() Message       // Returns test message
+
+// Mock builders
+testutil.NewMockRepository() MockRepo  // Returns mock with defaults
+```
+
+#### Coverage Targets by Layer
+
+| Layer | Target | Current | Method |
+|-------|--------|---------|--------|
+| Repository | 65%+ | 44.3% | Real DB + transactions |
+| Service | 70%+ | 54.0% | Mocked repositories |
+| Handler | 75%+ | 63.9% | HTTP testing |
+| **Overall** | **70%** | **39.3%** | Multi-layer integration |
+
+#### Test Quality Standards
+
+1. **Independence**: Tests must not depend on execution order. Can run in any order, including with `-p 1` (sequential).
+
+2. **Cleanup**: All tests properly clean up after themselves:
+   - Repository tests: Transaction rollback
+   - Service tests: Mock expectations assertion
+   - Handler tests: Response cleanup
+
+3. **Isolation**: No shared state between tests. Each test is self-contained.
+
+4. **Determinism**: Tests produce consistent results across multiple runs (checked with `-race` flag).
+
+5. **Speed**: Tests run efficiently:
+   - Repository layer: ~0.5-1.0s per package
+   - Service layer: ~0.1-0.5s per package
+   - Handler layer: ~0.2-1.0s per package
+   - Total: ~30-60s parallel execution
+
+#### Adding New Tests
+
+When adding tests for a new feature or bug fix:
+
+1. **Identify the layer**: Repository (data access), Service (business logic), or Handler (HTTP)
+2. **Choose test type**:
+   - **Repository**: Real DB with transaction rollback
+   - **Service**: Mocked repository interfaces
+   - **Handler**: HTTP test with mocked service
+3. **Use table-driven format** for multiple similar test cases
+4. **Test happy path + error scenarios**
+5. **Verify with assertions** (direct queries for repository, mock assertions for service/handler)
+6. **Run with `-race` flag** to catch concurrency issues
+7. **Document edge cases** in test names (`TestFunctionName_EdgeCaseDescription`)
+
+**Template for Repository Test**:
+```go
+func TestUpsertUser_NewUser(t *testing.T) {
+    db := testutil.SetupTestDB()
+    defer testutil.TeardownTestDB(db)
+
+    tx := db.BeginTx(context.Background(), nil)
+    defer tx.Rollback()
+
+    repo := repository.NewUserRepository(tx)
+    user := testutil.SampleUser()
+
+    err := repo.UpsertUser(context.Background(), user)
+    if err != nil {
+        t.Fatalf("UpsertUser failed: %v", err)
+    }
+
+    // Verify in database
+    var retrieved User
+    row := tx.QueryRow("SELECT id, first_name FROM users WHERE id = $1", user.ID)
+    if err := row.Scan(&retrieved.ID, &retrieved.FirstName); err != nil {
+        t.Fatalf("User not in database: %v", err)
+    }
+}
+```
+
+**Template for Service Test**:
+```go
+func TestGetUserCard_Happy(t *testing.T) {
+    mockRepo := new(MockRepository)
+    mockRepo.On("GetUserCard", mock.Anything, userID).
+        Return(&card, nil)
+
+    service := NewCardService(mockRepo)
+    result, err := service.GetUserCard(context.Background(), userID)
+
+    if err != nil {
+        t.Fatalf("GetUserCard failed: %v", err)
+    }
+    mockRepo.AssertExpectations(t)
+}
+```
+
+**Template for Handler Test**:
+```go
+func TestGetCard_Success(t *testing.T) {
+    mockService := new(MockCardService)
+    mockService.On("GetUserCard", mock.Anything, userID).
+        Return(&card, nil)
+
+    handler := NewCardHandler(mockService)
+    req, _ := http.NewRequest("GET", "/cards/123", nil)
+    rec := httptest.NewRecorder()
+
+    handler.GetUserCard(rec, req)
+
+    if rec.Code != http.StatusOK {
+        t.Errorf("Expected 200, got %d", rec.Code)
+    }
+}
+```
+
 ## Project Structure
 
 ```

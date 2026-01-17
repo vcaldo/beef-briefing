@@ -542,3 +542,1686 @@ func TestErrorResponse_JSONStructure(t *testing.T) {
 		t.Error("'error' field should be a string")
 	}
 }
+
+// =============================================================================
+// List Matches Tests
+// =============================================================================
+
+func TestListMatches_Returns200OnSuccess(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/matches?chat_id=-1001234567890", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleListMatches(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify matches field exists
+	if _, ok := resp["matches"]; !ok {
+		t.Error("response should contain 'matches' field")
+	}
+}
+
+func TestListMatches_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/matches?chat_id=-1001234567890", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleListMatches(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestListMatches_Returns400OnMissingChatID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	// Token without chat_id
+	token, _ := jwtAuth.CreateToken(12345, nil, nil, "Test User")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/matches", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleListMatches(rr, req)
+
+	// Should return 400 or 403 based on missing chat context
+	if rr.Code != http.StatusBadRequest && rr.Code != http.StatusForbidden {
+		t.Errorf("expected status 400 or 403, got %d. Body: %s", rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Join Match Tests
+// =============================================================================
+
+func TestJoinMatch_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	matchID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+matchID+"/join", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleJoinMatch(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestJoinMatch_Returns400OnMissingMatchID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	// Request without match ID in URL
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match//join", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": ""})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleJoinMatch(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestJoinMatch_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000002"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+nonExistentMatchID+"/join", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleJoinMatch(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Leave Match Tests
+// =============================================================================
+
+func TestLeaveMatch_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	matchID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+matchID+"/leave", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleLeaveMatch(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestLeaveMatch_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000003"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+nonExistentMatchID+"/leave", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleLeaveMatch(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Start Match Tests
+// =============================================================================
+
+func TestStartMatch_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	matchID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+matchID+"/start", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleStartMatch(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestStartMatch_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000004"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+nonExistentMatchID+"/start", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleStartMatch(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Get Shop Tests
+// =============================================================================
+
+func TestGetShop_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	matchID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/match/"+matchID+"/shop", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetShop(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestGetShop_Returns400OnMissingMatchID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	// Request without match ID in URL
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/match//shop", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": ""})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetShop(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestGetShop_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000005"
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/match/"+nonExistentMatchID+"/shop", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetShop(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Buy Card Tests
+// =============================================================================
+
+func TestBuyCard_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	matchID := "00000000-0000-0000-0000-000000000001"
+	reqBody := BuyCardRequest{CardIndex: 0}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+matchID+"/buy", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBuyCard(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBuyCard_Returns400OnInvalidJSON(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	matchID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+matchID+"/buy", bytes.NewReader([]byte(`{invalid json`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleBuyCard(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBuyCard_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000006"
+	reqBody := BuyCardRequest{CardIndex: 0}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+nonExistentMatchID+"/buy", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleBuyCard(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Reroll Tests
+// =============================================================================
+
+func TestReroll_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	matchID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+matchID+"/reroll", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleReroll(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestReroll_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000007"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+nonExistentMatchID+"/reroll", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleReroll(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Upgrade Tests
+// =============================================================================
+
+func TestUpgrade_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	matchID := "00000000-0000-0000-0000-000000000001"
+	reqBody := UpgradeRequest{TeamSlot: 0, UpgradeType: "atk"}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+matchID+"/upgrade", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleUpgrade(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestUpgrade_Returns400OnInvalidJSON(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	matchID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+matchID+"/upgrade", bytes.NewReader([]byte(`{invalid json`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleUpgrade(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestUpgrade_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000008"
+	reqBody := UpgradeRequest{TeamSlot: 0, UpgradeType: "atk"}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+nonExistentMatchID+"/upgrade", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleUpgrade(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Set Order Tests
+// =============================================================================
+
+func TestSetOrder_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	matchID := "00000000-0000-0000-0000-000000000001"
+	reqBody := SetOrderRequest{Order: []int{0, 1, 2}}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+matchID+"/order", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleSetOrder(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestSetOrder_Returns400OnInvalidJSON(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	matchID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+matchID+"/order", bytes.NewReader([]byte(`{invalid json`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleSetOrder(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Submit Team Tests
+// =============================================================================
+
+func TestSubmitTeam_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	matchID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+matchID+"/team", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleSubmitTeam(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestSubmitTeam_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000009"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+nonExistentMatchID+"/team", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleSubmitTeam(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Get Battle Tests
+// =============================================================================
+
+func TestGetBattle_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	matchID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/match/"+matchID+"/battle", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetBattle(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestGetBattle_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000010"
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/match/"+nonExistentMatchID+"/battle", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetBattle(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Get Leaderboard Tests
+// =============================================================================
+
+func TestGetLeaderboard_Returns200OnSuccess(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/leaderboard?chat_id=-1001234567890", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetLeaderboard(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify entries field exists
+	if _, ok := resp["entries"]; !ok {
+		t.Error("response should contain 'entries' field")
+	}
+	// Verify type field exists
+	if _, ok := resp["type"]; !ok {
+		t.Error("response should contain 'type' field")
+	}
+}
+
+func TestGetLeaderboard_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/leaderboard?chat_id=-1001234567890", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetLeaderboard(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestGetLeaderboard_UsesDefaultType(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	// Request without type parameter - should default to "ranked"
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/leaderboard?chat_id=-1001234567890", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetLeaderboard(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify default type is "ranked"
+	if resp["type"] != "ranked" {
+		t.Errorf("expected type 'ranked', got '%s'", resp["type"])
+	}
+}
+
+// =============================================================================
+// Get Constants Tests
+// =============================================================================
+
+func TestGetConstants_Returns200OnSuccess(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/constants", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetConstants(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify response structure
+	if _, ok := resp["costs"]; !ok {
+		t.Error("response should contain 'costs' field")
+	}
+	if _, ok := resp["sizes"]; !ok {
+		t.Error("response should contain 'sizes' field")
+	}
+	if _, ok := resp["upgrades"]; !ok {
+		t.Error("response should contain 'upgrades' field")
+	}
+	if _, ok := resp["timings"]; !ok {
+		t.Error("response should contain 'timings' field")
+	}
+
+	// Verify specific values
+	costs := resp["costs"].(map[string]interface{})
+	if costs["card"] != float64(3) {
+		t.Errorf("expected card cost 3, got %v", costs["card"])
+	}
+	if costs["reroll"] != float64(1) {
+		t.Errorf("expected reroll cost 1, got %v", costs["reroll"])
+	}
+	if costs["upgrade"] != float64(1) {
+		t.Errorf("expected upgrade cost 1, got %v", costs["upgrade"])
+	}
+}
+
+// =============================================================================
+// Get History Tests
+// =============================================================================
+
+func TestGetHistory_Returns200OnSuccess(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/history?chat_id=-1001234567890", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetHistory(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify response structure
+	if _, ok := resp["matches"]; !ok {
+		t.Error("response should contain 'matches' field")
+	}
+	if _, ok := resp["total"]; !ok {
+		t.Error("response should contain 'total' field")
+	}
+	if _, ok := resp["has_more"]; !ok {
+		t.Error("response should contain 'has_more' field")
+	}
+}
+
+func TestGetHistory_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/history?chat_id=-1001234567890", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetHistory(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Get Profile Tests
+// =============================================================================
+
+func TestGetProfile_Returns200OnSuccess(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/profile?chat_id=-1001234567890", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetProfile(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify response structure
+	if _, ok := resp["recent_matches"]; !ok {
+		t.Error("response should contain 'recent_matches' field")
+	}
+	// profile can be null for users without arena data
+}
+
+func TestGetProfile_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/profile?chat_id=-1001234567890", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetProfile(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Get H2H Tests
+// =============================================================================
+
+func TestGetH2H_Returns200OnSuccess(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/h2h?chat_id=-1001234567890&opponent_id=67890", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetH2H(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify response structure
+	if _, ok := resp["recent_matches"]; !ok {
+		t.Error("response should contain 'recent_matches' field")
+	}
+	// record can be null if no matches played
+}
+
+func TestGetH2H_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/h2h?chat_id=-1001234567890&opponent_id=67890", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetH2H(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestGetH2H_Returns400OnMissingOpponentID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	// Missing opponent_id parameter
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/h2h?chat_id=-1001234567890", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetH2H(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Share Result Tests
+// =============================================================================
+
+func TestShareResult_Returns401OnUnauthorized(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without JWT claims
+	matchID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+matchID+"/share", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleShareResult(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+}
+
+func TestShareResult_Returns400OnMissingMatchID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	// Request without match ID in URL
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match//share", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": ""})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleShareResult(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestShareResult_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000011"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/arena/match/"+nonExistentMatchID+"/share", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleShareResult(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+// =============================================================================
+// Bot Endpoint Tests
+// =============================================================================
+
+func TestBotCreateMatch_Returns400OnMissingFields(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request with missing fields
+	reqBody := BotCreateMatchRequest{ChatID: 0, CreatorUserID: 0}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/match", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotCreateMatch(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotCreateMatch_Returns400OnInvalidJSON(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/match", bytes.NewReader([]byte(`{invalid json`)))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotCreateMatch(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotGetMatch_Returns400OnMissingMatchID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/match/", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": ""})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetMatch(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotGetMatch_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000012"
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/match/"+nonExistentMatchID, nil)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetMatch(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotJoinMatch_Returns400OnMissingUserID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	matchID := "00000000-0000-0000-0000-000000000001"
+	reqBody := BotJoinMatchRequest{UserID: 0}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/match/"+matchID+"/join", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotJoinMatch(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotJoinMatch_Returns400OnInvalidJSON(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	matchID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/match/"+matchID+"/join", bytes.NewReader([]byte(`{invalid json`)))
+	req.Header.Set("Content-Type", "application/json")
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotJoinMatch(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotLeaveMatch_Returns400OnMissingUserID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	matchID := "00000000-0000-0000-0000-000000000001"
+	reqBody := BotJoinMatchRequest{UserID: 0}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/match/"+matchID+"/leave", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotLeaveMatch(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotStartMatch_Returns400OnMissingUserID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	matchID := "00000000-0000-0000-0000-000000000001"
+	reqBody := BotJoinMatchRequest{UserID: 0}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/match/"+matchID+"/start", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotStartMatch(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotGetPendingMatches_Returns200OnSuccess(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/matches/pending", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetPendingMatches(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify matches field exists
+	if _, ok := resp["matches"]; !ok {
+		t.Error("response should contain 'matches' field")
+	}
+}
+
+func TestBotAutoStartMatch_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000013"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/match/"+nonExistentMatchID+"/auto-start", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotAutoStartMatch(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotForceSubmitTeams_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000014"
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/match/"+nonExistentMatchID+"/force-submit", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotForceSubmitTeams(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotGetShareData_Returns400OnMissingMatchID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/match//share-data", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": ""})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetShareData(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotGetShareData_Returns404OnMatchNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	nonExistentMatchID := "00000000-0000-0000-0000-000000000015"
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/match/"+nonExistentMatchID+"/share-data", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": nonExistentMatchID})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetShareData(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}

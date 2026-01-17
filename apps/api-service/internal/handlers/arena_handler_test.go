@@ -2225,3 +2225,463 @@ func TestBotGetShareData_Returns404OnMatchNotFound(t *testing.T) {
 		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
 	}
 }
+
+// =============================================================================
+// Tournament Handler Tests
+// =============================================================================
+
+func TestBotGetTodayTournament_Returns400OnMissingChatID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without chat_id
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournament/today?date=2026-01-17", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetTodayTournament(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "chat_id is required" {
+		t.Errorf("expected error message 'chat_id is required', got '%s'", resp["error"])
+	}
+}
+
+func TestBotGetTodayTournament_Returns400OnMissingDate(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request without date
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournament/today?chat_id=-1001234567890", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetTodayTournament(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["error"] != "date is required (YYYY-MM-DD)" {
+		t.Errorf("expected error message 'date is required (YYYY-MM-DD)', got '%s'", resp["error"])
+	}
+}
+
+func TestBotGetTodayTournament_Returns200OnNoTournament(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request for a chat with no tournament
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournament/today?chat_id=-1001234567890&date=2026-01-17", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetTodayTournament(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["tournament"] != nil {
+		t.Errorf("expected tournament to be nil, got %v", resp["tournament"])
+	}
+}
+
+func TestBotGetTournament_Returns400OnInvalidID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournament/invalid", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "invalid"})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetTournament(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotGetTournament_Returns404OnNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournament/99999", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "99999"})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetTournament(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotGetPendingAnnouncements_Returns200(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournaments/pending-announcements", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetPendingAnnouncements(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if _, ok := resp["tournaments"]; !ok {
+		t.Errorf("expected 'tournaments' key in response")
+	}
+}
+
+func TestBotAnnounceTournament_Returns400OnMissingFields(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request with missing fields
+	reqBody := TournamentAnnounceRequest{ChatID: 0, Date: ""}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/announce", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotAnnounceTournament(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotAnnounceTournament_Returns400OnInvalidJSON(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/announce", bytes.NewReader([]byte(`{invalid json`)))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotAnnounceTournament(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotJoinTournament_Returns400OnMissingFields(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request with missing fields
+	reqBody := TournamentJoinRequest{ChatID: 0, UserID: 0}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/join", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotJoinTournament(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotJoinTournament_Returns400OnInvalidJSON(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/join", bytes.NewReader([]byte(`{invalid json`)))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotJoinTournament(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotJoinTournament_Returns404OnNoTournament(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request for a chat with no tournament
+	reqBody := TournamentJoinRequest{ChatID: -1001234567890, UserID: 12345}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/join", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotJoinTournament(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotLeaveTournament_Returns400OnMissingFields(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request with missing fields
+	reqBody := TournamentJoinRequest{ChatID: 0, UserID: 0}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/leave", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotLeaveTournament(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotLeaveTournament_Returns400OnInvalidJSON(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/leave", bytes.NewReader([]byte(`{invalid json`)))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotLeaveTournament(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotLeaveTournament_Returns404OnNoTournament(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Request for a chat with no tournament
+	reqBody := TournamentJoinRequest{ChatID: -1001234567890, UserID: 12345}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/leave", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotLeaveTournament(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotGetPendingClose_Returns200(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournaments/pending-close", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetPendingClose(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if _, ok := resp["tournaments"]; !ok {
+		t.Errorf("expected 'tournaments' key in response")
+	}
+}
+
+func TestBotCloseTournament_Returns400OnInvalidID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/invalid/close", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "invalid"})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotCloseTournament(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotCloseTournament_Returns404OnNotFound(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/99999/close", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "99999"})
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotCloseTournament(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+}
+
+func TestBotGetPendingRounds_Returns200(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournaments/pending-rounds", nil)
+
+	rr := httptest.NewRecorder()
+	handler.HandleBotGetPendingRounds(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if _, ok := resp["tournaments"]; !ok {
+		t.Errorf("expected 'tournaments' key in response")
+	}
+}

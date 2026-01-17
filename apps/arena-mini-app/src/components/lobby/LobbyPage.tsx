@@ -437,6 +437,7 @@ export function LobbyPage({
                     onExpire={() => {
                       addPageAction('match_auto_start', { match_id: activeMatch.id })
                     }}
+                    timerThresholds={gameConstants?.timer_thresholds}
                   />
                 </div>
               )}
@@ -546,7 +547,10 @@ export function LobbyPage({
                         {/* Timer */}
                         {match.join_deadline && (
                           <div className="match-card-timer compact">
-                            <CountdownTimer deadline={match.join_deadline} />
+                            <CountdownTimer
+                              deadline={match.join_deadline}
+                              timerThresholds={gameConstants?.timer_thresholds}
+                            />
                           </div>
                         )}
                       </div>

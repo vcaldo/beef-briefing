@@ -421,6 +421,7 @@ export function ShopPage({
                 onExpire={() => {
                   addPageAction('shop_phase_expired', { match_id: activeMatch.id })
                 }}
+                timerThresholds={gameConstants?.timer_thresholds}
               />
             </div>
           )}

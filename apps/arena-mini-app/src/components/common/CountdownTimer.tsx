@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import type { TimerThresholds } from '../../types'
 
 interface CountdownTimerProps {
   /**
@@ -36,6 +37,12 @@ interface CountdownTimerProps {
    * Label to show before the time (e.g., "Deadline:").
    */
   label?: string
+
+  /**
+   * Timer urgency thresholds from game constants.
+   * If not provided, uses fallback defaults (120s safe, 30s warning).
+   */
+  timerThresholds?: TimerThresholds
 }
 
 /**
@@ -62,6 +69,7 @@ export function CountdownTimer({
   className = '',
   showIcon = true,
   label,
+  timerThresholds,
 }: CountdownTimerProps) {
   // CRITICAL: Initialize to 0, NOT using lazy initializer with Date.now()
   // This prevents React error #310 caused by non-deterministic state initialization
@@ -145,15 +153,19 @@ export function CountdownTimer({
 
   // Determine color state class
   const getStateClass = (): string => {
-    if (remainingSeconds > 120) {
-      // > 2 minutes: safe (green)
+    // Use backend thresholds if provided, otherwise fallback to defaults
+    const safeThreshold = timerThresholds?.safe ?? 120
+    const warningThreshold = timerThresholds?.warning ?? 30
+
+    if (remainingSeconds > safeThreshold) {
+      // > safe threshold (default 2 minutes): safe (green)
       return 'safe'
     }
-    if (remainingSeconds > 30) {
-      // 30s - 2m: warning (yellow)
+    if (remainingSeconds > warningThreshold) {
+      // warning to safe threshold (default 30s-2m): warning (yellow)
       return 'warning'
     }
-    // < 30s: urgent (red with pulse)
+    // <= warning threshold (default 30s): urgent (red with pulse)
     return 'urgent'
   }
 

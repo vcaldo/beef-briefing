@@ -325,6 +325,15 @@ func (h *ArenaHandler) HandleGetConstants(w http.ResponseWriter, r *http.Request
 				"low":    "#ef4444",
 			},
 		},
+		"timer_thresholds": map[string]interface{}{
+			"safe":    120,
+			"warning": 30,
+			"colors": map[string]string{
+				"safe":    "#22c55e",
+				"warning": "#eab308",
+				"urgent":  "#ef4444",
+			},
+		},
 	}
 
 	httputil.RespondJSON(w, constants, http.StatusOK)

@@ -573,7 +573,7 @@ export function ShopPage({
           <div className="shop-grid">
             {shopCards.map((card: EnhancedShopCard) => {
               const isPurchased = card.is_purchased
-              const canAfford = card.can_afford && coins >= cardCost
+              const canAfford = card.can_afford
               const teamFull = teamCards.length >= teamSize
 
               return (

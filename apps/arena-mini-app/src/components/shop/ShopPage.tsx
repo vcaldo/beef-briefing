@@ -482,6 +482,7 @@ export function ShopPage({
                         hp: card.hp,
                         maxHp: card.max_hp,
                       }}
+                      hpBarThresholds={gameConstants?.hp_bar_thresholds}
                       isAlive={true}
                       showHpBar={true}
                       cardName={card.name}

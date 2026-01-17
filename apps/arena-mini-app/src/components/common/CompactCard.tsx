@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import type { PlaceholderPositions } from '../../types'
+import type { PlaceholderPositions, HpBarThresholds } from '../../types'
 
 /** Current stat values to display on the card */
 interface CardStats {
@@ -16,6 +16,8 @@ interface CompactCardProps {
   positions?: PlaceholderPositions | null
   /** Current card stats to overlay on the image */
   currentStats: CardStats
+  /** HP bar color thresholds from backend */
+  hpBarThresholds?: HpBarThresholds
   /** Whether the card is alive (false = grayscale + reduced opacity) */
   isAlive?: boolean
   /** Whether to show the HP bar (default true) */
@@ -35,17 +37,27 @@ interface CompactCardProps {
 }
 
 /**
- * Calculates HP bar color based on percentage
- * - Green: >66%
- * - Yellow: 33-66%
- * - Red: <33%
+ * Calculates HP bar color based on percentage and thresholds.
+ * Uses backend-provided thresholds if available, otherwise falls back to defaults.
+ *
+ * @param hp Current HP value
+ * @param maxHp Maximum HP value
+ * @param thresholds Optional HP bar thresholds from backend
+ * @returns CSS color string for HP bar
  */
-function getHpBarColor(hp: number, maxHp: number): string {
-  if (maxHp <= 0) return '#ef4444' // Red for invalid
+function getHpBarColor(hp: number, maxHp: number, thresholds?: HpBarThresholds): string {
+  // Fallback thresholds if backend values not available
+  const highThreshold = thresholds?.high ?? 66
+  const mediumThreshold = thresholds?.medium ?? 33
+  const highColor = thresholds?.colors?.high ?? '#22c55e'
+  const mediumColor = thresholds?.colors?.medium ?? '#eab308'
+  const lowColor = thresholds?.colors?.low ?? '#ef4444'
+
+  if (maxHp <= 0) return lowColor // Red for invalid
   const percentage = (hp / maxHp) * 100
-  if (percentage > 66) return '#22c55e' // Green
-  if (percentage >= 33) return '#eab308' // Yellow
-  return '#ef4444' // Red
+  if (percentage > highThreshold) return highColor
+  if (percentage >= mediumThreshold) return mediumColor
+  return lowColor
 }
 
 /**
@@ -84,6 +96,7 @@ export function CompactCard({
   imageUrl,
   positions,
   currentStats,
+  hpBarThresholds,
   isAlive = true,
   showHpBar = true,
   cardName = 'Card',
@@ -100,8 +113,8 @@ export function CompactCard({
   }, [currentStats.hp, currentStats.maxHp])
 
   const hpBarColor = useMemo(
-    () => getHpBarColor(currentStats.hp, currentStats.maxHp),
-    [currentStats.hp, currentStats.maxHp]
+    () => getHpBarColor(currentStats.hp, currentStats.maxHp, hpBarThresholds),
+    [currentStats.hp, currentStats.maxHp, hpBarThresholds]
   )
 
   // Extract position data with fallbacks

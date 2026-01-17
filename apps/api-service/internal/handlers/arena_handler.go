@@ -316,6 +316,15 @@ func (h *ArenaHandler) HandleGetConstants(w http.ResponseWriter, r *http.Request
 			"shop_phase_duration":  180,
 			"join_window_duration": 300,
 		},
+		"hp_bar_thresholds": map[string]interface{}{
+			"high":        66,
+			"medium":      33,
+			"colors": map[string]string{
+				"high":   "#22c55e",
+				"medium": "#eab308",
+				"low":    "#ef4444",
+			},
+		},
 	}
 
 	httputil.RespondJSON(w, constants, http.StatusOK)

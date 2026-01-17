@@ -207,6 +207,7 @@ function App() {
           <BattlePage
             userId={userId}
             activeMatch={activeMatch}
+            gameConstants={gameConstants}
             onMatchChange={handleMatchChange}
             onNavigateToStats={() => handleTabChange('stats')}
             onNavigateToLobby={navigateToLobby}

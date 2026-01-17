@@ -895,6 +895,35 @@ export interface ProfileResponse {
 // =============================================================================
 
 /**
+ * HP bar color thresholds for visual representation.
+ *
+ * Defines percentage thresholds for HP bar color transitions
+ * and the corresponding CSS colors.
+ *
+ * @example
+ * // Get HP bar color based on percentage
+ * const percentage = (hp / maxHp) * 100;
+ * const color = percentage > thresholds.high ? thresholds.colors.high :
+ *               percentage >= thresholds.medium ? thresholds.colors.medium :
+ *               thresholds.colors.low;
+ */
+export interface HpBarThresholds {
+  /** HP percentage threshold for "high" health (default: 66) */
+  high: number
+  /** HP percentage threshold for "medium" health (default: 33) */
+  medium: number
+  /** Colors for each HP level */
+  colors: {
+    /** Color for high health (>66%) (default: '#22c55e' green) */
+    high: string
+    /** Color for medium health (33-66%) (default: '#eab308' yellow) */
+    medium: string
+    /** Color for low health (<33%) (default: '#ef4444' red) */
+    low: string
+  }
+}
+
+/**
  * Game economy and timing constants.
  *
  * Fetched once on app load and used throughout the UI for
@@ -933,6 +962,8 @@ export interface GameConstants {
   shop_phase_seconds: number
   /** Minimum cards required to submit team */
   minimum_cards_required: number
+  /** HP bar color thresholds */
+  hp_bar_thresholds: HpBarThresholds
 }
 
 // =============================================================================

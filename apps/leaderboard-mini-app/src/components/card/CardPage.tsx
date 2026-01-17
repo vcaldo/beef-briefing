@@ -27,7 +27,6 @@ export function CardPage({ userId, chatTitle }: CardPageProps) {
             user_id: userId,
             card_id: userCard.id,
             week_start: userCard.week_start,
-            theme: userCard.theme,
           })
         } else {
           addPageAction('card_not_found', { user_id: userId })

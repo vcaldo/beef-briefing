@@ -2,7 +2,8 @@
  * StatsPage - Main stats view for arena matches
  *
  * Features:
- * - 4 sub-tabs: Leaderboard, Profile, History, H2H
+ * - 3 sub-tabs: Leaderboard, Profile, History
+ * - H2H stats shown as modal overlay when clicking opponents
  * - Tab data caching to avoid refetching
  * - Manual refresh only (no automatic polling)
  * - Pagination for leaderboard and history
@@ -51,11 +52,10 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
   const [historyPage, setHistoryPage] = useState(0)
   const [historyLoading, setHistoryLoading] = useState(false)
 
-  // H2H state
+  // H2H state (now for modal)
   const [h2hData, setH2HData] = useState<H2HResponse | null>(null)
-  const [h2hOpponentId, setH2HOpponentId] = useState<number | null>(null)
   const [h2hLoading, setH2HLoading] = useState(false)
-  const [h2hSearchQuery, setH2HSearchQuery] = useState('')
+  const [showH2HModal, setShowH2HModal] = useState(false)
 
   // Error state
   const [error, setError] = useState<string | null>(null)
@@ -186,7 +186,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
         if (!isMountedRef.current) return
 
         setH2HData(data)
-        setH2HOpponentId(opponentId)
         addPageAction('h2h_loaded', {
           opponent_id: opponentId,
           total_matches: data.record.total_matches,
@@ -219,9 +218,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
    * This avoids unnecessary API calls when switching between tabs,
    * providing a snappier UX. The trade-off is slightly stale data
    * until the user explicitly refreshes.
-   *
-   * H2H is special: it requires selecting an opponent first,
-   * so no auto-fetch occurs when navigating to that tab.
    */
   useEffect(() => {
     switch (activeSubTab) {
@@ -240,10 +236,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
         if (!historyData) {
           fetchHistory()
         }
-        break
-      case 'h2h':
-        // H2H requires user to select an opponent from Leaderboard/History
-        // No auto-fetch - user must click on a player first
         break
     }
   }, [activeSubTab, leaderboardData, profileData, historyData, fetchLeaderboard, fetchProfile, fetchHistory])
@@ -288,15 +280,21 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     [fetchHistory]
   )
 
-  // Handle H2H opponent selection from leaderboard
+  // Handle H2H opponent selection from leaderboard or history
   const handleSelectOpponent = useCallback(
     (opponentId: number) => {
       if (opponentId === userId) return // Can't view H2H with yourself
-      setActiveSubTab('h2h')
+      setShowH2HModal(true)
       fetchH2H(opponentId)
     },
     [userId, fetchH2H]
   )
+
+  // Handle closing H2H modal
+  const handleCloseH2HModal = useCallback(() => {
+    setShowH2HModal(false)
+    setH2HData(null)
+  }, [])
 
   // Render rank badge class
   const getRankClass = (rank: number): string => {
@@ -332,6 +330,12 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
     return (
       <div className="stats-content">
+        {/* Hint message */}
+        <div className="tab-hint">
+          <span className="tab-hint-icon">ℹ️</span>
+          <span>Tap any player to view your head-to-head record</span>
+        </div>
+
         {/* Type toggle */}
         <div className="leaderboard-type-toggle">
           <button
@@ -442,6 +446,20 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     }
 
     const { stats } = profileData
+
+    // Check if stats data is available
+    if (!stats) {
+      return (
+        <div className="empty-state">
+          <span className="empty-icon">📊</span>
+          <p>No statistics available</p>
+          <p className="empty-hint">Play some matches to build your stats!</p>
+          <button className="btn-primary" onClick={fetchProfile}>
+            Refresh
+          </button>
+        </div>
+      )
+    }
 
     return (
       <div className="stats-content">
@@ -571,6 +589,12 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
     return (
       <div className="stats-content">
+        {/* Hint message */}
+        <div className="tab-hint">
+          <span className="tab-hint-icon">ℹ️</span>
+          <span>Tap any match to see detailed head-to-head stats</span>
+        </div>
+
         {historyData && historyData.matches.length > 0 ? (
           <>
             <div className="history-list">
@@ -640,85 +664,72 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     )
   }
 
-  // Render H2H tab content
-  const renderH2H = () => {
+  // Render H2H modal overlay
+  const renderH2HModal = () => {
+    if (!showH2HModal) return null
+
     return (
-      <div className="stats-content">
-        {/* Search/Select opponent */}
-        <div className="h2h-search">
-          <p className="h2h-hint">
-            Tap a player on the Leaderboard or History to view your head-to-head record
-          </p>
-          {h2hSearchQuery && (
-            <input
-              type="text"
-              className="h2h-search-input"
-              placeholder="Search by name or ID..."
-              value={h2hSearchQuery}
-              onChange={(e) => setH2HSearchQuery(e.target.value)}
-            />
+      <div className="h2h-modal-backdrop" onClick={handleCloseH2HModal}>
+        <div className="h2h-modal-content" onClick={(e) => e.stopPropagation()}>
+          <button className="h2h-modal-close" onClick={handleCloseH2HModal} aria-label="Close">
+            ×
+          </button>
+
+          {/* Loading state */}
+          {h2hLoading && (
+            <div className="h2h-modal-loading">
+              <LoadingSpinner message="Loading head-to-head..." />
+            </div>
           )}
-        </div>
 
-        {/* Loading state */}
-        {h2hLoading && <LoadingSpinner message="Loading head-to-head..." />}
+          {/* H2H data display */}
+          {!h2hLoading && h2hData && (
+            <div className="h2h-result">
+              <div className="h2h-header">
+                <div className="h2h-player you">You</div>
+                <div className="h2h-vs">VS</div>
+                <div className="h2h-player opponent">
+                  {h2hData.record.opponent.first_name}
+                  {h2hData.record.opponent.username && (
+                    <span className="h2h-username">@{h2hData.record.opponent.username}</span>
+                  )}
+                </div>
+              </div>
 
-        {/* H2H data display */}
-        {!h2hLoading && h2hData && (
-          <div className="h2h-result">
-            <div className="h2h-header">
-              <div className="h2h-player you">You</div>
-              <div className="h2h-vs">VS</div>
-              <div className="h2h-player opponent">
-                {h2hData.record.opponent.first_name}
-                {h2hData.record.opponent.username && (
-                  <span className="h2h-username">@{h2hData.record.opponent.username}</span>
+              <div className="h2h-record">
+                <div className="h2h-stat wins">
+                  <span className="h2h-stat-value">{h2hData.record.wins}</span>
+                  <span className="h2h-stat-label">Wins</span>
+                </div>
+                <div className="h2h-stat draws">
+                  <span className="h2h-stat-value">{h2hData.record.draws}</span>
+                  <span className="h2h-stat-label">Draws</span>
+                </div>
+                <div className="h2h-stat losses">
+                  <span className="h2h-stat-value">{h2hData.record.losses}</span>
+                  <span className="h2h-stat-label">Losses</span>
+                </div>
+              </div>
+
+              <div className="h2h-summary">
+                <div className="h2h-summary-item">
+                  <span className="summary-label">Total Matches</span>
+                  <span className="summary-value">{h2hData.record.total_matches}</span>
+                </div>
+                <div className="h2h-summary-item">
+                  <span className="summary-label">Win Rate</span>
+                  <span className="summary-value">{(h2hData.record.win_rate * 100).toFixed(1)}%</span>
+                </div>
+                {h2hData.record.last_played && (
+                  <div className="h2h-summary-item">
+                    <span className="summary-label">Last Played</span>
+                    <span className="summary-value">{formatDate(h2hData.record.last_played)}</span>
+                  </div>
                 )}
               </div>
             </div>
-
-            <div className="h2h-record">
-              <div className="h2h-stat wins">
-                <span className="h2h-stat-value">{h2hData.record.wins}</span>
-                <span className="h2h-stat-label">Wins</span>
-              </div>
-              <div className="h2h-stat draws">
-                <span className="h2h-stat-value">{h2hData.record.draws}</span>
-                <span className="h2h-stat-label">Draws</span>
-              </div>
-              <div className="h2h-stat losses">
-                <span className="h2h-stat-value">{h2hData.record.losses}</span>
-                <span className="h2h-stat-label">Losses</span>
-              </div>
-            </div>
-
-            <div className="h2h-summary">
-              <div className="h2h-summary-item">
-                <span className="summary-label">Total Matches</span>
-                <span className="summary-value">{h2hData.record.total_matches}</span>
-              </div>
-              <div className="h2h-summary-item">
-                <span className="summary-label">Win Rate</span>
-                <span className="summary-value">{(h2hData.record.win_rate * 100).toFixed(1)}%</span>
-              </div>
-              {h2hData.record.last_played && (
-                <div className="h2h-summary-item">
-                  <span className="summary-label">Last Played</span>
-                  <span className="summary-value">{formatDate(h2hData.record.last_played)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* No opponent selected */}
-        {!h2hLoading && !h2hData && !h2hOpponentId && (
-          <div className="empty-state">
-            <span className="empty-icon">🤝</span>
-            <p>Select an opponent</p>
-            <p className="empty-hint">Choose a player from Leaderboard or History</p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     )
   }
@@ -732,8 +743,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
         return renderProfile()
       case 'history':
         return renderHistory()
-      case 'h2h':
-        return renderH2H()
       default:
         return renderLeaderboard()
     }
@@ -767,14 +776,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
         >
           📜 History
         </button>
-        <button
-          className={`stats-tab ${activeSubTab === 'h2h' ? 'active' : ''}`}
-          onClick={() => handleSubTabChange('h2h')}
-          role="tab"
-          aria-selected={activeSubTab === 'h2h'}
-        >
-          🤝 H2H
-        </button>
       </nav>
 
       {/* Error banner */}
@@ -792,6 +793,9 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
       <div className="stats-tab-content" role="tabpanel">
         {renderContent()}
       </div>
+
+      {/* H2H Modal */}
+      {renderH2HModal()}
     </div>
   )
 }

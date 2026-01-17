@@ -886,8 +886,8 @@ export interface ProfileResponse {
   username?: string
   /** Profile photo URL */
   photo_url?: string
-  /** Complete user statistics */
-  stats: ProfileStats
+  /** Complete user statistics (optional - may be undefined if user hasn't played any matches) */
+  stats?: ProfileStats
 }
 
 // =============================================================================
@@ -958,8 +958,6 @@ export interface CardImage {
   week_start: string
   /** Object storage path */
   storage_path: string
-  /** Theme used for rendering */
-  theme: string
   /** ISO timestamp when generated */
   generated_at: string
   /** User's first name (may be null) */
@@ -1217,11 +1215,12 @@ export type TabId = 'lobby' | 'shop' | 'battle' | 'stats'
  * Stats page sub-tab identifiers.
  *
  * Controls which section is displayed within the Stats page.
+ * Note: H2H is now shown as a modal overlay instead of a separate tab.
  *
  * @example
  * const [subTab, setSubTab] = useState<StatsSubTab>('leaderboard');
  */
-export type StatsSubTab = 'leaderboard' | 'profile' | 'history' | 'h2h'
+export type StatsSubTab = 'leaderboard' | 'profile' | 'history'
 
 /**
  * Application lifecycle state.

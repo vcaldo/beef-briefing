@@ -10,7 +10,6 @@ export interface CardImage {
   chat_id: number
   week_start: string
   storage_path: string
-  theme: string
   generated_at: string
   first_name: string | null
   last_name: string | null

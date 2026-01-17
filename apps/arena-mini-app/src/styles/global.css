@@ -1186,6 +1186,11 @@ a:focus:not(:focus-visible),
   justify-content: center;
 }
 
+.team-reorder-group {
+  display: flex;
+  gap: 8px;
+}
+
 .team-slot {
   position: relative;
   width: 80px;

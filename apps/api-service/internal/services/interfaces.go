@@ -193,3 +193,34 @@ type BattleCard = battle.Card
 
 // ShopCard represents a card in the shop (re-export from battle package for interface clarity).
 type ShopCard = battle.ShopCard
+
+// =============================================================================
+// PROFILE PHOTO SERVICE INTERFACE
+// =============================================================================
+
+// ProfilePhotoServiceInterface defines methods for profile photo operations.
+// The profile photo service handles uploading, retrieving, and managing
+// user and chat profile photos.
+type ProfilePhotoServiceInterface interface {
+	// ProcessUserPhotos stores profile photos for a user, replacing any existing photos.
+	ProcessUserPhotos(ctx context.Context, userID int64, photos []models.ProfilePhotoMeta, files map[string][]byte) error
+
+	// ProcessChatPhotos stores profile photos for a chat, replacing any existing photos.
+	ProcessChatPhotos(ctx context.Context, chatID int64, photos []models.ProfilePhotoMeta, files map[string][]byte) error
+
+	// GetAllUserIDs returns all user IDs from the database.
+	GetAllUserIDs(ctx context.Context) ([]int64, error)
+
+	// GetAllChatIDs returns all chat IDs from the database.
+	GetAllChatIDs(ctx context.Context) ([]int64, error)
+
+	// GetUserPhoto retrieves a user's profile photo by size.
+	// Size can be "small", "medium", or "large" (default).
+	// Returns a pre-signed URL for the photo with 1-hour expiry.
+	GetUserPhoto(ctx context.Context, userID int64, size string) (string, error)
+
+	// GetChatPhoto retrieves a chat's profile photo by size.
+	// Size can be "small", "medium", or "large" (default).
+	// Returns a pre-signed URL for the photo with 1-hour expiry.
+	GetChatPhoto(ctx context.Context, chatID int64, size string) (string, error)
+}

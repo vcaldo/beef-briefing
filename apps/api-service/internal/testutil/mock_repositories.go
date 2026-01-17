@@ -2508,6 +2508,7 @@ type MockMLRepository struct {
 
 	// Call tracking
 	GetUnprocessedMessagesCalls int
+	LastGetUnprocessedLimit     int // Track last limit used
 	GetProcessingStatsCalls     int
 	SaveSentimentResultsCalls   int
 	SaveToxicityResultsCalls    int
@@ -2517,6 +2518,9 @@ type MockMLRepository struct {
 	SaveTopicsCalls             int
 	SaveMessageTopicsCalls      int
 	MarkMessagesProcessedCalls  int
+	ProcessedMessageIDs         []int64  // Track processed message IDs in order
+	ProcessedChatIDs            []int64  // Track processed chat IDs in order
+	ProcessedVersion            string   // Track last processor version
 
 	// Error injection
 	GetUnprocessedMessagesError error
@@ -2564,6 +2568,7 @@ func (m *MockMLRepository) Reset() {
 	m.ProcessedMessages = make(map[int64]string)
 
 	m.GetUnprocessedMessagesCalls = 0
+	m.LastGetUnprocessedLimit = 0
 	m.GetProcessingStatsCalls = 0
 	m.SaveSentimentResultsCalls = 0
 	m.SaveToxicityResultsCalls = 0
@@ -2573,6 +2578,9 @@ func (m *MockMLRepository) Reset() {
 	m.SaveTopicsCalls = 0
 	m.SaveMessageTopicsCalls = 0
 	m.MarkMessagesProcessedCalls = 0
+	m.ProcessedMessageIDs = []int64{}
+	m.ProcessedChatIDs = []int64{}
+	m.ProcessedVersion = ""
 
 	m.GetUnprocessedMessagesError = nil
 	m.GetProcessingStatsError = nil
@@ -2609,6 +2617,27 @@ func (m *MockMLRepository) SetProcessingStats(stats map[string]int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ProcessingStats = stats
+}
+
+// SetGetUnprocessedError sets the error for GetUnprocessedMessages.
+func (m *MockMLRepository) SetGetUnprocessedError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.GetUnprocessedMessagesError = err
+}
+
+// SetSaveSentimentError sets the error for SaveSentimentResults.
+func (m *MockMLRepository) SetSaveSentimentError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.SaveSentimentResultsError = err
+}
+
+// SetGetStatsError sets the error for GetProcessingStats.
+func (m *MockMLRepository) SetGetStatsError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.GetProcessingStatsError = err
 }
 
 // =============================================================================
@@ -2674,6 +2703,7 @@ func (m *MockMLRepository) GetUnprocessedMessages(ctx context.Context, limit int
 	defer m.mu.Unlock()
 
 	m.GetUnprocessedMessagesCalls++
+	m.LastGetUnprocessedLimit = limit // Track the limit
 	if m.GetUnprocessedMessagesError != nil {
 		return nil, m.GetUnprocessedMessagesError
 	}
@@ -2840,6 +2870,11 @@ func (m *MockMLRepository) MarkMessagesProcessed(ctx context.Context, messageIDs
 	if m.MarkMessagesProcessedError != nil {
 		return m.MarkMessagesProcessedError
 	}
+
+	// Track message IDs, chat IDs, and version
+	m.ProcessedMessageIDs = append(m.ProcessedMessageIDs, messageIDs...)
+	m.ProcessedChatIDs = append(m.ProcessedChatIDs, chatIDs...)
+	m.ProcessedVersion = version
 
 	for _, msgID := range messageIDs {
 		m.ProcessedMessages[msgID] = version

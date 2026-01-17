@@ -300,6 +300,18 @@ export function BattlePage({
     }
   }, [currentEventIndex])
 
+  // Auto-play battle after initial load
+  useEffect(() => {
+    if (battleData && currentEventIndex === -1 && !isPlaying) {
+      const autoPlayTimer = setTimeout(() => {
+        setIsPlaying(true)
+        addPageAction('battle_autoplay_started', { match_id: matchId })
+      }, 1500) // 1.5 second delay
+
+      return () => clearTimeout(autoPlayTimer)
+    }
+  }, [battleData, currentEventIndex, isPlaying, matchId])
+
   // Skip to end
   const skipToEnd = useCallback(() => {
     if (!battleData) return

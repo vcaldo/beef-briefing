@@ -231,6 +231,7 @@ function App() {
             onMatchChange={handleMatchChange}
             onNavigateToShop={navigateToShop}
             onNavigateToBattle={navigateToBattle}
+            gameConstants={gameConstants}
           />
         )
     }

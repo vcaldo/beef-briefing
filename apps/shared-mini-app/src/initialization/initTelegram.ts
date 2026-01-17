@@ -9,7 +9,6 @@
 import {
   init,
   miniApp,
-  themeParams,
   viewport,
   backButton,
 } from '@telegram-apps/sdk-react'
@@ -49,9 +48,10 @@ export async function initializeTelegramSDK(): Promise<void> {
       miniApp.ready()
     }
 
-    if (themeParams.mount.isAvailable()) {
-      themeParams.mount()
-    }
+    // Disabled theme mounting to force dark theme only
+    // if (themeParams.mount.isAvailable()) {
+    //   themeParams.mount()
+    // }
 
     if (viewport.mount.isAvailable()) {
       // viewport.mount() can be async in some SDK versions

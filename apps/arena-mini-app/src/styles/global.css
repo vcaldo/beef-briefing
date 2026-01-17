@@ -2342,7 +2342,91 @@ a:focus:not(:focus-visible),
   color: var(--hp-low);
 }
 
-/* H2H styles */
+/* Tab hint messages */
+.tab-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid var(--arena-blue);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--tg-theme-hint-color);
+}
+
+.tab-hint-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+/* H2H Modal */
+.h2h-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+  backdrop-filter: blur(4px);
+}
+
+.h2h-modal-content {
+  position: relative;
+  background: var(--arena-bg-dark);
+  border-radius: 16px;
+  max-width: 90vw;
+  max-height: 80vh;
+  width: 100%;
+  max-width: 500px;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s ease-out;
+  border: 1px solid var(--arena-bg-light);
+}
+
+.h2h-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--arena-bg-light);
+  border: none;
+  border-radius: 50%;
+  color: var(--tg-theme-text-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 1;
+  font-size: 24px;
+  line-height: 1;
+  padding: 0;
+}
+
+.h2h-modal-close:hover {
+  background: var(--arena-bg-medium);
+  transform: scale(1.1);
+}
+
+.h2h-modal-close:active {
+  transform: scale(0.95);
+}
+
+.h2h-modal-loading {
+  padding: 60px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* H2H styles (shared between modal and legacy tab) */
 .h2h-search {
   padding: 16px;
   text-align: center;

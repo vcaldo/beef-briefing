@@ -564,7 +564,7 @@ export function BattlePage({
       {/* Event Log */}
       <div className="event-log" ref={eventLogRef}>
         <div className="event-log-title">Battle Log</div>
-        {battleData.events.map((event, index) => (
+        {battleData.events.slice(0, currentEventIndex + 1).map((event, index) => (
           <div
             key={index}
             className={`event-log-item ${event.type} ${index === currentEventIndex ? 'current' : ''} ${index < currentEventIndex ? 'played' : ''}`}

@@ -266,9 +266,52 @@ class ArenaApiClient extends BaseApiClient {
       throw new Error('No chat ID available')
     }
 
-    return this.request<ProfileResponse>(
-      `/api/v1/mini-app/arena/profile?chat_id=${targetChatId}`
-    )
+    // Backend returns: { profile: {...}, recent_matches: [...] }
+    const response = await this.request<{
+      profile: any
+      recent_matches: any[]
+    }>(`/api/v1/mini-app/arena/profile?chat_id=${targetChatId}`)
+
+    // If no profile (new user), return minimal structure without stats
+    if (!response.profile) {
+      return {
+        user_id: 0,
+        first_name: 'Unknown',
+      }
+    }
+
+    const p = response.profile
+
+    // Transform backend response to match frontend ProfileResponse structure
+    return {
+      user_id: p.user_id,
+      first_name: p.first_name,
+      username: p.username || undefined,
+      photo_url: undefined, // Backend doesn't return photo_url yet
+      stats: {
+        ranked_wins: p.ranked_wins,
+        ranked_losses: p.ranked_losses,
+        ranked_draws: p.ranked_draws,
+        ranked_matches_played: p.ranked_matches,
+        ranked_win_rate: p.ranked_win_rate,
+        ranked_current_streak: p.ranked_current_streak,
+        ranked_best_streak: p.ranked_best_streak,
+        ranked_tournaments_played: p.ranked_tournaments_played,
+        ranked_tournaments_won: p.ranked_tournaments_won,
+        regular_wins: p.regular_wins,
+        regular_losses: p.regular_losses,
+        regular_draws: p.regular_draws,
+        regular_matches_played: p.regular_matches_played,
+        regular_win_rate: p.regular_win_rate,
+        regular_current_streak: p.regular_current_streak,
+        regular_best_streak: p.regular_best_streak,
+        total_matches: p.total_matches,
+        total_wins: p.total_wins,
+        total_damage_dealt: p.total_damage_dealt || 0,
+        rank: p.ranked_rank || undefined,
+        tier: undefined, // Backend doesn't calculate tier yet
+      },
+    }
   }
 
   /**
@@ -293,7 +336,7 @@ class ArenaApiClient extends BaseApiClient {
   async getCardImage(
     userId: number,
     weekOffset: number = 0,
-    cardType: 'regular' | 'compact' = 'regular'
+    _cardType: 'regular' | 'compact' = 'regular'
   ): Promise<CardImageResponse | null> {
     const chatId = this.getChatId()
     if (!chatId) {
@@ -308,13 +351,9 @@ class ArenaApiClient extends BaseApiClient {
     weekStart.setDate(now.getDate() - daysToMonday + weekOffset * 7)
     const weekStartStr = weekStart.toISOString().split('T')[0]
 
-    // Determine theme suffix for compact cards
-    const themeSuffix = cardType === 'compact' ? '_compact' : ''
-    const theme = `neon_arcade${themeSuffix}`
-
     try {
       const data = await this.request<{ images: CardImageResponse[] }>(
-        `/api/v1/mini-app/gallery/images?chat_id=${chatId}&week_start=${weekStartStr}&theme=${theme}&user_id=${userId}`
+        `/api/v1/mini-app/gallery/images?chat_id=${chatId}&week_start=${weekStartStr}&user_id=${userId}`
       )
 
       if (data.images && data.images.length > 0) {

@@ -28,6 +28,7 @@ interface BattlePageProps {
   userId: number
   activeMatch: Match | null
   onNavigateToStats?: () => void
+  onNavigateToLobby?: () => void
   onMatchChange?: (match: Match | null) => void
 }
 
@@ -35,6 +36,7 @@ export function BattlePage({
   userId,
   activeMatch,
   onNavigateToStats,
+  onNavigateToLobby,
   onMatchChange,
 }: BattlePageProps) {
   // Battle data state
@@ -361,7 +363,10 @@ export function BattlePage({
     if (onMatchChange) {
       onMatchChange(null)
     }
-  }, [onMatchChange])
+    if (onNavigateToLobby) {
+      onNavigateToLobby()
+    }
+  }, [onMatchChange, onNavigateToLobby])
 
   // Loading state
   if (loading) {

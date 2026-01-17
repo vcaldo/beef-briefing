@@ -18,12 +18,12 @@ import (
 
 // CardHandler handles HTTP requests for user card endpoints.
 type CardHandler struct {
-	cardService *services.CardService
+	cardService services.CardServiceInterface
 	config      *config.Config
 }
 
 // NewCardHandler creates a new CardHandler.
-func NewCardHandler(cardService *services.CardService, cfg *config.Config) *CardHandler {
+func NewCardHandler(cardService services.CardServiceInterface, cfg *config.Config) *CardHandler {
 	return &CardHandler{
 		cardService: cardService,
 		config:      cfg,

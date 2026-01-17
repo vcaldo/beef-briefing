@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"beef-briefing/apps/api-service/internal/game/battle"
+	"beef-briefing/apps/api-service/internal/game/shop"
 	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/storage"
 )
@@ -482,6 +483,9 @@ type MockDealer struct {
 	GetCardCountCalls int
 	DealCardsCalls    int
 }
+
+// Ensure MockDealer implements the shop.DealerInterface at compile time
+var _ shop.DealerInterface = (*MockDealer)(nil)
 
 // NewMockDealer creates a new MockDealer with default values.
 func NewMockDealer() *MockDealer {

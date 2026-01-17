@@ -25,6 +25,11 @@ type MockGameRepository struct {
 	ParticipantsWithUser map[string]map[int64]*repository.ParticipantWithUser // matchID -> userID -> participant with user info
 	Rounds             map[string][]*repository.MatchRound                // matchID -> rounds
 
+	// Tournament storage
+	Tournaments            map[int64]*repository.RankedTournament           // tournamentID -> tournament
+	TournamentParticipants map[int64]map[int64]*repository.TournamentParticipant // tournamentID -> userID -> participant
+	TournamentNextID       int64                                            // auto-increment counter for tournament IDs
+
 	// Call tracking
 	CreateMatchCalls           int
 	GetMatchCalls              int
@@ -39,6 +44,19 @@ type MockGameRepository struct {
 	UpdateParticipantShopCalls int
 	CreateRoundCalls           int
 
+	// Tournament call tracking
+	GetOrCreateTournamentCalls        int
+	GetTournamentByIDCalls            int
+	GetTodayTournamentCalls           int
+	AddTournamentParticipantCalls     int
+	RemoveTournamentParticipantCalls  int
+	GetTournamentParticipantsCalls    int
+	IsTournamentParticipantCalls      int
+	SetTournamentAnnouncedCalls       int
+	CloseTournamentRegistrationCalls  int
+	SkipTournamentCalls               int
+	CompleteTournamentCalls           int
+
 	// Error injection
 	CreateMatchError           error
 	GetMatchError              error
@@ -52,15 +70,31 @@ type MockGameRepository struct {
 	SubmitTeamError            error
 	UpdateParticipantShopError error
 	CreateRoundError           error
+
+	// Tournament error injection
+	GetOrCreateTournamentError       error
+	GetTournamentByIDError           error
+	GetTodayTournamentError          error
+	AddTournamentParticipantError    error
+	RemoveTournamentParticipantError error
+	GetTournamentParticipantsError   error
+	IsTournamentParticipantError     error
+	SetTournamentAnnouncedError      error
+	CloseTournamentRegistrationError error
+	SkipTournamentError              error
+	CompleteTournamentError          error
 }
 
 // NewMockGameRepository creates a new MockGameRepository with initialized storage.
 func NewMockGameRepository() *MockGameRepository {
 	return &MockGameRepository{
-		Matches:              make(map[string]*repository.Match),
-		Participants:         make(map[string]map[int64]*repository.Participant),
-		ParticipantsWithUser: make(map[string]map[int64]*repository.ParticipantWithUser),
-		Rounds:               make(map[string][]*repository.MatchRound),
+		Matches:                make(map[string]*repository.Match),
+		Participants:           make(map[string]map[int64]*repository.Participant),
+		ParticipantsWithUser:   make(map[string]map[int64]*repository.ParticipantWithUser),
+		Rounds:                 make(map[string][]*repository.MatchRound),
+		Tournaments:            make(map[int64]*repository.RankedTournament),
+		TournamentParticipants: make(map[int64]map[int64]*repository.TournamentParticipant),
+		TournamentNextID:       1,
 	}
 }
 
@@ -73,6 +107,9 @@ func (m *MockGameRepository) Reset() {
 	m.Participants = make(map[string]map[int64]*repository.Participant)
 	m.ParticipantsWithUser = make(map[string]map[int64]*repository.ParticipantWithUser)
 	m.Rounds = make(map[string][]*repository.MatchRound)
+	m.Tournaments = make(map[int64]*repository.RankedTournament)
+	m.TournamentParticipants = make(map[int64]map[int64]*repository.TournamentParticipant)
+	m.TournamentNextID = 1
 
 	m.CreateMatchCalls = 0
 	m.GetMatchCalls = 0
@@ -87,6 +124,19 @@ func (m *MockGameRepository) Reset() {
 	m.UpdateParticipantShopCalls = 0
 	m.CreateRoundCalls = 0
 
+	// Tournament call tracking
+	m.GetOrCreateTournamentCalls = 0
+	m.GetTournamentByIDCalls = 0
+	m.GetTodayTournamentCalls = 0
+	m.AddTournamentParticipantCalls = 0
+	m.RemoveTournamentParticipantCalls = 0
+	m.GetTournamentParticipantsCalls = 0
+	m.IsTournamentParticipantCalls = 0
+	m.SetTournamentAnnouncedCalls = 0
+	m.CloseTournamentRegistrationCalls = 0
+	m.SkipTournamentCalls = 0
+	m.CompleteTournamentCalls = 0
+
 	m.CreateMatchError = nil
 	m.GetMatchError = nil
 	m.GetActiveMatchesError = nil
@@ -99,6 +149,19 @@ func (m *MockGameRepository) Reset() {
 	m.SubmitTeamError = nil
 	m.UpdateParticipantShopError = nil
 	m.CreateRoundError = nil
+
+	// Tournament error injection
+	m.GetOrCreateTournamentError = nil
+	m.GetTournamentByIDError = nil
+	m.GetTodayTournamentError = nil
+	m.AddTournamentParticipantError = nil
+	m.RemoveTournamentParticipantError = nil
+	m.GetTournamentParticipantsError = nil
+	m.IsTournamentParticipantError = nil
+	m.SetTournamentAnnouncedError = nil
+	m.CloseTournamentRegistrationError = nil
+	m.SkipTournamentError = nil
+	m.CompleteTournamentError = nil
 }
 
 // copyMatch creates a deep copy of a Match to prevent data races
@@ -622,95 +685,412 @@ func (m *MockGameRepository) GetMatchRounds(ctx context.Context, matchID string)
 }
 
 // =============================================================================
-// Tournament Operations (Stubs)
+// Tournament Operations (Mock Implementation)
 // =============================================================================
 
-// GetOrCreateTournament is a stub for interface compliance.
+// copyTournament creates a deep copy of a tournament to prevent data races.
+func copyTournament(t *repository.RankedTournament) *repository.RankedTournament {
+	if t == nil {
+		return nil
+	}
+	cp := *t
+	// Deep copy pointer fields
+	if t.AnnouncementMessageID != nil {
+		id := *t.AnnouncementMessageID
+		cp.AnnouncementMessageID = &id
+	}
+	if t.AnnouncedAt != nil {
+		at := *t.AnnouncedAt
+		cp.AnnouncedAt = &at
+	}
+	if t.RegistrationClosedAt != nil {
+		at := *t.RegistrationClosedAt
+		cp.RegistrationClosedAt = &at
+	}
+	if t.CompletedAt != nil {
+		at := *t.CompletedAt
+		cp.CompletedAt = &at
+	}
+	if t.MatchID != nil {
+		id := *t.MatchID
+		cp.MatchID = &id
+	}
+	if t.WinnerUserID != nil {
+		id := *t.WinnerUserID
+		cp.WinnerUserID = &id
+	}
+	return &cp
+}
+
+// AddTournament adds a tournament to the mock storage for test setup.
+func (m *MockGameRepository) AddTournament(t *repository.RankedTournament) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.Tournaments[t.ID] = copyTournament(t)
+	if m.TournamentParticipants[t.ID] == nil {
+		m.TournamentParticipants[t.ID] = make(map[int64]*repository.TournamentParticipant)
+	}
+}
+
+// GetOrCreateTournament gets an existing tournament or creates a new one.
 func (m *MockGameRepository) GetOrCreateTournament(ctx context.Context, chatID int64, date string) (*repository.RankedTournament, error) {
-	return nil, nil
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.GetOrCreateTournamentCalls++
+
+	if m.GetOrCreateTournamentError != nil {
+		return nil, m.GetOrCreateTournamentError
+	}
+
+	// Look for existing tournament
+	for _, t := range m.Tournaments {
+		if t.ChatID == chatID && t.TournamentDate == date {
+			return copyTournament(t), nil
+		}
+	}
+
+	// Create new tournament
+	id := m.TournamentNextID
+	m.TournamentNextID++
+
+	tournament := &repository.RankedTournament{
+		ID:               id,
+		ChatID:           chatID,
+		TournamentDate:   date,
+		Status:           repository.TournamentStatusScheduled,
+		ParticipantCount: 0,
+		CreatedAt:        time.Now(),
+	}
+
+	m.Tournaments[id] = tournament
+	m.TournamentParticipants[id] = make(map[int64]*repository.TournamentParticipant)
+
+	return copyTournament(tournament), nil
 }
 
-// GetTournamentByID is a stub for interface compliance.
+// GetTournamentByID retrieves a tournament by ID.
 func (m *MockGameRepository) GetTournamentByID(ctx context.Context, id int64) (*repository.RankedTournament, error) {
-	return nil, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetTournamentByIDCalls++
+
+	if m.GetTournamentByIDError != nil {
+		return nil, m.GetTournamentByIDError
+	}
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return nil, nil
+	}
+
+	return copyTournament(t), nil
 }
 
-// GetTodayTournament is a stub for interface compliance.
+// GetTodayTournament retrieves today's tournament for a chat.
 func (m *MockGameRepository) GetTodayTournament(ctx context.Context, chatID int64, date string) (*repository.RankedTournament, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetTodayTournamentCalls++
+
+	if m.GetTodayTournamentError != nil {
+		return nil, m.GetTodayTournamentError
+	}
+
+	for _, t := range m.Tournaments {
+		if t.ChatID == chatID && t.TournamentDate == date {
+			return copyTournament(t), nil
+		}
+	}
+
 	return nil, nil
 }
 
-// GetTournamentsByStatus is a stub for interface compliance.
+// GetTournamentsByStatus returns tournaments with a specific status.
 func (m *MockGameRepository) GetTournamentsByStatus(ctx context.Context, status repository.TournamentStatus) ([]*repository.RankedTournament, error) {
-	return []*repository.RankedTournament{}, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []*repository.RankedTournament
+	for _, t := range m.Tournaments {
+		if t.Status == status {
+			result = append(result, copyTournament(t))
+		}
+	}
+	return result, nil
 }
 
-// GetTournamentsWithPendingRounds is a stub for interface compliance.
+// GetTournamentsWithPendingRounds returns tournaments that need next round execution.
 func (m *MockGameRepository) GetTournamentsWithPendingRounds(ctx context.Context) ([]*repository.RankedTournament, error) {
-	return []*repository.RankedTournament{}, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []*repository.RankedTournament
+	for _, t := range m.Tournaments {
+		if t.Status == repository.TournamentStatusInProgress {
+			result = append(result, copyTournament(t))
+		}
+	}
+	return result, nil
 }
 
-// UpdateTournamentStatus is a stub for interface compliance.
+// UpdateTournamentStatus updates the status of a tournament.
 func (m *MockGameRepository) UpdateTournamentStatus(ctx context.Context, id int64, status repository.TournamentStatus) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return errors.New("tournament not found")
+	}
+
+	t.Status = status
 	return nil
 }
 
-// SetTournamentAnnounced is a stub for interface compliance.
+// SetTournamentAnnounced marks a tournament as announced.
 func (m *MockGameRepository) SetTournamentAnnounced(ctx context.Context, id int64, messageID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.SetTournamentAnnouncedCalls++
+
+	if m.SetTournamentAnnouncedError != nil {
+		return m.SetTournamentAnnouncedError
+	}
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return errors.New("tournament not found")
+	}
+
+	t.Status = repository.TournamentStatusOpen
+	t.AnnouncementMessageID = &messageID
+	now := time.Now()
+	t.AnnouncedAt = &now
+
 	return nil
 }
 
-// CloseTournamentRegistration is a stub for interface compliance.
+// CloseTournamentRegistration closes registration and links the match.
 func (m *MockGameRepository) CloseTournamentRegistration(ctx context.Context, id int64, matchID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.CloseTournamentRegistrationCalls++
+
+	if m.CloseTournamentRegistrationError != nil {
+		return m.CloseTournamentRegistrationError
+	}
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return errors.New("tournament not found")
+	}
+
+	t.Status = repository.TournamentStatusInProgress
+	t.MatchID = &matchID
+	now := time.Now()
+	t.RegistrationClosedAt = &now
+
 	return nil
 }
 
-// CompleteTournament is a stub for interface compliance.
+// CompleteTournament marks a tournament as completed.
 func (m *MockGameRepository) CompleteTournament(ctx context.Context, id int64, winnerUserID *int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.CompleteTournamentCalls++
+
+	if m.CompleteTournamentError != nil {
+		return m.CompleteTournamentError
+	}
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return errors.New("tournament not found")
+	}
+
+	t.Status = repository.TournamentStatusCompleted
+	t.WinnerUserID = winnerUserID
+	now := time.Now()
+	t.CompletedAt = &now
+
 	return nil
 }
 
-// SkipTournament is a stub for interface compliance.
+// SkipTournament marks a tournament as skipped.
 func (m *MockGameRepository) SkipTournament(ctx context.Context, id int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.SkipTournamentCalls++
+
+	if m.SkipTournamentError != nil {
+		return m.SkipTournamentError
+	}
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return errors.New("tournament not found")
+	}
+
+	t.Status = repository.TournamentStatusSkipped
+
 	return nil
 }
 
-// UpdateTournamentBracket is a stub for interface compliance.
+// UpdateTournamentBracket updates the bracket state.
 func (m *MockGameRepository) UpdateTournamentBracket(ctx context.Context, id int64, bracketState json.RawMessage) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return errors.New("tournament not found")
+	}
+
+	t.BracketState = &bracketState
 	return nil
 }
 
-// AddTournamentParticipant is a stub for interface compliance.
+// AddTournamentParticipant adds a user to a tournament.
 func (m *MockGameRepository) AddTournamentParticipant(ctx context.Context, tournamentID, userID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.AddTournamentParticipantCalls++
+
+	if m.AddTournamentParticipantError != nil {
+		return m.AddTournamentParticipantError
+	}
+
+	if m.TournamentParticipants[tournamentID] == nil {
+		m.TournamentParticipants[tournamentID] = make(map[int64]*repository.TournamentParticipant)
+	}
+
+	m.TournamentParticipants[tournamentID][userID] = &repository.TournamentParticipant{
+		ID:           int64(len(m.TournamentParticipants[tournamentID]) + 1),
+		TournamentID: tournamentID,
+		UserID:       userID,
+		JoinedAt:     time.Now(),
+	}
+
+	// Update participant count on tournament
+	if t, exists := m.Tournaments[tournamentID]; exists {
+		t.ParticipantCount = len(m.TournamentParticipants[tournamentID])
+	}
+
 	return nil
 }
 
-// RemoveTournamentParticipant is a stub for interface compliance.
+// RemoveTournamentParticipant removes a user from a tournament.
 func (m *MockGameRepository) RemoveTournamentParticipant(ctx context.Context, tournamentID, userID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.RemoveTournamentParticipantCalls++
+
+	if m.RemoveTournamentParticipantError != nil {
+		return m.RemoveTournamentParticipantError
+	}
+
+	if m.TournamentParticipants[tournamentID] != nil {
+		delete(m.TournamentParticipants[tournamentID], userID)
+
+		// Update participant count on tournament
+		if t, exists := m.Tournaments[tournamentID]; exists {
+			t.ParticipantCount = len(m.TournamentParticipants[tournamentID])
+		}
+	}
+
 	return nil
 }
 
-// GetTournamentParticipants is a stub for interface compliance.
+// GetTournamentParticipants retrieves all participants for a tournament.
 func (m *MockGameRepository) GetTournamentParticipants(ctx context.Context, tournamentID int64) ([]*repository.TournamentParticipant, error) {
-	return []*repository.TournamentParticipant{}, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetTournamentParticipantsCalls++
+
+	if m.GetTournamentParticipantsError != nil {
+		return nil, m.GetTournamentParticipantsError
+	}
+
+	var result []*repository.TournamentParticipant
+	if participants, exists := m.TournamentParticipants[tournamentID]; exists {
+		for _, p := range participants {
+			cp := *p
+			result = append(result, &cp)
+		}
+	}
+
+	return result, nil
 }
 
-// IsTournamentParticipant is a stub for interface compliance.
+// IsTournamentParticipant checks if a user is registered for a tournament.
 func (m *MockGameRepository) IsTournamentParticipant(ctx context.Context, tournamentID, userID int64) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.IsTournamentParticipantCalls++
+
+	if m.IsTournamentParticipantError != nil {
+		return false, m.IsTournamentParticipantError
+	}
+
+	if participants, exists := m.TournamentParticipants[tournamentID]; exists {
+		_, isParticipant := participants[userID]
+		return isParticipant, nil
+	}
+
 	return false, nil
 }
 
-// GetTournamentsNeedingAnnouncement is a stub for interface compliance.
+// GetTournamentsNeedingAnnouncement returns tournaments that need to be announced.
 func (m *MockGameRepository) GetTournamentsNeedingAnnouncement(ctx context.Context, currentTime time.Time) ([]*repository.TournamentInfo, error) {
-	return []*repository.TournamentInfo{}, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []*repository.TournamentInfo
+	for _, t := range m.Tournaments {
+		if t.Status == repository.TournamentStatusScheduled {
+			result = append(result, &repository.TournamentInfo{
+				TournamentID:     t.ID,
+				ChatID:           t.ChatID,
+				TournamentDate:   t.TournamentDate,
+				ParticipantCount: int64(t.ParticipantCount),
+			})
+		}
+	}
+	return result, nil
 }
 
-// GetTournamentsNeedingClose is a stub for interface compliance.
+// GetTournamentsNeedingClose returns tournaments that need registration closed.
 func (m *MockGameRepository) GetTournamentsNeedingClose(ctx context.Context, currentTime time.Time) ([]*repository.TournamentInfo, error) {
-	return []*repository.TournamentInfo{}, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []*repository.TournamentInfo
+	for _, t := range m.Tournaments {
+		if t.Status == repository.TournamentStatusOpen {
+			result = append(result, &repository.TournamentInfo{
+				TournamentID:     t.ID,
+				ChatID:           t.ChatID,
+				TournamentDate:   t.TournamentDate,
+				ParticipantCount: int64(t.ParticipantCount),
+			})
+		}
+	}
+	return result, nil
 }
 
-// GetChatsWithTimezone is a stub for interface compliance.
+// GetChatsWithTimezone returns all chats with their timezone settings.
 func (m *MockGameRepository) GetChatsWithTimezone(ctx context.Context) ([]*repository.ChatTimezone, error) {
 	return []*repository.ChatTimezone{}, nil
 }

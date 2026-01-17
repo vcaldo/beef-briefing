@@ -20,7 +20,7 @@ import (
 type TournamentService struct {
 	db       *sql.DB
 	gameRepo repository.GameRepositoryInterface
-	dealer   *shop.Dealer
+	dealer   shop.DealerInterface
 	nrApp    *newrelic.Application
 }
 
@@ -28,7 +28,7 @@ type TournamentService struct {
 func NewTournamentService(
 	db *sql.DB,
 	gameRepo repository.GameRepositoryInterface,
-	dealer *shop.Dealer,
+	dealer shop.DealerInterface,
 	nrApp *newrelic.Application,
 ) *TournamentService {
 	return &TournamentService{

@@ -4,11 +4,13 @@ package testutil
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"sync"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/repository"
 )
 
@@ -2884,3 +2886,376 @@ func (m *MockMLRepository) MarkMessagesProcessed(ctx context.Context, messageIDs
 
 // Ensure MockMLRepository implements the interface at compile time
 var _ repository.MLRepositoryInterface = (*MockMLRepository)(nil)
+
+// =============================================================================
+// MockProfilePhotoRepository
+// =============================================================================
+
+// MockProfilePhotoRepository is a mock implementation of ProfilePhotoRepositoryInterface for testing.
+type MockProfilePhotoRepository struct {
+	mu sync.RWMutex
+
+	// Stored data
+	UserPhotos []models.DBUserProfilePhoto
+	ChatPhotos []models.DBChatProfilePhoto
+	AllUserIDs []int64
+	AllChatIDs []int64
+
+	// For GetUserPhotoBySize
+	UserPhotoBySize *models.DBUserProfilePhoto
+
+	// For GetChatPhotoBySize
+	ChatPhotoBySize *models.DBChatProfilePhoto
+
+	// Call counters
+	ReplaceUserPhotosCalls int
+	ReplaceChatPhotosCalls int
+	GetUserPhotosCalls     int
+	GetChatPhotosCalls     int
+	GetAllUserIDsCalls     int
+	GetAllChatIDsCalls     int
+	GetUserPhotoBySizeCalls int
+	GetChatPhotoBySizeCalls int
+
+	// Errors
+	ReplaceUserPhotosError  error
+	ReplaceChatPhotosError  error
+	GetUserPhotosError      error
+	GetChatPhotosError      error
+	GetAllUserIDsError      error
+	GetAllChatIDsError      error
+	GetUserPhotoError       error
+	GetChatPhotoError       error
+}
+
+// NewMockProfilePhotoRepository creates a new MockProfilePhotoRepository.
+func NewMockProfilePhotoRepository() *MockProfilePhotoRepository {
+	return &MockProfilePhotoRepository{
+		UserPhotos: make([]models.DBUserProfilePhoto, 0),
+		ChatPhotos: make([]models.DBChatProfilePhoto, 0),
+		AllUserIDs: make([]int64, 0),
+		AllChatIDs: make([]int64, 0),
+	}
+}
+
+// ReplaceUserPhotos replaces user photos.
+func (m *MockProfilePhotoRepository) ReplaceUserPhotos(ctx context.Context, tx *sql.Tx, userID int64, photos []models.DBUserProfilePhoto) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ReplaceUserPhotosCalls++
+	if m.ReplaceUserPhotosError != nil {
+		return m.ReplaceUserPhotosError
+	}
+
+	// Remove existing photos for this user
+	newPhotos := make([]models.DBUserProfilePhoto, 0)
+	for _, photo := range m.UserPhotos {
+		if photo.UserID != userID {
+			newPhotos = append(newPhotos, photo)
+		}
+	}
+	m.UserPhotos = newPhotos
+
+	// Add new photos
+	m.UserPhotos = append(m.UserPhotos, photos...)
+	return nil
+}
+
+// ReplaceChatPhotos replaces chat photos.
+func (m *MockProfilePhotoRepository) ReplaceChatPhotos(ctx context.Context, tx *sql.Tx, chatID int64, photos []models.DBChatProfilePhoto) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ReplaceChatPhotosCalls++
+	if m.ReplaceChatPhotosError != nil {
+		return m.ReplaceChatPhotosError
+	}
+
+	// Remove existing photos for this chat
+	newPhotos := make([]models.DBChatProfilePhoto, 0)
+	for _, photo := range m.ChatPhotos {
+		if photo.ChatID != chatID {
+			newPhotos = append(newPhotos, photo)
+		}
+	}
+	m.ChatPhotos = newPhotos
+
+	// Add new photos
+	m.ChatPhotos = append(m.ChatPhotos, photos...)
+	return nil
+}
+
+// GetUserPhotos retrieves user photos.
+func (m *MockProfilePhotoRepository) GetUserPhotos(ctx context.Context, userID int64) ([]models.DBUserProfilePhoto, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetUserPhotosCalls++
+	if m.GetUserPhotosError != nil {
+		return nil, m.GetUserPhotosError
+	}
+
+	var photos []models.DBUserProfilePhoto
+	for _, photo := range m.UserPhotos {
+		if photo.UserID == userID {
+			photos = append(photos, photo)
+		}
+	}
+	return photos, nil
+}
+
+// GetChatPhotos retrieves chat photos.
+func (m *MockProfilePhotoRepository) GetChatPhotos(ctx context.Context, chatID int64) ([]models.DBChatProfilePhoto, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetChatPhotosCalls++
+	if m.GetChatPhotosError != nil {
+		return nil, m.GetChatPhotosError
+	}
+
+	var photos []models.DBChatProfilePhoto
+	for _, photo := range m.ChatPhotos {
+		if photo.ChatID == chatID {
+			photos = append(photos, photo)
+		}
+	}
+	return photos, nil
+}
+
+// GetAllUserIDs returns all user IDs.
+func (m *MockProfilePhotoRepository) GetAllUserIDs(ctx context.Context) ([]int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetAllUserIDsCalls++
+	if m.GetAllUserIDsError != nil {
+		return nil, m.GetAllUserIDsError
+	}
+
+	return m.AllUserIDs, nil
+}
+
+// GetAllChatIDs returns all chat IDs.
+func (m *MockProfilePhotoRepository) GetAllChatIDs(ctx context.Context) ([]int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetAllChatIDsCalls++
+	if m.GetAllChatIDsError != nil {
+		return nil, m.GetAllChatIDsError
+	}
+
+	return m.AllChatIDs, nil
+}
+
+// GetUserPhotoBySize retrieves user photo by size.
+func (m *MockProfilePhotoRepository) GetUserPhotoBySize(ctx context.Context, userID int64, size string) (*models.DBUserProfilePhoto, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetUserPhotoBySizeCalls++
+	if m.GetUserPhotoError != nil {
+		return nil, m.GetUserPhotoError
+	}
+
+	return m.UserPhotoBySize, nil
+}
+
+// GetChatPhotoBySize retrieves chat photo by size.
+func (m *MockProfilePhotoRepository) GetChatPhotoBySize(ctx context.Context, chatID int64, size string) (*models.DBChatProfilePhoto, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetChatPhotoBySizeCalls++
+	if m.GetChatPhotoError != nil {
+		return nil, m.GetChatPhotoError
+	}
+
+	return m.ChatPhotoBySize, nil
+}
+
+// SetAllUserIDs sets the user IDs to return.
+func (m *MockProfilePhotoRepository) SetAllUserIDs(ids []int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.AllUserIDs = ids
+}
+
+// SetAllChatIDs sets the chat IDs to return.
+func (m *MockProfilePhotoRepository) SetAllChatIDs(ids []int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.AllChatIDs = ids
+}
+
+// SetUserPhotoBySize sets the user photo to return for GetUserPhotoBySize.
+func (m *MockProfilePhotoRepository) SetUserPhotoBySize(photo *models.DBUserProfilePhoto) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.UserPhotoBySize = photo
+}
+
+// SetChatPhotoBySize sets the chat photo to return for GetChatPhotoBySize.
+func (m *MockProfilePhotoRepository) SetChatPhotoBySize(photo *models.DBChatProfilePhoto) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ChatPhotoBySize = photo
+}
+
+// SetReplaceUserPhotosError sets the error to return for ReplaceUserPhotos.
+func (m *MockProfilePhotoRepository) SetReplaceUserPhotosError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ReplaceUserPhotosError = err
+}
+
+// SetGetUserPhotoError sets the error to return for GetUserPhotoBySize.
+func (m *MockProfilePhotoRepository) SetGetUserPhotoError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.GetUserPhotoError = err
+}
+
+// Reset clears all stored data and resets call counters.
+func (m *MockProfilePhotoRepository) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.UserPhotos = make([]models.DBUserProfilePhoto, 0)
+	m.ChatPhotos = make([]models.DBChatProfilePhoto, 0)
+	m.AllUserIDs = make([]int64, 0)
+	m.AllChatIDs = make([]int64, 0)
+	m.UserPhotoBySize = nil
+	m.ChatPhotoBySize = nil
+	m.ReplaceUserPhotosCalls = 0
+	m.ReplaceChatPhotosCalls = 0
+	m.GetUserPhotosCalls = 0
+	m.GetChatPhotosCalls = 0
+	m.GetAllUserIDsCalls = 0
+	m.GetAllChatIDsCalls = 0
+	m.GetUserPhotoBySizeCalls = 0
+	m.GetChatPhotoBySizeCalls = 0
+	m.ReplaceUserPhotosError = nil
+	m.ReplaceChatPhotosError = nil
+	m.GetUserPhotosError = nil
+	m.GetChatPhotosError = nil
+	m.GetAllUserIDsError = nil
+	m.GetAllChatIDsError = nil
+	m.GetUserPhotoError = nil
+	m.GetChatPhotoError = nil
+}
+
+// Ensure MockProfilePhotoRepository implements the interface at compile time
+var _ repository.ProfilePhotoRepositoryInterface = (*MockProfilePhotoRepository)(nil)
+
+// =============================================================================
+// MockMediaRepository
+// =============================================================================
+
+// MockMediaRepository is a mock implementation of MediaRepositoryInterface for testing.
+type MockMediaRepository struct {
+	mu sync.RWMutex
+
+	// Stored data
+	ObjectKeyByHash string
+
+	// Call counters
+	GetObjectKeyByHashCalls int
+
+	// Errors
+	GetObjectKeyByHashError error
+}
+
+// NewMockMediaRepository creates a new MockMediaRepository.
+func NewMockMediaRepository() *MockMediaRepository {
+	return &MockMediaRepository{}
+}
+
+// GetObjectKeyByHash retrieves object key by hash.
+func (m *MockMediaRepository) GetObjectKeyByHash(ctx context.Context, tx *sql.Tx, hash string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.GetObjectKeyByHashCalls++
+	if m.GetObjectKeyByHashError != nil {
+		return "", m.GetObjectKeyByHashError
+	}
+
+	return m.ObjectKeyByHash, nil
+}
+
+// SetObjectKeyByHash sets the object key to return.
+func (m *MockMediaRepository) SetObjectKeyByHash(key string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ObjectKeyByHash = key
+}
+
+// Reset clears all stored data and resets call counters.
+func (m *MockMediaRepository) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ObjectKeyByHash = ""
+	m.GetObjectKeyByHashCalls = 0
+	m.GetObjectKeyByHashError = nil
+}
+
+// Stub implementations for MediaRepositoryInterface methods not used in ProfilePhotoService tests
+
+func (m *MockMediaRepository) InsertMediaFile(ctx context.Context, tx *sql.Tx, messageID int64, mediaType, fileID, fileUniqueID, objectKey, fileHash string, fileSize *int64, mimeType, fileName string, duration, width, height *int, performer, title string) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertMediaFileReturningID(ctx context.Context, tx *sql.Tx, messageID int64, mediaType, fileID, fileUniqueID, objectKey, fileHash string, fileSize *int64, mimeType, fileName string, duration, width, height *int, performer, title string) (int64, error) {
+	return 0, nil
+}
+
+func (m *MockMediaRepository) InsertPhoto(ctx context.Context, tx *sql.Tx, messageID int64, photo *models.PhotoSize, objectKey, fileHash string) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertLocation(ctx context.Context, tx *sql.Tx, messageID int64, location *models.Location) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertLocationReturningID(ctx context.Context, tx *sql.Tx, messageID int64, location *models.Location) (int64, error) {
+	return 0, nil
+}
+
+func (m *MockMediaRepository) InsertSticker(ctx context.Context, tx *sql.Tx, messageID, mediaFileID int64, sticker *models.Sticker) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertGame(ctx context.Context, tx *sql.Tx, messageID int64, game *models.Game) (int64, error) {
+	return 0, nil
+}
+
+func (m *MockMediaRepository) InsertGamePhoto(ctx context.Context, tx *sql.Tx, gameID int64, photo *models.PhotoSize, objectKey, fileHash string) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertPoll(ctx context.Context, tx *sql.Tx, messageID int64, poll *models.Poll) (int64, error) {
+	return 0, nil
+}
+
+func (m *MockMediaRepository) InsertPollOption(ctx context.Context, tx *sql.Tx, pollID int64, index int, option *models.PollOption) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertContact(ctx context.Context, tx *sql.Tx, messageID int64, contact *models.Contact) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertVenue(ctx context.Context, tx *sql.Tx, messageID, locationID int64, venue *models.Venue) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertDice(ctx context.Context, tx *sql.Tx, messageID int64, dice *models.Dice) error {
+	return nil
+}
+
+// Ensure MockMediaRepository implements the interface at compile time
+var _ repository.MediaRepositoryInterface = (*MockMediaRepository)(nil)

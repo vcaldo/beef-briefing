@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"beef-briefing/apps/api-service/internal/storage"
 )
 
 // MockMinIOClient is a mock implementation of MinIO storage operations for testing.
@@ -33,6 +35,9 @@ type MockMinIOClient struct {
 	// UploadCalls tracks the number of times UploadMedia was called.
 	UploadCalls int
 
+	// UploadCount is an alias for UploadCalls for backward compatibility.
+	UploadCount int
+
 	// GetObjectCalls tracks the number of times GetObject was called.
 	GetObjectCalls int
 
@@ -41,6 +46,11 @@ type MockMinIOClient struct {
 
 	// GetPresignedURLSecondsCalls tracks the number of times GetPresignedURLSeconds was called.
 	GetPresignedURLSecondsCalls int
+
+	// Configurable return values
+	NextUploadObjectKey string
+	NextUploadFileHash  string
+	NextPresignedURL    string
 }
 
 // MockObject represents an object stored in the mock storage.
@@ -67,14 +77,22 @@ func (m *MockMinIOClient) UploadMedia(ctx context.Context, fileID string, data [
 	defer m.mu.Unlock()
 
 	m.UploadCalls++
+	m.UploadCount++ // Keep both in sync for backward compatibility
 
 	if m.UploadError != nil {
 		return "", "", m.UploadError
 	}
 
-	// Generate a simple hash for testing (not a real SHA256)
-	fileHash := generateMockHash(data)
-	objectKey := mediaType + "/" + fileHash[:2] + "/" + fileHash
+	// Use configured return values if set
+	var objectKey, fileHash string
+	if m.NextUploadObjectKey != "" {
+		objectKey = m.NextUploadObjectKey
+		fileHash = m.NextUploadFileHash
+	} else {
+		// Generate a simple hash for testing (not a real SHA256)
+		fileHash = generateMockHash(data)
+		objectKey = mediaType + "/" + fileHash[:2] + "/" + fileHash
+	}
 
 	m.Storage[objectKey] = &MockObject{
 		Data:        data,
@@ -112,6 +130,9 @@ func (m *MockMinIOClient) GetObjectURL(objectKey string) string {
 	return m.PresignedURLBase + "/mock-bucket/" + objectKey
 }
 
+// Ensure MockMinIOClient implements the storage.MinIOClientInterface at compile time
+var _ storage.MinIOClientInterface = (*MockMinIOClient)(nil)
+
 // GetPresignedURL generates a mock presigned URL.
 func (m *MockMinIOClient) GetPresignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
 	m.mu.Lock()
@@ -121,6 +142,11 @@ func (m *MockMinIOClient) GetPresignedURL(ctx context.Context, objectKey string,
 
 	if m.GetPresignedURLError != nil {
 		return "", m.GetPresignedURLError
+	}
+
+	// Use configured return value if set
+	if m.NextPresignedURL != "" {
+		return m.NextPresignedURL, nil
 	}
 
 	// Return a mock presigned URL with expiry encoded
@@ -146,12 +172,35 @@ func (m *MockMinIOClient) Reset() {
 
 	m.Storage = make(map[string]*MockObject)
 	m.UploadCalls = 0
+	m.UploadCount = 0
 	m.GetObjectCalls = 0
 	m.GetPresignedURLCalls = 0
 	m.GetPresignedURLSecondsCalls = 0
 	m.UploadError = nil
 	m.GetObjectError = nil
 	m.GetPresignedURLError = nil
+	m.NextUploadObjectKey = ""
+	m.NextUploadFileHash = ""
+	m.NextPresignedURL = ""
+}
+
+// SetUploadResult configures the next UploadMedia call to return specific values.
+func (m *MockMinIOClient) SetUploadResult(objectKey, fileHash string, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.NextUploadObjectKey = objectKey
+	m.NextUploadFileHash = fileHash
+	m.UploadError = err
+}
+
+// SetPresignedURL configures the next GetPresignedURL call to return specific URL.
+func (m *MockMinIOClient) SetPresignedURL(url string, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.NextPresignedURL = url
+	m.GetPresignedURLError = err
 }
 
 // AddObject directly adds an object to storage for test setup.

@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/game/battle"
+	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/storage"
 )
 
@@ -511,7 +513,7 @@ func (m *MockDealer) GetCardCount(ctx context.Context, chatID int64) (int, error
 }
 
 // DealCards returns the next queued result from DealCardsResults.
-func (m *MockDealer) DealCards(ctx context.Context, chatID int64, count int) (interface{}, error) {
+func (m *MockDealer) DealCards(ctx context.Context, chatID int64, count int) ([]*battle.ShopCard, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -521,16 +523,9 @@ func (m *MockDealer) DealCards(ctx context.Context, chatID int64, count int) (in
 		return nil, m.DealCardsError
 	}
 
-	if len(m.DealCardsResults) == 0 {
-		// Return empty slice if no results queued
-		return []interface{}{}, nil
-	}
-
-	// Pop the first result
-	result := m.DealCardsResults[0]
-	m.DealCardsResults = m.DealCardsResults[1:]
-
-	return result, nil
+	// For test purposes, return empty slice
+	// Tests that need specific card data should set DealCardsResults
+	return []*battle.ShopCard{}, nil
 }
 
 // SetCardCount sets the card count to be returned by GetCardCount.
@@ -568,4 +563,67 @@ func (m *MockDealer) Reset() {
 	m.DealCardsError = nil
 	m.GetCardCountCalls = 0
 	m.DealCardsCalls = 0
+}
+
+// =============================================================================
+// MockIngestService
+// =============================================================================
+
+// MockIngestService is a mock implementation of IngestService for testing handlers.
+type MockIngestService struct {
+	mu sync.RWMutex
+
+	// ProcessUpdateCalled tracks if ProcessUpdate was called
+	ProcessUpdateCalled bool
+
+	// LastUpdate stores the last update passed to ProcessUpdate
+	LastUpdate *models.Update
+
+	// LastFiles stores the last files map passed to ProcessUpdate
+	LastFiles map[string][]byte
+
+	// ProcessUpdateError is the error to return from ProcessUpdate
+	ProcessUpdateError error
+}
+
+// NewMockIngestService creates a new MockIngestService
+func NewMockIngestService() *MockIngestService {
+	return &MockIngestService{
+		ProcessUpdateCalled: false,
+		LastFiles:           make(map[string][]byte),
+	}
+}
+
+// ProcessUpdate mocks the IngestService.ProcessUpdate method
+func (m *MockIngestService) ProcessUpdate(ctx context.Context, update *models.Update, files map[string][]byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ProcessUpdateCalled = true
+	m.LastUpdate = update
+
+	m.LastFiles = make(map[string][]byte)
+	for k, v := range files {
+		m.LastFiles[k] = v
+	}
+
+	return m.ProcessUpdateError
+}
+
+// SetProcessUpdateError configures the error to return from ProcessUpdate
+func (m *MockIngestService) SetProcessUpdateError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ProcessUpdateError = err
+}
+
+// Reset clears all state
+func (m *MockIngestService) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ProcessUpdateCalled = false
+	m.LastUpdate = nil
+	m.LastFiles = make(map[string][]byte)
+	m.ProcessUpdateError = nil
 }

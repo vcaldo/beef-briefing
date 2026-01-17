@@ -19,13 +19,14 @@ func newTestMatchServiceForMatchTests(mockRepo *testutil.MockGameRepository, moc
 
 // Test fixtures specific to match_service tests
 
-func newMatchForTest(id string, chatID int64, status repository.MatchStatus) *repository.Match {
+func newMatchForTest(id string, chatID int64, status repository.MatchStatus, creatorUserID int64) *repository.Match {
 	return &repository.Match{
-		ID:        id,
-		ChatID:    chatID,
-		MatchType: repository.MatchTypeRegular,
-		Status:    status,
-		CreatedAt: time.Now(),
+		ID:            id,
+		ChatID:        chatID,
+		MatchType:     repository.MatchTypeRegular,
+		Status:        status,
+		CreatorUserID: &creatorUserID,
+		CreatedAt:     time.Now(),
 	}
 }
 
@@ -118,7 +119,7 @@ func TestCreateMatch_ActiveMatchExistsForMatch(t *testing.T) {
 	userID := int64(1)
 
 	// Setup: Active match already exists
-	activeMatch := newMatchForTest("match-1", chatID, repository.MatchStatusOpen)
+	activeMatch := newMatchForTest("match-1", chatID, repository.MatchStatusOpen, 1)
 	mockRepo.AddMatch(activeMatch)
 	mockDealer.SetCardCount(15)
 
@@ -173,7 +174,7 @@ func TestGetMatch_ExistingMatch(t *testing.T) {
 	userID := int64(1)
 
 	// Setup: Create match with participant
-	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen)
+	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen, userID)
 	mockRepo.AddMatch(match)
 	participant := newParticipantWithUserForMatchTest(matchID, userID, "User", "user1")
 	mockRepo.AddParticipantWithUser(participant)
@@ -233,9 +234,9 @@ func TestGetActiveMatches_FilterByStatus(t *testing.T) {
 	chatID := int64(-100123)
 
 	// Setup: Create matches with different statuses
-	openMatch := newMatchForTest("match-1", chatID, repository.MatchStatusOpen)
-	shopMatch := newMatchForTest("match-2", chatID, repository.MatchStatusShopPhase)
-	completedMatch := newMatchForTest("match-3", chatID, repository.MatchStatusComplete)
+	openMatch := newMatchForTest("match-1", chatID, repository.MatchStatusOpen, 1)
+	shopMatch := newMatchForTest("match-2", chatID, repository.MatchStatusShopPhase, 1)
+	completedMatch := newMatchForTest("match-3", chatID, repository.MatchStatusCompleted, 1)
 
 	mockRepo.AddMatch(openMatch)
 	mockRepo.AddMatch(shopMatch)
@@ -310,7 +311,7 @@ func TestJoinMatch_AddParticipant(t *testing.T) {
 	joinerID := int64(2)
 
 	// Setup: Create match with creator
-	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen)
+	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen, creatorID)
 	mockRepo.AddMatch(match)
 	mockRepo.AddParticipantWithUser(newParticipantWithUserForMatchTest(matchID, creatorID, "Creator", "creator"))
 	mockDealer.SetCardCount(15)
@@ -351,7 +352,7 @@ func TestJoinMatch_MatchNotOpenForJoin(t *testing.T) {
 	userID := int64(2)
 
 	// Setup: Match is in shop phase (not open for joining)
-	match := newMatchForTest(matchID, chatID, repository.MatchStatusShopPhase)
+	match := newMatchForTest(matchID, chatID, repository.MatchStatusShopPhase, 1)
 	mockRepo.AddMatch(match)
 
 	// Execute
@@ -378,7 +379,7 @@ func TestJoinMatch_AlreadyJoined(t *testing.T) {
 	userID := int64(1)
 
 	// Setup: Match with user already as participant
-	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen)
+	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen, userID)
 	mockRepo.AddMatch(match)
 	mockRepo.AddParticipantWithUser(newParticipantWithUserForMatchTest(matchID, userID, "User", "user1"))
 	mockDealer.SetCardCount(15)
@@ -386,15 +387,12 @@ func TestJoinMatch_AlreadyJoined(t *testing.T) {
 	// Execute (try to join again)
 	result, err := svc.JoinMatch(ctx, matchID, userID)
 
-	// Verify (should succeed but participant count stays 1)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+	// Verify (should fail with already joined error)
+	if err == nil {
+		t.Fatal("expected error when trying to join twice, got nil")
 	}
-	if result == nil {
-		t.Fatal("expected result, got nil")
-	}
-	if len(result.Participants) != 1 {
-		t.Fatalf("expected 1 participant (no duplicate), got %d", len(result.Participants))
+	if result != nil {
+		t.Errorf("expected nil result on error, got %+v", result)
 	}
 }
 
@@ -412,7 +410,7 @@ func TestLeaveMatch_RemoveParticipant(t *testing.T) {
 	userID := int64(1)
 
 	// Setup: Match with participant
-	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen)
+	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen, userID)
 	mockRepo.AddMatch(match)
 	mockRepo.AddParticipantWithUser(newParticipantWithUserForMatchTest(matchID, userID, "User", "user1"))
 
@@ -443,7 +441,7 @@ func TestLeaveMatch_NotInMatchForLeave(t *testing.T) {
 	userID := int64(999) // User not in match
 
 	// Setup: Match with different participant
-	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen)
+	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen, userID)
 	mockRepo.AddMatch(match)
 	mockRepo.AddParticipantWithUser(newParticipantWithUserForMatchTest(matchID, 1, "Other", "other"))
 
@@ -470,7 +468,7 @@ func TestStartMatch_TransitionToShopPhaseForMatch(t *testing.T) {
 	userID := int64(1)
 
 	// Setup: Open match with 2 participants
-	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen)
+	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen, userID)
 	mockRepo.AddMatch(match)
 	mockRepo.AddParticipantWithUser(newParticipantWithUserForMatchTest(matchID, userID, "User1", "user1"))
 	mockRepo.AddParticipantWithUser(newParticipantWithUserForMatchTest(matchID, 2, "User2", "user2"))
@@ -515,7 +513,7 @@ func TestStartMatch_NotEnoughParticipantsForMatchStart(t *testing.T) {
 	userID := int64(1)
 
 	// Setup: Match with only 1 participant (need at least 2)
-	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen)
+	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen, userID)
 	mockRepo.AddMatch(match)
 	mockRepo.AddParticipantWithUser(newParticipantWithUserForMatchTest(matchID, userID, "User1", "user1"))
 
@@ -543,7 +541,7 @@ func TestStartMatch_RepositoryErrorInMatch(t *testing.T) {
 	userID := int64(1)
 
 	// Setup: Match with participants
-	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen)
+	match := newMatchForTest(matchID, chatID, repository.MatchStatusOpen, userID)
 	mockRepo.AddMatch(match)
 	mockRepo.AddParticipantWithUser(newParticipantWithUserForMatchTest(matchID, userID, "User1", "user1"))
 	mockRepo.AddParticipantWithUser(newParticipantWithUserForMatchTest(matchID, 2, "User2", "user2"))

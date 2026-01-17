@@ -18,12 +18,12 @@ import (
 // It is responsible only for HTTP concerns: parsing requests, extracting files,
 // and writing responses. Business logic is delegated to IngestService.
 type IngestHandler struct {
-	ingestService *services.IngestService
+	ingestService services.IngestServiceInterface
 	config        *config.Config
 }
 
 // NewIngestHandler creates a new IngestHandler with the given dependencies.
-func NewIngestHandler(ingestService *services.IngestService, cfg *config.Config) *IngestHandler {
+func NewIngestHandler(ingestService services.IngestServiceInterface, cfg *config.Config) *IngestHandler {
 	return &IngestHandler{
 		ingestService: ingestService,
 		config:        cfg,

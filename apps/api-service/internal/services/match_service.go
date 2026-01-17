@@ -21,7 +21,7 @@ import (
 type MatchService struct {
 	db       *sql.DB
 	gameRepo repository.GameRepositoryInterface
-	dealer   *shop.Dealer
+	dealer   shop.DealerInterface
 	nrApp    *newrelic.Application
 }
 
@@ -29,7 +29,7 @@ type MatchService struct {
 func NewMatchService(
 	db *sql.DB,
 	gameRepo repository.GameRepositoryInterface,
-	dealer *shop.Dealer,
+	dealer shop.DealerInterface,
 	nrApp *newrelic.Application,
 ) *MatchService {
 	return &MatchService{

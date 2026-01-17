@@ -20,9 +20,10 @@ type MockGameRepository struct {
 	mu sync.RWMutex // protects all fields below
 
 	// Match storage
-	Matches      map[string]*repository.Match
-	Participants map[string]map[int64]*repository.Participant // matchID -> userID -> participant
-	Rounds       map[string][]*repository.MatchRound          // matchID -> rounds
+	Matches            map[string]*repository.Match
+	Participants       map[string]map[int64]*repository.Participant       // matchID -> userID -> participant
+	ParticipantsWithUser map[string]map[int64]*repository.ParticipantWithUser // matchID -> userID -> participant with user info
+	Rounds             map[string][]*repository.MatchRound                // matchID -> rounds
 
 	// Call tracking
 	CreateMatchCalls           int
@@ -56,9 +57,10 @@ type MockGameRepository struct {
 // NewMockGameRepository creates a new MockGameRepository with initialized storage.
 func NewMockGameRepository() *MockGameRepository {
 	return &MockGameRepository{
-		Matches:      make(map[string]*repository.Match),
-		Participants: make(map[string]map[int64]*repository.Participant),
-		Rounds:       make(map[string][]*repository.MatchRound),
+		Matches:              make(map[string]*repository.Match),
+		Participants:         make(map[string]map[int64]*repository.Participant),
+		ParticipantsWithUser: make(map[string]map[int64]*repository.ParticipantWithUser),
+		Rounds:               make(map[string][]*repository.MatchRound),
 	}
 }
 
@@ -69,6 +71,7 @@ func (m *MockGameRepository) Reset() {
 
 	m.Matches = make(map[string]*repository.Match)
 	m.Participants = make(map[string]map[int64]*repository.Participant)
+	m.ParticipantsWithUser = make(map[string]map[int64]*repository.ParticipantWithUser)
 	m.Rounds = make(map[string][]*repository.MatchRound)
 
 	m.CreateMatchCalls = 0
@@ -407,6 +410,18 @@ func (m *MockGameRepository) AddParticipant(ctx context.Context, matchID string,
 		CoinsRemaining: 10,
 	}
 	m.Participants[matchID][userID] = participant
+
+	// Also add to ParticipantsWithUser for GetMatchParticipants
+	if m.ParticipantsWithUser[matchID] == nil {
+		m.ParticipantsWithUser[matchID] = make(map[int64]*repository.ParticipantWithUser)
+	}
+	pwu := &repository.ParticipantWithUser{
+		Participant: *participant,
+		FirstName:   "Test User",
+		Username:    "testuser",
+	}
+	m.ParticipantsWithUser[matchID][userID] = pwu
+
 	return copyParticipant(participant), nil
 }
 
@@ -432,6 +447,17 @@ func (m *MockGameRepository) GetParticipant(ctx context.Context, matchID string,
 func (m *MockGameRepository) GetMatchParticipants(ctx context.Context, matchID string) ([]*repository.ParticipantWithUser, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
+	// Prefer ParticipantsWithUser if available, otherwise construct from Participants
+	if pwu, ok := m.ParticipantsWithUser[matchID]; ok && len(pwu) > 0 {
+		var result []*repository.ParticipantWithUser
+		for _, p := range pwu {
+			// Copy to prevent races
+			pCopy := *p
+			result = append(result, &pCopy)
+		}
+		return result, nil
+	}
 
 	if m.Participants[matchID] == nil {
 		return []*repository.ParticipantWithUser{}, nil
@@ -3259,3 +3285,49 @@ func (m *MockMediaRepository) InsertDice(ctx context.Context, tx *sql.Tx, messag
 
 // Ensure MockMediaRepository implements the interface at compile time
 var _ repository.MediaRepositoryInterface = (*MockMediaRepository)(nil)
+
+// Test Helper Methods for MockGameRepository
+
+// AddMatch is a helper method to add a match directly to storage for testing.
+// This is used to bypass validation logic in CreateMatch.
+func (m *MockGameRepository) AddMatch(match *repository.Match) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Matches[match.ID] = match
+	if m.Participants[match.ID] == nil {
+		m.Participants[match.ID] = make(map[int64]*repository.Participant)
+	}
+	if m.ParticipantsWithUser[match.ID] == nil {
+		m.ParticipantsWithUser[match.ID] = make(map[int64]*repository.ParticipantWithUser)
+	}
+}
+
+// AddParticipantWithUser is a helper method to add a participant with user info directly to storage.
+func (m *MockGameRepository) AddParticipantWithUser(p *repository.ParticipantWithUser) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.ParticipantsWithUser[p.MatchID] == nil {
+		m.ParticipantsWithUser[p.MatchID] = make(map[int64]*repository.ParticipantWithUser)
+	}
+	m.ParticipantsWithUser[p.MatchID][p.UserID] = p
+
+	// Also add to Participants map
+	if m.Participants[p.MatchID] == nil {
+		m.Participants[p.MatchID] = make(map[int64]*repository.Participant)
+	}
+	m.Participants[p.MatchID][p.UserID] = &p.Participant
+}
+
+// GetParticipantsByMatch returns all participants for a match (helper for tests).
+func (m *MockGameRepository) GetParticipantsByMatch(matchID string) []*repository.Participant {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var participants []*repository.Participant
+	if matchParticipants, ok := m.Participants[matchID]; ok {
+		for _, p := range matchParticipants {
+			participants = append(participants, p)
+		}
+	}
+	return participants
+}

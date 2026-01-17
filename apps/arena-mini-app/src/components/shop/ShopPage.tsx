@@ -20,6 +20,7 @@ import type {
   Match,
   EnhancedShopResponse,
   EnhancedShopCard,
+  EnhancedTeamCard,
   UpgradeType,
   GameConstants,
 } from '../../types'
@@ -56,51 +57,89 @@ export function ShopPage({
   // Refs for cleanup and preventing stale closures
   const pollIntervalRef = useRef<number | null>(null)
   const isMountedRef = useRef(true)
+  const isDraggingRef = useRef(false)
+
+  // Local state for smooth drag-and-drop (decoupled from server state)
+  const [localTeamOrder, setLocalTeamOrder] = useState<EnhancedTeamCard[]>([])
+  // Ref to track current order (avoids stale closure in handleDragEnd)
+  const localTeamOrderRef = useRef<EnhancedTeamCard[]>([])
 
   // Derived state
   const coins = shopData?.coins ?? 0
   const canReroll = shopData?.can_reroll ?? false
   const isSubmitted = shopData?.is_ready ?? false
   const teamCards = shopData?.team ?? []
+  const teamOrder = shopData?.team_order ?? []
   const shopCards = shopData?.cards ?? []
   const teamSize = gameConstants?.team_size ?? 3
   const cardCost = gameConstants?.card_cost ?? 3
   const rerollCost = gameConstants?.reroll_cost ?? 1
   const upgradeCost = gameConstants?.upgrade_cost ?? 1
 
-  // Handle team reordering via drag-and-drop
-  const handleTeamReorder = useCallback(
-    async (newOrder: typeof teamCards) => {
-      if (!activeMatch || isSubmitted) return
-
-      // Map new visual order to position indices
-      const newPositions = newOrder.map((_, idx) => idx)
-      const oldPositions = teamCards.map((c) => c.position).sort((a, b) => a - b)
-
-      // Skip if order hasn't changed
-      if (JSON.stringify(newPositions) === JSON.stringify(oldPositions)) return
-
-      setActionLoading('reorder')
-      try {
-        const data = await apiClient.setTeamOrder(activeMatch.id, newPositions)
-        addPageAction('team_reordered', {
-          match_id: activeMatch.id,
-          old_order: oldPositions,
-          new_order: newPositions,
-        })
-        setShopData(data)
-      } catch (err) {
-        console.error('Failed to reorder team:', err)
-        setError(err instanceof Error ? err.message : 'Failed to reorder team')
-        if (err instanceof Error) {
-          noticeError(err, { context: 'reorder_team', match_id: activeMatch.id })
-        }
-      } finally {
-        setActionLoading(null)
+  // Sync local team order with server state (when not dragging)
+  // Apply team_order to display cards in battle order
+  useEffect(() => {
+    if (!isDraggingRef.current && teamCards.length > 0) {
+      if (teamOrder.length === teamCards.length) {
+        // Reorder cards according to team_order (battle order)
+        const orderedTeam = teamOrder.map((posIdx: number) => teamCards[posIdx])
+        setLocalTeamOrder(orderedTeam)
+      } else {
+        setLocalTeamOrder(teamCards)
       }
-    },
-    [activeMatch, teamCards, isSubmitted]
-  )
+    }
+  }, [teamCards, teamOrder])
+
+  // Keep ref in sync with state (for handleDragEnd to avoid stale closure)
+  useEffect(() => {
+    localTeamOrderRef.current = localTeamOrder
+  }, [localTeamOrder])
+
+  // Instant visual update during drag (no API call)
+  const handleVisualReorder = useCallback((newOrder: EnhancedTeamCard[]) => {
+    setLocalTeamOrder(newOrder)
+  }, [])
+
+  // API call only when drag ends
+  const handleDragEnd = useCallback(async () => {
+    isDraggingRef.current = false
+
+    if (!activeMatch || isSubmitted) return
+
+    // Read current order from ref (avoids stale closure)
+    const currentOrder = localTeamOrderRef.current
+
+    // Compare with server order by card IDs
+    const newCardIds = currentOrder.map((c: EnhancedTeamCard) => c.card_id)
+    const oldCardIds = teamCards.map((c: EnhancedTeamCard) => c.card_id)
+
+    // Skip if order hasn't changed
+    if (JSON.stringify(newCardIds) === JSON.stringify(oldCardIds)) return
+
+    setActionLoading('reorder')
+    try {
+      // Send the original positions in new order
+      // e.g., if user dragged card from pos 2 to pos 0: [card2, card0, card1] → [2, 0, 1]
+      const newPositions = currentOrder.map((c: EnhancedTeamCard) => c.position)
+      const data = await apiClient.setTeamOrder(activeMatch.id, newPositions)
+      addPageAction('team_reordered', {
+        match_id: activeMatch.id,
+        old_order: oldCardIds,
+        new_order: newCardIds,
+      })
+      setShopData(data)
+    } catch (err) {
+      console.error('Failed to reorder team:', err)
+      // Revert to server state on error
+      setLocalTeamOrder(teamCards)
+      setError(err instanceof Error ? err.message : 'Failed to reorder team')
+      if (err instanceof Error) {
+        noticeError(err, { context: 'reorder_team', match_id: activeMatch.id })
+      }
+    } finally {
+      setActionLoading(null)
+    }
+  }, [activeMatch, teamCards, isSubmitted])
 
   // Fetch shop data from API
   const fetchShop = useCallback(async () => {
@@ -409,20 +448,22 @@ export function ShopPage({
         <h2 className="shop-section-title">Your Team ({teamCards.length}/{teamSize})</h2>
         <div className="team-display">
           {/* Draggable team cards */}
-          {teamCards.length > 0 && (
+          {localTeamOrder.length > 0 && (
             <Reorder.Group
               axis="x"
-              values={teamCards}
-              onReorder={handleTeamReorder}
+              values={localTeamOrder}
+              onReorder={handleVisualReorder}
               className="team-reorder-group"
               as="div"
             >
-              {teamCards.map((card, idx) => (
+              {localTeamOrder.map((card: EnhancedTeamCard, idx: number) => (
                 <Reorder.Item
                   key={card.card_id}
                   value={card}
                   className={`team-slot filled ${actionLoading === 'reorder' ? 'dragging' : ''}`}
                   drag={!isSubmitted}
+                  onDragStart={() => { isDraggingRef.current = true }}
+                  onDragEnd={handleDragEnd}
                   whileDrag={{ scale: 1.05, opacity: 0.8 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                   as="div"

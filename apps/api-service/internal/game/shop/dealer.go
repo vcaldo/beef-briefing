@@ -18,6 +18,12 @@ type CardService interface {
 	GetCardImageURLString(ctx context.Context, userID, chatID int64, weekStart *time.Time, theme string, expirySeconds int) (string, error)
 }
 
+// DealerInterface defines the interface for card dealing operations
+type DealerInterface interface {
+	GetCardCount(ctx context.Context, chatID int64) (int, error)
+	DealCards(ctx context.Context, chatID int64, count int) ([]*battle.ShopCard, error)
+}
+
 // Dealer handles card dealing from the database
 type Dealer struct {
 	db            *sql.DB

@@ -219,10 +219,10 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 	ingestService := services.NewIngestService(db, minioClient, nrApp, nil)
 	ingestHandler := handlers.NewIngestHandler(ingestService, cfg)
 
-	profilePhotoService := services.NewProfilePhotoService(db, minioClient, nrApp)
+	profilePhotoService := services.NewProfilePhotoService(db, minioClient, nrApp, nil)
 	profilePhotoHandler := handlers.NewProfilePhotoHandler(profilePhotoService, cfg)
 
-	mlService := services.NewMLService(db, nrApp)
+	mlService := services.NewMLService(db, nrApp, nil)
 	mlHandler := handlers.NewMLHandler(mlService, cfg)
 
 	cardService := services.NewCardService(db, minioClient, nrApp, nil)

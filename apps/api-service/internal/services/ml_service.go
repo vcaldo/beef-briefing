@@ -13,16 +13,32 @@ import (
 
 // MLService handles ML analytics business logic.
 type MLService struct {
-	mlRepo *repository.MLRepository
+	mlRepo repository.MLRepositoryInterface
 	nrApp  *newrelic.Application
 }
 
+// MLServiceDeps allows optional dependency injection for testing.
+// If nil is passed to NewMLService, default implementations are used.
+type MLServiceDeps struct {
+	MLRepo repository.MLRepositoryInterface
+}
+
 // NewMLService creates a new MLService.
-func NewMLService(db *sql.DB, nrApp *newrelic.Application) *MLService {
-	return &MLService{
-		mlRepo: repository.NewMLRepository(db, nrApp),
-		nrApp:  nrApp,
+// Pass nil for deps to use default implementations (production use).
+// Pass a MLServiceDeps struct to inject mock implementations (testing use).
+func NewMLService(db *sql.DB, nrApp *newrelic.Application, deps *MLServiceDeps) *MLService {
+	s := &MLService{
+		nrApp: nrApp,
 	}
+
+	// Use injected dependencies if provided, otherwise create defaults
+	if deps != nil && deps.MLRepo != nil {
+		s.mlRepo = deps.MLRepo
+	} else {
+		s.mlRepo = repository.NewMLRepository(db, nrApp)
+	}
+
+	return s
 }
 
 // MLMessage represents a message for ML processing.

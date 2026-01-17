@@ -21,13 +21,13 @@ import (
 
 // MiniAppHandler handles HTTP requests for Mini App endpoints.
 type MiniAppHandler struct {
-	service     *services.MiniAppService
-	cardService *services.CardService
+	service     services.MiniAppServiceInterface
+	cardService services.CardServiceInterface
 	config      *config.Config
 }
 
 // NewMiniAppHandler creates a new MiniAppHandler.
-func NewMiniAppHandler(service *services.MiniAppService, cardService *services.CardService, cfg *config.Config) *MiniAppHandler {
+func NewMiniAppHandler(service services.MiniAppServiceInterface, cardService services.CardServiceInterface, cfg *config.Config) *MiniAppHandler {
 	return &MiniAppHandler{
 		service:     service,
 		cardService: cardService,

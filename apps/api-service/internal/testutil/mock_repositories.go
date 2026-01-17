@@ -4,11 +4,13 @@ package testutil
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"sync"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/models"
 	"beef-briefing/apps/api-service/internal/repository"
 )
 
@@ -18,9 +20,15 @@ type MockGameRepository struct {
 	mu sync.RWMutex // protects all fields below
 
 	// Match storage
-	Matches      map[string]*repository.Match
-	Participants map[string]map[int64]*repository.Participant // matchID -> userID -> participant
-	Rounds       map[string][]*repository.MatchRound          // matchID -> rounds
+	Matches            map[string]*repository.Match
+	Participants       map[string]map[int64]*repository.Participant       // matchID -> userID -> participant
+	ParticipantsWithUser map[string]map[int64]*repository.ParticipantWithUser // matchID -> userID -> participant with user info
+	Rounds             map[string][]*repository.MatchRound                // matchID -> rounds
+
+	// Tournament storage
+	Tournaments            map[int64]*repository.RankedTournament           // tournamentID -> tournament
+	TournamentParticipants map[int64]map[int64]*repository.TournamentParticipant // tournamentID -> userID -> participant
+	TournamentNextID       int64                                            // auto-increment counter for tournament IDs
 
 	// Call tracking
 	CreateMatchCalls           int
@@ -36,6 +44,19 @@ type MockGameRepository struct {
 	UpdateParticipantShopCalls int
 	CreateRoundCalls           int
 
+	// Tournament call tracking
+	GetOrCreateTournamentCalls        int
+	GetTournamentByIDCalls            int
+	GetTodayTournamentCalls           int
+	AddTournamentParticipantCalls     int
+	RemoveTournamentParticipantCalls  int
+	GetTournamentParticipantsCalls    int
+	IsTournamentParticipantCalls      int
+	SetTournamentAnnouncedCalls       int
+	CloseTournamentRegistrationCalls  int
+	SkipTournamentCalls               int
+	CompleteTournamentCalls           int
+
 	// Error injection
 	CreateMatchError           error
 	GetMatchError              error
@@ -49,14 +70,31 @@ type MockGameRepository struct {
 	SubmitTeamError            error
 	UpdateParticipantShopError error
 	CreateRoundError           error
+
+	// Tournament error injection
+	GetOrCreateTournamentError       error
+	GetTournamentByIDError           error
+	GetTodayTournamentError          error
+	AddTournamentParticipantError    error
+	RemoveTournamentParticipantError error
+	GetTournamentParticipantsError   error
+	IsTournamentParticipantError     error
+	SetTournamentAnnouncedError      error
+	CloseTournamentRegistrationError error
+	SkipTournamentError              error
+	CompleteTournamentError          error
 }
 
 // NewMockGameRepository creates a new MockGameRepository with initialized storage.
 func NewMockGameRepository() *MockGameRepository {
 	return &MockGameRepository{
-		Matches:      make(map[string]*repository.Match),
-		Participants: make(map[string]map[int64]*repository.Participant),
-		Rounds:       make(map[string][]*repository.MatchRound),
+		Matches:                make(map[string]*repository.Match),
+		Participants:           make(map[string]map[int64]*repository.Participant),
+		ParticipantsWithUser:   make(map[string]map[int64]*repository.ParticipantWithUser),
+		Rounds:                 make(map[string][]*repository.MatchRound),
+		Tournaments:            make(map[int64]*repository.RankedTournament),
+		TournamentParticipants: make(map[int64]map[int64]*repository.TournamentParticipant),
+		TournamentNextID:       1,
 	}
 }
 
@@ -67,7 +105,11 @@ func (m *MockGameRepository) Reset() {
 
 	m.Matches = make(map[string]*repository.Match)
 	m.Participants = make(map[string]map[int64]*repository.Participant)
+	m.ParticipantsWithUser = make(map[string]map[int64]*repository.ParticipantWithUser)
 	m.Rounds = make(map[string][]*repository.MatchRound)
+	m.Tournaments = make(map[int64]*repository.RankedTournament)
+	m.TournamentParticipants = make(map[int64]map[int64]*repository.TournamentParticipant)
+	m.TournamentNextID = 1
 
 	m.CreateMatchCalls = 0
 	m.GetMatchCalls = 0
@@ -82,6 +124,19 @@ func (m *MockGameRepository) Reset() {
 	m.UpdateParticipantShopCalls = 0
 	m.CreateRoundCalls = 0
 
+	// Tournament call tracking
+	m.GetOrCreateTournamentCalls = 0
+	m.GetTournamentByIDCalls = 0
+	m.GetTodayTournamentCalls = 0
+	m.AddTournamentParticipantCalls = 0
+	m.RemoveTournamentParticipantCalls = 0
+	m.GetTournamentParticipantsCalls = 0
+	m.IsTournamentParticipantCalls = 0
+	m.SetTournamentAnnouncedCalls = 0
+	m.CloseTournamentRegistrationCalls = 0
+	m.SkipTournamentCalls = 0
+	m.CompleteTournamentCalls = 0
+
 	m.CreateMatchError = nil
 	m.GetMatchError = nil
 	m.GetActiveMatchesError = nil
@@ -94,6 +149,19 @@ func (m *MockGameRepository) Reset() {
 	m.SubmitTeamError = nil
 	m.UpdateParticipantShopError = nil
 	m.CreateRoundError = nil
+
+	// Tournament error injection
+	m.GetOrCreateTournamentError = nil
+	m.GetTournamentByIDError = nil
+	m.GetTodayTournamentError = nil
+	m.AddTournamentParticipantError = nil
+	m.RemoveTournamentParticipantError = nil
+	m.GetTournamentParticipantsError = nil
+	m.IsTournamentParticipantError = nil
+	m.SetTournamentAnnouncedError = nil
+	m.CloseTournamentRegistrationError = nil
+	m.SkipTournamentError = nil
+	m.CompleteTournamentError = nil
 }
 
 // copyMatch creates a deep copy of a Match to prevent data races
@@ -405,6 +473,18 @@ func (m *MockGameRepository) AddParticipant(ctx context.Context, matchID string,
 		CoinsRemaining: 10,
 	}
 	m.Participants[matchID][userID] = participant
+
+	// Also add to ParticipantsWithUser for GetMatchParticipants
+	if m.ParticipantsWithUser[matchID] == nil {
+		m.ParticipantsWithUser[matchID] = make(map[int64]*repository.ParticipantWithUser)
+	}
+	pwu := &repository.ParticipantWithUser{
+		Participant: *participant,
+		FirstName:   "Test User",
+		Username:    "testuser",
+	}
+	m.ParticipantsWithUser[matchID][userID] = pwu
+
 	return copyParticipant(participant), nil
 }
 
@@ -430,6 +510,17 @@ func (m *MockGameRepository) GetParticipant(ctx context.Context, matchID string,
 func (m *MockGameRepository) GetMatchParticipants(ctx context.Context, matchID string) ([]*repository.ParticipantWithUser, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
+	// Prefer ParticipantsWithUser if available, otherwise construct from Participants
+	if pwu, ok := m.ParticipantsWithUser[matchID]; ok && len(pwu) > 0 {
+		var result []*repository.ParticipantWithUser
+		for _, p := range pwu {
+			// Copy to prevent races
+			pCopy := *p
+			result = append(result, &pCopy)
+		}
+		return result, nil
+	}
 
 	if m.Participants[matchID] == nil {
 		return []*repository.ParticipantWithUser{}, nil
@@ -594,95 +685,412 @@ func (m *MockGameRepository) GetMatchRounds(ctx context.Context, matchID string)
 }
 
 // =============================================================================
-// Tournament Operations (Stubs)
+// Tournament Operations (Mock Implementation)
 // =============================================================================
 
-// GetOrCreateTournament is a stub for interface compliance.
+// copyTournament creates a deep copy of a tournament to prevent data races.
+func copyTournament(t *repository.RankedTournament) *repository.RankedTournament {
+	if t == nil {
+		return nil
+	}
+	cp := *t
+	// Deep copy pointer fields
+	if t.AnnouncementMessageID != nil {
+		id := *t.AnnouncementMessageID
+		cp.AnnouncementMessageID = &id
+	}
+	if t.AnnouncedAt != nil {
+		at := *t.AnnouncedAt
+		cp.AnnouncedAt = &at
+	}
+	if t.RegistrationClosedAt != nil {
+		at := *t.RegistrationClosedAt
+		cp.RegistrationClosedAt = &at
+	}
+	if t.CompletedAt != nil {
+		at := *t.CompletedAt
+		cp.CompletedAt = &at
+	}
+	if t.MatchID != nil {
+		id := *t.MatchID
+		cp.MatchID = &id
+	}
+	if t.WinnerUserID != nil {
+		id := *t.WinnerUserID
+		cp.WinnerUserID = &id
+	}
+	return &cp
+}
+
+// AddTournament adds a tournament to the mock storage for test setup.
+func (m *MockGameRepository) AddTournament(t *repository.RankedTournament) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.Tournaments[t.ID] = copyTournament(t)
+	if m.TournamentParticipants[t.ID] == nil {
+		m.TournamentParticipants[t.ID] = make(map[int64]*repository.TournamentParticipant)
+	}
+}
+
+// GetOrCreateTournament gets an existing tournament or creates a new one.
 func (m *MockGameRepository) GetOrCreateTournament(ctx context.Context, chatID int64, date string) (*repository.RankedTournament, error) {
-	return nil, nil
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.GetOrCreateTournamentCalls++
+
+	if m.GetOrCreateTournamentError != nil {
+		return nil, m.GetOrCreateTournamentError
+	}
+
+	// Look for existing tournament
+	for _, t := range m.Tournaments {
+		if t.ChatID == chatID && t.TournamentDate == date {
+			return copyTournament(t), nil
+		}
+	}
+
+	// Create new tournament
+	id := m.TournamentNextID
+	m.TournamentNextID++
+
+	tournament := &repository.RankedTournament{
+		ID:               id,
+		ChatID:           chatID,
+		TournamentDate:   date,
+		Status:           repository.TournamentStatusScheduled,
+		ParticipantCount: 0,
+		CreatedAt:        time.Now(),
+	}
+
+	m.Tournaments[id] = tournament
+	m.TournamentParticipants[id] = make(map[int64]*repository.TournamentParticipant)
+
+	return copyTournament(tournament), nil
 }
 
-// GetTournamentByID is a stub for interface compliance.
+// GetTournamentByID retrieves a tournament by ID.
 func (m *MockGameRepository) GetTournamentByID(ctx context.Context, id int64) (*repository.RankedTournament, error) {
-	return nil, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetTournamentByIDCalls++
+
+	if m.GetTournamentByIDError != nil {
+		return nil, m.GetTournamentByIDError
+	}
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return nil, nil
+	}
+
+	return copyTournament(t), nil
 }
 
-// GetTodayTournament is a stub for interface compliance.
+// GetTodayTournament retrieves today's tournament for a chat.
 func (m *MockGameRepository) GetTodayTournament(ctx context.Context, chatID int64, date string) (*repository.RankedTournament, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetTodayTournamentCalls++
+
+	if m.GetTodayTournamentError != nil {
+		return nil, m.GetTodayTournamentError
+	}
+
+	for _, t := range m.Tournaments {
+		if t.ChatID == chatID && t.TournamentDate == date {
+			return copyTournament(t), nil
+		}
+	}
+
 	return nil, nil
 }
 
-// GetTournamentsByStatus is a stub for interface compliance.
+// GetTournamentsByStatus returns tournaments with a specific status.
 func (m *MockGameRepository) GetTournamentsByStatus(ctx context.Context, status repository.TournamentStatus) ([]*repository.RankedTournament, error) {
-	return []*repository.RankedTournament{}, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []*repository.RankedTournament
+	for _, t := range m.Tournaments {
+		if t.Status == status {
+			result = append(result, copyTournament(t))
+		}
+	}
+	return result, nil
 }
 
-// GetTournamentsWithPendingRounds is a stub for interface compliance.
+// GetTournamentsWithPendingRounds returns tournaments that need next round execution.
 func (m *MockGameRepository) GetTournamentsWithPendingRounds(ctx context.Context) ([]*repository.RankedTournament, error) {
-	return []*repository.RankedTournament{}, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []*repository.RankedTournament
+	for _, t := range m.Tournaments {
+		if t.Status == repository.TournamentStatusInProgress {
+			result = append(result, copyTournament(t))
+		}
+	}
+	return result, nil
 }
 
-// UpdateTournamentStatus is a stub for interface compliance.
+// UpdateTournamentStatus updates the status of a tournament.
 func (m *MockGameRepository) UpdateTournamentStatus(ctx context.Context, id int64, status repository.TournamentStatus) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return errors.New("tournament not found")
+	}
+
+	t.Status = status
 	return nil
 }
 
-// SetTournamentAnnounced is a stub for interface compliance.
+// SetTournamentAnnounced marks a tournament as announced.
 func (m *MockGameRepository) SetTournamentAnnounced(ctx context.Context, id int64, messageID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.SetTournamentAnnouncedCalls++
+
+	if m.SetTournamentAnnouncedError != nil {
+		return m.SetTournamentAnnouncedError
+	}
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return errors.New("tournament not found")
+	}
+
+	t.Status = repository.TournamentStatusOpen
+	t.AnnouncementMessageID = &messageID
+	now := time.Now()
+	t.AnnouncedAt = &now
+
 	return nil
 }
 
-// CloseTournamentRegistration is a stub for interface compliance.
+// CloseTournamentRegistration closes registration and links the match.
 func (m *MockGameRepository) CloseTournamentRegistration(ctx context.Context, id int64, matchID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.CloseTournamentRegistrationCalls++
+
+	if m.CloseTournamentRegistrationError != nil {
+		return m.CloseTournamentRegistrationError
+	}
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return errors.New("tournament not found")
+	}
+
+	t.Status = repository.TournamentStatusInProgress
+	t.MatchID = &matchID
+	now := time.Now()
+	t.RegistrationClosedAt = &now
+
 	return nil
 }
 
-// CompleteTournament is a stub for interface compliance.
+// CompleteTournament marks a tournament as completed.
 func (m *MockGameRepository) CompleteTournament(ctx context.Context, id int64, winnerUserID *int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.CompleteTournamentCalls++
+
+	if m.CompleteTournamentError != nil {
+		return m.CompleteTournamentError
+	}
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return errors.New("tournament not found")
+	}
+
+	t.Status = repository.TournamentStatusCompleted
+	t.WinnerUserID = winnerUserID
+	now := time.Now()
+	t.CompletedAt = &now
+
 	return nil
 }
 
-// SkipTournament is a stub for interface compliance.
+// SkipTournament marks a tournament as skipped.
 func (m *MockGameRepository) SkipTournament(ctx context.Context, id int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.SkipTournamentCalls++
+
+	if m.SkipTournamentError != nil {
+		return m.SkipTournamentError
+	}
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return errors.New("tournament not found")
+	}
+
+	t.Status = repository.TournamentStatusSkipped
+
 	return nil
 }
 
-// UpdateTournamentBracket is a stub for interface compliance.
+// UpdateTournamentBracket updates the bracket state.
 func (m *MockGameRepository) UpdateTournamentBracket(ctx context.Context, id int64, bracketState json.RawMessage) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	t, exists := m.Tournaments[id]
+	if !exists {
+		return errors.New("tournament not found")
+	}
+
+	t.BracketState = &bracketState
 	return nil
 }
 
-// AddTournamentParticipant is a stub for interface compliance.
+// AddTournamentParticipant adds a user to a tournament.
 func (m *MockGameRepository) AddTournamentParticipant(ctx context.Context, tournamentID, userID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.AddTournamentParticipantCalls++
+
+	if m.AddTournamentParticipantError != nil {
+		return m.AddTournamentParticipantError
+	}
+
+	if m.TournamentParticipants[tournamentID] == nil {
+		m.TournamentParticipants[tournamentID] = make(map[int64]*repository.TournamentParticipant)
+	}
+
+	m.TournamentParticipants[tournamentID][userID] = &repository.TournamentParticipant{
+		ID:           int64(len(m.TournamentParticipants[tournamentID]) + 1),
+		TournamentID: tournamentID,
+		UserID:       userID,
+		JoinedAt:     time.Now(),
+	}
+
+	// Update participant count on tournament
+	if t, exists := m.Tournaments[tournamentID]; exists {
+		t.ParticipantCount = len(m.TournamentParticipants[tournamentID])
+	}
+
 	return nil
 }
 
-// RemoveTournamentParticipant is a stub for interface compliance.
+// RemoveTournamentParticipant removes a user from a tournament.
 func (m *MockGameRepository) RemoveTournamentParticipant(ctx context.Context, tournamentID, userID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.RemoveTournamentParticipantCalls++
+
+	if m.RemoveTournamentParticipantError != nil {
+		return m.RemoveTournamentParticipantError
+	}
+
+	if m.TournamentParticipants[tournamentID] != nil {
+		delete(m.TournamentParticipants[tournamentID], userID)
+
+		// Update participant count on tournament
+		if t, exists := m.Tournaments[tournamentID]; exists {
+			t.ParticipantCount = len(m.TournamentParticipants[tournamentID])
+		}
+	}
+
 	return nil
 }
 
-// GetTournamentParticipants is a stub for interface compliance.
+// GetTournamentParticipants retrieves all participants for a tournament.
 func (m *MockGameRepository) GetTournamentParticipants(ctx context.Context, tournamentID int64) ([]*repository.TournamentParticipant, error) {
-	return []*repository.TournamentParticipant{}, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetTournamentParticipantsCalls++
+
+	if m.GetTournamentParticipantsError != nil {
+		return nil, m.GetTournamentParticipantsError
+	}
+
+	var result []*repository.TournamentParticipant
+	if participants, exists := m.TournamentParticipants[tournamentID]; exists {
+		for _, p := range participants {
+			cp := *p
+			result = append(result, &cp)
+		}
+	}
+
+	return result, nil
 }
 
-// IsTournamentParticipant is a stub for interface compliance.
+// IsTournamentParticipant checks if a user is registered for a tournament.
 func (m *MockGameRepository) IsTournamentParticipant(ctx context.Context, tournamentID, userID int64) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.IsTournamentParticipantCalls++
+
+	if m.IsTournamentParticipantError != nil {
+		return false, m.IsTournamentParticipantError
+	}
+
+	if participants, exists := m.TournamentParticipants[tournamentID]; exists {
+		_, isParticipant := participants[userID]
+		return isParticipant, nil
+	}
+
 	return false, nil
 }
 
-// GetTournamentsNeedingAnnouncement is a stub for interface compliance.
+// GetTournamentsNeedingAnnouncement returns tournaments that need to be announced.
 func (m *MockGameRepository) GetTournamentsNeedingAnnouncement(ctx context.Context, currentTime time.Time) ([]*repository.TournamentInfo, error) {
-	return []*repository.TournamentInfo{}, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []*repository.TournamentInfo
+	for _, t := range m.Tournaments {
+		if t.Status == repository.TournamentStatusScheduled {
+			result = append(result, &repository.TournamentInfo{
+				TournamentID:     t.ID,
+				ChatID:           t.ChatID,
+				TournamentDate:   t.TournamentDate,
+				ParticipantCount: int64(t.ParticipantCount),
+			})
+		}
+	}
+	return result, nil
 }
 
-// GetTournamentsNeedingClose is a stub for interface compliance.
+// GetTournamentsNeedingClose returns tournaments that need registration closed.
 func (m *MockGameRepository) GetTournamentsNeedingClose(ctx context.Context, currentTime time.Time) ([]*repository.TournamentInfo, error) {
-	return []*repository.TournamentInfo{}, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []*repository.TournamentInfo
+	for _, t := range m.Tournaments {
+		if t.Status == repository.TournamentStatusOpen {
+			result = append(result, &repository.TournamentInfo{
+				TournamentID:     t.ID,
+				ChatID:           t.ChatID,
+				TournamentDate:   t.TournamentDate,
+				ParticipantCount: int64(t.ParticipantCount),
+			})
+		}
+	}
+	return result, nil
 }
 
-// GetChatsWithTimezone is a stub for interface compliance.
+// GetChatsWithTimezone returns all chats with their timezone settings.
 func (m *MockGameRepository) GetChatsWithTimezone(ctx context.Context) ([]*repository.ChatTimezone, error) {
 	return []*repository.ChatTimezone{}, nil
 }
@@ -2508,6 +2916,7 @@ type MockMLRepository struct {
 
 	// Call tracking
 	GetUnprocessedMessagesCalls int
+	LastGetUnprocessedLimit     int // Track last limit used
 	GetProcessingStatsCalls     int
 	SaveSentimentResultsCalls   int
 	SaveToxicityResultsCalls    int
@@ -2517,6 +2926,9 @@ type MockMLRepository struct {
 	SaveTopicsCalls             int
 	SaveMessageTopicsCalls      int
 	MarkMessagesProcessedCalls  int
+	ProcessedMessageIDs         []int64  // Track processed message IDs in order
+	ProcessedChatIDs            []int64  // Track processed chat IDs in order
+	ProcessedVersion            string   // Track last processor version
 
 	// Error injection
 	GetUnprocessedMessagesError error
@@ -2564,6 +2976,7 @@ func (m *MockMLRepository) Reset() {
 	m.ProcessedMessages = make(map[int64]string)
 
 	m.GetUnprocessedMessagesCalls = 0
+	m.LastGetUnprocessedLimit = 0
 	m.GetProcessingStatsCalls = 0
 	m.SaveSentimentResultsCalls = 0
 	m.SaveToxicityResultsCalls = 0
@@ -2573,6 +2986,9 @@ func (m *MockMLRepository) Reset() {
 	m.SaveTopicsCalls = 0
 	m.SaveMessageTopicsCalls = 0
 	m.MarkMessagesProcessedCalls = 0
+	m.ProcessedMessageIDs = []int64{}
+	m.ProcessedChatIDs = []int64{}
+	m.ProcessedVersion = ""
 
 	m.GetUnprocessedMessagesError = nil
 	m.GetProcessingStatsError = nil
@@ -2609,6 +3025,27 @@ func (m *MockMLRepository) SetProcessingStats(stats map[string]int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ProcessingStats = stats
+}
+
+// SetGetUnprocessedError sets the error for GetUnprocessedMessages.
+func (m *MockMLRepository) SetGetUnprocessedError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.GetUnprocessedMessagesError = err
+}
+
+// SetSaveSentimentError sets the error for SaveSentimentResults.
+func (m *MockMLRepository) SetSaveSentimentError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.SaveSentimentResultsError = err
+}
+
+// SetGetStatsError sets the error for GetProcessingStats.
+func (m *MockMLRepository) SetGetStatsError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.GetProcessingStatsError = err
 }
 
 // =============================================================================
@@ -2674,6 +3111,7 @@ func (m *MockMLRepository) GetUnprocessedMessages(ctx context.Context, limit int
 	defer m.mu.Unlock()
 
 	m.GetUnprocessedMessagesCalls++
+	m.LastGetUnprocessedLimit = limit // Track the limit
 	if m.GetUnprocessedMessagesError != nil {
 		return nil, m.GetUnprocessedMessagesError
 	}
@@ -2841,6 +3279,11 @@ func (m *MockMLRepository) MarkMessagesProcessed(ctx context.Context, messageIDs
 		return m.MarkMessagesProcessedError
 	}
 
+	// Track message IDs, chat IDs, and version
+	m.ProcessedMessageIDs = append(m.ProcessedMessageIDs, messageIDs...)
+	m.ProcessedChatIDs = append(m.ProcessedChatIDs, chatIDs...)
+	m.ProcessedVersion = version
+
 	for _, msgID := range messageIDs {
 		m.ProcessedMessages[msgID] = version
 	}
@@ -2849,3 +3292,422 @@ func (m *MockMLRepository) MarkMessagesProcessed(ctx context.Context, messageIDs
 
 // Ensure MockMLRepository implements the interface at compile time
 var _ repository.MLRepositoryInterface = (*MockMLRepository)(nil)
+
+// =============================================================================
+// MockProfilePhotoRepository
+// =============================================================================
+
+// MockProfilePhotoRepository is a mock implementation of ProfilePhotoRepositoryInterface for testing.
+type MockProfilePhotoRepository struct {
+	mu sync.RWMutex
+
+	// Stored data
+	UserPhotos []models.DBUserProfilePhoto
+	ChatPhotos []models.DBChatProfilePhoto
+	AllUserIDs []int64
+	AllChatIDs []int64
+
+	// For GetUserPhotoBySize
+	UserPhotoBySize *models.DBUserProfilePhoto
+
+	// For GetChatPhotoBySize
+	ChatPhotoBySize *models.DBChatProfilePhoto
+
+	// Call counters
+	ReplaceUserPhotosCalls int
+	ReplaceChatPhotosCalls int
+	GetUserPhotosCalls     int
+	GetChatPhotosCalls     int
+	GetAllUserIDsCalls     int
+	GetAllChatIDsCalls     int
+	GetUserPhotoBySizeCalls int
+	GetChatPhotoBySizeCalls int
+
+	// Errors
+	ReplaceUserPhotosError  error
+	ReplaceChatPhotosError  error
+	GetUserPhotosError      error
+	GetChatPhotosError      error
+	GetAllUserIDsError      error
+	GetAllChatIDsError      error
+	GetUserPhotoError       error
+	GetChatPhotoError       error
+}
+
+// NewMockProfilePhotoRepository creates a new MockProfilePhotoRepository.
+func NewMockProfilePhotoRepository() *MockProfilePhotoRepository {
+	return &MockProfilePhotoRepository{
+		UserPhotos: make([]models.DBUserProfilePhoto, 0),
+		ChatPhotos: make([]models.DBChatProfilePhoto, 0),
+		AllUserIDs: make([]int64, 0),
+		AllChatIDs: make([]int64, 0),
+	}
+}
+
+// ReplaceUserPhotos replaces user photos.
+func (m *MockProfilePhotoRepository) ReplaceUserPhotos(ctx context.Context, tx *sql.Tx, userID int64, photos []models.DBUserProfilePhoto) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ReplaceUserPhotosCalls++
+	if m.ReplaceUserPhotosError != nil {
+		return m.ReplaceUserPhotosError
+	}
+
+	// Remove existing photos for this user
+	newPhotos := make([]models.DBUserProfilePhoto, 0)
+	for _, photo := range m.UserPhotos {
+		if photo.UserID != userID {
+			newPhotos = append(newPhotos, photo)
+		}
+	}
+	m.UserPhotos = newPhotos
+
+	// Add new photos
+	m.UserPhotos = append(m.UserPhotos, photos...)
+	return nil
+}
+
+// ReplaceChatPhotos replaces chat photos.
+func (m *MockProfilePhotoRepository) ReplaceChatPhotos(ctx context.Context, tx *sql.Tx, chatID int64, photos []models.DBChatProfilePhoto) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ReplaceChatPhotosCalls++
+	if m.ReplaceChatPhotosError != nil {
+		return m.ReplaceChatPhotosError
+	}
+
+	// Remove existing photos for this chat
+	newPhotos := make([]models.DBChatProfilePhoto, 0)
+	for _, photo := range m.ChatPhotos {
+		if photo.ChatID != chatID {
+			newPhotos = append(newPhotos, photo)
+		}
+	}
+	m.ChatPhotos = newPhotos
+
+	// Add new photos
+	m.ChatPhotos = append(m.ChatPhotos, photos...)
+	return nil
+}
+
+// GetUserPhotos retrieves user photos.
+func (m *MockProfilePhotoRepository) GetUserPhotos(ctx context.Context, userID int64) ([]models.DBUserProfilePhoto, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetUserPhotosCalls++
+	if m.GetUserPhotosError != nil {
+		return nil, m.GetUserPhotosError
+	}
+
+	var photos []models.DBUserProfilePhoto
+	for _, photo := range m.UserPhotos {
+		if photo.UserID == userID {
+			photos = append(photos, photo)
+		}
+	}
+	return photos, nil
+}
+
+// GetChatPhotos retrieves chat photos.
+func (m *MockProfilePhotoRepository) GetChatPhotos(ctx context.Context, chatID int64) ([]models.DBChatProfilePhoto, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetChatPhotosCalls++
+	if m.GetChatPhotosError != nil {
+		return nil, m.GetChatPhotosError
+	}
+
+	var photos []models.DBChatProfilePhoto
+	for _, photo := range m.ChatPhotos {
+		if photo.ChatID == chatID {
+			photos = append(photos, photo)
+		}
+	}
+	return photos, nil
+}
+
+// GetAllUserIDs returns all user IDs.
+func (m *MockProfilePhotoRepository) GetAllUserIDs(ctx context.Context) ([]int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetAllUserIDsCalls++
+	if m.GetAllUserIDsError != nil {
+		return nil, m.GetAllUserIDsError
+	}
+
+	return m.AllUserIDs, nil
+}
+
+// GetAllChatIDs returns all chat IDs.
+func (m *MockProfilePhotoRepository) GetAllChatIDs(ctx context.Context) ([]int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetAllChatIDsCalls++
+	if m.GetAllChatIDsError != nil {
+		return nil, m.GetAllChatIDsError
+	}
+
+	return m.AllChatIDs, nil
+}
+
+// GetUserPhotoBySize retrieves user photo by size.
+func (m *MockProfilePhotoRepository) GetUserPhotoBySize(ctx context.Context, userID int64, size string) (*models.DBUserProfilePhoto, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetUserPhotoBySizeCalls++
+	if m.GetUserPhotoError != nil {
+		return nil, m.GetUserPhotoError
+	}
+
+	return m.UserPhotoBySize, nil
+}
+
+// GetChatPhotoBySize retrieves chat photo by size.
+func (m *MockProfilePhotoRepository) GetChatPhotoBySize(ctx context.Context, chatID int64, size string) (*models.DBChatProfilePhoto, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.GetChatPhotoBySizeCalls++
+	if m.GetChatPhotoError != nil {
+		return nil, m.GetChatPhotoError
+	}
+
+	return m.ChatPhotoBySize, nil
+}
+
+// SetAllUserIDs sets the user IDs to return.
+func (m *MockProfilePhotoRepository) SetAllUserIDs(ids []int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.AllUserIDs = ids
+}
+
+// SetAllChatIDs sets the chat IDs to return.
+func (m *MockProfilePhotoRepository) SetAllChatIDs(ids []int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.AllChatIDs = ids
+}
+
+// SetUserPhotoBySize sets the user photo to return for GetUserPhotoBySize.
+func (m *MockProfilePhotoRepository) SetUserPhotoBySize(photo *models.DBUserProfilePhoto) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.UserPhotoBySize = photo
+}
+
+// SetChatPhotoBySize sets the chat photo to return for GetChatPhotoBySize.
+func (m *MockProfilePhotoRepository) SetChatPhotoBySize(photo *models.DBChatProfilePhoto) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ChatPhotoBySize = photo
+}
+
+// SetReplaceUserPhotosError sets the error to return for ReplaceUserPhotos.
+func (m *MockProfilePhotoRepository) SetReplaceUserPhotosError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ReplaceUserPhotosError = err
+}
+
+// SetGetUserPhotoError sets the error to return for GetUserPhotoBySize.
+func (m *MockProfilePhotoRepository) SetGetUserPhotoError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.GetUserPhotoError = err
+}
+
+// Reset clears all stored data and resets call counters.
+func (m *MockProfilePhotoRepository) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.UserPhotos = make([]models.DBUserProfilePhoto, 0)
+	m.ChatPhotos = make([]models.DBChatProfilePhoto, 0)
+	m.AllUserIDs = make([]int64, 0)
+	m.AllChatIDs = make([]int64, 0)
+	m.UserPhotoBySize = nil
+	m.ChatPhotoBySize = nil
+	m.ReplaceUserPhotosCalls = 0
+	m.ReplaceChatPhotosCalls = 0
+	m.GetUserPhotosCalls = 0
+	m.GetChatPhotosCalls = 0
+	m.GetAllUserIDsCalls = 0
+	m.GetAllChatIDsCalls = 0
+	m.GetUserPhotoBySizeCalls = 0
+	m.GetChatPhotoBySizeCalls = 0
+	m.ReplaceUserPhotosError = nil
+	m.ReplaceChatPhotosError = nil
+	m.GetUserPhotosError = nil
+	m.GetChatPhotosError = nil
+	m.GetAllUserIDsError = nil
+	m.GetAllChatIDsError = nil
+	m.GetUserPhotoError = nil
+	m.GetChatPhotoError = nil
+}
+
+// Ensure MockProfilePhotoRepository implements the interface at compile time
+var _ repository.ProfilePhotoRepositoryInterface = (*MockProfilePhotoRepository)(nil)
+
+// =============================================================================
+// MockMediaRepository
+// =============================================================================
+
+// MockMediaRepository is a mock implementation of MediaRepositoryInterface for testing.
+type MockMediaRepository struct {
+	mu sync.RWMutex
+
+	// Stored data
+	ObjectKeyByHash string
+
+	// Call counters
+	GetObjectKeyByHashCalls int
+
+	// Errors
+	GetObjectKeyByHashError error
+}
+
+// NewMockMediaRepository creates a new MockMediaRepository.
+func NewMockMediaRepository() *MockMediaRepository {
+	return &MockMediaRepository{}
+}
+
+// GetObjectKeyByHash retrieves object key by hash.
+func (m *MockMediaRepository) GetObjectKeyByHash(ctx context.Context, tx *sql.Tx, hash string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.GetObjectKeyByHashCalls++
+	if m.GetObjectKeyByHashError != nil {
+		return "", m.GetObjectKeyByHashError
+	}
+
+	return m.ObjectKeyByHash, nil
+}
+
+// SetObjectKeyByHash sets the object key to return.
+func (m *MockMediaRepository) SetObjectKeyByHash(key string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ObjectKeyByHash = key
+}
+
+// Reset clears all stored data and resets call counters.
+func (m *MockMediaRepository) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ObjectKeyByHash = ""
+	m.GetObjectKeyByHashCalls = 0
+	m.GetObjectKeyByHashError = nil
+}
+
+// Stub implementations for MediaRepositoryInterface methods not used in ProfilePhotoService tests
+
+func (m *MockMediaRepository) InsertMediaFile(ctx context.Context, tx *sql.Tx, messageID int64, mediaType, fileID, fileUniqueID, objectKey, fileHash string, fileSize *int64, mimeType, fileName string, duration, width, height *int, performer, title string) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertMediaFileReturningID(ctx context.Context, tx *sql.Tx, messageID int64, mediaType, fileID, fileUniqueID, objectKey, fileHash string, fileSize *int64, mimeType, fileName string, duration, width, height *int, performer, title string) (int64, error) {
+	return 0, nil
+}
+
+func (m *MockMediaRepository) InsertPhoto(ctx context.Context, tx *sql.Tx, messageID int64, photo *models.PhotoSize, objectKey, fileHash string) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertLocation(ctx context.Context, tx *sql.Tx, messageID int64, location *models.Location) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertLocationReturningID(ctx context.Context, tx *sql.Tx, messageID int64, location *models.Location) (int64, error) {
+	return 0, nil
+}
+
+func (m *MockMediaRepository) InsertSticker(ctx context.Context, tx *sql.Tx, messageID, mediaFileID int64, sticker *models.Sticker) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertGame(ctx context.Context, tx *sql.Tx, messageID int64, game *models.Game) (int64, error) {
+	return 0, nil
+}
+
+func (m *MockMediaRepository) InsertGamePhoto(ctx context.Context, tx *sql.Tx, gameID int64, photo *models.PhotoSize, objectKey, fileHash string) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertPoll(ctx context.Context, tx *sql.Tx, messageID int64, poll *models.Poll) (int64, error) {
+	return 0, nil
+}
+
+func (m *MockMediaRepository) InsertPollOption(ctx context.Context, tx *sql.Tx, pollID int64, index int, option *models.PollOption) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertContact(ctx context.Context, tx *sql.Tx, messageID int64, contact *models.Contact) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertVenue(ctx context.Context, tx *sql.Tx, messageID, locationID int64, venue *models.Venue) error {
+	return nil
+}
+
+func (m *MockMediaRepository) InsertDice(ctx context.Context, tx *sql.Tx, messageID int64, dice *models.Dice) error {
+	return nil
+}
+
+// Ensure MockMediaRepository implements the interface at compile time
+var _ repository.MediaRepositoryInterface = (*MockMediaRepository)(nil)
+
+// Test Helper Methods for MockGameRepository
+
+// AddMatch is a helper method to add a match directly to storage for testing.
+// This is used to bypass validation logic in CreateMatch.
+func (m *MockGameRepository) AddMatch(match *repository.Match) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Matches[match.ID] = match
+	if m.Participants[match.ID] == nil {
+		m.Participants[match.ID] = make(map[int64]*repository.Participant)
+	}
+	if m.ParticipantsWithUser[match.ID] == nil {
+		m.ParticipantsWithUser[match.ID] = make(map[int64]*repository.ParticipantWithUser)
+	}
+}
+
+// AddParticipantWithUser is a helper method to add a participant with user info directly to storage.
+func (m *MockGameRepository) AddParticipantWithUser(p *repository.ParticipantWithUser) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.ParticipantsWithUser[p.MatchID] == nil {
+		m.ParticipantsWithUser[p.MatchID] = make(map[int64]*repository.ParticipantWithUser)
+	}
+	m.ParticipantsWithUser[p.MatchID][p.UserID] = p
+
+	// Also add to Participants map
+	if m.Participants[p.MatchID] == nil {
+		m.Participants[p.MatchID] = make(map[int64]*repository.Participant)
+	}
+	m.Participants[p.MatchID][p.UserID] = &p.Participant
+}
+
+// GetParticipantsByMatch returns all participants for a match (helper for tests).
+func (m *MockGameRepository) GetParticipantsByMatch(matchID string) []*repository.Participant {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var participants []*repository.Participant
+	if matchParticipants, ok := m.Participants[matchID]; ok {
+		for _, p := range matchParticipants {
+			participants = append(participants, p)
+		}
+	}
+	return participants
+}

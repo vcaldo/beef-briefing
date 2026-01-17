@@ -519,3 +519,224 @@ func TestSubmitTeam_AllReady_TriggersBattle(t *testing.T) {
 		t.Errorf("expected participant status to be 'ready', got %s", submittedParticipant.Status)
 	}
 }
+
+// TestReroll_DisabledAfterPurchase verifies that reroll fails after buying first card.
+func TestReroll_DisabledAfterPurchase(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := testutil.NewMockGameRepository()
+
+	// Dealer not needed for this validation test
+	svc := &ShopService{
+		db:       nil,
+		gameRepo: mockRepo,
+		dealer:   nil, // Not needed - test only validates team size check
+		nrApp:    nil,
+	}
+
+	matchID := "match-1"
+	userID := int64(1)
+
+	match := newTestMatch(matchID, repository.MatchStatusShopPhase)
+
+	// Create participant with 1 card already purchased (team not empty)
+	cards := []*battle.ShopCard{
+		{Index: 0, CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, IsPurchased: true},
+		{Index: 1, CardID: 2, UserID: 102, Name: "Bob", ATK: 12, HP: 28, IsPurchased: false},
+	}
+	team := []*battle.Card{
+		{CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, MaxHP: 30, Position: 0},
+	}
+	participant := newTestParticipantWithShop(matchID, userID, cards, team, 10) // Enough coins
+
+	mockRepo.Matches[matchID] = match
+	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
+		userID: participant,
+	}
+
+	// Attempt reroll (should fail because team is not empty)
+	_, err := svc.Reroll(ctx, matchID, userID)
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	expectedMsg := "reroll not allowed after purchasing cards"
+	if err.Error() != expectedMsg {
+		t.Errorf("expected error %q, got %q", expectedMsg, err.Error())
+	}
+}
+
+// TestReroll_InsufficientCoins verifies that reroll fails when player has insufficient coins.
+func TestReroll_InsufficientCoins(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := testutil.NewMockGameRepository()
+
+	// Dealer not needed for this validation test
+	svc := &ShopService{
+		db:       nil,
+		gameRepo: mockRepo,
+		dealer:   nil, // Not needed - test only validates coins check
+		nrApp:    nil,
+	}
+
+	matchID := "match-1"
+	userID := int64(1)
+
+	match := newTestMatch(matchID, repository.MatchStatusShopPhase)
+
+	// Create participant with no purchases but insufficient coins
+	// Reroll costs 1, but also need 9 coins to complete team (3 cards * 3 coins)
+	cards := []*battle.ShopCard{
+		{Index: 0, CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, IsPurchased: false},
+		{Index: 1, CardID: 2, UserID: 102, Name: "Bob", ATK: 12, HP: 28, IsPurchased: false},
+	}
+	team := []*battle.Card{} // Empty team
+	participant := newTestParticipantWithShop(matchID, userID, cards, team, 5) // Only 5 coins (need 10 total)
+
+	mockRepo.Matches[matchID] = match
+	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
+		userID: participant,
+	}
+
+	// Attempt reroll (should fail due to insufficient coins)
+	_, err := svc.Reroll(ctx, matchID, userID)
+
+	if err != apperror.ErrNotEnoughCoins {
+		t.Errorf("expected ErrNotEnoughCoins, got %v", err)
+	}
+}
+
+// TestBuyCard_CardNotInShop verifies that buying an invalid card index fails.
+func TestBuyCard_CardNotInShop(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := testutil.NewMockGameRepository()
+	svc := newTestShopService(mockRepo)
+
+	matchID := "match-1"
+	userID := int64(1)
+
+	match := newTestMatch(matchID, repository.MatchStatusShopPhase)
+
+	cards := []*battle.ShopCard{
+		{Index: 0, CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, IsPurchased: false},
+		{Index: 1, CardID: 2, UserID: 102, Name: "Bob", ATK: 12, HP: 28, IsPurchased: false},
+	}
+	team := []*battle.Card{}
+	participant := newTestParticipantWithShop(matchID, userID, cards, team, 10)
+
+	mockRepo.Matches[matchID] = match
+	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
+		userID: participant,
+	}
+
+	// Attempt to buy card at invalid index (out of bounds)
+	_, err := svc.BuyCard(ctx, matchID, userID, 5) // Only 2 cards, index 5 is invalid
+
+	if err != apperror.ErrInvalidCardIndex {
+		t.Errorf("expected ErrInvalidCardIndex, got %v", err)
+	}
+}
+
+// TestBuyCard_CardAlreadyPurchased verifies that buying the same card twice fails.
+func TestBuyCard_CardAlreadyPurchased(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := testutil.NewMockGameRepository()
+	svc := newTestShopService(mockRepo)
+
+	matchID := "match-1"
+	userID := int64(1)
+
+	match := newTestMatch(matchID, repository.MatchStatusShopPhase)
+
+	// Card at index 0 is already purchased
+	cards := []*battle.ShopCard{
+		{Index: 0, CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, IsPurchased: true},
+		{Index: 1, CardID: 2, UserID: 102, Name: "Bob", ATK: 12, HP: 28, IsPurchased: false},
+	}
+	team := []*battle.Card{
+		{CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, MaxHP: 30, Position: 0},
+	}
+	participant := newTestParticipantWithShop(matchID, userID, cards, team, 10)
+
+	mockRepo.Matches[matchID] = match
+	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
+		userID: participant,
+	}
+
+	// Attempt to buy already-purchased card
+	_, err := svc.BuyCard(ctx, matchID, userID, 0)
+
+	if err != apperror.ErrCardAlreadyPurchased {
+		t.Errorf("expected ErrCardAlreadyPurchased, got %v", err)
+	}
+}
+
+// Note: TestBuyCard_TeamFull already exists in arena_service_test.go
+
+// TestUpgradeCard_InsufficientCoins verifies that upgrade fails with insufficient coins.
+func TestUpgradeCard_InsufficientCoins(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := testutil.NewMockGameRepository()
+	svc := newTestShopService(mockRepo)
+
+	matchID := "match-1"
+	userID := int64(1)
+
+	match := newTestMatch(matchID, repository.MatchStatusShopPhase)
+
+	// Create team with 1 card (need 6 more coins to complete: 2 cards * 3 coins)
+	// Upgrade costs 1, so need 7 total, but only have 5
+	cards := []*battle.ShopCard{
+		{Index: 0, CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, IsPurchased: true},
+	}
+	team := []*battle.Card{
+		{CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, MaxHP: 30, Position: 0},
+	}
+	participant := newTestParticipantWithShop(matchID, userID, cards, team, 5) // Only 5 coins
+
+	mockRepo.Matches[matchID] = match
+	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
+		userID: participant,
+	}
+
+	// Attempt upgrade (should fail - insufficient coins)
+	_, err := svc.UpgradeCard(ctx, matchID, userID, 0, shop.UpgradeATK)
+
+	if err != apperror.ErrNotEnoughCoins {
+		t.Errorf("expected ErrNotEnoughCoins, got %v", err)
+	}
+}
+
+// TestSubmitTeam_WrongSize verifies that submitting a team with wrong size fails.
+func TestSubmitTeam_WrongSize(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := testutil.NewMockGameRepository()
+	svc := newTestShopService(mockRepo)
+
+	matchID := "match-1"
+	userID := int64(1)
+
+	match := newTestMatch(matchID, repository.MatchStatusShopPhase)
+
+	// Create team with only 2 cards (incomplete - needs 3)
+	cards := []*battle.ShopCard{
+		{Index: 0, CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, IsPurchased: true},
+		{Index: 1, CardID: 2, UserID: 102, Name: "Bob", ATK: 12, HP: 28, IsPurchased: true},
+	}
+	team := []*battle.Card{
+		{CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, MaxHP: 30, Position: 0},
+		{CardID: 2, UserID: 102, Name: "Bob", ATK: 12, HP: 28, MaxHP: 28, Position: 1},
+	}
+	participant := newTestParticipantWithShop(matchID, userID, cards, team, 1)
+
+	mockRepo.Matches[matchID] = match
+	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
+		userID: participant,
+	}
+
+	// Attempt to submit incomplete team
+	err := svc.SubmitTeam(ctx, matchID, userID)
+
+	if err != shop.ErrTeamIncomplete {
+		t.Errorf("expected ErrTeamIncomplete, got %v", err)
+	}
+}

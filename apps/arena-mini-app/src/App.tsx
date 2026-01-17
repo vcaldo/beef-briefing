@@ -161,6 +161,11 @@ function App() {
     setActiveMatch(match)
   }, [])
 
+  // Navigate to lobby tab
+  const navigateToLobby = useCallback(() => {
+    handleTabChange('lobby')
+  }, [handleTabChange])
+
   // Navigate to shop tab
   const navigateToShop = useCallback(() => {
     handleTabChange('shop')
@@ -204,6 +209,7 @@ function App() {
             activeMatch={activeMatch}
             onMatchChange={handleMatchChange}
             onNavigateToStats={() => handleTabChange('stats')}
+            onNavigateToLobby={navigateToLobby}
           />
         )
       case 'stats':

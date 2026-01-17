@@ -17,11 +17,24 @@ import (
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
+// MinIOClientInterface defines the interface for MinIO storage operations.
+// This allows for mocking in tests.
+type MinIOClientInterface interface {
+	UploadMedia(ctx context.Context, fileID string, data []byte, mimeType string, mediaType string) (string, string, error)
+	GetObjectURL(objectKey string) string
+	GetObject(ctx context.Context, objectKey string) (io.ReadCloser, int64, string, error)
+	GetPresignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error)
+	GetPresignedURLSeconds(ctx context.Context, objectKey string, expirySeconds int) (string, error)
+}
+
 type MinIOClient struct {
 	client *minio.Client
 	bucket string
 	nrApp  *newrelic.Application
 }
+
+// Ensure MinIOClient implements the interface at compile time
+var _ MinIOClientInterface = (*MinIOClient)(nil)
 
 func NewMinIOClient(endpoint, accessKey, secretKey, bucket, region string, useSSL bool, nrApp *newrelic.Application) (*MinIOClient, error) {
 	client, err := minio.New(endpoint, &minio.Options{

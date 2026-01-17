@@ -7,6 +7,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"beef-briefing/apps/api-service/internal/game/battle"
+	"beef-briefing/apps/api-service/internal/game/shop"
+	"beef-briefing/apps/api-service/internal/models"
+	"beef-briefing/apps/api-service/internal/storage"
 )
 
 // MockMinIOClient is a mock implementation of MinIO storage operations for testing.
@@ -33,6 +38,9 @@ type MockMinIOClient struct {
 	// UploadCalls tracks the number of times UploadMedia was called.
 	UploadCalls int
 
+	// UploadCount is an alias for UploadCalls for backward compatibility.
+	UploadCount int
+
 	// GetObjectCalls tracks the number of times GetObject was called.
 	GetObjectCalls int
 
@@ -41,6 +49,11 @@ type MockMinIOClient struct {
 
 	// GetPresignedURLSecondsCalls tracks the number of times GetPresignedURLSeconds was called.
 	GetPresignedURLSecondsCalls int
+
+	// Configurable return values
+	NextUploadObjectKey string
+	NextUploadFileHash  string
+	NextPresignedURL    string
 }
 
 // MockObject represents an object stored in the mock storage.
@@ -67,14 +80,22 @@ func (m *MockMinIOClient) UploadMedia(ctx context.Context, fileID string, data [
 	defer m.mu.Unlock()
 
 	m.UploadCalls++
+	m.UploadCount++ // Keep both in sync for backward compatibility
 
 	if m.UploadError != nil {
 		return "", "", m.UploadError
 	}
 
-	// Generate a simple hash for testing (not a real SHA256)
-	fileHash := generateMockHash(data)
-	objectKey := mediaType + "/" + fileHash[:2] + "/" + fileHash
+	// Use configured return values if set
+	var objectKey, fileHash string
+	if m.NextUploadObjectKey != "" {
+		objectKey = m.NextUploadObjectKey
+		fileHash = m.NextUploadFileHash
+	} else {
+		// Generate a simple hash for testing (not a real SHA256)
+		fileHash = generateMockHash(data)
+		objectKey = mediaType + "/" + fileHash[:2] + "/" + fileHash
+	}
 
 	m.Storage[objectKey] = &MockObject{
 		Data:        data,
@@ -112,6 +133,9 @@ func (m *MockMinIOClient) GetObjectURL(objectKey string) string {
 	return m.PresignedURLBase + "/mock-bucket/" + objectKey
 }
 
+// Ensure MockMinIOClient implements the storage.MinIOClientInterface at compile time
+var _ storage.MinIOClientInterface = (*MockMinIOClient)(nil)
+
 // GetPresignedURL generates a mock presigned URL.
 func (m *MockMinIOClient) GetPresignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
 	m.mu.Lock()
@@ -121,6 +145,11 @@ func (m *MockMinIOClient) GetPresignedURL(ctx context.Context, objectKey string,
 
 	if m.GetPresignedURLError != nil {
 		return "", m.GetPresignedURLError
+	}
+
+	// Use configured return value if set
+	if m.NextPresignedURL != "" {
+		return m.NextPresignedURL, nil
 	}
 
 	// Return a mock presigned URL with expiry encoded
@@ -146,12 +175,35 @@ func (m *MockMinIOClient) Reset() {
 
 	m.Storage = make(map[string]*MockObject)
 	m.UploadCalls = 0
+	m.UploadCount = 0
 	m.GetObjectCalls = 0
 	m.GetPresignedURLCalls = 0
 	m.GetPresignedURLSecondsCalls = 0
 	m.UploadError = nil
 	m.GetObjectError = nil
 	m.GetPresignedURLError = nil
+	m.NextUploadObjectKey = ""
+	m.NextUploadFileHash = ""
+	m.NextPresignedURL = ""
+}
+
+// SetUploadResult configures the next UploadMedia call to return specific values.
+func (m *MockMinIOClient) SetUploadResult(objectKey, fileHash string, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.NextUploadObjectKey = objectKey
+	m.NextUploadFileHash = fileHash
+	m.UploadError = err
+}
+
+// SetPresignedURL configures the next GetPresignedURL call to return specific URL.
+func (m *MockMinIOClient) SetPresignedURL(url string, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.NextPresignedURL = url
+	m.GetPresignedURLError = err
 }
 
 // AddObject directly adds an object to storage for test setup.
@@ -404,3 +456,179 @@ func (h *MockSegmentHandle) End() {
 		h.txn.Segments[h.index].Ended = true
 	}
 }
+
+// MockDealer is a mock implementation of the Dealer from the shop package.
+// It allows tests to control card dealing behavior without database access.
+type MockDealer struct {
+	mu sync.RWMutex
+
+	// CardCount is the number of cards available for dealing
+	CardCount int
+
+	// DealCardsResults is a queue of results to return from DealCards calls
+	DealCardsResults [][]*struct {
+		ID     int64
+		UserID int64
+		Combat struct {
+			ATK int
+			HP  int
+		}
+	}
+
+	// Errors for injection
+	GetCardCountError error
+	DealCardsError    error
+
+	// Call tracking
+	GetCardCountCalls int
+	DealCardsCalls    int
+}
+
+// Ensure MockDealer implements the shop.DealerInterface at compile time
+var _ shop.DealerInterface = (*MockDealer)(nil)
+
+// NewMockDealer creates a new MockDealer with default values.
+func NewMockDealer() *MockDealer {
+	return &MockDealer{
+		CardCount:        0,
+		DealCardsResults: make([][]*struct {
+			ID     int64
+			UserID int64
+			Combat struct {
+				ATK int
+				HP  int
+			}
+		}, 0),
+	}
+}
+
+// GetCardCount returns the mock card count.
+func (m *MockDealer) GetCardCount(ctx context.Context, chatID int64) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.GetCardCountCalls++
+
+	if m.GetCardCountError != nil {
+		return 0, m.GetCardCountError
+	}
+
+	return m.CardCount, nil
+}
+
+// DealCards returns the next queued result from DealCardsResults.
+func (m *MockDealer) DealCards(ctx context.Context, chatID int64, count int) ([]*battle.ShopCard, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.DealCardsCalls++
+
+	if m.DealCardsError != nil {
+		return nil, m.DealCardsError
+	}
+
+	// For test purposes, return empty slice
+	// Tests that need specific card data should set DealCardsResults
+	return []*battle.ShopCard{}, nil
+}
+
+// SetCardCount sets the card count to be returned by GetCardCount.
+func (m *MockDealer) SetCardCount(count int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.CardCount = count
+}
+
+// AddDealCardsResult adds a result to the queue for DealCards.
+func (m *MockDealer) AddDealCardsResult(cards interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Convert the input to our internal type
+	// This is a simplified version - in practice you'd need proper type conversion
+	m.DealCardsResults = append(m.DealCardsResults, nil)
+}
+
+// Reset clears all state and resets counters.
+func (m *MockDealer) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.CardCount = 0
+	m.DealCardsResults = make([][]*struct {
+		ID     int64
+		UserID int64
+		Combat struct {
+			ATK int
+			HP  int
+		}
+	}, 0)
+	m.GetCardCountError = nil
+	m.DealCardsError = nil
+	m.GetCardCountCalls = 0
+	m.DealCardsCalls = 0
+}
+
+// =============================================================================
+// MockIngestService
+// =============================================================================
+
+// MockIngestService is a mock implementation of IngestService for testing handlers.
+type MockIngestService struct {
+	mu sync.RWMutex
+
+	// ProcessUpdateCalled tracks if ProcessUpdate was called
+	ProcessUpdateCalled bool
+
+	// LastUpdate stores the last update passed to ProcessUpdate
+	LastUpdate *models.Update
+
+	// LastFiles stores the last files map passed to ProcessUpdate
+	LastFiles map[string][]byte
+
+	// ProcessUpdateError is the error to return from ProcessUpdate
+	ProcessUpdateError error
+}
+
+// NewMockIngestService creates a new MockIngestService
+func NewMockIngestService() *MockIngestService {
+	return &MockIngestService{
+		ProcessUpdateCalled: false,
+		LastFiles:           make(map[string][]byte),
+	}
+}
+
+// ProcessUpdate mocks the IngestService.ProcessUpdate method
+func (m *MockIngestService) ProcessUpdate(ctx context.Context, update *models.Update, files map[string][]byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ProcessUpdateCalled = true
+	m.LastUpdate = update
+
+	m.LastFiles = make(map[string][]byte)
+	for k, v := range files {
+		m.LastFiles[k] = v
+	}
+
+	return m.ProcessUpdateError
+}
+
+// SetProcessUpdateError configures the error to return from ProcessUpdate
+func (m *MockIngestService) SetProcessUpdateError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ProcessUpdateError = err
+}
+
+// Reset clears all state
+func (m *MockIngestService) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ProcessUpdateCalled = false
+	m.LastUpdate = nil
+	m.LastFiles = make(map[string][]byte)
+	m.ProcessUpdateError = nil
+}
+

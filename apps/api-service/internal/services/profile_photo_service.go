@@ -19,21 +19,54 @@ import (
 // ProfilePhotoService handles profile photo processing for users and chats.
 type ProfilePhotoService struct {
 	db               *sql.DB
-	storageClient    *storage.MinIOClient
+	storageClient    storage.MinIOClientInterface
 	nrApp            *newrelic.Application
-	profilePhotoRepo *repository.ProfilePhotoRepository
-	mediaRepo        *repository.MediaRepository
+	profilePhotoRepo repository.ProfilePhotoRepositoryInterface
+	mediaRepo        repository.MediaRepositoryInterface
+}
+
+// ProfilePhotoServiceDeps allows optional dependency injection for testing.
+// If nil is passed to NewProfilePhotoService, default implementations are used.
+type ProfilePhotoServiceDeps struct {
+	ProfilePhotoRepo repository.ProfilePhotoRepositoryInterface
+	MediaRepo        repository.MediaRepositoryInterface
+	StorageClient    storage.MinIOClientInterface
 }
 
 // NewProfilePhotoService creates a new ProfilePhotoService.
-func NewProfilePhotoService(db *sql.DB, storageClient *storage.MinIOClient, nrApp *newrelic.Application) *ProfilePhotoService {
-	return &ProfilePhotoService{
-		db:               db,
-		storageClient:    storageClient,
-		nrApp:            nrApp,
-		profilePhotoRepo: repository.NewProfilePhotoRepository(db, nrApp),
-		mediaRepo:        repository.NewMediaRepository(db, nrApp),
+// Pass nil for deps to use default implementations (production use).
+// Pass a ProfilePhotoServiceDeps struct to inject mock implementations (testing use).
+func NewProfilePhotoService(db *sql.DB, storageClient *storage.MinIOClient, nrApp *newrelic.Application, deps *ProfilePhotoServiceDeps) *ProfilePhotoService {
+	s := &ProfilePhotoService{
+		db:    db,
+		nrApp: nrApp,
 	}
+
+	// Use injected dependencies if provided, otherwise create defaults
+	if deps != nil {
+		if deps.ProfilePhotoRepo != nil {
+			s.profilePhotoRepo = deps.ProfilePhotoRepo
+		}
+		if deps.MediaRepo != nil {
+			s.mediaRepo = deps.MediaRepo
+		}
+		if deps.StorageClient != nil {
+			s.storageClient = deps.StorageClient
+		}
+	}
+
+	// Create defaults for any nil dependencies
+	if s.profilePhotoRepo == nil {
+		s.profilePhotoRepo = repository.NewProfilePhotoRepository(db, nrApp)
+	}
+	if s.mediaRepo == nil {
+		s.mediaRepo = repository.NewMediaRepository(db, nrApp)
+	}
+	if s.storageClient == nil && storageClient != nil {
+		s.storageClient = storageClient
+	}
+
+	return s
 }
 
 // ProcessUserPhotos stores profile photos for a user, replacing any existing photos.

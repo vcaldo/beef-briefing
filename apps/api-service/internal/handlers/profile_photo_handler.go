@@ -20,7 +20,7 @@ import (
 
 // ProfilePhotoHandler handles HTTP requests for profile photo endpoints.
 type ProfilePhotoHandler struct {
-	profilePhotoService *services.ProfilePhotoService
+	profilePhotoService services.ProfilePhotoServiceInterface
 	config              *config.Config
 }
 
@@ -31,7 +31,7 @@ type PhotoURLResponse struct {
 }
 
 // NewProfilePhotoHandler creates a new ProfilePhotoHandler.
-func NewProfilePhotoHandler(profilePhotoService *services.ProfilePhotoService, cfg *config.Config) *ProfilePhotoHandler {
+func NewProfilePhotoHandler(profilePhotoService services.ProfilePhotoServiceInterface, cfg *config.Config) *ProfilePhotoHandler {
 	return &ProfilePhotoHandler{
 		profilePhotoService: profilePhotoService,
 		config:              cfg,

@@ -731,20 +731,194 @@ Handler tests use **HTTP testing** with mocked services via `httptest`.
 
 #### Test Utilities (testutil package)
 
-The `testutil` package provides helper functions for test setup/teardown:
+The `testutil` package (`apps/api-service/internal/testutil/`) provides comprehensive testing utilities organized into four files:
 
+**1. Database Utilities** (`db.go`):
+- `SetupTestDB(t *testing.T) *TestDB` - Create test database connection
+  - Reads configuration from environment variables (TEST_DB_HOST, TEST_DB_PORT, etc.)
+  - Sets up connection pool with reasonable defaults (5 max connections, 2 idle)
+  - Verifies connection with Ping()
+- `TeardownTestDB(t *testing.T, tdb *TestDB)` - Close test database connection gracefully
+- `WithTestTransaction(t *testing.T, db *sql.DB, fn func(tx *sql.Tx))` - Execute test code in automatic rollback transaction
+  - Perfect for test isolation without modifying database
+  - Panics are captured and cleanup is guaranteed
+- `WithTestTransactionContext(ctx context.Context, t *testing.T, db *sql.DB, fn func(ctx context.Context, tx *sql.Tx))` - Same as WithTestTransaction but accepts context for timeouts/cancellation
+- `CleanupTables(t *testing.T, tx *sql.Tx, tables ...string)` - Truncate tables within a transaction
+  - Uses CASCADE to handle foreign key constraints
+- `DBTX` interface - Satisfied by both *sql.DB and *sql.Tx for flexible code
+
+**Usage Pattern**:
 ```go
-// Database helpers
-testutil.SetupTestDB() *sql.DB         // Returns test DB connection
-testutil.TeardownTestDB(*sql.DB)       // Closes connection
+func TestSomething(t *testing.T) {
+    tdb := testutil.SetupTestDB(t)
+    defer testutil.TeardownTestDB(t, tdb)
 
-// Sample data factories
-testutil.SampleUser() User             // Returns test user
-testutil.SampleChat() Chat             // Returns test chat
-testutil.SampleMessage() Message       // Returns test message
+    testutil.WithTestTransaction(t, tdb.DB, func(tx *sql.Tx) {
+        repo := repository.NewUserRepository(tx)
+        // Test code using repo
+        // Changes will be rolled back after this function returns
+    })
+}
+```
 
-// Mock builders
-testutil.NewMockRepository() MockRepo  // Returns mock with defaults
+**2. Sample Data Fixtures** (`fixtures.go`):
+Helper functions that return valid test data with sensible defaults. All functions are customizable via variants:
+
+*User Data*:
+- `SampleUser() User` - Returns basic test user
+- `SampleUserWithID(id int64) User` - Custom user ID
+- `SampleBotUser() User` - Bot user for testing bot-specific logic
+
+*Chat Data*:
+- `SampleChat() Chat` - Returns supergroup (most common type)
+- `SampleChatWithID(id int64) Chat` - Custom chat ID
+- `SamplePrivateChat() Chat` - Private chat for 1-on-1 testing
+
+*Message Data*:
+- `SampleMessage() Message` - Text message from sample user in sample chat
+- `SampleMessageWithID(id int64) Message` - Custom message ID
+- `SampleMessageWithText(text string) Message` - Custom message text
+- `SamplePhotoMessage() Message` - Message with photo attachment (multiple sizes)
+
+*Telegram Update Data*:
+- `SampleTelegramUpdate() Update` - Standard text message update
+- `SampleTelegramUpdateWithID(id int64) Update` - Custom update ID
+- `SampleEditedMessageUpdate() Update` - Update with edited message
+- `SampleReactionUpdate() Update` - Message reaction update (e.g., 👍)
+- `SampleReactionCountUpdate() Update` - Reaction count aggregation update
+
+*Arena Game Data*:
+- `SampleMatch() Match` - Regular match in "open" status
+- `SampleMatchWithID(id string) Match` - Custom match ID
+- `SampleMatchWithStatus(status MatchStatus) Match` - Custom match status
+- `SampleRankedMatch() Match` - Ranked tournament match
+- `SampleShopPhaseMatch() Match` - Match in active shop phase
+- `SampleBattlePhaseMatch() Match` - Match in active battle phase
+- `SampleCompletedMatch() Match` - Completed match with winner
+- `SampleParticipant(matchID, userID) Participant` - Match participant
+- `SampleParticipantWithTeam(matchID, userID) Participant` - Participant who submitted team
+
+**3. Mock Services & Storage** (`mocks.go`):
+
+*MinIO Storage Mock* - `MockMinIOClient`:
+- Implements `storage.MinIOClientInterface` for testing file uploads
+- Stores uploaded data in memory (thread-safe)
+- Methods:
+  - `UploadMedia(ctx, fileID, data, mimeType, mediaType) (objectKey, fileHash, error)` - Mock file upload
+  - `GetObject(ctx, objectKey) (reader, size, contentType, error)` - Retrieve stored object
+  - `GetObjectURL(objectKey) string` - Generate mock object URL
+  - `GetPresignedURL(ctx, objectKey, expiry) (url, error)` - Generate presigned URL with expiry
+  - `GetPresignedURLSeconds(ctx, objectKey, expirySeconds) (url, error)` - Presigned URL with seconds
+- Configuration:
+  - `PresignedURLBase` - Customize base URL (default: "https://mock-storage.example.com")
+  - `Storage map[string]*MockObject` - Access uploaded objects directly
+  - `UploadError`, `GetObjectError`, `GetPresignedURLError` - Error injection
+- Tracking:
+  - `UploadCalls`, `GetObjectCalls`, `GetPresignedURLCalls` - Call counters
+  - `NextUploadObjectKey`, `NextUploadFileHash`, `NextPresignedURL` - Configurable responses
+- Methods:
+  - `Reset()` - Clear all storage and reset counters
+  - `SetUploadResult(objectKey, fileHash, err)` - Configure next upload response
+  - `SetPresignedURL(url, err)` - Configure next presigned URL
+  - `AddObject(objectKey, data, contentType)` - Directly add object for setup
+
+*New Relic Mocks*:
+- `MockNewRelicApp` - Mock New Relic application
+  - `RecordCustomEvent(eventType, params) error` - Track custom events
+  - `Shutdown(timeout)` - Graceful shutdown
+  - Access recorded events: `GetCustomEvents()`, `GetCustomEventsByType()`, `CustomEventCount()`
+- `MockNewRelicTransaction` - Mock transaction for segment/error tracking
+  - `StartSegment(name) *MockSegmentHandle` - Start a named segment
+  - `NoticeError(err)` - Record an error
+  - `End()` - Mark transaction as ended
+
+*Shop Mock* - `MockDealer`:
+- Implements `shop.DealerInterface` for card dealing
+- Methods:
+  - `GetCardCount(ctx, chatID) (count, error)` - Mock card pool size
+  - `DealCards(ctx, chatID, count) ([]*ShopCard, error)` - Deal cards from pool
+- Configuration:
+  - `CardCount` - Set available card count
+  - `GetCardCountError`, `DealCardsError` - Error injection
+- Tracking:
+  - `GetCardCountCalls`, `DealCardsCalls` - Call counters
+  - `SetCardCount(count)` - Configure card count
+  - `Reset()` - Clear state
+
+*Ingest Service Mock* - `MockIngestService`:
+- Mock for handler layer testing
+- Methods:
+  - `ProcessUpdate(ctx, update, files) error` - Mock update processing
+  - `SetProcessUpdateError(err)` - Configure error response
+- Tracking:
+  - `ProcessUpdateCalled` - Was method called?
+  - `LastUpdate` - Last update received
+  - `LastFiles` - Last files map received
+
+**4. Mock Repositories** (`mock_repositories.go`):
+
+*MockGameRepository* - Complete in-memory game state for testing:
+- **Match Storage**: `Matches map[string]*Match`
+- **Participant Storage**: `Participants map[string]map[int64]*Participant`
+- **Round Storage**: `Rounds map[string][]*MatchRound`
+- **Tournament Storage**: `Tournaments map[int64]*RankedTournament`
+- **Tournament Participants**: `TournamentParticipants map[int64]map[int64]*TournamentParticipant`
+
+*Methods*:
+```go
+// Match methods
+CreateMatch(ctx, match) error
+GetMatch(ctx, matchID) (*Match, error)
+GetActiveMatches(ctx, chatID, format, status) ([]*Match, error)
+StartShopPhase(ctx, matchID) error
+StartBattlePhase(ctx, matchID) error
+CompleteMatch(ctx, matchID, winnerID) error
+
+// Participant methods
+AddParticipant(ctx, matchID, userID) error
+GetParticipant(ctx, matchID, userID) (*Participant, error)
+RemoveParticipant(ctx, matchID, userID) error
+SubmitTeam(ctx, matchID, userID, teamSize) error
+UpdateParticipantShop(ctx, matchID, userID, coins, cards) error
+
+// Tournament methods
+GetOrCreateTournament(ctx, chatID, date) (*RankedTournament, error)
+GetTournamentByID(ctx, id) (*RankedTournament, error)
+AddTournamentParticipant(ctx, tournamentID, userID) error
+RemoveTournamentParticipant(ctx, tournamentID, userID) error
+CloseTournamentRegistration(ctx, tournamentID) error
+CompleteTournament(ctx, tournamentID) error
+```
+
+*Features*:
+- Thread-safe with mutex protection
+- Full state persistence in memory
+- Comprehensive error injection for all methods
+- Call tracking for all operations (useful for verifying behavior)
+- `Reset()` - Clear all state and reset counters
+- Suitable for testing entire game workflows
+
+**Example Usage**:
+```go
+func TestShopService(t *testing.T) {
+    mockRepo := testutil.NewMockGameRepository()
+    mockRepo.CreateMatchError = nil // No errors
+
+    service := NewShopService(mockRepo)
+
+    // Create a match using the service
+    match, _ := service.CreateMatch(ctx, &Match{...})
+
+    // Verify the mock was called
+    if mockRepo.CreateMatchCalls != 1 {
+        t.Errorf("Expected CreateMatch to be called once")
+    }
+
+    // Verify state was stored
+    if stored, ok := mockRepo.Matches[match.ID]; !ok {
+        t.Error("Match not found in repository")
+    }
+}
 ```
 
 #### Coverage Targets by Layer

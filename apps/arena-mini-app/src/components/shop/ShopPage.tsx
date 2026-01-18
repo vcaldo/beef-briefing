@@ -15,6 +15,7 @@ import { Reorder } from 'framer-motion'
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer, CompactCard } from '../common'
+import { TeamPhaseModal } from './TeamPhaseModal'
 
 import type {
   Match,
@@ -53,6 +54,7 @@ export function ShopPage({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null) // 'buy' | 'reroll' | 'upgrade' | 'submit'
+  const [isTeamPhase, setIsTeamPhase] = useState(false) // Team phase modal state
 
   // Refs for cleanup and preventing stale closures
   const pollIntervalRef = useRef<number | null>(null)
@@ -397,6 +399,20 @@ export function ShopPage({
     if (coins >= cardCost) return 'coin-display can-afford'
     if (coins > 0) return 'coin-display limited'
     return 'coin-display empty'
+  }
+
+  // Render TeamPhaseModal when in team phase
+  if (isTeamPhase && shopData && activeMatch) {
+    return (
+      <TeamPhaseModal
+        shopData={shopData}
+        activeMatch={activeMatch}
+        gameConstants={gameConstants}
+        onShopDataChange={setShopData}
+        onNavigateToBattle={onNavigateToBattle}
+        onMatchChange={onMatchChange}
+      />
+    )
   }
 
   return (

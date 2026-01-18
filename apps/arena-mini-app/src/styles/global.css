@@ -553,6 +553,39 @@ a:focus:not(:focus-visible),
   transition: filter 0.3s ease, opacity 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* Attacking state - orange glow with scale up, pulsing animation */
+.compact-card-anim-attacking {
+  transform: scale(1.05);
+  box-shadow:
+    0 0 20px rgba(249, 115, 22, 0.6),
+    0 0 40px rgba(249, 115, 22, 0.4),
+    0 0 60px rgba(249, 115, 22, 0.2);
+  animation: card-attack-pulse 0.4s ease-in-out;
+  z-index: 10;
+}
+
+/* Attack pulse keyframes - scale up with intensifying orange glow */
+@keyframes card-attack-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow:
+      0 0 25px rgba(249, 115, 22, 0.8),
+      0 0 50px rgba(249, 115, 22, 0.5),
+      0 0 75px rgba(249, 115, 22, 0.3);
+  }
+  100% {
+    transform: scale(1.05);
+    box-shadow:
+      0 0 20px rgba(249, 115, 22, 0.6),
+      0 0 40px rgba(249, 115, 22, 0.4),
+      0 0 60px rgba(249, 115, 22, 0.2);
+  }
+}
+
 /* =============================================================================
    Buttons
    ============================================================================= */

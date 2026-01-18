@@ -714,3 +714,89 @@ func TestGetCardImageURLString_Success(t *testing.T) {
 		t.Error("expected non-empty URL")
 	}
 }
+
+// TestGetPlaceholderPositions_NeonArcadeTheme verifies that neon_arcade theme returns embedded positions.
+func TestGetPlaceholderPositions_NeonArcadeTheme(t *testing.T) {
+	mockRepo := testutil.NewMockCardRepository()
+	svc := newTestCardService(mockRepo, nil)
+
+	// Execute
+	result := svc.GetPlaceholderPositions("neon_arcade")
+
+	// Verify
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if len(result) == 0 {
+		t.Error("expected non-empty JSON")
+	}
+
+	// Verify it's valid JSON
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(result, &parsed); err != nil {
+		t.Fatalf("expected valid JSON, got error: %v", err)
+	}
+
+	// Verify structure contains expected fields
+	if _, ok := parsed["version"]; !ok {
+		t.Error("expected 'version' field in JSON")
+	}
+	if _, ok := parsed["card_dimensions"]; !ok {
+		t.Error("expected 'card_dimensions' field in JSON")
+	}
+	if _, ok := parsed["placeholders"]; !ok {
+		t.Error("expected 'placeholders' field in JSON")
+	}
+}
+
+// TestGetPlaceholderPositions_EmptyTheme verifies that empty theme defaults to neon_arcade.
+func TestGetPlaceholderPositions_EmptyTheme(t *testing.T) {
+	mockRepo := testutil.NewMockCardRepository()
+	svc := newTestCardService(mockRepo, nil)
+
+	// Execute
+	result := svc.GetPlaceholderPositions("")
+
+	// Verify
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if len(result) == 0 {
+		t.Error("expected non-empty JSON")
+	}
+
+	// Verify it's valid JSON
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(result, &parsed); err != nil {
+		t.Fatalf("expected valid JSON, got error: %v", err)
+	}
+}
+
+// TestGetPlaceholderPositions_UnknownTheme verifies that unknown theme defaults to neon_arcade.
+func TestGetPlaceholderPositions_UnknownTheme(t *testing.T) {
+	mockRepo := testutil.NewMockCardRepository()
+	svc := newTestCardService(mockRepo, nil)
+
+	// Execute
+	result := svc.GetPlaceholderPositions("unknown_theme")
+
+	// Verify - should return neon_arcade as fallback
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if len(result) == 0 {
+		t.Error("expected non-empty JSON")
+	}
+
+	// Verify it's valid JSON
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(result, &parsed); err != nil {
+		t.Fatalf("expected valid JSON, got error: %v", err)
+	}
+
+	// Verify it's the same as neon_arcade
+	expectedResult := svc.GetPlaceholderPositions("neon_arcade")
+	if string(result) != string(expectedResult) {
+		t.Error("expected unknown theme to return same result as neon_arcade")
+	}
+}

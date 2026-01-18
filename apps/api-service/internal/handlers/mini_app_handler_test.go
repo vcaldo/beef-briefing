@@ -175,6 +175,10 @@ func (m *mockMiniAppCardService) GetCardImageURLString(ctx context.Context, user
 	return "", errors.New("not implemented")
 }
 
+func (m *mockMiniAppCardService) GetPlaceholderPositions(theme string) json.RawMessage {
+	return nil
+}
+
 func (m *mockMiniAppCardService) GetGalleryWeeks(ctx context.Context, chatID int64) (*services.GalleryWeeksResponse, error) {
 	if m.getGalleryWeeksFunc != nil {
 		return m.getGalleryWeeksFunc(ctx, chatID)

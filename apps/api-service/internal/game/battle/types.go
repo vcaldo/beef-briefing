@@ -26,6 +26,10 @@ type Card struct {
 	Username string `json:"username"`  // Optional username
 	PhotoURL string `json:"photo_url"` // Profile photo URL
 
+	// Card rendering data
+	CardImageURL         string          `json:"card_image_url,omitempty"`
+	PlaceholderPositions json.RawMessage `json:"placeholder_positions,omitempty"`
+
 	// Combat stats (base + upgrades)
 	ATK   int `json:"atk"`
 	DEF   int `json:"def"` // Used for display, not combat
@@ -199,8 +203,11 @@ type ShopCard struct {
 	Username string `json:"username,omitempty"`
 	PhotoURL string `json:"photo_url,omitempty"`
 
-	// Card image URL for shop display (overrides PhotoURL for shop phase)
+	// Card image URL for shop display (regular 400x600 cards)
 	CardImageURL string `json:"card_image_url,omitempty"`
+	// Compact card image URL for team display (300x450 cards with placeholder support)
+	CompactCardImageURL  string          `json:"compact_card_image_url,omitempty"`
+	PlaceholderPositions json.RawMessage `json:"placeholder_positions,omitempty"`
 
 	// Base stats from ml_user_cards
 	ATK int `json:"atk"`
@@ -215,20 +222,23 @@ type ShopCard struct {
 	Index       int  `json:"index"` // Position in shop (0-5)
 }
 
-// ToCard converts a ShopCard to a battle Card
+// ToCard converts a ShopCard to a battle Card.
+// Uses CompactCardImageURL for team display (300x450 with placeholder support).
 func (sc *ShopCard) ToCard() *Card {
 	return &Card{
-		CardID:      sc.CardID,
-		UserID:      sc.UserID,
-		Name:        sc.Name,
-		Username:    sc.Username,
-		PhotoURL:    sc.PhotoURL,
-		ATK:         sc.ATK,
-		DEF:         sc.DEF,
-		HP:          sc.HP,
-		MaxHP:       sc.HP,
-		ATKUpgrades: 0,
-		HPUpgrades:  0,
+		CardID:               sc.CardID,
+		UserID:               sc.UserID,
+		Name:                 sc.Name,
+		Username:             sc.Username,
+		PhotoURL:             sc.PhotoURL,
+		CardImageURL:         sc.CompactCardImageURL, // Use compact card for team display
+		PlaceholderPositions: sc.PlaceholderPositions,
+		ATK:                  sc.ATK,
+		DEF:                  sc.DEF,
+		HP:                   sc.HP,
+		MaxHP:                sc.HP,
+		ATKUpgrades:          0,
+		HPUpgrades:           0,
 	}
 }
 

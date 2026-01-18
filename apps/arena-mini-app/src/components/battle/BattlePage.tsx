@@ -14,6 +14,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, ErrorDisplay } from '../common'
+import { CompactCard } from '../common/CompactCard'
 import type { BattleResult, BattleEvent, CardSnapshot, Match, GameConstants } from '../../types'
 
 // Playback speed options (events per second)
@@ -411,70 +412,46 @@ export function BattlePage({
     (battleData.is_draw && false) // No winner on draw
   const isDraw = battleData.is_draw
 
-  // Get HP bar color based on percentage and backend thresholds
-  const getHpColor = (hp: number, maxHp: number): string => {
-    const thresholds = gameConstants?.hp_bar_thresholds
-    const highThreshold = thresholds?.high ?? 66
-    const mediumThreshold = thresholds?.medium ?? 33
-    const highColor = thresholds?.colors?.high ?? 'var(--hp-full)'
-    const mediumColor = thresholds?.colors?.medium ?? 'var(--hp-medium)'
-    const lowColor = thresholds?.colors?.low ?? 'var(--hp-low)'
-
-    const pct = (hp / maxHp) * 100
-    if (pct > highThreshold) return highColor
-    if (pct >= mediumThreshold) return mediumColor
-    return lowColor
-  }
-
   // Render a battle card
   const renderBattleCard = (
     cardId: number,
     teamOwnerId: number,
-    originalCard: { name: string; photo_url?: string; username?: string }
+    originalCard: {
+      name: string
+      photo_url?: string
+      username?: string
+      card_image_url?: string
+      placeholder_positions?: any
+    }
   ) => {
     const state = cardStates.get(cardId)
     if (!state) return null
 
-    const hpPercent = Math.max(0, (state.hp / state.max_hp) * 100)
-    const hpColor = getHpColor(state.hp, state.max_hp)
     const isCurrentUser = teamOwnerId === userId
 
     return (
-      <div
-        key={cardId}
-        className={`battle-card ${!state.is_alive ? 'dead' : ''} ${state.is_attacking ? 'attacking' : ''} ${state.is_defending ? 'defending' : ''}`}
-        data-card-id={cardId}
-        data-is-alive={state.is_alive}
-        data-is-attacking={state.is_attacking}
-        data-is-defending={state.is_defending}
-      >
-        <div className={`battle-card-owner ${isCurrentUser ? 'you' : ''}`}>
+      <div key={cardId} className="battle-card-wrapper">
+        <div className={`battle-card-owner-badge ${isCurrentUser ? 'you' : ''}`}>
           {isCurrentUser ? 'You' : ''}
         </div>
-        <div className="battle-card-avatar">
-          {originalCard.photo_url ? (
-            <img src={originalCard.photo_url} alt={state.name} />
-          ) : (
-            <div className="battle-card-avatar-placeholder">
-              {state.name.charAt(0).toUpperCase()}
-            </div>
-          )}
-        </div>
-        <div className="battle-card-name">{state.name}</div>
-        <div className="battle-card-stats">
-          <span className="stat atk">⚔️ {state.atk}</span>
-          <span className="stat hp">❤️ {state.hp}/{state.max_hp}</span>
-        </div>
-        <div className="battle-card-hp-bar">
-          <div
-            className="battle-card-hp-fill"
-            style={{
-              width: `${hpPercent}%`,
-              backgroundColor: hpColor,
-              transition: 'width 0.3s ease, background-color 0.3s ease',
-            }}
-          />
-        </div>
+        <CompactCard
+          imageUrl={originalCard.card_image_url || ''}
+          positions={originalCard.placeholder_positions}
+          currentStats={{
+            atk: state.atk,
+            def: 0,
+            hp: state.hp,
+            maxHp: state.max_hp,
+          }}
+          hpBarThresholds={gameConstants?.hp_bar_thresholds}
+          isAlive={state.is_alive}
+          isAttacking={state.is_attacking}
+          isDefending={state.is_defending}
+          showHpBar={true}
+          cardName={state.name}
+          cardId={cardId}
+          className="battle-compact-card"
+        />
       </div>
     )
   }

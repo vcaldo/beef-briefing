@@ -377,6 +377,8 @@ a:focus:not(:focus-visible),
   width: 100%;
   height: 100%;
   object-fit: cover;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 /* Stat overlay positioned absolutely on the card */
@@ -1408,6 +1410,24 @@ a:focus:not(:focus-visible),
   border-radius: 6px;
 }
 
+/* Team Phase Compact Card - Scale from 300x450 to 100x150 */
+.team-phase-compact-card {
+  width: 300px;
+  height: 450px;
+  transform: scale(0.333);
+  transform-origin: top left;
+}
+
+/* Scale stat overlays for team phase */
+.team-phase-compact-card .compact-card-stat {
+  /* Stats inherit positions from placeholder_positions and scale with the card */
+}
+
+/* Scale HP bar for team phase */
+.team-phase-compact-card .compact-card-hp-bar {
+  /* HP bar inherits positions from placeholder_positions and scales with the card */
+}
+
 .team-phase-card-image {
   width: 100%;
   height: 100%;
@@ -1608,9 +1628,15 @@ a:focus:not(:focus-visible),
 }
 
 @keyframes attack-pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+  0% {
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.8), 0 0 40px rgba(249, 115, 22, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(249, 115, 22, 1), 0 0 60px rgba(249, 115, 22, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.8), 0 0 40px rgba(249, 115, 22, 0.4);
+  }
 }
 
 @keyframes damage-shake {
@@ -1896,6 +1922,54 @@ a:focus:not(:focus-visible),
 .battle-card-hp-fill {
   height: 100%;
   border-radius: 2px;
+}
+
+/* Battle Card Wrapper (for compact cards with owner badge) */
+.battle-card-wrapper {
+  position: relative;
+  width: 90px;
+}
+
+/* Battle Card Owner Badge (positioned above the card) */
+.battle-card-owner-badge {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--arena-orange);
+  color: white;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.battle-card-owner-badge:empty {
+  display: none;
+}
+
+.battle-card-owner-badge.you {
+  background: var(--arena-orange);
+}
+
+/* Battle Compact Card - Scale from 300x450 to 90x135 */
+.battle-compact-card {
+  width: 300px;
+  height: 450px;
+  transform: scale(0.3);
+  transform-origin: top left;
+}
+
+/* Scale stat overlays for battle */
+.battle-compact-card .compact-card-stat {
+  /* Stats inherit positions from placeholder_positions and scale with the card */
+}
+
+/* Scale HP bar for battle */
+.battle-compact-card .compact-card-hp-bar {
+  /* HP bar inherits positions from placeholder_positions and scales with the card */
 }
 
 /* Battle Teams */
@@ -2984,8 +3058,8 @@ a:focus:not(:focus-visible),
   }
 
   .compact-card {
-    width: 240px;
-    height: 360px;
+    transform: scale(0.8);
+    transform-origin: top left;
   }
 }
 

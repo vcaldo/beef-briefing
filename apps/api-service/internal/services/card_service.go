@@ -5,12 +5,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"time"
 
 	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/jsonutil"
 	"beef-briefing/apps/api-service/internal/nrutil"
 	"beef-briefing/apps/api-service/internal/repository"
+	"beef-briefing/apps/api-service/internal/services/embedded"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
@@ -529,4 +531,20 @@ func (s *CardService) GetGalleryImageURL(
 		URL:       url,
 		ExpiresIn: expirySeconds,
 	}, nil
+}
+
+// GetPlaceholderPositions returns the embedded placeholder positions JSON for a given theme.
+// Currently only supports "neon_arcade" theme. Returns the JSON as json.RawMessage for direct use.
+func (s *CardService) GetPlaceholderPositions(theme string) json.RawMessage {
+	slog.Debug("Getting placeholder positions", "theme", theme)
+
+	// Default to neon_arcade if theme is empty or not recognized
+	if theme == "" || theme == "neon_arcade" {
+		slog.Debug("Using neon_arcade theme positions", "theme", theme, "is_default", theme == "")
+		return json.RawMessage(embedded.NeonArcadeCompactPositions)
+	}
+
+	// For unsupported themes, return neon_arcade as default
+	slog.Info("Unsupported theme, falling back to neon_arcade", "requested_theme", theme, "fallback_theme", "neon_arcade")
+	return json.RawMessage(embedded.NeonArcadeCompactPositions)
 }

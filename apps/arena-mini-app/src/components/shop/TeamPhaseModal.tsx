@@ -20,6 +20,7 @@ import type {
   UpgradeType,
 } from '../../types'
 import { CountdownTimer, LoadingSpinner } from '../common'
+import { CompactCard } from '../common/CompactCard'
 import { apiClient } from '../../api/client'
 
 const POLL_INTERVAL = 3000 // 3 seconds
@@ -289,22 +290,22 @@ export function TeamPhaseModal({
                     <span className="team-phase-slot-number">{idx + 1}</span>
 
                     <div className="team-phase-card-container">
-                      {card.card_image_url ? (
-                        <img
-                          src={card.card_image_url}
-                          alt={card.name}
-                          className="team-phase-card-image"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="team-phase-card-fallback">
-                          <div className="team-phase-card-name">{card.name}</div>
-                          <div className="team-phase-card-stats">
-                            <span className="stat atk">⚔️ {card.atk}</span>
-                            <span className="stat hp">❤️ {card.hp}</span>
-                          </div>
-                        </div>
-                      )}
+                      <CompactCard
+                        imageUrl={card.card_image_url || ''}
+                        positions={card.placeholder_positions}
+                        currentStats={{
+                          atk: card.atk,
+                          def: card.def,
+                          hp: card.hp,
+                          maxHp: card.max_hp,
+                        }}
+                        hpBarThresholds={gameConstants?.hp_bar_thresholds}
+                        isAlive={true}
+                        showHpBar={true}
+                        cardName={card.name}
+                        cardId={card.card_id}
+                        className="team-phase-compact-card"
+                      />
                     </div>
 
                     {/* Upgrade buttons - only show if not submitted */}

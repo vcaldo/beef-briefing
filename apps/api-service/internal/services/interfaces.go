@@ -5,6 +5,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"time"
 
@@ -150,6 +151,7 @@ type CardServiceInterface interface {
 	// Card Image Methods
 	GetCardImageURL(ctx context.Context, userID int64, chatID int64, weekStart *time.Time, theme string, expirySeconds int) (*CardImageURLResponse, error)
 	GetCardImageURLString(ctx context.Context, userID int64, chatID int64, weekStart *time.Time, theme string, expirySeconds int) (string, error)
+	GetPlaceholderPositions(theme string) json.RawMessage
 
 	// Gallery Methods
 	GetGalleryWeeks(ctx context.Context, chatID int64) (*GalleryWeeksResponse, error)

@@ -15,7 +15,19 @@ import { apiClient } from '../../api/client'
 import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, ErrorDisplay } from '../common'
 import { CompactCard } from '../common/CompactCard'
-import type { BattleResult, BattleEvent, CardSnapshot, Match, GameConstants, PlaceholderPositions } from '../../types'
+import { useBattleAnimation } from '../../hooks'
+import type { UseBattleAnimationOptions } from '../../hooks'
+import type {
+  BattleResult,
+  BattleEvent,
+  CardSnapshot,
+  Match,
+  GameConstants,
+  PlaceholderPositions,
+  CardAnimationState,
+  EventAnimationPhase,
+} from '../../types'
+import { ANIMATION_DURATIONS } from '../../types'
 
 // Playback speed options (events per second)
 const PLAYBACK_SPEEDS = [

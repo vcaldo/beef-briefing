@@ -37,6 +37,11 @@ interface CompactCardProps {
    * Only rendered when provided and > 0.
    */
   damageNumber?: number
+  /**
+   * Whether the card is dead. If true, applies `.card-dead` class to force
+   * HP bar to 0% immediately. Defaults to checking if currentStats.hp <= 0.
+   */
+  isDead?: boolean
   /** Click handler */
   onClick?: () => void
 }
@@ -106,6 +111,7 @@ export function CompactCard({
   className = '',
   animationState,
   damageNumber,
+  isDead,
   onClick,
 }: CompactCardProps): React.JSX.Element {
   // Calculate HP bar width and color
@@ -123,11 +129,16 @@ export function CompactCard({
   const combatStats = positions?.placeholders?.combat_stats
   const hpBar = positions?.placeholders?.hp_bar
 
+  // Determine if card is dead (explicit prop or derived from HP)
+  const isCardDead = isDead ?? currentStats.hp <= 0
+
   // Build class names for card state
   const cardClasses = [
     'compact-card',
     // Animation state class (e.g., compact-card-anim-attacking, compact-card-anim-taking_damage)
     animationState && `compact-card-anim-${animationState}`,
+    // Dead card class forces HP bar to 0% immediately
+    isCardDead && 'card-dead',
     onClick && 'cursor-pointer',
     className,
   ]

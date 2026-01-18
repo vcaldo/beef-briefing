@@ -337,10 +337,12 @@ export function useBattleAnimation(
               const next = new Map(prev)
               const defender = next.get(defenderKey)
               if (defender && event.hp_after !== undefined) {
+                // Clamp HP to 0 minimum - backend may send negative values for overkill damage
+                const clampedHp = Math.max(0, event.hp_after)
                 next.set(defenderKey, {
                   ...defender,
-                  hp: event.hp_after,
-                  is_alive: event.hp_after > 0,
+                  hp: clampedHp,
+                  is_alive: clampedHp > 0,
                 })
               }
               return next
@@ -501,10 +503,12 @@ export function useBattleAnimation(
         if (defender) {
           // Update HP and is_alive
           if (event.hp_after !== undefined) {
+            // Clamp HP to 0 minimum - backend may send negative values for overkill damage
+            const clampedHp = Math.max(0, event.hp_after)
             finalCardStates.set(defenderKey, {
               ...defender,
-              hp: event.hp_after,
-              is_alive: event.hp_after > 0,
+              hp: clampedHp,
+              is_alive: clampedHp > 0,
             })
           }
         }

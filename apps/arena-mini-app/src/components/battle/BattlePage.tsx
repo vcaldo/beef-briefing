@@ -270,6 +270,7 @@ export function BattlePage({
           hpBarThresholds={gameConstants?.hp_bar_thresholds}
           animationState={animState}
           damageNumber={damageToShow}
+          isDead={!state.is_alive}
           showHpBar={true}
           cardName={state.name}
           cardId={cardId}
@@ -315,7 +316,14 @@ export function BattlePage({
       </div>
 
       {/* Battle Arena */}
-      <div className="battle-arena">
+      <div
+        className="battle-arena"
+        style={{
+          // Scale HP bar transition duration with playback speed
+          // At 1x (value=1000), duration is 300ms; at 2x (value=500), duration is 150ms
+          '--hp-transition-duration': `${(PLAYBACK_SPEEDS[playbackSpeedIndex].value / 1000) * 300}ms`,
+        } as React.CSSProperties}
+      >
         {/* Team A (opponent or self) */}
         <div className="battle-team team-a">
           <div className="team-label">{battleData.player_a_name}</div>

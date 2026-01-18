@@ -473,7 +473,8 @@ a:focus:not(:focus-visible),
 .compact-card-hp-bar-fill {
   height: 100%;
   border-radius: 2px;
-  transition: width 0.3s ease, background-color 0.3s ease;
+  transition: width var(--hp-transition-duration, 0.3s) ease,
+              background-color var(--hp-transition-duration, 0.3s) ease;
 }
 
 /* Fallback stats display when positions not available */
@@ -520,7 +521,15 @@ a:focus:not(:focus-visible),
 .compact-card-hp-bar-fill-fallback {
   height: 100%;
   border-radius: 4px;
-  transition: width 0.3s ease, background-color 0.3s ease;
+  transition: width var(--hp-transition-duration, 0.3s) ease,
+              background-color var(--hp-transition-duration, 0.3s) ease;
+}
+
+/* Force HP bar to 0% immediately when card is dead */
+.card-dead .compact-card-hp-bar-fill,
+.card-dead .compact-card-hp-bar-fill-fallback {
+  width: 0% !important;
+  transition: none !important;
 }
 
 /* =============================================================================

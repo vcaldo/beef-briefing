@@ -456,6 +456,13 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 		damageTaken = round.PlayerADmg
 	}
 
+	// Add New Relic transaction attributes for damage metrics
+	if txn := newrelic.FromContext(ctx); txn != nil {
+		txn.AddAttribute("damage_dealt", damageDealt)
+		txn.AddAttribute("damage_taken", damageTaken)
+		txn.AddAttribute("damage_diff", damageDealt-damageTaken)
+	}
+
 	return &BattleResponse{
 		MatchID:     matchID,
 		WinnerID:    round.WinnerID,

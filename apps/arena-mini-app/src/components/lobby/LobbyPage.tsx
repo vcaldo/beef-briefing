@@ -12,7 +12,7 @@ import { useState, useCallback, useRef } from 'react'
 
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
-import { LoadingSpinner, CountdownTimer } from '../common'
+import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
 import { usePolling, useErrorBanner } from '../../hooks'
 
 import type { Match, GameConstants } from '../../types'
@@ -337,13 +337,11 @@ export function LobbyPage({
 
       {/* Error banner */}
       {error && (
-        <div className="lobby-error-banner" role="alert">
-          <span className="lobby-error-icon">⚠️</span>
-          <span className="lobby-error-text">{error}</span>
-          <button className="lobby-error-dismiss" onClick={clearError} aria-label="Dismiss error">
-            ×
-          </button>
-        </div>
+        <ErrorBanner
+          message={error}
+          onDismiss={clearError}
+          className="lobby-error-banner"
+        />
       )}
 
       {/* Active match card */}

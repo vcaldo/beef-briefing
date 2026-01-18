@@ -12,7 +12,7 @@ import { useState, useCallback } from 'react'
 
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
-import { LoadingSpinner, CountdownTimer } from '../common'
+import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
 import { usePolling, useErrorBanner } from '../../hooks'
 import TeamPhaseModal from './TeamPhaseModal'
 
@@ -287,13 +287,11 @@ export function ShopPage({
 
       {/* Error banner */}
       {error && (
-        <div className="shop-error-banner" role="alert">
-          <span className="shop-error-icon">⚠️</span>
-          <span className="shop-error-text">{error}</span>
-          <button className="shop-error-dismiss" onClick={clearError} aria-label="Dismiss error">
-            ×
-          </button>
-        </div>
+        <ErrorBanner
+          message={error}
+          onDismiss={clearError}
+          className="shop-error-banner"
+        />
       )}
 
       {/* Waiting message when submitted */}

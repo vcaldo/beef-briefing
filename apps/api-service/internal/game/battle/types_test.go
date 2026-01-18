@@ -18,7 +18,8 @@ func TestShopCard_ToCard_CopiesAllFields(t *testing.T) {
 		Name:                 "TestUser",
 		Username:             "testuser",
 		PhotoURL:             "https://example.com/photo.jpg",
-		CardImageURL:         "https://example.com/card.png",
+		CardImageURL:         "https://example.com/card.png",         // Regular card (shop display)
+		CompactCardImageURL:  "https://example.com/card_compact.png", // Compact card (team display)
 		PlaceholderPositions: placeholderPositions,
 		ATK:                  15,
 		DEF:                  10,
@@ -45,8 +46,9 @@ func TestShopCard_ToCard_CopiesAllFields(t *testing.T) {
 	if card.PhotoURL != shopCard.PhotoURL {
 		t.Errorf("expected PhotoURL=%q, got %q", shopCard.PhotoURL, card.PhotoURL)
 	}
-	if card.CardImageURL != shopCard.CardImageURL {
-		t.Errorf("expected CardImageURL=%q, got %q", shopCard.CardImageURL, card.CardImageURL)
+	// ToCard uses CompactCardImageURL for team display (not CardImageURL)
+	if card.CardImageURL != shopCard.CompactCardImageURL {
+		t.Errorf("expected CardImageURL=%q (from CompactCardImageURL), got %q", shopCard.CompactCardImageURL, card.CardImageURL)
 	}
 	if string(card.PlaceholderPositions) != string(shopCard.PlaceholderPositions) {
 		t.Errorf("expected PlaceholderPositions=%s, got %s", shopCard.PlaceholderPositions, card.PlaceholderPositions)
@@ -158,23 +160,26 @@ func TestShopCard_ToCard_CopiesPlaceholderPositions(t *testing.T) {
 	}
 }
 
-func TestShopCard_ToCard_CopiesCardImageURL(t *testing.T) {
-	expectedURL := "https://storage.example.com/cards/neon_arcade/abc123.png"
+func TestShopCard_ToCard_CopiesCompactCardImageURL(t *testing.T) {
+	regularURL := "https://storage.example.com/cards/neon_arcade/abc123.png"
+	compactURL := "https://storage.example.com/cards/neon_arcade_compact/abc123.png"
 
 	shopCard := &ShopCard{
-		CardID:       101,
-		UserID:       202,
-		Name:         "TestUser",
-		CardImageURL: expectedURL,
-		ATK:          15,
-		DEF:          10,
-		HP:           50,
+		CardID:              101,
+		UserID:              202,
+		Name:                "TestUser",
+		CardImageURL:        regularURL, // Regular card for shop display
+		CompactCardImageURL: compactURL, // Compact card for team display
+		ATK:                 15,
+		DEF:                 10,
+		HP:                  50,
 	}
 
 	card := shopCard.ToCard()
 
-	if card.CardImageURL != expectedURL {
-		t.Errorf("expected CardImageURL=%q, got %q", expectedURL, card.CardImageURL)
+	// ToCard should use CompactCardImageURL for team display
+	if card.CardImageURL != compactURL {
+		t.Errorf("expected CardImageURL=%q (from CompactCardImageURL), got %q", compactURL, card.CardImageURL)
 	}
 }
 

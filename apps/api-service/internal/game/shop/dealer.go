@@ -96,15 +96,18 @@ func (d *Dealer) DealCards(ctx context.Context, chatID int64, count int) ([]*bat
 	cards := make([]*battle.ShopCard, 0, count)
 	index := 0
 
-	// Get placeholder positions for the theme (same for all cards)
-	theme := "neon_arcade"
+	// Theme for regular cards (shop display) and compact cards (team display)
+	regularTheme := "neon_arcade"
+	compactTheme := "neon_arcade_compact"
+
+	// Get placeholder positions for compact theme (same for all cards)
 	var placeholderPositions json.RawMessage
 	if d.cardService != nil {
 		endSegment := nrutil.StartSegment(ctx, "service:get-placeholder-positions")
-		placeholderPositions = d.cardService.GetPlaceholderPositions(theme)
+		placeholderPositions = d.cardService.GetPlaceholderPositions(compactTheme)
 		endSegment()
 		slog.DebugContext(ctx, "Fetched placeholder positions for dealt cards",
-			"theme", theme,
+			"compact_theme", compactTheme,
 			"chat_id", chatID,
 			"card_count", count,
 			"has_positions", placeholderPositions != nil)
@@ -159,9 +162,9 @@ func (d *Dealer) DealCards(ctx context.Context, chatID int64, count int) ([]*bat
 		photoURL, _ := d.getUserPhotoURL(ctx, userID)
 		card.PhotoURL = photoURL
 
-		// Try to get card image URL (for shop phase)
-		cardImageURL := d.getCardImageURL(ctx, userID, chatID, theme)
-		card.CardImageURL = cardImageURL
+		// Get card image URLs: regular for shop display, compact for team display
+		card.CardImageURL = d.getCardImageURL(ctx, userID, chatID, regularTheme)
+		card.CompactCardImageURL = d.getCardImageURL(ctx, userID, chatID, compactTheme)
 
 		// Set placeholder positions
 		card.PlaceholderPositions = placeholderPositions
@@ -255,15 +258,18 @@ func (d *Dealer) DealRerollCards(ctx context.Context, chatID int64, count int, e
 
 	cards := make([]*battle.ShopCard, 0, count)
 
-	// Get placeholder positions for the theme (same for all cards)
-	theme := "neon_arcade"
+	// Theme for regular cards (shop display) and compact cards (team display)
+	regularTheme := "neon_arcade"
+	compactTheme := "neon_arcade_compact"
+
+	// Get placeholder positions for compact theme (same for all cards)
 	var placeholderPositions json.RawMessage
 	if d.cardService != nil {
 		endSegment := nrutil.StartSegment(ctx, "service:get-placeholder-positions")
-		placeholderPositions = d.cardService.GetPlaceholderPositions(theme)
+		placeholderPositions = d.cardService.GetPlaceholderPositions(compactTheme)
 		endSegment()
 		slog.DebugContext(ctx, "Fetched placeholder positions for reroll cards",
-			"theme", theme,
+			"compact_theme", compactTheme,
 			"chat_id", chatID,
 			"card_count", count,
 			"exclude_count", len(excludeCardIDs),
@@ -316,9 +322,9 @@ func (d *Dealer) DealRerollCards(ctx context.Context, chatID int64, count int, e
 		photoURL, _ := d.getUserPhotoURL(ctx, userID)
 		card.PhotoURL = photoURL
 
-		// Try to get card image URL (for shop phase)
-		cardImageURL := d.getCardImageURL(ctx, userID, chatID, theme)
-		card.CardImageURL = cardImageURL
+		// Get card image URLs: regular for shop display, compact for team display
+		card.CardImageURL = d.getCardImageURL(ctx, userID, chatID, regularTheme)
+		card.CompactCardImageURL = d.getCardImageURL(ctx, userID, chatID, compactTheme)
 
 		// Set placeholder positions
 		card.PlaceholderPositions = placeholderPositions

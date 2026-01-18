@@ -203,8 +203,10 @@ type ShopCard struct {
 	Username string `json:"username,omitempty"`
 	PhotoURL string `json:"photo_url,omitempty"`
 
-	// Card image URL for shop display (overrides PhotoURL for shop phase)
-	CardImageURL         string          `json:"card_image_url,omitempty"`
+	// Card image URL for shop display (regular 400x600 cards)
+	CardImageURL string `json:"card_image_url,omitempty"`
+	// Compact card image URL for team display (300x450 cards with placeholder support)
+	CompactCardImageURL  string          `json:"compact_card_image_url,omitempty"`
 	PlaceholderPositions json.RawMessage `json:"placeholder_positions,omitempty"`
 
 	// Base stats from ml_user_cards
@@ -220,7 +222,8 @@ type ShopCard struct {
 	Index       int  `json:"index"` // Position in shop (0-5)
 }
 
-// ToCard converts a ShopCard to a battle Card
+// ToCard converts a ShopCard to a battle Card.
+// Uses CompactCardImageURL for team display (300x450 with placeholder support).
 func (sc *ShopCard) ToCard() *Card {
 	return &Card{
 		CardID:               sc.CardID,
@@ -228,7 +231,7 @@ func (sc *ShopCard) ToCard() *Card {
 		Name:                 sc.Name,
 		Username:             sc.Username,
 		PhotoURL:             sc.PhotoURL,
-		CardImageURL:         sc.CardImageURL,
+		CardImageURL:         sc.CompactCardImageURL, // Use compact card for team display
 		PlaceholderPositions: sc.PlaceholderPositions,
 		ATK:                  sc.ATK,
 		DEF:                  sc.DEF,

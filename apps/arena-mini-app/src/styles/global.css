@@ -540,16 +540,16 @@ a:focus:not(:focus-visible),
 
 /* Idle state - default, no animation active */
 .compact-card-anim-idle {
+  --anim-scale: 1;
   filter: none;
   opacity: 1;
-  transform: scale(1);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  transition: filter 0.3s ease, opacity 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  transition: filter 0.3s ease, opacity 0.3s ease, box-shadow 0.2s ease;
 }
 
 /* Attacking state - orange glow with scale up, pulsing animation */
 .compact-card-anim-attacking {
-  transform: scale(1.05);
+  --anim-scale: 1.05;
   box-shadow:
     0 0 20px rgba(249, 115, 22, 0.6),
     0 0 40px rgba(249, 115, 22, 0.4),
@@ -561,18 +561,18 @@ a:focus:not(:focus-visible),
 /* Attack pulse keyframes - scale up with intensifying orange glow */
 @keyframes card-attack-pulse {
   0% {
-    transform: scale(1);
+    --anim-scale: 1;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   }
   50% {
-    transform: scale(1.08);
+    --anim-scale: 1.08;
     box-shadow:
       0 0 25px rgba(249, 115, 22, 0.8),
       0 0 50px rgba(249, 115, 22, 0.5),
       0 0 75px rgba(249, 115, 22, 0.3);
   }
   100% {
-    transform: scale(1.05);
+    --anim-scale: 1.05;
     box-shadow:
       0 0 20px rgba(249, 115, 22, 0.6),
       0 0 40px rgba(249, 115, 22, 0.4),
@@ -582,6 +582,7 @@ a:focus:not(:focus-visible),
 
 /* Taking damage state - red glow with shake effect */
 .compact-card-anim-taking-damage {
+  --anim-scale: 1;
   animation: card-damage-shake 0.3s ease-in-out;
   box-shadow:
     0 0 15px rgba(239, 68, 68, 0.7),
@@ -591,41 +592,41 @@ a:focus:not(:focus-visible),
 /* Damage shake keyframes - rapid horizontal shake with red flash */
 @keyframes card-damage-shake {
   0% {
-    transform: translateX(0);
+    transform: translateX(0) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   }
   10% {
-    transform: translateX(-6px);
+    transform: translateX(-6px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
     box-shadow:
       0 0 20px rgba(239, 68, 68, 0.8),
       0 0 40px rgba(239, 68, 68, 0.5);
   }
   20% {
-    transform: translateX(6px);
+    transform: translateX(6px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
   }
   30% {
-    transform: translateX(-5px);
+    transform: translateX(-5px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
   }
   40% {
-    transform: translateX(5px);
+    transform: translateX(5px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
   }
   50% {
-    transform: translateX(-4px);
+    transform: translateX(-4px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
   }
   60% {
-    transform: translateX(4px);
+    transform: translateX(4px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
   }
   70% {
-    transform: translateX(-2px);
+    transform: translateX(-2px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
   }
   80% {
-    transform: translateX(2px);
+    transform: translateX(2px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
   }
   90% {
-    transform: translateX(-1px);
+    transform: translateX(-1px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
   }
   100% {
-    transform: translateX(0);
+    transform: translateX(0) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
     box-shadow:
       0 0 15px rgba(239, 68, 68, 0.7),
       0 0 30px rgba(239, 68, 68, 0.4);
@@ -2136,8 +2137,11 @@ a:focus:not(:focus-visible),
 .battle-compact-card {
   width: 300px;
   height: 450px;
-  transform: scale(0.3);
+  --base-scale: 0.3;
+  --anim-scale: 1;
+  transform: scale(calc(var(--base-scale) * var(--anim-scale)));
   transform-origin: top left;
+  transition: transform 0.15s ease-out;
 }
 
 /* Scale stat overlays for battle */
@@ -3285,7 +3289,7 @@ a:focus:not(:focus-visible),
     height: 105px;
   }
 
-  .compact-card {
+  .compact-card:not(.battle-compact-card) {
     transform: scale(0.8);
     transform-origin: top left;
   }

@@ -170,14 +170,17 @@ export function CompactCard({
       data-is-alive={isAlive}
       data-is-attacking={isAttacking}
       data-is-defending={isDefending}
-      style={{
-        // Apply grayscale and reduced opacity when dead
-        // When using animationState, CSS handles dead state styling via compact-card-anim-dead class
-        // Only apply inline styles when using legacy isAlive prop
-        filter: !animationState && !isAlive ? 'grayscale(100%)' : undefined,
-        opacity: animationState ? undefined : (isAlive ? 1 : 0.5),
-        transition: 'filter 0.3s ease, opacity 0.3s ease',
-      }}
+      style={
+        // When animationState is provided, let CSS classes handle all styling
+        // Only apply inline styles for legacy isAlive prop (non-animation usage)
+        animationState
+          ? undefined
+          : {
+              filter: !isAlive ? 'grayscale(100%)' : undefined,
+              opacity: isAlive ? 1 : 0.5,
+              transition: 'filter 0.3s ease, opacity 0.3s ease',
+            }
+      }
     >
       {/* Base card image */}
       <img

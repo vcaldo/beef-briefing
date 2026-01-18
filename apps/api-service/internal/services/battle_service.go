@@ -391,8 +391,10 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 	// No rounds yet - return minimal response
 	if len(rounds) == 0 {
 		return &BattleResponse{
-			MatchID: matchID,
-			Events:  []battle.BattleEvent{},
+			MatchID:      matchID,
+			Events:       []battle.BattleEvent{},
+			DamageDealt:  0,
+			DamageTaken:  0,
 		}, nil
 	}
 
@@ -442,6 +444,18 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 		Cards:     teamBCards,
 	}
 
+	// Calculate player-relative damage summary
+	var damageDealt, damageTaken int
+	if userID == round.PlayerAID {
+		// User is Player A
+		damageDealt = round.PlayerADmg
+		damageTaken = round.PlayerBDmg
+	} else {
+		// User is Player B
+		damageDealt = round.PlayerBDmg
+		damageTaken = round.PlayerADmg
+	}
+
 	return &BattleResponse{
 		MatchID:     matchID,
 		WinnerID:    round.WinnerID,
@@ -456,5 +470,7 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 		PlayerBID:   round.PlayerBID,
 		PlayerAName: nameMap[round.PlayerAID],
 		PlayerBName: nameMap[round.PlayerBID],
+		DamageDealt: damageDealt,
+		DamageTaken: damageTaken,
 	}, nil
 }

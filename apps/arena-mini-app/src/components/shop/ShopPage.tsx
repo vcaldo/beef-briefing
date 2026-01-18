@@ -8,11 +8,12 @@
  * - Continues polling AFTER team submission to detect battle start
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
-import { LoadingSpinner, CountdownTimer } from '../common'
+import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
+import { usePolling, useErrorBanner } from '../../hooks'
 import TeamPhaseModal from './TeamPhaseModal'
 
 import type {
@@ -26,8 +27,6 @@ import type {
 const POLL_INTERVAL = 3000 // 3 seconds
 
 interface ShopPageProps {
-  chatId: number // Reserved for future use (e.g., card image fetching by chat)
-  userId: number // Reserved for future use (e.g., highlight user's cards)
   activeMatch: Match | null
   onNavigateToBattle: () => void
   onMatchChange: (match: Match | null) => void
@@ -35,26 +34,19 @@ interface ShopPageProps {
 }
 
 export function ShopPage({
-  chatId: _chatId, // Reserved for future use
-  userId: _userId, // Reserved for future use
   activeMatch,
   onNavigateToBattle,
   onMatchChange,
   gameConstants,
 }: ShopPageProps) {
-  // Reserved variables - suppress unused warnings
-  void _chatId
-  void _userId
   // Shop state
   const [shopData, setShopData] = useState<EnhancedShopResponse | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null) // 'buy' | 'reroll'
   const [isTeamPhase, setIsTeamPhase] = useState(false) // Team phase modal state
 
-  // Refs for cleanup and preventing stale closures
-  const pollIntervalRef = useRef<number | null>(null)
-  const isMountedRef = useRef(true)
+  // Error banner with auto-dismiss
+  const { error, showError, clearError } = useErrorBanner()
 
   // Derived state
   const coins = shopData?.coins ?? 0
@@ -67,22 +59,18 @@ export function ShopPage({
   const rerollCost = gameConstants?.reroll_cost ?? 1
 
 
-  // Fetch shop data from API
-  const fetchShop = useCallback(async () => {
-    if (!isMountedRef.current || !activeMatch) return
-
-    try {
-      const data = await apiClient.getShop(activeMatch.id)
-
-      if (!isMountedRef.current) return
-
+  /**
+   * Handle successful shop data fetch.
+   * Detects phase transitions and triggers navigation accordingly.
+   */
+  const handleShopSuccess = useCallback(
+    (data: EnhancedShopResponse) => {
       setShopData(data)
-      setError(null)
 
       // Check for phase transition to battle (or completed - battle executes instantly)
       if (data.status === 'battle_phase' || data.status === 'completed') {
         addPageAction('match_phase_transition', {
-          match_id: activeMatch.id,
+          match_id: activeMatch?.id,
           from_status: 'shop_phase',
           to_status: data.status,
         })
@@ -93,7 +81,7 @@ export function ShopPage({
       // Check if match was cancelled
       if (data.status === 'cancelled') {
         addPageAction('match_ended_in_shop', {
-          match_id: activeMatch.id,
+          match_id: activeMatch?.id,
           status: data.status,
         })
         onMatchChange(null)
@@ -104,28 +92,32 @@ export function ShopPage({
       if (loading) {
         setLoading(false)
         addPageAction('shop_loaded', {
-          match_id: activeMatch.id,
+          match_id: activeMatch?.id,
           coins: data.coins,
           shop_cards: data.cards.length,
           team_cards: data.team.length,
           can_reroll: data.can_reroll,
         })
       }
-    } catch (err) {
-      if (!isMountedRef.current) return
-
-      console.error('Failed to fetch shop:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load shop')
-      setLoading(false)
-
-      if (err instanceof Error) {
-        noticeError(err, { context: 'shop_fetch', match_id: activeMatch?.id })
-      }
-    }
-  }, [activeMatch, onNavigateToBattle, onMatchChange, loading])
+    },
+    [activeMatch?.id, onNavigateToBattle, onMatchChange, loading]
+  )
 
   /**
-   * Setup shop polling for phase transition detection.
+   * Handle shop fetch errors.
+   */
+  const handleShopError = useCallback(
+    (err: Error) => {
+      console.error('Failed to fetch shop:', err)
+      showError(err, 'Failed to load shop')
+      setLoading(false)
+      noticeError(err, { context: 'shop_fetch', match_id: activeMatch?.id })
+    },
+    [activeMatch?.id, showError]
+  )
+
+  /**
+   * Shop polling for phase transition detection.
    *
    * CRITICAL: Polling continues AFTER team submission!
    *
@@ -139,25 +131,16 @@ export function ShopPage({
    * 3. Polling continues at 3s intervals
    * 4. When API returns status='battle_phase', navigate to Battle tab
    */
-  useEffect(() => {
-    isMountedRef.current = true
-
-    // Fetch shop data immediately
-    fetchShop()
-
-    // Poll every 3 seconds to detect battle phase transition
-    // This interval runs continuously regardless of submission status
-    pollIntervalRef.current = window.setInterval(fetchShop, POLL_INTERVAL)
-
-    // Cleanup on unmount
-    return () => {
-      isMountedRef.current = false
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current)
-        pollIntervalRef.current = null
-      }
-    }
-  }, [fetchShop])
+  usePolling({
+    fetchFn: useCallback(
+      () => apiClient.getShop(activeMatch?.id ?? ''),
+      [activeMatch?.id]
+    ),
+    interval: POLL_INTERVAL,
+    enabled: !!activeMatch,
+    onSuccess: handleShopSuccess,
+    onError: handleShopError,
+  })
 
   /**
    * Buy a card from the shop and add it to the team.
@@ -186,7 +169,7 @@ export function ShopPage({
         setShopData(data)
       } catch (err) {
         console.error('Failed to buy card:', err)
-        setError(err instanceof Error ? err.message : 'Failed to buy card')
+        showError(err, 'Failed to buy card')
         if (err instanceof Error) {
           noticeError(err, { context: 'buy_card', match_id: activeMatch.id })
         }
@@ -194,7 +177,7 @@ export function ShopPage({
         setActionLoading(null)
       }
     },
-    [activeMatch, actionLoading]
+    [activeMatch, actionLoading, showError]
   )
 
   /**
@@ -223,23 +206,14 @@ export function ShopPage({
       setShopData(data)
     } catch (err) {
       console.error('Failed to reroll shop:', err)
-      setError(err instanceof Error ? err.message : 'Failed to reroll shop')
+      showError(err, 'Failed to reroll shop')
       if (err instanceof Error) {
         noticeError(err, { context: 'reroll_shop', match_id: activeMatch.id })
       }
     } finally {
       setActionLoading(null)
     }
-  }, [activeMatch, actionLoading, canReroll])
-
-
-  // Clear error after a timeout
-  useEffect(() => {
-    if (error) {
-      const timeout = setTimeout(() => setError(null), 5000)
-      return () => clearTimeout(timeout)
-    }
-  }, [error])
+  }, [activeMatch, actionLoading, canReroll, showError])
 
   // No active match - should not be on this page
   if (!activeMatch) {
@@ -313,13 +287,11 @@ export function ShopPage({
 
       {/* Error banner */}
       {error && (
-        <div className="shop-error-banner" role="alert">
-          <span className="shop-error-icon">⚠️</span>
-          <span className="shop-error-text">{error}</span>
-          <button className="shop-error-dismiss" onClick={() => setError(null)} aria-label="Dismiss error">
-            ×
-          </button>
-        </div>
+        <ErrorBanner
+          message={error}
+          onDismiss={clearError}
+          className="shop-error-banner"
+        />
       )}
 
       {/* Waiting message when submitted */}

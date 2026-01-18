@@ -15,7 +15,77 @@ import type {
   ProfileResponse,
   GameConstants,
   CardImageResponse,
+  MatchType,
 } from '../types'
+
+// =============================================================================
+// API RESPONSE TYPES (match backend response structure)
+// =============================================================================
+
+/**
+ * Opponent info within a recent match from the profile API response.
+ */
+interface ProfileApiMatchOpponent {
+  user_id: number
+  first_name: string
+  username?: string
+}
+
+/**
+ * A recent match entry from the profile API response.
+ * Backend transforms MatchHistoryEntry into this structure.
+ */
+interface ProfileApiRecentMatch {
+  match_id: string
+  match_type: MatchType
+  opponent: ProfileApiMatchOpponent
+  result: 'win' | 'loss' | 'draw'
+  your_team: unknown // JSON RawMessage from backend
+  opponent_team: unknown // JSON RawMessage from backend
+  completed_at: string // ISO timestamp
+}
+
+/**
+ * Profile stats from the backend API response.
+ * Backend returns ProfileStatsResponse with these fields.
+ */
+interface ProfileApiProfile {
+  user_id: number
+  first_name: string
+  username?: string
+  ranked_wins: number
+  ranked_losses: number
+  ranked_draws: number
+  ranked_matches: number
+  ranked_win_rate: number
+  ranked_tournaments_played: number
+  ranked_tournaments_won: number
+  ranked_current_streak: number
+  ranked_best_streak: number
+  ranked_rank: number
+  regular_wins: number
+  regular_losses: number
+  regular_draws: number
+  regular_matches_played: number
+  regular_win_rate: number
+  regular_current_streak: number
+  regular_best_streak: number
+  regular_rank: number
+  total_matches: number
+  total_wins: number
+  total_damage_dealt: number
+  first_match_at?: string
+  last_match_at?: string
+}
+
+/**
+ * Profile API response structure.
+ * Backend returns: { profile: {...} | null, recent_matches: [...] }
+ */
+interface ProfileApiResponse {
+  profile: ProfileApiProfile | null
+  recent_matches: ProfileApiRecentMatch[]
+}
 
 class ArenaApiClient extends BaseApiClient {
   constructor(baseUrl?: string) {
@@ -267,10 +337,9 @@ class ArenaApiClient extends BaseApiClient {
     }
 
     // Backend returns: { profile: {...}, recent_matches: [...] }
-    const response = await this.request<{
-      profile: any
-      recent_matches: any[]
-    }>(`/api/v1/mini-app/arena/profile?chat_id=${targetChatId}`)
+    const response = await this.request<ProfileApiResponse>(
+      `/api/v1/mini-app/arena/profile?chat_id=${targetChatId}`
+    )
 
     // If no profile (new user), return minimal structure without stats
     if (!response.profile) {

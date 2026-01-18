@@ -8,11 +8,12 @@
  * - Auto-navigates to Shop when match transitions to shop_phase
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef } from 'react'
 
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
-import { LoadingSpinner, CountdownTimer } from '../common'
+import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
+import { usePolling, useErrorBanner } from '../../hooks'
 
 import type { Match, GameConstants } from '../../types'
 
@@ -44,12 +45,11 @@ export function LobbyPage({
   // Local state
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null) // 'create' | 'join' | 'leave' | 'start'
 
-  // Refs for cleanup and preventing stale closures
-  const pollIntervalRef = useRef<number | null>(null)
-  const isMountedRef = useRef(true)
+  // Error banner with auto-dismiss
+  const { error, showError, clearError } = useErrorBanner()
+
   // Track whether initial fetch is complete - used to distinguish page reload from real-time transitions
   const initialFetchDoneRef = useRef(false)
 
@@ -68,29 +68,12 @@ export function LobbyPage({
   )
 
   /**
-   * Fetch all active matches from the API and handle phase transitions.
-   *
-   * Key behaviors:
-   * 1. Detects when user's match transitions to shop_phase → auto-navigate
-   * 2. Updates local match list state for display
-   * 3. Tracks user's active match across the app
-   *
-   * Phase transition detection is critical for seamless UX: when the match
-   * creator starts a match or auto-start triggers, this callback detects
-   * the status change and navigates to the shop screen automatically.
+   * Handle successful fetch of match list.
+   * Detects phase transitions and triggers navigation accordingly.
    */
-  const fetchMatches = useCallback(async () => {
-    // Skip if component unmounted (prevents React state update warnings)
-    if (!isMountedRef.current) return
-
-    try {
-      const fetchedMatches = await apiClient.getMatches(chatId)
-
-      // Double-check mounted state after async operation
-      if (!isMountedRef.current) return
-
+  const handleMatchListSuccess = useCallback(
+    (fetchedMatches: Match[]) => {
       setMatches(fetchedMatches)
-      setError(null)
 
       // Find if user is participating in any active match
       const userMatch = findUserMatch(fetchedMatches)
@@ -144,33 +127,34 @@ export function LobbyPage({
       if (!initialFetchDoneRef.current) {
         initialFetchDoneRef.current = true
       }
-    } catch (err) {
-      if (!isMountedRef.current) return
+    },
+    [findUserMatch, activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle, loading]
+  )
 
+  /**
+   * Handle error when fetching match list.
+   */
+  const handleMatchListError = useCallback(
+    (err: Error) => {
       console.error('Failed to fetch matches:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load matches')
+      showError(err, 'Failed to load matches')
       setLoading(false)
+      noticeError(err, { context: 'lobby_fetch_matches' })
+    },
+    [showError]
+  )
 
-      if (err instanceof Error) {
-        noticeError(err, { context: 'lobby_fetch_matches' })
-      }
-    }
-  }, [chatId, userId, findUserMatch, activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle, loading])
-
-  // Poll for match with specific match ID (when user is in a match)
-  const fetchMatchDetails = useCallback(async () => {
-    if (!isMountedRef.current || !activeMatch) return
-
-    try {
-      const match = await apiClient.getMatch(activeMatch.id)
-
-      if (!isMountedRef.current) return
-
+  /**
+   * Handle successful fetch of single match details.
+   * Detects phase transitions for users already in a match.
+   */
+  const handleMatchDetailsSuccess = useCallback(
+    (match: Match) => {
       // Check for phase transition to shop
       if (match.status === 'shop_phase') {
         addPageAction('match_phase_transition', {
           match_id: match.id,
-          from_status: activeMatch.status,
+          from_status: activeMatch?.status,
           to_status: 'shop_phase',
         })
         onMatchChange(match)
@@ -182,7 +166,7 @@ export function LobbyPage({
       if (match.status === 'battle_phase' || match.status === 'completed') {
         addPageAction('match_phase_transition', {
           match_id: match.id,
-          from_status: activeMatch.status,
+          from_status: activeMatch?.status,
           to_status: match.status,
         })
         onMatchChange(match)
@@ -197,65 +181,49 @@ export function LobbyPage({
           status: match.status,
         })
         onMatchChange(null)
-        // Refresh full list
-        fetchMatches()
         return
       }
 
       // Update match state
       onMatchChange(match)
-    } catch (err) {
-      if (!isMountedRef.current) return
-
-      console.error('Failed to fetch match details:', err)
-      // On error, fall back to fetching all matches
-      fetchMatches()
-    }
-  }, [activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle, fetchMatches])
+    },
+    [activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle]
+  )
 
   /**
-   * Setup match polling with adaptive intervals.
-   *
+   * Handle error when fetching match details.
+   */
+  const handleMatchDetailsError = useCallback((err: Error) => {
+    console.error('Failed to fetch match details:', err)
+    // Errors are silently logged - polling will retry on next interval
+  }, [])
+
+  /**
    * Polling strategy:
    * - When NOT in a match: Poll /matches every 3s to show available matches
    * - When IN a match: Poll /match/{id} every 2s for faster status updates
    *
-   * This effect re-runs when activeMatch changes to switch between strategies.
    * The faster polling when in a match ensures users see phase transitions
    * (open → shop_phase) quickly for responsive navigation.
    */
-  useEffect(() => {
-    isMountedRef.current = true
 
-    // Fetch immediately on mount or when activeMatch changes
-    fetchMatches()
+  // Poll match list when not in a match
+  usePolling({
+    fetchFn: useCallback(() => apiClient.getMatches(chatId), [chatId]),
+    interval: POLL_INTERVAL_NO_MATCH,
+    enabled: !activeMatch,
+    onSuccess: handleMatchListSuccess,
+    onError: handleMatchListError,
+  })
 
-    // Configure polling based on match participation status
-    const startPolling = () => {
-      // Clear any existing interval before starting a new one
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current)
-      }
-
-      // Use faster polling (2s) when in a match for quicker phase detection
-      const interval = activeMatch ? POLL_INTERVAL_IN_MATCH : POLL_INTERVAL_NO_MATCH
-      // Poll specific match endpoint when in a match, otherwise poll match list
-      const pollFn = activeMatch ? fetchMatchDetails : fetchMatches
-
-      pollIntervalRef.current = window.setInterval(pollFn, interval)
-    }
-
-    startPolling()
-
-    // Cleanup: mark unmounted and clear interval to prevent memory leaks
-    return () => {
-      isMountedRef.current = false
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current)
-        pollIntervalRef.current = null
-      }
-    }
-  }, [activeMatch, fetchMatches, fetchMatchDetails])
+  // Poll single match when in a match (faster interval for phase detection)
+  usePolling({
+    fetchFn: useCallback(() => apiClient.getMatch(activeMatch!.id), [activeMatch]),
+    interval: POLL_INTERVAL_IN_MATCH,
+    enabled: !!activeMatch,
+    onSuccess: handleMatchDetailsSuccess,
+    onError: handleMatchDetailsError,
+  })
 
   // Create new match
   const handleCreateMatch = useCallback(async () => {
@@ -264,18 +232,17 @@ export function LobbyPage({
       const match = await apiClient.createMatch(chatId)
       addPageAction('match_created', { match_id: match.id })
       onMatchChange(match)
-      // Refresh list
-      fetchMatches()
+      // usePolling will automatically refresh the list on next interval
     } catch (err) {
       console.error('Failed to create match:', err)
-      setError(err instanceof Error ? err.message : 'Failed to create match')
+      showError(err, 'Failed to create match')
       if (err instanceof Error) {
         noticeError(err, { context: 'create_match' })
       }
     } finally {
       setActionLoading(null)
     }
-  }, [chatId, onMatchChange, fetchMatches])
+  }, [chatId, onMatchChange, showError])
 
   // Join match
   const handleJoinMatch = useCallback(
@@ -287,7 +254,7 @@ export function LobbyPage({
         onMatchChange(match)
       } catch (err) {
         console.error('Failed to join match:', err)
-        setError(err instanceof Error ? err.message : 'Failed to join match')
+        showError(err, 'Failed to join match')
         if (err instanceof Error) {
           noticeError(err, { context: 'join_match', match_id: matchId })
         }
@@ -295,7 +262,7 @@ export function LobbyPage({
         setActionLoading(null)
       }
     },
-    [onMatchChange]
+    [onMatchChange, showError]
   )
 
   // Leave match
@@ -306,11 +273,10 @@ export function LobbyPage({
         await apiClient.leaveMatch(matchId)
         addPageAction('match_left', { match_id: matchId })
         onMatchChange(null)
-        // Refresh list
-        fetchMatches()
+        // usePolling will automatically refresh the list on next interval
       } catch (err) {
         console.error('Failed to leave match:', err)
-        setError(err instanceof Error ? err.message : 'Failed to leave match')
+        showError(err, 'Failed to leave match')
         if (err instanceof Error) {
           noticeError(err, { context: 'leave_match', match_id: matchId })
         }
@@ -318,7 +284,7 @@ export function LobbyPage({
         setActionLoading(null)
       }
     },
-    [onMatchChange, fetchMatches]
+    [onMatchChange, showError]
   )
 
   // Start match early (creator only)
@@ -338,7 +304,7 @@ export function LobbyPage({
         }
       } catch (err) {
         console.error('Failed to start match:', err)
-        setError(err instanceof Error ? err.message : 'Failed to start match')
+        showError(err, 'Failed to start match')
         if (err instanceof Error) {
           noticeError(err, { context: 'start_match', match_id: matchId })
         }
@@ -346,16 +312,8 @@ export function LobbyPage({
         setActionLoading(null)
       }
     },
-    [onMatchChange, onNavigateToShop]
+    [onMatchChange, onNavigateToShop, showError]
   )
-
-  // Clear error after a timeout
-  useEffect(() => {
-    if (error) {
-      const timeout = setTimeout(() => setError(null), 5000)
-      return () => clearTimeout(timeout)
-    }
-  }, [error])
 
   // Loading state
   if (loading) {
@@ -379,13 +337,11 @@ export function LobbyPage({
 
       {/* Error banner */}
       {error && (
-        <div className="lobby-error-banner" role="alert">
-          <span className="lobby-error-icon">⚠️</span>
-          <span className="lobby-error-text">{error}</span>
-          <button className="lobby-error-dismiss" onClick={() => setError(null)} aria-label="Dismiss error">
-            ×
-          </button>
-        </div>
+        <ErrorBanner
+          message={error}
+          onDismiss={clearError}
+          className="lobby-error-banner"
+        />
       )}
 
       {/* Active match card */}

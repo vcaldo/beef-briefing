@@ -195,8 +195,6 @@ function App() {
       case 'shop':
         return (
           <ShopPage
-            userId={userId}
-            chatId={chatId}
             activeMatch={activeMatch}
             onMatchChange={handleMatchChange}
             onNavigateToBattle={navigateToBattle}

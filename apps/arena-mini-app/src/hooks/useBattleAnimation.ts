@@ -205,11 +205,7 @@ export function useBattleAnimation(
   const isPlayingRef = useRef(isPlaying)
   const currentEventIndexRef = useRef(currentEventIndex)
 
-  // Keep refs in sync
-  useEffect(() => {
-    isPlayingRef.current = isPlaying
-  }, [isPlaying])
-
+  // Keep currentEventIndex ref in sync
   useEffect(() => {
     currentEventIndexRef.current = currentEventIndex
   }, [currentEventIndex])
@@ -452,6 +448,7 @@ export function useBattleAnimation(
     if (nextIndex >= battleData.events.length) {
       // All events processed
       setIsPlaying(false)
+      isPlayingRef.current = false
       setIsComplete(true)
       setCurrentPhase('idle')
       return
@@ -470,6 +467,7 @@ export function useBattleAnimation(
     if (!battleData || isComplete) return
 
     setIsPlaying(true)
+    isPlayingRef.current = true
 
     // If we haven't started yet, advance to first event
     if (currentEventIndexRef.current === -1) {
@@ -489,6 +487,7 @@ export function useBattleAnimation(
    */
   const pause = useCallback(() => {
     setIsPlaying(false)
+    isPlayingRef.current = false
     if (phaseTimeoutRef.current) {
       clearTimeout(phaseTimeoutRef.current)
       phaseTimeoutRef.current = null
@@ -501,6 +500,7 @@ export function useBattleAnimation(
   const reset = useCallback(() => {
     // Stop playback
     setIsPlaying(false)
+    isPlayingRef.current = false
     if (phaseTimeoutRef.current) {
       clearTimeout(phaseTimeoutRef.current)
       phaseTimeoutRef.current = null
@@ -531,6 +531,7 @@ export function useBattleAnimation(
 
     // Stop playback
     setIsPlaying(false)
+    isPlayingRef.current = false
     if (phaseTimeoutRef.current) {
       clearTimeout(phaseTimeoutRef.current)
       phaseTimeoutRef.current = null

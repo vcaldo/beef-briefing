@@ -14,7 +14,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer, CompactCard } from '../common'
-import { TeamPhaseModal } from './TeamPhaseModal'
+import TeamPhaseModal from './TeamPhaseModal'
 
 import type {
   Match,
@@ -263,9 +263,6 @@ export function ShopPage({
       </div>
     )
   }
-
-  // Check if team is complete
-  const isTeamComplete = teamCards.length >= teamSize
 
   // Coin display class based on affordability
   const getCoinClass = () => {

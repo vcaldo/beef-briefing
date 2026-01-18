@@ -15,7 +15,7 @@ import { apiClient } from '../../api/client'
 import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, ErrorDisplay } from '../common'
 import { CompactCard } from '../common/CompactCard'
-import type { BattleResult, BattleEvent, CardSnapshot, Match, GameConstants } from '../../types'
+import type { BattleResult, BattleEvent, CardSnapshot, Match, GameConstants, PlaceholderPositions } from '../../types'
 
 // Playback speed options (events per second)
 const PLAYBACK_SPEEDS = [
@@ -421,7 +421,7 @@ export function BattlePage({
       photo_url?: string
       username?: string
       card_image_url?: string
-      placeholder_positions?: any
+      placeholder_positions?: PlaceholderPositions | null
     }
   ) => {
     const state = cardStates.get(cardId)

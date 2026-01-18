@@ -27,8 +27,6 @@ import type {
 const POLL_INTERVAL = 3000 // 3 seconds
 
 interface ShopPageProps {
-  chatId: number // Reserved for future use (e.g., card image fetching by chat)
-  userId: number // Reserved for future use (e.g., highlight user's cards)
   activeMatch: Match | null
   onNavigateToBattle: () => void
   onMatchChange: (match: Match | null) => void
@@ -36,16 +34,11 @@ interface ShopPageProps {
 }
 
 export function ShopPage({
-  chatId: _chatId, // Reserved for future use
-  userId: _userId, // Reserved for future use
   activeMatch,
   onNavigateToBattle,
   onMatchChange,
   gameConstants,
 }: ShopPageProps) {
-  // Reserved variables - suppress unused warnings
-  void _chatId
-  void _userId
   // Shop state
   const [shopData, setShopData] = useState<EnhancedShopResponse | null>(null)
   const [loading, setLoading] = useState(true)

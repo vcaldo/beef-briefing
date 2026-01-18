@@ -377,6 +377,8 @@ a:focus:not(:focus-visible),
   width: 100%;
   height: 100%;
   object-fit: cover;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 /* Stat overlay positioned absolutely on the card */
@@ -3050,8 +3052,8 @@ a:focus:not(:focus-visible),
   }
 
   .compact-card {
-    width: 240px;
-    height: 360px;
+    transform: scale(0.8);
+    transform-origin: top left;
   }
 }
 

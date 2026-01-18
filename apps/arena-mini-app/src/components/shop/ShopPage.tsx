@@ -21,7 +21,6 @@ import type {
   EnhancedShopResponse,
   EnhancedShopCard,
   EnhancedTeamCard,
-  UpgradeType,
   GameConstants,
 } from '../../types'
 
@@ -52,7 +51,7 @@ export function ShopPage({
   const [shopData, setShopData] = useState<EnhancedShopResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [actionLoading, setActionLoading] = useState<string | null>(null) // 'buy' | 'reroll' | 'upgrade' | 'submit'
+  const [actionLoading, setActionLoading] = useState<string | null>(null) // 'buy' | 'reroll'
   const [isTeamPhase, setIsTeamPhase] = useState(false) // Team phase modal state
 
   // Refs for cleanup and preventing stale closures
@@ -69,7 +68,6 @@ export function ShopPage({
   const teamSize = gameConstants?.team_size ?? 3
   const cardCost = gameConstants?.card_cost ?? 3
   const rerollCost = gameConstants?.reroll_cost ?? 1
-  const upgradeCost = gameConstants?.upgrade_cost ?? 1
 
 
   // Fetch shop data from API
@@ -237,56 +235,6 @@ export function ShopPage({
     }
   }, [activeMatch, actionLoading, canReroll])
 
-  // Upgrade card handler
-  const handleUpgrade = useCallback(
-    async (teamSlot: number, upgradeType: UpgradeType) => {
-      if (!activeMatch || actionLoading) return
-
-      setActionLoading(`upgrade-${teamSlot}-${upgradeType}`)
-      try {
-        const data = await apiClient.upgradeCard(activeMatch.id, teamSlot, upgradeType)
-        addPageAction('card_upgraded', {
-          match_id: activeMatch.id,
-          team_slot: teamSlot,
-          upgrade_type: upgradeType,
-          coins_remaining: data.coins,
-        })
-        setShopData(data)
-      } catch (err) {
-        console.error('Failed to upgrade card:', err)
-        setError(err instanceof Error ? err.message : 'Failed to upgrade card')
-        if (err instanceof Error) {
-          noticeError(err, { context: 'upgrade_card', match_id: activeMatch.id })
-        }
-      } finally {
-        setActionLoading(null)
-      }
-    },
-    [activeMatch, actionLoading]
-  )
-
-  // Submit team handler
-  const handleSubmitTeam = useCallback(async () => {
-    if (!activeMatch || actionLoading || isSubmitted) return
-
-    setActionLoading('submit')
-    try {
-      const data = await apiClient.submitTeam(activeMatch.id)
-      addPageAction('team_submitted', {
-        match_id: activeMatch.id,
-        team_size: data.team.length,
-      })
-      setShopData(data)
-    } catch (err) {
-      console.error('Failed to submit team:', err)
-      setError(err instanceof Error ? err.message : 'Failed to submit team')
-      if (err instanceof Error) {
-        noticeError(err, { context: 'submit_team', match_id: activeMatch.id })
-      }
-    } finally {
-      setActionLoading(null)
-    }
-  }, [activeMatch, actionLoading, isSubmitted])
 
   // Clear error after a timeout
   useEffect(() => {
@@ -318,7 +266,6 @@ export function ShopPage({
 
   // Check if team is complete
   const isTeamComplete = teamCards.length >= teamSize
-  const canSubmit = isTeamComplete && !isSubmitted
 
   // Coin display class based on affordability
   const getCoinClass = () => {
@@ -552,29 +499,6 @@ export function ShopPage({
         </section>
       )}
 
-      {/* Submit button - fixed at bottom */}
-      <footer className="shop-footer">
-        {!isSubmitted ? (
-          <button
-            className="btn-primary btn-lg submit-btn"
-            onClick={handleSubmitTeam}
-            disabled={!canSubmit || actionLoading !== null}
-          >
-            {actionLoading === 'submit' ? (
-              <LoadingSpinner size="sm" inline />
-            ) : isTeamComplete ? (
-              'Submit Team'
-            ) : (
-              `Need ${teamSize - teamCards.length} more card${teamSize - teamCards.length > 1 ? 's' : ''}`
-            )}
-          </button>
-        ) : (
-          <div className="submit-status">
-            <span className="submit-status-icon">✓</span>
-            <span className="submit-status-text">Team submitted - waiting for battle</span>
-          </div>
-        )}
-      </footer>
     </div>
   )
 }

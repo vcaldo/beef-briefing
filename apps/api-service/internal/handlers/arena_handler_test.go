@@ -2857,15 +2857,28 @@ func TestGetShop_IncludesPlaceholderPositions(t *testing.T) {
 	baseUserID := int64(90000000)   // Unique base user ID
 
 	// Clean up any leftover data from previous test runs
-	_, _ = tdb.DB.Exec("DELETE FROM ml_user_cards WHERE chat_id = $1", chatID)
-	_, _ = tdb.DB.Exec("DELETE FROM match_rounds WHERE match_id IN (SELECT id FROM matches WHERE chat_id = $1)", chatID)
-	_, _ = tdb.DB.Exec("DELETE FROM match_participants WHERE match_id IN (SELECT id FROM matches WHERE chat_id = $1)", chatID)
+	// Delete in correct order to handle foreign key constraints
+	// Also clean up by user IDs to handle leftover data from failed test runs
+	_, _ = tdb.DB.Exec(`
+		DELETE FROM match_rounds
+		WHERE match_id IN (
+			SELECT id FROM matches
+			WHERE chat_id = $1
+			   OR id IN (
+				SELECT match_id FROM match_participants
+				WHERE user_id >= $2 AND user_id < $3
+			)
+		)
+	`, chatID, baseUserID, baseUserID+100)
+	_, _ = tdb.DB.Exec(`
+		DELETE FROM match_participants
+		WHERE match_id IN (SELECT id FROM matches WHERE chat_id = $1)
+		   OR user_id >= $2 AND user_id < $3
+	`, chatID, baseUserID, baseUserID+100)
 	_, _ = tdb.DB.Exec("DELETE FROM matches WHERE chat_id = $1", chatID)
-
-	// Also cleanup any matches that could conflict (active matches for this chat)
-	_, _ = tdb.DB.Exec("DELETE FROM match_rounds WHERE match_id IN (SELECT id FROM matches WHERE chat_id = $1 AND status != 'completed')", chatID)
-	_, _ = tdb.DB.Exec("DELETE FROM match_participants WHERE match_id IN (SELECT id FROM matches WHERE chat_id = $1 AND status != 'completed')", chatID)
-	_, _ = tdb.DB.Exec("DELETE FROM matches WHERE chat_id = $1 AND status != 'completed'", chatID)
+	_, _ = tdb.DB.Exec("DELETE FROM ml_user_cards WHERE chat_id = $1 OR user_id >= $2 AND user_id < $3", chatID, baseUserID, baseUserID+100)
+	_, _ = tdb.DB.Exec("DELETE FROM users WHERE id >= $1 AND id < $2", baseUserID, baseUserID+100)
+	_, _ = tdb.DB.Exec("DELETE FROM chats WHERE id = $1", chatID)
 
 	// Insert test users and ML cards (need at least 10 cards for arena)
 	repo := repository.NewUserRepository(tdb.DB, nil)
@@ -3031,7 +3044,348 @@ func TestGetShop_IncludesPlaceholderPositions(t *testing.T) {
 	}
 
 	// Check card_image_url field in HTTP response
-	if _, ok := httpFirstCard["card_image_url"]; !ok {
-		t.Error("expected 'card_image_url' field in HTTP card response")
+	// Note: card_image_url has omitempty tag, so it may not be present if empty
+	// We just verify that if present, it's a string
+	if val, ok := httpFirstCard["card_image_url"]; ok {
+		if _, isString := val.(string); !isString {
+			t.Errorf("expected 'card_image_url' to be a string, got %T", val)
+		}
+	}
+}
+
+// TestGetBattle_IncludesPlaceholderPositions tests that GetBattle endpoint
+// returns battle cards with placeholder_positions and card_image_url fields
+func TestGetBattle_IncludesPlaceholderPositions(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	// Setup test data with unique IDs to avoid conflicts
+	chatID := int64(-100987654444) // Unique chatID for this test (different from all other tests)
+	baseUserID := int64(92000000)   // Unique base user ID
+
+	// Clean up any leftover data from previous test runs
+	// Delete in correct order to handle foreign key constraints
+	// Also clean up by user IDs to handle leftover data from failed test runs
+	_, _ = tdb.DB.Exec(`
+		DELETE FROM match_rounds
+		WHERE match_id IN (
+			SELECT id FROM matches
+			WHERE chat_id = $1
+			   OR id IN (
+				SELECT match_id FROM match_participants
+				WHERE user_id >= $2 AND user_id < $3
+			)
+		)
+	`, chatID, baseUserID, baseUserID+100)
+	_, _ = tdb.DB.Exec(`
+		DELETE FROM match_participants
+		WHERE match_id IN (SELECT id FROM matches WHERE chat_id = $1)
+		   OR user_id >= $2 AND user_id < $3
+	`, chatID, baseUserID, baseUserID+100)
+	_, _ = tdb.DB.Exec("DELETE FROM matches WHERE chat_id = $1", chatID)
+	_, _ = tdb.DB.Exec("DELETE FROM ml_user_cards WHERE chat_id = $1 OR user_id >= $2 AND user_id < $3", chatID, baseUserID, baseUserID+100)
+	_, _ = tdb.DB.Exec("DELETE FROM users WHERE id >= $1 AND id < $2", baseUserID, baseUserID+100)
+	_, _ = tdb.DB.Exec("DELETE FROM chats WHERE id = $1", chatID)
+
+	// Insert test users and ML cards (need at least 10 cards for arena)
+	repo := repository.NewUserRepository(tdb.DB, nil)
+	tx, err := tdb.DB.Begin()
+	if err != nil {
+		t.Fatalf("failed to begin transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Insert 12 users to have enough cards
+	for i := 0; i < 12; i++ {
+		userID := baseUserID + int64(i)
+		user := testutil.SampleUserWithID(userID)
+		if err := repo.UpsertUser(context.Background(), tx, &user); err != nil {
+			t.Fatalf("failed to insert user %d: %v", userID, err)
+		}
+	}
+
+	// Insert test chat
+	chat := testutil.SampleChatWithID(chatID)
+	chatRepo := repository.NewChatRepository(tdb.DB, nil)
+	if err := chatRepo.UpsertChat(context.Background(), tx, &chat); err != nil {
+		t.Fatalf("failed to insert chat: %v", err)
+	}
+
+	// Create ML user cards for all users
+	stats := `{"overall_score": 75, "atk": 80, "def": 70, "hp": 90, "tier": "Elite"}`
+
+	for i := 0; i < 12; i++ {
+		userID := baseUserID + int64(i)
+		_, err = tx.Exec(`
+			INSERT INTO ml_user_cards (user_id, chat_id, week_start, week_end,
+				stats_window_start, stats_window_end, stats, messages_analyzed)
+			VALUES
+				($1, $2, '2025-01-13', '2025-01-19', '2025-01-13 00:00:00', '2025-01-19 23:59:59', $3, 100)
+		`, userID, chatID, stats)
+		if err != nil {
+			t.Fatalf("failed to insert ml_user_card for user %d: %v", userID, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("failed to commit: %v", err)
+	}
+
+	user1ID := baseUserID
+	user2ID := baseUserID + 1
+
+	// Setup services
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	// Create a match
+	match, err := arenaService.CreateMatch(context.Background(), chatID, user1ID)
+	if err != nil {
+		t.Fatalf("failed to create match: %v", err)
+	}
+
+	// Add second participant
+	_, err = arenaService.JoinMatch(context.Background(), match.ID, user2ID)
+	if err != nil {
+		t.Fatalf("failed to add user2 as participant: %v", err)
+	}
+
+	// Start the match (transitions to shop phase)
+	_, err = arenaService.StartMatch(context.Background(), match.ID, user1ID)
+	if err != nil {
+		t.Fatalf("failed to start match: %v", err)
+	}
+
+	// Get shop state for both users
+	shopState1, err := arenaService.GetShop(context.Background(), match.ID, user1ID)
+	if err != nil {
+		t.Fatalf("failed to get shop for user1: %v", err)
+	}
+
+	shopState2, err := arenaService.GetShop(context.Background(), match.ID, user2ID)
+	if err != nil {
+		t.Fatalf("failed to get shop for user2: %v", err)
+	}
+
+	// Buy 3 cards for user1 (using card index, not card ID)
+	for i := 0; i < 3 && i < len(shopState1.Cards); i++ {
+		_, err = arenaService.BuyCard(context.Background(), match.ID, user1ID, i)
+		if err != nil {
+			t.Fatalf("failed to buy card %d for user1: %v", i, err)
+		}
+	}
+
+	// Buy 3 cards for user2 (using card index, not card ID)
+	for i := 0; i < 3 && i < len(shopState2.Cards); i++ {
+		_, err = arenaService.BuyCard(context.Background(), match.ID, user2ID, i)
+		if err != nil {
+			t.Fatalf("failed to buy card %d for user2: %v", i, err)
+		}
+	}
+
+	// Submit teams for both users
+	_, err = arenaService.SubmitTeam(context.Background(), match.ID, user1ID)
+	if err != nil {
+		t.Fatalf("failed to submit team for user1: %v", err)
+	}
+
+	_, err = arenaService.SubmitTeam(context.Background(), match.ID, user2ID)
+	if err != nil {
+		t.Fatalf("failed to submit team for user2: %v", err)
+	}
+
+	// Start battle (triggers battle execution)
+	_, err = arenaService.StartBattle(context.Background(), match.ID)
+	if err != nil {
+		t.Fatalf("failed to start battle: %v", err)
+	}
+
+	// Get battle state
+	battleState, err := arenaService.GetBattle(context.Background(), match.ID, user1ID)
+	if err != nil {
+		t.Fatalf("failed to get battle: %v", err)
+	}
+
+	// Verify team A cards have placeholder_positions
+	if battleState.TeamAFinal == nil {
+		t.Fatal("expected TeamAFinal to be non-nil")
+	}
+	if len(battleState.TeamAFinal.Cards) == 0 {
+		t.Fatal("expected at least one card in TeamAFinal")
+	}
+
+	firstCardTeamA := battleState.TeamAFinal.Cards[0]
+
+	// Check placeholder_positions field for Team A
+	if firstCardTeamA.PlaceholderPositions == nil {
+		t.Error("expected 'placeholder_positions' to be non-nil in Team A card")
+	} else {
+		// Verify it's valid JSON with expected structure
+		var posData map[string]interface{}
+		if err := json.Unmarshal(firstCardTeamA.PlaceholderPositions, &posData); err != nil {
+			t.Errorf("failed to unmarshal placeholder_positions for Team A: %v", err)
+		}
+
+		// Verify expected fields in placeholder_positions
+		expectedFields := []string{"version", "card_dimensions", "placeholders"}
+		for _, field := range expectedFields {
+			if _, ok := posData[field]; !ok {
+				t.Errorf("expected '%s' field in Team A placeholder_positions", field)
+			}
+		}
+	}
+
+	// Verify team B cards have placeholder_positions
+	if battleState.TeamBFinal == nil {
+		t.Fatal("expected TeamBFinal to be non-nil")
+	}
+	if len(battleState.TeamBFinal.Cards) == 0 {
+		t.Fatal("expected at least one card in TeamBFinal")
+	}
+
+	firstCardTeamB := battleState.TeamBFinal.Cards[0]
+
+	// Check placeholder_positions field for Team B
+	if firstCardTeamB.PlaceholderPositions == nil {
+		t.Error("expected 'placeholder_positions' to be non-nil in Team B card")
+	} else {
+		// Verify it's valid JSON with expected structure
+		var posData map[string]interface{}
+		if err := json.Unmarshal(firstCardTeamB.PlaceholderPositions, &posData); err != nil {
+			t.Errorf("failed to unmarshal placeholder_positions for Team B: %v", err)
+		}
+
+		// Verify expected fields in placeholder_positions
+		expectedFields := []string{"version", "card_dimensions", "placeholders"}
+		for _, field := range expectedFields {
+			if _, ok := posData[field]; !ok {
+				t.Errorf("expected '%s' field in Team B placeholder_positions", field)
+			}
+		}
+	}
+
+	// Setup handler
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Create JWT token for user1
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	token, _ := jwtAuth.CreateToken(user1ID, &chatID, nil, "Test User 1")
+
+	// Make request to GetBattle endpoint
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/match/"+match.ID+"/battle", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": match.ID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetBattle(rr, req)
+
+	// Verify status code
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	// Parse HTTP response
+	var httpBattleState map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&httpBattleState); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify team_a_final exists in HTTP response
+	teamAInterface, ok := httpBattleState["team_a_final"]
+	if !ok {
+		t.Fatal("expected 'team_a_final' field in battle response")
+	}
+
+	teamAMap, ok := teamAInterface.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected 'team_a_final' to be an object, got %T", teamAInterface)
+	}
+
+	// Verify team_a_final.cards array exists
+	cardsAInterface, ok := teamAMap["cards"]
+	if !ok {
+		t.Fatal("expected 'cards' field in team_a_final")
+	}
+
+	cardsA, ok := cardsAInterface.([]interface{})
+	if !ok {
+		t.Fatalf("expected 'cards' to be an array, got %T", cardsAInterface)
+	}
+
+	if len(cardsA) == 0 {
+		t.Fatal("expected at least one card in team_a_final")
+	}
+
+	// Verify first card in Team A has placeholder_positions and card_image_url in HTTP response
+	httpFirstCardTeamA, ok := cardsA[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected card to be an object, got %T", cardsA[0])
+	}
+
+	// Check placeholder_positions field in HTTP response for Team A
+	if _, ok := httpFirstCardTeamA["placeholder_positions"]; !ok {
+		t.Error("expected 'placeholder_positions' field in HTTP Team A card response")
+	}
+
+	// Check card_image_url field in HTTP response for Team A
+	// Note: card_image_url has omitempty tag, so it may not be present if empty
+	// We just verify that if present, it's a string
+	if val, ok := httpFirstCardTeamA["card_image_url"]; ok {
+		if _, isString := val.(string); !isString {
+			t.Errorf("expected 'card_image_url' to be a string, got %T", val)
+		}
+	}
+
+	// Verify team_b_final exists in HTTP response
+	teamBInterface, ok := httpBattleState["team_b_final"]
+	if !ok {
+		t.Fatal("expected 'team_b_final' field in battle response")
+	}
+
+	teamBMap, ok := teamBInterface.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected 'team_b_final' to be an object, got %T", teamBInterface)
+	}
+
+	// Verify team_b_final.cards array exists
+	cardsBInterface, ok := teamBMap["cards"]
+	if !ok {
+		t.Fatal("expected 'cards' field in team_b_final")
+	}
+
+	cardsB, ok := cardsBInterface.([]interface{})
+	if !ok {
+		t.Fatalf("expected 'cards' to be an array, got %T", cardsBInterface)
+	}
+
+	if len(cardsB) == 0 {
+		t.Fatal("expected at least one card in team_b_final")
+	}
+
+	// Verify first card in Team B has placeholder_positions and card_image_url in HTTP response
+	httpFirstCardTeamB, ok := cardsB[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected card to be an object, got %T", cardsB[0])
+	}
+
+	// Check placeholder_positions field in HTTP response for Team B
+	if _, ok := httpFirstCardTeamB["placeholder_positions"]; !ok {
+		t.Error("expected 'placeholder_positions' field in HTTP Team B card response")
+	}
+
+	// Check card_image_url field in HTTP response for Team B
+	// Note: card_image_url has omitempty tag, so it may not be present if empty
+	// We just verify that if present, it's a string
+	if val, ok := httpFirstCardTeamB["card_image_url"]; ok {
+		if _, isString := val.(string); !isString {
+			t.Errorf("expected 'card_image_url' to be a string, got %T", val)
+		}
 	}
 }

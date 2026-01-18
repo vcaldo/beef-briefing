@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"beef-briefing/apps/api-service/internal/game/battle"
@@ -84,6 +85,10 @@ func (d *Dealer) DealCards(ctx context.Context, chatID int64, count int) ([]*bat
 
 	rows, err := d.db.QueryContext(ctx, query, chatID, count)
 	if err != nil {
+		slog.ErrorContext(ctx, "Failed to query cards from database",
+			"chat_id", chatID,
+			"requested_count", count,
+			"error", err.Error())
 		return nil, fmt.Errorf("failed to query cards: %w", err)
 	}
 	defer rows.Close()
@@ -95,7 +100,18 @@ func (d *Dealer) DealCards(ctx context.Context, chatID int64, count int) ([]*bat
 	theme := "neon_arcade"
 	var placeholderPositions json.RawMessage
 	if d.cardService != nil {
+		endSegment := nrutil.StartSegment(ctx, "service:get-placeholder-positions")
 		placeholderPositions = d.cardService.GetPlaceholderPositions(theme)
+		endSegment()
+		slog.DebugContext(ctx, "Fetched placeholder positions for dealt cards",
+			"theme", theme,
+			"chat_id", chatID,
+			"card_count", count,
+			"has_positions", placeholderPositions != nil)
+	} else {
+		slog.WarnContext(ctx, "CardService is nil, placeholder positions will not be attached",
+			"chat_id", chatID,
+			"card_count", count)
 	}
 
 	for rows.Next() {
@@ -108,12 +124,21 @@ func (d *Dealer) DealCards(ctx context.Context, chatID int64, count int) ([]*bat
 		)
 
 		if err := rows.Scan(&cardID, &userID, &firstName, &username, &statsJSON); err != nil {
+			slog.ErrorContext(ctx, "Failed to scan card row from query result",
+				"chat_id", chatID,
+				"card_index", index,
+				"error", err.Error())
 			return nil, fmt.Errorf("failed to scan card row: %w", err)
 		}
 
 		// Parse stats to get combat values
 		var stats CardStats
 		if err := jsonutil.Unmarshal(statsJSON, &stats); err != nil {
+			slog.ErrorContext(ctx, "Failed to parse card stats JSON",
+				"chat_id", chatID,
+				"card_id", cardID,
+				"user_id", userID,
+				"error", err.Error())
 			return nil, fmt.Errorf("failed to parse card stats: %w", err)
 		}
 
@@ -140,19 +165,40 @@ func (d *Dealer) DealCards(ctx context.Context, chatID int64, count int) ([]*bat
 
 		// Set placeholder positions
 		card.PlaceholderPositions = placeholderPositions
+		if placeholderPositions != nil {
+			slog.DebugContext(ctx, "Attached placeholder positions to card",
+				"card_id", card.CardID,
+				"user_id", card.UserID,
+				"name", card.Name,
+				"index", index)
+		}
 
 		cards = append(cards, card)
 		index++
 	}
 
 	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "Error iterating card rows",
+			"chat_id", chatID,
+			"processed_count", len(cards),
+			"error", err.Error())
 		return nil, fmt.Errorf("error iterating card rows: %w", err)
 	}
 
 	if len(cards) < count {
 		// Not enough cards, but return what we have
 		// The service layer will check if minimum is met
+		slog.WarnContext(ctx, "Dealt fewer cards than requested",
+			"chat_id", chatID,
+			"requested_count", count,
+			"dealt_count", len(cards))
 	}
+
+	slog.DebugContext(ctx, "Completed dealing cards",
+		"chat_id", chatID,
+		"requested_count", count,
+		"dealt_count", len(cards),
+		"positions_attached", placeholderPositions != nil)
 
 	return cards, nil
 }
@@ -198,6 +244,11 @@ func (d *Dealer) DealRerollCards(ctx context.Context, chatID int64, count int, e
 
 	rows, err := d.db.QueryContext(ctx, query, args...)
 	if err != nil {
+		slog.ErrorContext(ctx, "Failed to query reroll cards from database",
+			"chat_id", chatID,
+			"requested_count", count,
+			"exclude_count", len(excludeCardIDs),
+			"error", err.Error())
 		return nil, fmt.Errorf("failed to query reroll cards: %w", err)
 	}
 	defer rows.Close()
@@ -208,7 +259,19 @@ func (d *Dealer) DealRerollCards(ctx context.Context, chatID int64, count int, e
 	theme := "neon_arcade"
 	var placeholderPositions json.RawMessage
 	if d.cardService != nil {
+		endSegment := nrutil.StartSegment(ctx, "service:get-placeholder-positions")
 		placeholderPositions = d.cardService.GetPlaceholderPositions(theme)
+		endSegment()
+		slog.DebugContext(ctx, "Fetched placeholder positions for reroll cards",
+			"theme", theme,
+			"chat_id", chatID,
+			"card_count", count,
+			"exclude_count", len(excludeCardIDs),
+			"has_positions", placeholderPositions != nil)
+	} else {
+		slog.WarnContext(ctx, "CardService is nil, placeholder positions will not be attached to reroll cards",
+			"chat_id", chatID,
+			"card_count", count)
 	}
 
 	for rows.Next() {
@@ -221,11 +284,20 @@ func (d *Dealer) DealRerollCards(ctx context.Context, chatID int64, count int, e
 		)
 
 		if err := rows.Scan(&cardID, &userID, &firstName, &username, &statsJSON); err != nil {
+			slog.ErrorContext(ctx, "Failed to scan reroll card row from query result",
+				"chat_id", chatID,
+				"processed_count", len(cards),
+				"error", err.Error())
 			return nil, fmt.Errorf("failed to scan reroll card row: %w", err)
 		}
 
 		var stats CardStats
 		if err := jsonutil.Unmarshal(statsJSON, &stats); err != nil {
+			slog.ErrorContext(ctx, "Failed to parse reroll card stats JSON",
+				"chat_id", chatID,
+				"card_id", cardID,
+				"user_id", userID,
+				"error", err.Error())
 			return nil, fmt.Errorf("failed to parse card stats: %w", err)
 		}
 
@@ -250,13 +322,30 @@ func (d *Dealer) DealRerollCards(ctx context.Context, chatID int64, count int, e
 
 		// Set placeholder positions
 		card.PlaceholderPositions = placeholderPositions
+		if placeholderPositions != nil {
+			slog.DebugContext(ctx, "Attached placeholder positions to reroll card",
+				"card_id", card.CardID,
+				"user_id", card.UserID,
+				"name", card.Name)
+		}
 
 		cards = append(cards, card)
 	}
 
 	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "Error iterating reroll card rows",
+			"chat_id", chatID,
+			"processed_count", len(cards),
+			"excluded_count", len(excludeCardIDs),
+			"error", err.Error())
 		return nil, fmt.Errorf("error iterating reroll card rows: %w", err)
 	}
+
+	slog.DebugContext(ctx, "Completed dealing reroll cards",
+		"chat_id", chatID,
+		"requested_count", count,
+		"dealt_count", len(cards),
+		"excluded_cards", len(excludeCardIDs))
 
 	return cards, nil
 }
@@ -279,6 +368,9 @@ func (d *Dealer) GetCardCount(ctx context.Context, chatID int64) (int, error) {
 	var count int
 	err := d.db.QueryRowContext(ctx, query, chatID).Scan(&count)
 	if err != nil {
+		slog.ErrorContext(ctx, "Failed to count cards for chat",
+			"chat_id", chatID,
+			"error", err.Error())
 		return 0, fmt.Errorf("failed to count cards: %w", err)
 	}
 

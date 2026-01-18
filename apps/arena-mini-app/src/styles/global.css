@@ -1767,7 +1767,7 @@ a:focus:not(:focus-visible),
 .battle-arena {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--battle-gap, 24px);
   padding: 16px;
   background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
   min-height: 400px;
@@ -2140,7 +2140,7 @@ a:focus:not(:focus-visible),
   --base-scale: 0.3;
   --anim-scale: 1;
   transform: scale(calc(var(--base-scale) * var(--anim-scale)));
-  transform-origin: top left;
+  transform-origin: center;
   transition: transform 0.15s ease-out;
 }
 
@@ -3292,6 +3292,28 @@ a:focus:not(:focus-visible),
   .compact-card:not(.battle-compact-card) {
     transform: scale(0.8);
     transform-origin: top left;
+  }
+
+  .battle-arena {
+    --battle-gap: 8px;
+    padding: 8px;
+  }
+
+  .battle-card-wrapper {
+    width: 75px;
+  }
+
+  .battle-compact-card {
+    --base-scale: 0.25;
+  }
+}
+
+/* Mobile-specific battle adjustments for tablets and larger phones */
+@media (max-width: 480px) {
+  .battle-arena {
+    --battle-gap: 12px;
+    padding: 12px;
+    min-height: auto;
   }
 }
 

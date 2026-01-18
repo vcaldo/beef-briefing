@@ -196,6 +196,119 @@ make tf-connect           # Alternative SSH command
 make tf-deploy-check      # Pre-deployment validation
 ```
 
+## Cache Management
+
+### OCI Layer Cache Overview
+
+The deployment system uses OCI (Open Container Initiative) format layer caching to optimize Docker image transfers between local development and production. This significantly reduces deployment times by transferring only changed image layers instead of entire images.
+
+**Cache Locations:**
+- **Local**: `/tmp/beef-briefing-oci-cache/` (development machine)
+- **Remote**: `~/beef-briefing/.oci-cache/` (production server)
+
+**Expected Sizes:**
+- Normal operations: 2-4GB (2 versions cached)
+- After cleanup: Should maintain last 2 deployment versions
+- Warning threshold: 5GB (automatic warning during deployment)
+
+### Automatic Cleanup
+
+Cache cleanup happens **automatically during normal deployments**:
+
+```bash
+make prod-deploy          # Automatic cleanup (keeps last 2 versions)
+make prod-deploy-skip-cleanup  # NO cleanup (cache grows indefinitely)
+```
+
+**Important**: Use `prod-deploy-skip-cleanup` sparingly! This flag bypasses all cache cleanup and should only be used when you need to preserve multiple versions for quick rollbacks. Regular use will cause cache accumulation.
+
+**What gets cleaned automatically:**
+- Old OCI cache directories (keeps last 2 versions)
+- Old Docker images on server (keeps current + previous)
+- Dangling Docker images
+
+### Manual Cache Management
+
+**Check cache health:**
+```bash
+make layer-cache-health        # Quick health check (size + versions)
+make layer-cache-stats         # Detailed statistics (blobs per version)
+```
+
+**Clean cache completely:**
+```bash
+make layer-cache-clean-remote  # Nuke entire remote cache (use for emergencies)
+make layer-cache-clean         # Clean local cache
+```
+
+**Aggressive cleanup (keep only 1 version):**
+```bash
+make layer-cache-clean-old     # Keep only most recent version (local + remote)
+```
+
+### Troubleshooting Cache Issues
+
+**Problem: Cache grew to 38GB**
+
+This indicates cleanup hasn't been running. Possible causes:
+1. Too many deployments with `--skip-cleanup` flag
+2. Cleanup failures (check deployment logs)
+3. Path resolution issues in SSH context
+
+**Solution:**
+```bash
+# Emergency cleanup (removes entire cache)
+make layer-cache-clean-remote
+
+# Or SSH directly
+ssh $(make -s tf-ssh-user-host) 'rm -rf ~/beef-briefing/.oci-cache'
+
+# Then verify cleanup worked
+make layer-cache-health
+```
+
+**Problem: Deployment warnings about cache size**
+
+During deployment, if cache exceeds 5GB, you'll see:
+```
+WARNING: Remote OCI cache is 8GB (threshold: 5GB)
+Consider running: make layer-cache-clean-remote
+```
+
+**Action**: If cleanup is running normally but cache is large, you may have:
+- Very large images (check image sizes)
+- Frequent deployments (many versions being kept)
+- Consider using `make layer-cache-clean-old` to keep only 1 version
+
+**Problem: Cleanup verification warnings**
+
+If you see "WARNING: Cleanup incomplete, X versions remain (expected 2)", this indicates cleanup didn't work properly. Check:
+- Disk space on server (cleanup fails if disk full)
+- Permissions on cache directory
+- Review deployment logs for detailed errors
+
+### Monitoring Best Practices
+
+**Regular health checks:**
+```bash
+# Before major deployment
+make layer-cache-health
+
+# After multiple deployments with --skip-cleanup
+make layer-cache-health
+```
+
+**Deployment workflow:**
+1. Normal deployments: Use `make prod-deploy` (automatic cleanup)
+2. Risky deployments: Use `make prod-deploy-skip-cleanup` (manual cleanup later)
+3. After skipped cleanup: Run `make layer-cache-health` to verify size
+4. If cache > 5GB: Run `make layer-cache-clean-old` or `make layer-cache-clean-remote`
+
+**Expected behavior:**
+- After each normal deployment: Cache size may increase temporarily during transfer
+- After cleanup: Should see "Cache size: XGB -> YGB" with Y ≤ X
+- Steady state: 2 versions cached, total size depends on image sizes
+
 ## Environment Configuration
 
 ### Development vs Production

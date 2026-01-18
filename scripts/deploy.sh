@@ -111,6 +111,12 @@ else
 fi
 
 # =============================================================================
+# CHECK CACHE HEALTH
+# =============================================================================
+log_step "Checking remote cache health..."
+check_cache_size "$SSH_HOST" 5  # Warn if cache > 5GB
+
+# =============================================================================
 # SAVE PREVIOUS TAG (for rollback)
 # =============================================================================
 log_step "Saving previous deployment tag for rollback..."
@@ -273,7 +279,8 @@ if [[ "$SKIP_CLEANUP" == "false" ]]; then
 
     log_success "Cleanup complete"
 else
-    log_warn "Skipping cleanup (--skip-cleanup)"
+    log_warn "Skipping cleanup (--skip-cleanup flag used)"
+    log_warn "Cache will continue to grow - run 'make layer-cache-clean-remote' periodically"
 fi
 
 # =============================================================================

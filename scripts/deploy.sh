@@ -7,6 +7,7 @@ set -e
 # Load common functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
+source "$SCRIPT_DIR/layer-transfer.sh"
 
 # =============================================================================
 # ARGUMENT PARSING
@@ -111,6 +112,12 @@ else
 fi
 
 # =============================================================================
+# CHECK CACHE HEALTH
+# =============================================================================
+log_step "Checking remote cache health..."
+check_cache_size "$SSH_HOST" 5  # Warn if cache > 5GB
+
+# =============================================================================
 # SAVE PREVIOUS TAG (for rollback)
 # =============================================================================
 log_step "Saving previous deployment tag for rollback..."
@@ -157,9 +164,6 @@ fi
 # =============================================================================
 # LAYER-AWARE IMAGE TRANSFER
 # =============================================================================
-# Source layer transfer functions
-source "$SCRIPT_DIR/layer-transfer.sh"
-
 # Transfer images using OCI directory format (only changed layers)
 transfer_images "$COMMIT_HASH" "$SSH_HOST"
 
@@ -273,7 +277,8 @@ if [[ "$SKIP_CLEANUP" == "false" ]]; then
 
     log_success "Cleanup complete"
 else
-    log_warn "Skipping cleanup (--skip-cleanup)"
+    log_warn "Skipping cleanup (--skip-cleanup flag used)"
+    log_warn "Cache will continue to grow - run 'make layer-cache-clean-remote' periodically"
 fi
 
 # =============================================================================

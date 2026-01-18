@@ -194,6 +194,65 @@ layer-cache-stats: ## Show layer cache statistics (local and remote)
 			echo "  (no cache)"; \
 		fi' 2>/dev/null || echo "  (unable to connect)"
 
+layer-cache-health: ## Check OCI cache health and size
+	@echo "=== Local Cache Health ==="
+	@if [ -d /tmp/beef-briefing-oci-cache ]; then \
+		echo "Size: $$(du -sh /tmp/beef-briefing-oci-cache | cut -f1)"; \
+		echo "Versions: $$(ls -1 /tmp/beef-briefing-oci-cache 2>/dev/null | wc -l)"; \
+		echo "Contents:"; \
+		ls -lth /tmp/beef-briefing-oci-cache | head -5; \
+	else \
+		echo "No local cache found"; \
+	fi
+	@echo ""
+	@echo "=== Remote Cache Health ==="
+	@ssh $$($(MAKE) -s tf-ssh-user-host) '\
+		if [ -d ~/beef-briefing/.oci-cache ]; then \
+			echo "Size: $$(du -sh ~/beef-briefing/.oci-cache | cut -f1)"; \
+			echo "Versions: $$(ls -1 ~/beef-briefing/.oci-cache 2>/dev/null | wc -l)"; \
+			echo "Contents:"; \
+			ls -lth ~/beef-briefing/.oci-cache | head -5; \
+		else \
+			echo "No remote cache found"; \
+		fi' 2>/dev/null || echo "Unable to connect to remote server"
+
+layer-cache-clean-old: ## Aggressive cleanup - keep only last version (local and remote)
+	@echo "WARNING: This will remove all but the most recent cache version"
+	@echo "Press Ctrl+C to cancel, or Enter to continue..."
+	@read confirm
+	@echo "Cleaning local cache (keeping 1 version)..."
+	@if [ -d /tmp/beef-briefing-oci-cache ]; then \
+		dir_count=$$(ls -1 /tmp/beef-briefing-oci-cache 2>/dev/null | wc -l); \
+		if [ "$$dir_count" -gt 1 ]; then \
+			ls -t /tmp/beef-briefing-oci-cache | tail -n +2 | while read dir; do \
+				size=$$(du -sh "/tmp/beef-briefing-oci-cache/$$dir" 2>/dev/null | cut -f1); \
+				echo "  Removing $$dir ($$size)"; \
+				rm -rf "/tmp/beef-briefing-oci-cache/$$dir"; \
+			done; \
+		else \
+			echo "  Cache has $$dir_count version(s) (keeping last 1)"; \
+		fi; \
+	else \
+		echo "  No local cache found"; \
+	fi
+	@echo "Cleaning remote cache (keeping 1 version)..."
+	@ssh $$($(MAKE) -s tf-ssh-user-host) '\
+		if [ -d ~/beef-briefing/.oci-cache ]; then \
+			dir_count=$$(ls -1 ~/beef-briefing/.oci-cache 2>/dev/null | wc -l); \
+			if [ "$$dir_count" -gt 1 ]; then \
+				ls -t ~/beef-briefing/.oci-cache | tail -n +2 | while read dir; do \
+					size=$$(du -sh "~/beef-briefing/.oci-cache/$$dir" 2>/dev/null | cut -f1); \
+					echo "  Removing $$dir ($$size)"; \
+					rm -rf "~/beef-briefing/.oci-cache/$$dir"; \
+				done; \
+			else \
+				echo "  Cache has $$dir_count version(s) (keeping last 1)"; \
+			fi; \
+		else \
+			echo "  No remote cache found"; \
+		fi' 2>/dev/null || echo "Unable to connect to remote server"
+	@echo "Aggressive cleanup complete"
+
 pg-tunnel: ## Open SSH tunnel to production PostgreSQL (localhost:5433 -> prod postgres)
 	@echo "Opening SSH tunnel to production PostgreSQL..."
 	@echo "Connect locally using: psql -h localhost -p 5433 -U postgres -d beef_briefing"

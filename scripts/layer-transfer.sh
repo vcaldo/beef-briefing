@@ -133,21 +133,43 @@ cleanup_local_cache() {
     local keep_tags="${1:-2}"
 
     if [[ ! -d "$LAYER_CACHE_DIR" ]]; then
+        log_info "No local cache directory found"
         return 0
     fi
 
-    log_info "Cleaning local OCI cache (keeping last $keep_tags)..."
+    log_info "Cleaning local OCI cache (keeping last $keep_tags versions)..."
+
+    # Get current cache size
+    local size_before
+    size_before=$(du -sh "$LAYER_CACHE_DIR" 2>/dev/null | cut -f1)
 
     # List directories sorted by modification time, remove oldest
     local dir_count
     dir_count=$(ls -1 "$LAYER_CACHE_DIR" 2>/dev/null | wc -l)
 
     if [[ "$dir_count" -gt "$keep_tags" ]]; then
+        log_info "Found $dir_count versions, removing oldest $((dir_count - keep_tags))"
         ls -t "$LAYER_CACHE_DIR" | tail -n +$((keep_tags + 1)) | while read -r dir; do
-            log_info "  Removing old cache: $dir"
+            local size
+            size=$(du -sh "${LAYER_CACHE_DIR}/${dir}" 2>/dev/null | cut -f1)
+            log_info "  Removing $dir ($size)"
             rm -rf "${LAYER_CACHE_DIR}/${dir}"
         done
+    else
+        log_info "Cache has $dir_count versions (keeping last $keep_tags)"
     fi
+
+    # Verify cleanup
+    local remaining
+    remaining=$(ls -1 "$LAYER_CACHE_DIR" 2>/dev/null | wc -l)
+    if [[ "$remaining" -gt "$keep_tags" ]]; then
+        log_warn "Cleanup incomplete, $remaining versions remain (expected $keep_tags)"
+    fi
+
+    # Show space freed
+    local size_after
+    size_after=$(du -sh "$LAYER_CACHE_DIR" 2>/dev/null | cut -f1)
+    log_info "Cache size: $size_before -> $size_after"
 }
 
 # Cleanup remote OCI cache, keeping the N most recent tags
@@ -156,18 +178,76 @@ cleanup_remote_cache() {
     local ssh_host="$1"
     local keep_tags="${2:-2}"
 
-    log_info "Cleaning remote OCI cache (keeping last $keep_tags)..."
+    log_info "Cleaning remote OCI cache (keeping last $keep_tags versions)..."
+
+    # Get current cache size
+    local size_before
+    size_before=$(remote_exec "$ssh_host" "du -sh $REMOTE_LAYER_CACHE_DIR 2>/dev/null | cut -f1" || echo "0")
+
     remote_exec "$ssh_host" "
         if [[ -d $REMOTE_LAYER_CACHE_DIR ]]; then
             dir_count=\$(ls -1 $REMOTE_LAYER_CACHE_DIR 2>/dev/null | wc -l)
             if [[ \"\$dir_count\" -gt $keep_tags ]]; then
+                echo \"Found \$dir_count versions, removing oldest \$((dir_count - keep_tags))\"
                 ls -t $REMOTE_LAYER_CACHE_DIR | tail -n +$((keep_tags + 1)) | while read dir; do
-                    echo \"  Removing old cache: \$dir\"
+                    size=\$(du -sh \"${REMOTE_LAYER_CACHE_DIR}/\$dir\" 2>/dev/null | cut -f1)
+                    echo \"  Removing \$dir (\$size)\"
                     rm -rf \"${REMOTE_LAYER_CACHE_DIR}/\$dir\"
                 done
+            else
+                echo \"Cache has \$dir_count versions (keeping last $keep_tags)\"
             fi
+
+            # Verify cleanup
+            remaining=\$(ls -1 $REMOTE_LAYER_CACHE_DIR 2>/dev/null | wc -l)
+            if [[ \"\$remaining\" -gt $keep_tags ]]; then
+                echo \"WARNING: Cleanup incomplete, \$remaining versions remain (expected $keep_tags)\"
+            fi
+        else
+            echo \"No remote cache directory found\"
         fi
     " || log_warn "Remote cache cleanup had warnings (non-fatal)"
+
+    # Show space freed
+    local size_after
+    size_after=$(remote_exec "$ssh_host" "du -sh $REMOTE_LAYER_CACHE_DIR 2>/dev/null | cut -f1" || echo "0")
+    log_info "Cache size: $size_before -> $size_after"
+}
+
+# Check if remote cache is getting too large
+# Args: $1 = ssh_host, $2 = warning threshold in GB (default: 5)
+check_cache_size() {
+    local ssh_host="$1"
+    local threshold_gb="${2:-5}"
+
+    log_info "Checking remote cache size..."
+
+    local cache_size
+    cache_size=$(remote_exec "$ssh_host" "
+        if [[ -d $REMOTE_LAYER_CACHE_DIR ]]; then
+            du -sb $REMOTE_LAYER_CACHE_DIR 2>/dev/null | cut -f1
+        else
+            echo 0
+        fi
+    " || echo "0")
+
+    # Convert to GB
+    local size_gb=$((cache_size / 1024 / 1024 / 1024))
+
+    if [[ $size_gb -gt $threshold_gb ]]; then
+        log_warn "Remote OCI cache is ${size_gb}GB (threshold: ${threshold_gb}GB)"
+        log_warn "Consider running: make layer-cache-clean-remote"
+
+        # Show cache contents
+        remote_exec "$ssh_host" "
+            if [[ -d $REMOTE_LAYER_CACHE_DIR ]]; then
+                echo 'Cached versions:'
+                ls -lth $REMOTE_LAYER_CACHE_DIR | head -10
+            fi
+        "
+    else
+        log_info "Cache size: ${size_gb}GB (threshold: ${threshold_gb}GB)"
+    fi
 }
 
 # =============================================================================

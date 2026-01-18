@@ -169,6 +169,8 @@ type BattleResponse struct {
 	NumRounds   int                  `json:"num_rounds"`
 	TeamADamage int                  `json:"team_a_damage"`
 	TeamBDamage int                  `json:"team_b_damage"`
+	DamageDealt int                  `json:"damage_dealt"`
+	DamageTaken int                  `json:"damage_taken"`
 	TeamAFinal  *battle.Team         `json:"team_a_final"`
 	TeamBFinal  *battle.Team         `json:"team_b_final"`
 	PlayerAID   int64                `json:"player_a_id"`

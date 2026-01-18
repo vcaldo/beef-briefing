@@ -1402,6 +1402,161 @@ func TestGetBattle_Returns404OnMatchNotFound(t *testing.T) {
 	}
 }
 
+func TestHandleGetBattle_ReturnsDamageSummary(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	// Setup services
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Create test users directly in DB
+	playerAID := int64(9911)
+	playerBID := int64(9922)
+	chatID := int64(-1001234567890)
+	matchID := "99999991-0000-0000-0000-000000000099"
+
+	// Cleanup function to remove test data
+	defer func() {
+		tdb.DB.Exec("DELETE FROM game_match_rounds WHERE match_id = $1", matchID)
+		tdb.DB.Exec("DELETE FROM game_match_participants WHERE match_id = $1", matchID)
+		tdb.DB.Exec("DELETE FROM game_matches WHERE id = $1", matchID)
+		tdb.DB.Exec("DELETE FROM chats WHERE id = $1", chatID)
+		tdb.DB.Exec("DELETE FROM users WHERE id IN ($1, $2)", playerAID, playerBID)
+	}()
+
+	_, err := tdb.DB.Exec(`
+		INSERT INTO users (id, first_name, is_bot)
+		VALUES ($1, 'PlayerA', false), ($2, 'PlayerB', false)
+		ON CONFLICT (id) DO NOTHING
+	`, playerAID, playerBID)
+	if err != nil {
+		t.Fatalf("failed to insert users: %v", err)
+	}
+
+	// Create chat first (required by foreign key constraint)
+	_, err = tdb.DB.Exec(`
+		INSERT INTO chats (id, type, timezone, ranked_tournaments_enabled)
+		VALUES ($1, 'supergroup', 'UTC', true)
+		ON CONFLICT (id) DO NOTHING
+	`, chatID)
+	if err != nil {
+		t.Fatalf("failed to insert chat: %v", err)
+	}
+
+	// Create test match in battle phase
+	_, err = tdb.DB.Exec(`
+		INSERT INTO game_matches (id, chat_id, match_type, status, format, creator_user_id, created_at)
+		VALUES ($1, $2, 'regular', 'battle_phase', '1v1', $3, NOW())
+	`, matchID, chatID, playerAID)
+	if err != nil {
+		t.Fatalf("failed to insert match: %v", err)
+	}
+
+	// Add participants with submitted teams
+	_, err = tdb.DB.Exec(`
+		INSERT INTO game_match_participants (match_id, user_id, team_submitted_at, team, joined_at)
+		VALUES
+			($1, $2, NOW(), '[]'::jsonb, NOW()),
+			($1, $3, NOW(), '[]'::jsonb, NOW())
+	`, matchID, playerAID, playerBID)
+	if err != nil {
+		t.Fatalf("failed to insert participants: %v", err)
+	}
+
+	// Create battle rounds with damage summary
+	// PlayerA deals 50 damage, PlayerB deals 30 damage
+	playerADmg := 50
+	playerBDmg := 30
+	_, err = tdb.DB.Exec(`
+		INSERT INTO game_match_rounds (match_id, round_number, player_a_id, player_b_id, winner_id, is_draw, player_a_damage, player_b_damage, player_a_team, player_b_team, battle_log, created_at)
+		VALUES ($1, 1, $2, $3, $2, false, $4, $5, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, NOW())
+	`, matchID, playerAID, playerBID, playerADmg, playerBDmg)
+	if err != nil {
+		t.Fatalf("failed to insert battle round: %v", err)
+	}
+
+	// Setup JWT authentication for PlayerA
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	token, _ := jwtAuth.CreateToken(playerAID, &chatID, nil, "PlayerA")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/match/"+matchID+"/battle", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": matchID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetBattle(rr, req)
+
+	// Verify status code
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+		return
+	}
+
+	// Parse JSON response
+	var battleResp services.BattleResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &battleResp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v. Body: %s", err, rr.Body.String())
+	}
+
+	// Verify damage_dealt and damage_taken fields are present
+	// PlayerA is the requesting user, so:
+	// - damage_dealt should be PlayerA's damage (50)
+	// - damage_taken should be PlayerB's damage (30)
+	if battleResp.DamageDealt != playerADmg {
+		t.Errorf("expected DamageDealt=%d, got %d", playerADmg, battleResp.DamageDealt)
+	}
+
+	if battleResp.DamageTaken != playerBDmg {
+		t.Errorf("expected DamageTaken=%d, got %d", playerBDmg, battleResp.DamageTaken)
+	}
+
+	// Verify absolute damage values are also present
+	if battleResp.TeamADamage != playerADmg {
+		t.Errorf("expected TeamADamage=%d, got %d", playerADmg, battleResp.TeamADamage)
+	}
+
+	if battleResp.TeamBDamage != playerBDmg {
+		t.Errorf("expected TeamBDamage=%d, got %d", playerBDmg, battleResp.TeamBDamage)
+	}
+
+	// Verify the JSON tags are correct by checking the raw JSON
+	var rawJSON map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &rawJSON); err != nil {
+		t.Fatalf("failed to unmarshal raw JSON: %v", err)
+	}
+
+	if _, exists := rawJSON["damage_dealt"]; !exists {
+		t.Error("JSON response missing 'damage_dealt' field")
+	}
+
+	if _, exists := rawJSON["damage_taken"]; !exists {
+		t.Error("JSON response missing 'damage_taken' field")
+	}
+
+	// Verify fields are integers in JSON
+	if damageDealt, ok := rawJSON["damage_dealt"].(float64); !ok {
+		t.Errorf("damage_dealt is not a number in JSON, got type %T", rawJSON["damage_dealt"])
+	} else if int(damageDealt) != playerADmg {
+		t.Errorf("damage_dealt JSON value=%d, expected %d", int(damageDealt), playerADmg)
+	}
+
+	if damageTaken, ok := rawJSON["damage_taken"].(float64); !ok {
+		t.Errorf("damage_taken is not a number in JSON, got type %T", rawJSON["damage_taken"])
+	} else if int(damageTaken) != playerBDmg {
+		t.Errorf("damage_taken JSON value=%d, expected %d", int(damageTaken), playerBDmg)
+	}
+}
+
 // =============================================================================
 // Get Leaderboard Tests
 // =============================================================================

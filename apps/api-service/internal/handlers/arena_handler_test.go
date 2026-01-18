@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"beef-briefing/apps/api-service/internal/middleware"
+	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/services"
 	"beef-briefing/apps/api-service/internal/testutil"
 	"beef-briefing/pkg/config"
@@ -2838,5 +2839,199 @@ func TestBotGetPendingRounds_Returns200(t *testing.T) {
 	}
 	if _, ok := resp["tournaments"]; !ok {
 		t.Errorf("expected 'tournaments' key in response")
+	}
+}
+
+// =============================================================================
+// Shop Endpoint Tests - Placeholder Positions & Card Image URL
+// =============================================================================
+
+// TestGetShop_IncludesPlaceholderPositions tests that GetShop endpoint
+// returns shop cards with placeholder_positions and card_image_url fields
+func TestGetShop_IncludesPlaceholderPositions(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	// Setup test data with unique IDs to avoid conflicts
+	chatID := int64(-100987654321) // Unique chatID for this test
+	baseUserID := int64(90000000)   // Unique base user ID
+
+	// Clean up any leftover data from previous test runs
+	_, _ = tdb.DB.Exec("DELETE FROM ml_user_cards WHERE chat_id = $1", chatID)
+	_, _ = tdb.DB.Exec("DELETE FROM match_rounds WHERE match_id IN (SELECT id FROM matches WHERE chat_id = $1)", chatID)
+	_, _ = tdb.DB.Exec("DELETE FROM match_participants WHERE match_id IN (SELECT id FROM matches WHERE chat_id = $1)", chatID)
+	_, _ = tdb.DB.Exec("DELETE FROM matches WHERE chat_id = $1", chatID)
+
+	// Also cleanup any matches that could conflict (active matches for this chat)
+	_, _ = tdb.DB.Exec("DELETE FROM match_rounds WHERE match_id IN (SELECT id FROM matches WHERE chat_id = $1 AND status != 'completed')", chatID)
+	_, _ = tdb.DB.Exec("DELETE FROM match_participants WHERE match_id IN (SELECT id FROM matches WHERE chat_id = $1 AND status != 'completed')", chatID)
+	_, _ = tdb.DB.Exec("DELETE FROM matches WHERE chat_id = $1 AND status != 'completed'", chatID)
+
+	// Insert test users and ML cards (need at least 10 cards for arena)
+	repo := repository.NewUserRepository(tdb.DB, nil)
+	tx, err := tdb.DB.Begin()
+	if err != nil {
+		t.Fatalf("failed to begin transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Insert 12 users to have enough cards
+	for i := 0; i < 12; i++ {
+		userID := baseUserID + int64(i)
+		user := testutil.SampleUserWithID(userID)
+		if err := repo.UpsertUser(context.Background(), tx, &user); err != nil {
+			t.Fatalf("failed to insert user %d: %v", userID, err)
+		}
+	}
+
+	// Insert test chat
+	chat := testutil.SampleChatWithID(chatID)
+	chatRepo := repository.NewChatRepository(tdb.DB, nil)
+	if err := chatRepo.UpsertChat(context.Background(), tx, &chat); err != nil {
+		t.Fatalf("failed to insert chat: %v", err)
+	}
+
+	// Create ML user cards for all users
+	stats := `{"overall_score": 75, "atk": 80, "def": 70, "hp": 90, "tier": "Elite"}`
+
+	for i := 0; i < 12; i++ {
+		userID := baseUserID + int64(i)
+		_, err = tx.Exec(`
+			INSERT INTO ml_user_cards (user_id, chat_id, week_start, week_end,
+				stats_window_start, stats_window_end, stats, messages_analyzed)
+			VALUES
+				($1, $2, '2025-01-13', '2025-01-19', '2025-01-13 00:00:00', '2025-01-19 23:59:59', $3, 100)
+		`, userID, chatID, stats)
+		if err != nil {
+			t.Fatalf("failed to insert ml_user_card for user %d: %v", userID, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("failed to commit: %v", err)
+	}
+
+	user1ID := baseUserID
+	user2ID := baseUserID + 1
+
+	// Setup services
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	// Create a match
+	match, err := arenaService.CreateMatch(context.Background(), chatID, user1ID)
+	if err != nil {
+		t.Fatalf("failed to create match: %v", err)
+	}
+
+	// Add second participant
+	_, err = arenaService.JoinMatch(context.Background(), match.ID, user2ID)
+	if err != nil {
+		t.Fatalf("failed to add user2 as participant: %v", err)
+	}
+
+	// Start the match (transitions to shop phase)
+	_, err = arenaService.StartMatch(context.Background(), match.ID, user1ID)
+	if err != nil {
+		t.Fatalf("failed to start match: %v", err)
+	}
+
+	// Get shop state (which triggers shop card dealing)
+	shopState, err := arenaService.GetShop(context.Background(), match.ID, user1ID)
+	if err != nil {
+		t.Fatalf("failed to get shop: %v", err)
+	}
+
+	// Verify cards have placeholder_positions
+	if len(shopState.Cards) == 0 {
+		t.Fatal("expected at least one card in shop")
+	}
+
+	firstCard := shopState.Cards[0]
+
+	// Check placeholder_positions field
+	if firstCard.PlaceholderPositions == nil {
+		t.Error("expected 'placeholder_positions' to be non-nil")
+	} else {
+		// Verify it's valid JSON with expected structure
+		var posData map[string]interface{}
+		if err := json.Unmarshal(firstCard.PlaceholderPositions, &posData); err != nil {
+			t.Errorf("failed to unmarshal placeholder_positions: %v", err)
+		}
+
+		// Verify expected fields in placeholder_positions
+		expectedFields := []string{"version", "card_dimensions", "placeholders"}
+		for _, field := range expectedFields {
+			if _, ok := posData[field]; !ok {
+				t.Errorf("expected '%s' field in placeholder_positions", field)
+			}
+		}
+	}
+
+	// Check card_image_url field (may be empty string but field should exist in JSON)
+	// We verify via HTTP handler below
+
+	// Setup handler
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	// Create JWT token for user1
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	token, _ := jwtAuth.CreateToken(user1ID, &chatID, nil, "Test User 1")
+
+	// Make request to GetShop endpoint
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/match/"+match.ID+"/shop", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req = mux.SetURLVars(req, map[string]string{"id": match.ID})
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetShop(rr, req)
+
+	// Verify status code
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	// Parse HTTP response
+	var httpShopState map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&httpShopState); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify cards array exists in HTTP response
+	cardsInterface, ok := httpShopState["cards"]
+	if !ok {
+		t.Fatal("expected 'cards' field in shop state")
+	}
+
+	cards, ok := cardsInterface.([]interface{})
+	if !ok {
+		t.Fatalf("expected 'cards' to be an array, got %T", cardsInterface)
+	}
+
+	if len(cards) == 0 {
+		t.Fatal("expected at least one card in shop")
+	}
+
+	// Verify first card has placeholder_positions and card_image_url in HTTP response
+	httpFirstCard, ok := cards[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected card to be an object, got %T", cards[0])
+	}
+
+	// Check placeholder_positions field in HTTP response
+	if _, ok := httpFirstCard["placeholder_positions"]; !ok {
+		t.Error("expected 'placeholder_positions' field in HTTP card response")
+	}
+
+	// Check card_image_url field in HTTP response
+	if _, ok := httpFirstCard["card_image_url"]; !ok {
+		t.Error("expected 'card_image_url' field in HTTP card response")
 	}
 }

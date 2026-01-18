@@ -177,20 +177,22 @@ export function BattlePage({
     (event: BattleEvent, eventIndex: number) => {
       // Mode 1: API provides complete card states snapshot
       // This is the preferred mode as it ensures UI matches server state exactly
-      // TODO: Update to use composite keys once API provides team owner IDs in card_states
-      if (event.card_states && event.card_states.length > 0) {
-        const newStates = new Map<string, CardSnapshot>()
-        event.card_states.forEach((state) => {
-          // Temporarily using card_id as key - will be updated when applyEvent gets composite key support
-          newStates.set(String(state.card_id), state)
-        })
-        setCardStates(newStates)
-        return
-      }
+      // Note: card_states from API don't include team_owner_id, so we cannot use
+      // composite keys here. This mode is currently disabled as it would break
+      // the same-card-on-both-teams case. TODO: Enable once API includes team_owner_id
+      // in card_states snapshot.
+      // if (event.card_states && event.card_states.length > 0) {
+      //   const newStates = new Map<string, CardSnapshot>()
+      //   event.card_states.forEach((state) => {
+      //     newStates.set(String(state.card_id), state)
+      //   })
+      //   setCardStates(newStates)
+      //   return
+      // }
 
-      // Mode 2: Compute state changes from event data (fallback)
-      // Used when API doesn't provide card_states or for backwards compatibility
-      // TODO: Update to use composite keys with team owner IDs from events (separate task)
+      // Mode 2: Compute state changes from event data using composite keys
+      // Uses attacker_team_owner_id and defender_team_owner_id from events to
+      // correctly identify cards when the same card_id appears on both teams
       setCardStates((prevStates: Map<string, CardSnapshot>) => {
         const newStates = new Map(prevStates)
 
@@ -206,9 +208,9 @@ export function BattlePage({
 
         if (event.type === 'attack' || event.type === 'damage') {
           // Highlight the attacking card with orange glow animation
-          // TODO: Use composite key with attacker_team_owner_id once API provides it
-          if (event.attacker_card_id) {
-            const attackerKey = String(event.attacker_card_id)
+          // Use composite key to correctly identify the card instance
+          if (event.attacker_card_id && event.attacker_team_owner_id) {
+            const attackerKey = getCardKey(event.attacker_team_owner_id, event.attacker_card_id)
             const attacker = newStates.get(attackerKey)
             if (attacker) {
               newStates.set(attackerKey, {
@@ -220,9 +222,9 @@ export function BattlePage({
 
           // Highlight defender and update their HP for HP bar animation
           // hp_after is provided by the API after damage calculation
-          // TODO: Use composite key with defender_team_owner_id once API provides it
-          if (event.defender_card_id) {
-            const defenderKey = String(event.defender_card_id)
+          // Use composite key to correctly identify the card instance
+          if (event.defender_card_id && event.defender_team_owner_id) {
+            const defenderKey = getCardKey(event.defender_team_owner_id, event.defender_card_id)
             const defender = newStates.get(defenderKey)
             if (defender) {
               newStates.set(defenderKey, {
@@ -235,9 +237,9 @@ export function BattlePage({
         } else if (event.type === 'death') {
           // Mark card as dead - triggers grayscale + opacity styling
           // This happens when a card's HP reaches 0
-          // TODO: Use composite key with defender_team_owner_id once API provides it
-          if (event.defender_card_id) {
-            const deadCardKey = String(event.defender_card_id)
+          // Use composite key to correctly identify the card instance
+          if (event.defender_card_id && event.defender_team_owner_id) {
+            const deadCardKey = getCardKey(event.defender_team_owner_id, event.defender_card_id)
             const deadCard = newStates.get(deadCardKey)
             if (deadCard) {
               newStates.set(deadCardKey, {

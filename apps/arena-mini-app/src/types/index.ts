@@ -22,6 +22,14 @@
 // Re-export shared auth types
 export type { AuthResponse } from '@beef-briefing/shared-mini-app/types'
 
+// Re-export animation types
+export type {
+  CardAnimationState,
+  EventAnimationPhase,
+  AnimationDurationKey,
+} from './animation'
+export { ANIMATION_DURATIONS } from './animation'
+
 // =============================================================================
 // ENUMS
 // =============================================================================

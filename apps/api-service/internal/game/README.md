@@ -84,7 +84,7 @@ The game supports two modes:
   - No errors returned for post-submission requests
 - **Actions**:
   - **Reroll shop** (only before first card purchase) - Replace unpurchased cards with new ones
-  - Buy cards from shop (4-6 cards available depending on rerolls)
+  - Buy cards from shop (4 cards available)
   - Upgrade purchased cards (ATK or HP)
   - Set team battle order
   - Submit team when ready
@@ -117,7 +117,7 @@ The game supports two modes:
 | Resource | Starting Amount | Description |
 |----------|----------------|-------------|
 | Coins | 10 | Currency for purchases |
-| Shop Cards | 6 | Random cards from current week |
+| Shop Cards | 4 | Random cards from current week |
 | Team Slots | 3 | Cards needed for battle |
 
 *Constants defined in [shop/types.go:10-18](shop/types.go#L10-L18)*
@@ -126,10 +126,10 @@ The game supports two modes:
 
 | Action | Cost | Constraint | Description |
 |--------|------|------------|-------------|
-| **Buy Card** | 2 coins | Team not full (< 3) | Purchase card from shop slot |
+| **Buy Card** | 3 coins | Team not full (< 3) | Purchase card from shop slot |
 | **Reroll Shop** | 1 coin | No cards purchased yet | Replace unpurchased cards with new ones (only before first purchase) |
-| **Upgrade ATK** | 2 coins | Card in team | +1 ATK per upgrade |
-| **Upgrade HP** | 2 coins | Card in team | +3 HP per upgrade |
+| **Upgrade ATK** | 1 coin | Card in team | +3 ATK per upgrade |
+| **Upgrade HP** | 1 coin | Card in team | +3 HP per upgrade |
 
 **Important**:
 - **Reroll** is only available **before any card is purchased**. Once you buy your first card, the reroll button becomes permanently disabled for that match.
@@ -152,13 +152,13 @@ The game supports two modes:
 
 **Step-by-step**:
 1. **Review initial shop cards**
-   - You start with 4 random cards (6 total with rerolls)
+   - You start with 4 random cards
 2. **Optional: Reroll** (only before first purchase)
    - Costs 1 coin
    - Replaces unpurchased cards with new ones
    - **Once you buy your first card, reroll becomes permanently disabled**
 3. **Buy 3 cards** from shop (required)
-   - Each purchase costs 2 coins
+   - Each purchase costs 3 coins
    - Choose wisely based on stats
    - This is your only chance to reroll - decide before buying!
 4. **Optional: Upgrade** purchased cards
@@ -296,7 +296,7 @@ Content-Type: application/json
 **Response**: Match object (201 Created)
 
 **Error Cases**:
-- `400 Bad Request`: Not enough cards available (< 12 for 6 shop slots)
+- `400 Bad Request`: Not enough cards available (minimum 10 cards required)
 - `400 Bad Request`: Active match already exists (see Lock System)
 
 *Handler: [arena_handler.go:295-340](../handlers/arena_handler.go#L295-L340)*
@@ -379,7 +379,7 @@ GET /api/v1/mini-app/arena/match/<match_id>/shop
       "is_purchased": false,
       "index": 0
     }
-    // ... 5 more cards
+    // ... 3 more cards
   ],
   "team": [],
   "team_order": [0, 1, 2],
@@ -423,7 +423,7 @@ Content-Type: application/json
 
 **Requirements**:
 - Match in `shop_phase`
-- Have 2+ coins
+- Have 3+ coins
 - Team not full (< 3 cards)
 - Card at index not already purchased
 
@@ -805,26 +805,44 @@ GET /api/v1/mini-app/arena/constants
 ```json
 {
   "costs": {
-    "card": 2,
+    "card": 3,
     "reroll": 1,
-    "upgrade": 2
+    "upgrade": 1
   },
   "sizes": {
-    "shop": 6,
+    "shop": 4,
     "team": 3
   },
   "upgrades": {
-    "atk_amount": 1,
+    "atk_amount": 3,
     "hp_amount": 3
   },
   "timings": {
     "shop_phase_duration": 180,
     "join_window_duration": 300
+  },
+  "hp_bar_thresholds": {
+    "high": 66,
+    "medium": 33,
+    "colors": {
+      "high": "#22c55e",
+      "medium": "#eab308",
+      "low": "#ef4444"
+    }
+  },
+  "timer_thresholds": {
+    "safe": 120,
+    "warning": 30,
+    "colors": {
+      "safe": "#22c55e",
+      "warning": "#eab308",
+      "urgent": "#ef4444"
+    }
   }
 }
 ```
 
-*Handler: [arena_handler.go:1855-1889](../handlers/arena_handler.go#L1855-L1889)*
+*Handler: [arena_handler.go:291-340](../handlers/arena_handler.go#L291-L340)*
 
 ---
 
@@ -903,7 +921,7 @@ interface ShopCard {
   hp: number;
   stats?: object;                // Full ML stats JSON
   is_purchased: boolean;
-  index: number;                 // 0-5 (shop position)
+  index: number;                 // 0-3 (shop position)
 }
 ```
 
@@ -941,7 +959,7 @@ interface ShopAffordability {
 ```typescript
 interface EnhancedShopCard extends ShopCard {
   // All ShopCard fields plus:
-  can_afford: boolean;           // Whether you have 2+ coins to buy
+  can_afford: boolean;           // Whether you have 3+ coins to buy
   preview_cost: number;          // Cost of this specific action
 }
 ```
@@ -963,16 +981,27 @@ interface EnhancedTeamCard extends Card {
 ### BattleResult
 ```typescript
 interface BattleResult {
+  match_id: string;
   winner_id?: number;            // null if draw
   is_draw: boolean;
   events: BattleEvent[];
   num_rounds: number;
-  team_a_damage: number;         // Total damage dealt by team A
-  team_b_damage: number;
+  team_a_damage: number;         // Total damage dealt by team A (absolute)
+  team_b_damage: number;         // Total damage dealt by team B (absolute)
+  damage_dealt: number;          // Player-relative: requesting user's damage
+  damage_taken: number;          // Player-relative: damage received by user
   team_a_final: Team;
   team_b_final: Team;
+  player_a_id: number;           // Player A's user ID
+  player_b_id: number;           // Player B's user ID
+  player_a_name: string;         // Player A's display name
+  player_b_name: string;         // Player B's display name
 }
 ```
+
+**Player-Relative Damage**: The `damage_dealt` and `damage_taken` fields are calculated from the requesting user's perspective:
+- If user is Player A: `damage_dealt = team_a_damage`, `damage_taken = team_b_damage`
+- If user is Player B: `damage_dealt = team_b_damage`, `damage_taken = team_a_damage`
 
 ### BattleEvent
 ```typescript
@@ -1025,16 +1054,16 @@ interface CardSnapshot {
 
 ### Economy
 - **Starting Coins**: 10
-- **Card Cost**: 2 coins
+- **Card Cost**: 3 coins
 - **Reroll Cost**: 1 coin
-- **Upgrade Cost**: 2 coins
+- **Upgrade Cost**: 1 coin
 
 ### Shop
-- **Shop Size**: 6 cards
+- **Shop Size**: 4 cards
 - **Team Size**: 3 cards (required)
 
 ### Upgrades
-- **ATK Upgrade**: +1 ATK per upgrade
+- **ATK Upgrade**: +3 ATK per upgrade
 - **HP Upgrade**: +3 HP and +3 MaxHP per upgrade
 
 ### Timings
@@ -1108,7 +1137,7 @@ setInterval(async () => {
 // Load shop state
 const shop = await GET(`/api/v1/mini-app/arena/match/${matchId}/shop`);
 
-// Display 6 shop cards + purchased team (or read-only team if submitted)
+// Display 4 shop cards + purchased team (or read-only team if submitted)
 if (shop.cards) {
   renderShop(shop.cards, shop.team);  // Interactive mode
 } else {
@@ -1214,7 +1243,7 @@ for (const event of battle.events) {
 ```typescript
 // Check if can buy card
 function canBuyCard(shop: ShopState, cardIndex: number): boolean {
-  return shop.coins >= 2 &&
+  return shop.coins >= 3 &&
          shop.team.length < 3 &&
          !shop.cards[cardIndex].is_purchased;
 }
@@ -1231,7 +1260,7 @@ function canReroll(shop: ShopState): boolean {
 // Check if can upgrade
 function canUpgrade(shop: ShopState, teamSlot: number): boolean {
   const remainingCards = 3 - shop.team.length;
-  const coinsNeeded = 2 + (remainingCards * 2);
+  const coinsNeeded = 1 + (remainingCards * 3);  // 1 for upgrade + 3 per remaining card
   return shop.coins >= coinsNeeded && teamSlot < shop.team.length;
 }
 

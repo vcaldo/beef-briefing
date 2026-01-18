@@ -22,6 +22,8 @@ import type {
 import { CountdownTimer, LoadingSpinner } from '../common'
 import { apiClient } from '../../api/client'
 
+const POLL_INTERVAL = 3000 // 3 seconds
+
 interface TeamPhaseModalProps {
   shopData: EnhancedShopResponse
   activeMatch: Match
@@ -36,12 +38,9 @@ export function TeamPhaseModal({
   activeMatch,
   gameConstants,
   onShopDataChange,
-  onNavigateToBattle: _onNavigateToBattle,
-  onMatchChange: _onMatchChange,
+  onNavigateToBattle,
+  onMatchChange,
 }: TeamPhaseModalProps) {
-  // Reserved variables - suppress unused warnings
-  void _onNavigateToBattle
-  void _onMatchChange
 
   // Derived state
   const coins = shopData?.coins ?? 0
@@ -61,6 +60,10 @@ export function TeamPhaseModal({
   const isDraggingRef = useRef(false)
   // Loading state for API calls
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  // Polling interval ref for cleanup
+  const pollIntervalRef = useRef<number | null>(null)
+  // Mounted ref to prevent state updates after unmount
+  const isMountedRef = useRef(false)
 
   // Sync local team order with server state (when not dragging)
   // Apply team_order to display cards in battle order
@@ -83,6 +86,70 @@ export function TeamPhaseModal({
   useEffect(() => {
     localTeamOrderRef.current = localTeamOrder
   }, [localTeamOrder])
+
+  /**
+   * Poll shop data to detect battle phase transition.
+   *
+   * CRITICAL: Polling continues AFTER team submission!
+   *
+   * The team phase modal needs to detect when both players have submitted
+   * their teams and the match transitions to battle_phase. This requires
+   * continuous polling even after the user has submitted.
+   *
+   * Polling flow:
+   * 1. User organizes team, upgrades cards, and submits
+   * 2. After submission, user sees "Waiting for opponent..." message
+   * 3. Polling continues at 3s intervals
+   * 4. When API returns status='battle_phase' or 'completed', call onNavigateToBattle()
+   */
+  const pollShopData = useCallback(async () => {
+    if (!activeMatch) return
+
+    try {
+      const data = await apiClient.getShop(activeMatch.id)
+
+      if (!isMountedRef.current) return
+
+      // Update shop data for UI
+      onShopDataChange(data)
+
+      // Check for phase transition to battle (or completed - battle executes instantly)
+      if (data.status === 'battle_phase' || data.status === 'completed') {
+        onNavigateToBattle()
+        return
+      }
+
+      // Check if match was cancelled
+      if (data.status === 'cancelled') {
+        onMatchChange(null)
+        return
+      }
+    } catch (err) {
+      if (!isMountedRef.current) return
+      console.error('Failed to poll shop data:', err)
+      // Don't show error UI during polling - just log it
+    }
+  }, [activeMatch, onShopDataChange, onNavigateToBattle, onMatchChange])
+
+  // Setup polling on mount
+  useEffect(() => {
+    isMountedRef.current = true
+
+    // Poll immediately on mount
+    pollShopData()
+
+    // Setup interval for continuous polling
+    pollIntervalRef.current = window.setInterval(pollShopData, POLL_INTERVAL)
+
+    // Cleanup on unmount
+    return () => {
+      isMountedRef.current = false
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
+    }
+  }, [pollShopData])
 
   // Instant visual update during drag (no API call)
   const handleVisualReorder = useCallback((newOrder: EnhancedTeamCard[]) => {

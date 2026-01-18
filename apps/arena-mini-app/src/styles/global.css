@@ -539,6 +539,21 @@ a:focus:not(:focus-visible),
 }
 
 /* =============================================================================
+   Compact Card Animation States
+   Phase-based animation system for battle replay.
+   Maps to CardAnimationState type: 'idle' | 'attacking' | 'taking_damage' | 'dying' | 'dead'
+   ============================================================================= */
+
+/* Idle state - default, no animation active */
+.compact-card-anim-idle {
+  filter: none;
+  opacity: 1;
+  transform: scale(1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  transition: filter 0.3s ease, opacity 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* =============================================================================
    Buttons
    ============================================================================= */
 .btn {

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import type { PlaceholderPositions, HpBarThresholds } from '../../types'
+import type { PlaceholderPositions, HpBarThresholds, CardAnimationState } from '../../types'
 
 /** Current stat values to display on the card */
 interface CardStats {
@@ -32,6 +32,18 @@ interface CompactCardProps {
   isAttacking?: boolean
   /** Whether this card is currently defending (for battle animations) */
   isDefending?: boolean
+  /**
+   * Animation state for battle replay animations.
+   * When provided, maps to CSS class: `compact-card-anim-${animationState}`
+   * Takes precedence over isAttacking/isDefending for visual styling.
+   * @see CardAnimationState
+   */
+  animationState?: CardAnimationState
+  /**
+   * Damage number to display as an overlay during damage phase.
+   * Only rendered when provided and > 0.
+   */
+  damageNumber?: number
   /** Click handler */
   onClick?: () => void
 }
@@ -104,6 +116,8 @@ export function CompactCard({
   className = '',
   isAttacking = false,
   isDefending = false,
+  animationState,
+  damageNumber,
   onClick,
 }: CompactCardProps): React.JSX.Element {
   // Calculate HP bar width and color
@@ -122,11 +136,15 @@ export function CompactCard({
   const hpBar = positions?.placeholders?.hp_bar
 
   // Build class names for card state
+  // animationState takes precedence for visual styling when provided
   const cardClasses = [
     'compact-card',
-    !isAlive && 'compact-card-dead',
-    isAttacking && 'compact-card-attacking',
-    isDefending && 'compact-card-defending',
+    // Animation state class (e.g., compact-card-anim-attacking, compact-card-anim-taking_damage)
+    animationState && `compact-card-anim-${animationState}`,
+    // Fallback to legacy props when animationState is not provided
+    !animationState && !isAlive && 'compact-card-dead',
+    !animationState && isAttacking && 'compact-card-attacking',
+    !animationState && isDefending && 'compact-card-defending',
     onClick && 'cursor-pointer',
     className,
   ]
@@ -154,8 +172,10 @@ export function CompactCard({
       data-is-defending={isDefending}
       style={{
         // Apply grayscale and reduced opacity when dead
-        filter: !isAlive ? 'grayscale(100%)' : undefined,
-        opacity: !isAlive ? 0.5 : 1,
+        // When using animationState, CSS handles dead state styling via compact-card-anim-dead class
+        // Only apply inline styles when using legacy isAlive prop
+        filter: !animationState && !isAlive ? 'grayscale(100%)' : undefined,
+        opacity: !animationState && !isAlive ? 0.5 : 1,
         transition: 'filter 0.3s ease, opacity 0.3s ease',
       }}
     >
@@ -256,6 +276,16 @@ export function CompactCard({
               // CSS transition handles animation (defined in global.css)
             }}
           />
+        </div>
+      )}
+
+      {/* Damage number overlay - displayed during damage phase */}
+      {damageNumber !== undefined && damageNumber > 0 && (
+        <div
+          className="damage-number"
+          aria-label={`Damage: ${damageNumber}`}
+        >
+          -{damageNumber}
         </div>
       )}
 

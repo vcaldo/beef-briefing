@@ -681,6 +681,10 @@ func (m *mockCardService) GetCardImageURLString(ctx context.Context, userID int6
 	return "https://mock-storage.example.com/card.png", nil
 }
 
+func (m *mockCardService) GetPlaceholderPositions(theme string) json.RawMessage {
+	return json.RawMessage(`{}`)
+}
+
 func (m *mockCardService) GetGalleryWeeks(ctx context.Context, chatID int64) (*GalleryWeeksResponse, error) {
 	return &GalleryWeeksResponse{Weeks: []string{}}, nil
 }

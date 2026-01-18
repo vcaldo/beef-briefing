@@ -19,15 +19,16 @@ import (
 
 // mockCardService implements services.CardServiceInterface for testing.
 type mockCardService struct {
-	getUserCardFunc           func(ctx context.Context, userID int64, chatID int64, weekStart *time.Time) (*repository.UserCard, *repository.CardUser, error)
-	getChatCardsFunc          func(ctx context.Context, req services.GetChatCardsRequest) (*services.GetChatCardsResponse, error)
-	getUserHistoryFunc        func(ctx context.Context, userID int64, chatID int64, limit int) (*services.UserHistoryResponse, error)
-	getAvailableWeeksFunc     func(ctx context.Context, chatID int64) (*services.AvailableWeeksResponse, error)
-	getCardImageURLFunc       func(ctx context.Context, userID int64, chatID int64, weekStart *time.Time, theme string, expirySeconds int) (*services.CardImageURLResponse, error)
-	getCardImageURLStringFunc func(ctx context.Context, userID int64, chatID int64, weekStart *time.Time, theme string, expirySeconds int) (string, error)
-	getGalleryWeeksFunc       func(ctx context.Context, chatID int64) (*services.GalleryWeeksResponse, error)
-	getGalleryImagesFunc      func(ctx context.Context, chatID int64, weekStart *time.Time, userID *int64, theme *string) (*services.GalleryImagesResponse, error)
-	getGalleryImageURLFunc    func(ctx context.Context, imageID int64, expirySeconds int) (*services.GalleryImageURLResponse, error)
+	getUserCardFunc             func(ctx context.Context, userID int64, chatID int64, weekStart *time.Time) (*repository.UserCard, *repository.CardUser, error)
+	getChatCardsFunc            func(ctx context.Context, req services.GetChatCardsRequest) (*services.GetChatCardsResponse, error)
+	getUserHistoryFunc          func(ctx context.Context, userID int64, chatID int64, limit int) (*services.UserHistoryResponse, error)
+	getAvailableWeeksFunc       func(ctx context.Context, chatID int64) (*services.AvailableWeeksResponse, error)
+	getCardImageURLFunc         func(ctx context.Context, userID int64, chatID int64, weekStart *time.Time, theme string, expirySeconds int) (*services.CardImageURLResponse, error)
+	getCardImageURLStringFunc   func(ctx context.Context, userID int64, chatID int64, weekStart *time.Time, theme string, expirySeconds int) (string, error)
+	getPlaceholderPositionsFunc func(theme string) json.RawMessage
+	getGalleryWeeksFunc         func(ctx context.Context, chatID int64) (*services.GalleryWeeksResponse, error)
+	getGalleryImagesFunc        func(ctx context.Context, chatID int64, weekStart *time.Time, userID *int64, theme *string) (*services.GalleryImagesResponse, error)
+	getGalleryImageURLFunc      func(ctx context.Context, imageID int64, expirySeconds int) (*services.GalleryImageURLResponse, error)
 }
 
 func (m *mockCardService) GetUserCard(ctx context.Context, userID int64, chatID int64, weekStart *time.Time) (*repository.UserCard, *repository.CardUser, error) {
@@ -70,6 +71,13 @@ func (m *mockCardService) GetCardImageURLString(ctx context.Context, userID int6
 		return m.getCardImageURLStringFunc(ctx, userID, chatID, weekStart, theme, expirySeconds)
 	}
 	return "", errors.New("not implemented")
+}
+
+func (m *mockCardService) GetPlaceholderPositions(theme string) json.RawMessage {
+	if m.getPlaceholderPositionsFunc != nil {
+		return m.getPlaceholderPositionsFunc(theme)
+	}
+	return nil
 }
 
 func (m *mockCardService) GetGalleryWeeks(ctx context.Context, chatID int64) (*services.GalleryWeeksResponse, error) {

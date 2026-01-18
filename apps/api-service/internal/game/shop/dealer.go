@@ -3,6 +3,7 @@ package shop
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 // CardService interface for fetching card images
 type CardService interface {
 	GetCardImageURLString(ctx context.Context, userID, chatID int64, weekStart *time.Time, theme string, expirySeconds int) (string, error)
+	GetPlaceholderPositions(theme string) json.RawMessage
 }
 
 // DealerInterface defines the interface for card dealing operations
@@ -89,6 +91,13 @@ func (d *Dealer) DealCards(ctx context.Context, chatID int64, count int) ([]*bat
 	cards := make([]*battle.ShopCard, 0, count)
 	index := 0
 
+	// Get placeholder positions for the theme (same for all cards)
+	theme := "neon_arcade"
+	var placeholderPositions json.RawMessage
+	if d.cardService != nil {
+		placeholderPositions = d.cardService.GetPlaceholderPositions(theme)
+	}
+
 	for rows.Next() {
 		var (
 			cardID    int64
@@ -126,9 +135,11 @@ func (d *Dealer) DealCards(ctx context.Context, chatID int64, count int) ([]*bat
 		card.PhotoURL = photoURL
 
 		// Try to get card image URL (for shop phase)
-		theme := "neon_arcade"
 		cardImageURL := d.getCardImageURL(ctx, userID, chatID, theme)
 		card.CardImageURL = cardImageURL
+
+		// Set placeholder positions
+		card.PlaceholderPositions = placeholderPositions
 
 		cards = append(cards, card)
 		index++
@@ -193,6 +204,13 @@ func (d *Dealer) DealRerollCards(ctx context.Context, chatID int64, count int, e
 
 	cards := make([]*battle.ShopCard, 0, count)
 
+	// Get placeholder positions for the theme (same for all cards)
+	theme := "neon_arcade"
+	var placeholderPositions json.RawMessage
+	if d.cardService != nil {
+		placeholderPositions = d.cardService.GetPlaceholderPositions(theme)
+	}
+
 	for rows.Next() {
 		var (
 			cardID    int64
@@ -227,9 +245,11 @@ func (d *Dealer) DealRerollCards(ctx context.Context, chatID int64, count int, e
 		card.PhotoURL = photoURL
 
 		// Try to get card image URL (for shop phase)
-		theme := "neon_arcade"
 		cardImageURL := d.getCardImageURL(ctx, userID, chatID, theme)
 		card.CardImageURL = cardImageURL
+
+		// Set placeholder positions
+		card.PlaceholderPositions = placeholderPositions
 
 		cards = append(cards, card)
 	}

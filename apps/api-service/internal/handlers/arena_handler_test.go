@@ -1425,6 +1425,7 @@ func TestHandleGetBattle_ReturnsDamageSummary(t *testing.T) {
 		tdb.DB.Exec("DELETE FROM game_match_rounds WHERE match_id = $1", matchID)
 		tdb.DB.Exec("DELETE FROM game_match_participants WHERE match_id = $1", matchID)
 		tdb.DB.Exec("DELETE FROM game_matches WHERE id = $1", matchID)
+		tdb.DB.Exec("DELETE FROM chats WHERE id = $1", chatID)
 		tdb.DB.Exec("DELETE FROM users WHERE id IN ($1, $2)", playerAID, playerBID)
 	}()
 
@@ -1435,6 +1436,16 @@ func TestHandleGetBattle_ReturnsDamageSummary(t *testing.T) {
 	`, playerAID, playerBID)
 	if err != nil {
 		t.Fatalf("failed to insert users: %v", err)
+	}
+
+	// Create chat first (required by foreign key constraint)
+	_, err = tdb.DB.Exec(`
+		INSERT INTO chats (id, type, timezone, ranked_tournaments_enabled)
+		VALUES ($1, 'supergroup', 'UTC', true)
+		ON CONFLICT (id) DO NOTHING
+	`, chatID)
+	if err != nil {
+		t.Fatalf("failed to insert chat: %v", err)
 	}
 
 	// Create test match in battle phase

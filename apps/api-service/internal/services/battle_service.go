@@ -391,10 +391,10 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 	// No rounds yet - return minimal response
 	if len(rounds) == 0 {
 		return &BattleResponse{
-			MatchID:      matchID,
-			Events:       []battle.BattleEvent{},
-			DamageDealt:  0,
-			DamageTaken:  0,
+			MatchID:     matchID,
+			Events:      []battle.BattleEvent{},
+			DamageDealt: 0,
+			DamageTaken: 0,
 		}, nil
 	}
 

@@ -14,7 +14,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, ErrorDisplay } from '../common'
-import type { BattleResult, BattleEvent, CardSnapshot, Match } from '../../types'
+import type { BattleResult, BattleEvent, CardSnapshot, Match, GameConstants } from '../../types'
 
 // Playback speed options (events per second)
 const PLAYBACK_SPEEDS = [
@@ -27,6 +27,7 @@ const PLAYBACK_SPEEDS = [
 interface BattlePageProps {
   userId: number
   activeMatch: Match | null
+  gameConstants: GameConstants | null
   onNavigateToStats?: () => void
   onNavigateToLobby?: () => void
   onMatchChange?: (match: Match | null) => void
@@ -35,6 +36,7 @@ interface BattlePageProps {
 export function BattlePage({
   userId,
   activeMatch,
+  gameConstants,
   onNavigateToStats,
   onNavigateToLobby,
   onMatchChange,
@@ -298,6 +300,18 @@ export function BattlePage({
     }
   }, [currentEventIndex])
 
+  // Auto-play battle after initial load
+  useEffect(() => {
+    if (battleData && currentEventIndex === -1 && !isPlaying) {
+      const autoPlayTimer = setTimeout(() => {
+        setIsPlaying(true)
+        addPageAction('battle_autoplay_started', { match_id: matchId })
+      }, 1500) // 1.5 second delay
+
+      return () => clearTimeout(autoPlayTimer)
+    }
+  }, [battleData, currentEventIndex, isPlaying, matchId])
+
   // Skip to end
   const skipToEnd = useCallback(() => {
     if (!battleData) return
@@ -397,12 +411,19 @@ export function BattlePage({
     (battleData.is_draw && false) // No winner on draw
   const isDraw = battleData.is_draw
 
-  // Get HP bar color based on percentage
+  // Get HP bar color based on percentage and backend thresholds
   const getHpColor = (hp: number, maxHp: number): string => {
+    const thresholds = gameConstants?.hp_bar_thresholds
+    const highThreshold = thresholds?.high ?? 66
+    const mediumThreshold = thresholds?.medium ?? 33
+    const highColor = thresholds?.colors?.high ?? 'var(--hp-full)'
+    const mediumColor = thresholds?.colors?.medium ?? 'var(--hp-medium)'
+    const lowColor = thresholds?.colors?.low ?? 'var(--hp-low)'
+
     const pct = (hp / maxHp) * 100
-    if (pct > 66) return 'var(--hp-full)'
-    if (pct > 33) return 'var(--hp-medium)'
-    return 'var(--hp-low)'
+    if (pct > highThreshold) return highColor
+    if (pct >= mediumThreshold) return mediumColor
+    return lowColor
   }
 
   // Render a battle card

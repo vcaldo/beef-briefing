@@ -14,7 +14,7 @@ import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer } from '../common'
 
-import type { Match } from '../../types'
+import type { Match, GameConstants } from '../../types'
 
 // Polling intervals (in ms)
 const POLL_INTERVAL_NO_MATCH = 3000 // 3 seconds when not in a match
@@ -28,6 +28,7 @@ interface LobbyPageProps {
   onNavigateToBattle: () => void
   activeMatch: Match | null
   onMatchChange: (match: Match | null) => void
+  gameConstants: GameConstants | null
 }
 
 export function LobbyPage({
@@ -38,6 +39,7 @@ export function LobbyPage({
   onNavigateToBattle,
   activeMatch,
   onMatchChange,
+  gameConstants,
 }: LobbyPageProps) {
   // Local state
   const [matches, setMatches] = useState<Match[]>([])
@@ -437,6 +439,7 @@ export function LobbyPage({
                     onExpire={() => {
                       addPageAction('match_auto_start', { match_id: activeMatch.id })
                     }}
+                    timerThresholds={gameConstants?.timer_thresholds}
                   />
                 </div>
               )}
@@ -546,7 +549,10 @@ export function LobbyPage({
                         {/* Timer */}
                         {match.join_deadline && (
                           <div className="match-card-timer compact">
-                            <CountdownTimer deadline={match.join_deadline} />
+                            <CountdownTimer
+                              deadline={match.join_deadline}
+                              timerThresholds={gameConstants?.timer_thresholds}
+                            />
                           </div>
                         )}
                       </div>

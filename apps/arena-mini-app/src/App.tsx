@@ -189,6 +189,7 @@ function App() {
             onMatchChange={handleMatchChange}
             onNavigateToShop={navigateToShop}
             onNavigateToBattle={navigateToBattle}
+            gameConstants={gameConstants}
           />
         )
       case 'shop':
@@ -207,6 +208,7 @@ function App() {
           <BattlePage
             userId={userId}
             activeMatch={activeMatch}
+            gameConstants={gameConstants}
             onMatchChange={handleMatchChange}
             onNavigateToStats={() => handleTabChange('stats')}
             onNavigateToLobby={navigateToLobby}
@@ -229,6 +231,7 @@ function App() {
             onMatchChange={handleMatchChange}
             onNavigateToShop={navigateToShop}
             onNavigateToBattle={navigateToBattle}
+            gameConstants={gameConstants}
           />
         )
     }

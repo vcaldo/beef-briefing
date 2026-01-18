@@ -421,6 +421,7 @@ export function ShopPage({
                 onExpire={() => {
                   addPageAction('shop_phase_expired', { match_id: activeMatch.id })
                 }}
+                timerThresholds={gameConstants?.timer_thresholds}
               />
             </div>
           )}
@@ -482,6 +483,7 @@ export function ShopPage({
                         hp: card.hp,
                         maxHp: card.max_hp,
                       }}
+                      hpBarThresholds={gameConstants?.hp_bar_thresholds}
                       isAlive={true}
                       showHpBar={true}
                       cardName={card.name}
@@ -571,7 +573,7 @@ export function ShopPage({
           <div className="shop-grid">
             {shopCards.map((card: EnhancedShopCard) => {
               const isPurchased = card.is_purchased
-              const canAfford = card.can_afford && coins >= cardCost
+              const canAfford = card.can_afford
               const teamFull = teamCards.length >= teamSize
 
               return (

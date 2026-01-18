@@ -89,6 +89,71 @@ All API calls use JWT authentication obtained through Telegram init_data.
 
 See [api-service README](../api-service/README.md) for full endpoint documentation.
 
+### Game Constants API
+
+The `/api/v1/mini-app/arena/constants` endpoint provides centralized game configuration, allowing backend-controlled tuning without code changes:
+
+**Response Structure**:
+```json
+{
+  "costs": {
+    "card": 3,
+    "reroll": 1,
+    "upgrade": 1
+  },
+  "sizes": {
+    "shop": 5,
+    "team": 3
+  },
+  "upgrades": {
+    "atk_amount": 3,
+    "hp_amount": 3
+  },
+  "timings": {
+    "shop_phase_duration": 180,
+    "join_window_duration": 300
+  },
+  "hp_bar_thresholds": {
+    "high": 66,
+    "medium": 33,
+    "colors": {
+      "high": "#22c55e",
+      "medium": "#eab308",
+      "low": "#ef4444"
+    }
+  },
+  "timer_thresholds": {
+    "safe": 120,
+    "warning": 30,
+    "colors": {
+      "safe": "#22c55e",
+      "warning": "#eab308",
+      "urgent": "#ef4444"
+    }
+  }
+}
+```
+
+**Threshold Configuration**:
+
+*HP Bar Thresholds* - Used in `CompactCard.tsx` and `BattlePage.tsx`:
+- `high`: Percentage threshold for green HP bar (default: 66%)
+- `medium`: Percentage threshold for yellow HP bar (default: 33%)
+- Below `medium`: Red HP bar
+- Colors: Customizable hex values for each threshold level
+
+*Timer Thresholds* - Used in `CountdownTimer.tsx`:
+- `safe`: Seconds above which timer is green (default: 120s = 2 minutes)
+- `warning`: Seconds below which timer is red with pulse animation (default: 30s)
+- Between thresholds: Yellow warning state
+- Colors: Customizable hex values for each urgency level
+
+**Frontend Implementation**:
+- Components fetch constants on mount via `App.tsx`
+- Graceful fallback to hardcoded defaults if API unavailable
+- All thresholds are optional; missing values use component defaults
+- Single source of truth: Backend controls game balance parameters
+
 ## Game Economy
 
 | Resource | Cost | Description |

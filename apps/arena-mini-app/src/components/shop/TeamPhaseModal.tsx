@@ -49,6 +49,9 @@ export function TeamPhaseModal({
   const teamCards = shopData?.team ?? []
   const teamOrder = shopData?.team_order ?? []
   const upgradeCost = gameConstants?.upgrade_cost ?? 1
+  const teamSize = gameConstants?.team_size ?? 3
+  const isTeamComplete = teamCards.length >= teamSize
+  const canSubmit = isTeamComplete && !isSubmitted
 
   // Local state for smooth drag-and-drop (decoupled from server state)
   const [localTeamOrder, setLocalTeamOrder] = useState<EnhancedTeamCard[]>([])
@@ -136,6 +139,22 @@ export function TeamPhaseModal({
     },
     [activeMatch, actionLoading, isSubmitted, onShopDataChange]
   )
+
+  // Submit team handler
+  const handleSubmitTeam = useCallback(async () => {
+    if (!activeMatch || actionLoading || isSubmitted) return
+
+    setActionLoading('submit')
+    try {
+      const data = await apiClient.submitTeam(activeMatch.id)
+      onShopDataChange(data)
+    } catch (err) {
+      console.error('Failed to submit team:', err)
+      // Optionally show error to user via toast/banner
+    } finally {
+      setActionLoading(null)
+    }
+  }, [activeMatch, actionLoading, isSubmitted, onShopDataChange])
 
   // Coin display class based on affordability
   const getCoinClass = () => {
@@ -274,6 +293,30 @@ export function TeamPhaseModal({
             )}
           </section>
         </div>
+
+        {/* Footer with Submit Team button or waiting state */}
+        <footer className="team-phase-footer">
+          {!isSubmitted ? (
+            <button
+              className="btn-primary btn-lg submit-btn"
+              onClick={handleSubmitTeam}
+              disabled={!canSubmit || actionLoading !== null}
+            >
+              {actionLoading === 'submit' ? (
+                <LoadingSpinner size="sm" inline />
+              ) : isTeamComplete ? (
+                'Submit Team'
+              ) : (
+                `Need ${teamSize - teamCards.length} more card${teamSize - teamCards.length > 1 ? 's' : ''}`
+              )}
+            </button>
+          ) : (
+            <div className="submit-status">
+              <span className="submit-status-icon">✓</span>
+              <span className="submit-status-text">Waiting for opponent...</span>
+            </div>
+          )}
+        </footer>
       </div>
     </div>
   )

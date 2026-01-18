@@ -672,6 +672,18 @@ a:focus:not(:focus-visible),
   }
 }
 
+/* Dead - static final state after death animation completes
+ * This is applied after 'dying' animation finishes to maintain the dead appearance
+ * Values match the 100% keyframe of card-death animation for visual continuity */
+.compact-card-anim-dead {
+  filter: grayscale(1) brightness(0.7);
+  opacity: 0.5;
+  transform: scale(0.92);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  /* No transitions - this is a static end state */
+  transition: none;
+}
+
 /* =============================================================================
    Buttons
    ============================================================================= */

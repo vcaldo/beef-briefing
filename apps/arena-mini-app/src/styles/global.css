@@ -1465,6 +1465,16 @@ a:focus:not(:focus-visible),
   border-style: solid;
   border-color: var(--arena-orange);
   background: transparent;
+  cursor: grab;
+}
+
+.team-phase-slot.filled:active {
+  cursor: grabbing;
+}
+
+.team-phase-slot.reordering {
+  pointer-events: none;
+  opacity: 0.6;
 }
 
 .team-phase-slot-number {

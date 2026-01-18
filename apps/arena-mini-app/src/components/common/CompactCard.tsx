@@ -175,7 +175,7 @@ export function CompactCard({
         // When using animationState, CSS handles dead state styling via compact-card-anim-dead class
         // Only apply inline styles when using legacy isAlive prop
         filter: !animationState && !isAlive ? 'grayscale(100%)' : undefined,
-        opacity: !animationState && !isAlive ? 0.5 : 1,
+        opacity: animationState ? undefined : (isAlive ? 1 : 0.5),
         transition: 'filter 0.3s ease, opacity 0.3s ease',
       }}
     >

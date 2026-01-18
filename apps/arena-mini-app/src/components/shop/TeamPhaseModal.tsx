@@ -17,8 +17,9 @@ import type {
   EnhancedShopResponse,
   EnhancedTeamCard,
   GameConstants,
+  UpgradeType,
 } from '../../types'
-import { CountdownTimer } from '../common'
+import { CountdownTimer, LoadingSpinner } from '../common'
 import { apiClient } from '../../api/client'
 
 interface TeamPhaseModalProps {
@@ -47,6 +48,7 @@ export function TeamPhaseModal({
   const isSubmitted = shopData?.is_ready ?? false
   const teamCards = shopData?.team ?? []
   const teamOrder = shopData?.team_order ?? []
+  const upgradeCost = gameConstants?.upgrade_cost ?? 1
 
   // Local state for smooth drag-and-drop (decoupled from server state)
   const [localTeamOrder, setLocalTeamOrder] = useState<EnhancedTeamCard[]>([])
@@ -116,9 +118,27 @@ export function TeamPhaseModal({
     }
   }, [activeMatch, isSubmitted, teamCards, onShopDataChange])
 
+  // Upgrade card handler
+  const handleUpgrade = useCallback(
+    async (teamSlot: number, upgradeType: UpgradeType) => {
+      if (!activeMatch || actionLoading || isSubmitted) return
+
+      setActionLoading(`upgrade-${teamSlot}-${upgradeType}`)
+      try {
+        const data = await apiClient.upgradeCard(activeMatch.id, teamSlot, upgradeType)
+        onShopDataChange(data)
+      } catch (err) {
+        console.error('Failed to upgrade card:', err)
+        // Optionally show error to user via toast/banner
+      } finally {
+        setActionLoading(null)
+      }
+    },
+    [activeMatch, actionLoading, isSubmitted, onShopDataChange]
+  )
+
   // Coin display class based on affordability
   const getCoinClass = () => {
-    const upgradeCost = gameConstants?.upgrade_cost ?? 1
     if (coins >= upgradeCost * 2) return 'coin-display can-afford'
     if (coins > 0) return 'coin-display limited'
     return 'coin-display empty'
@@ -200,6 +220,42 @@ export function TeamPhaseModal({
                         </div>
                       )}
                     </div>
+
+                    {/* Upgrade buttons - only show if not submitted */}
+                    {!isSubmitted && (
+                      <div className="team-phase-card-upgrades">
+                        <button
+                          className="upgrade-btn upgrade-atk"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleUpgrade(card.position, 'atk')
+                          }}
+                          disabled={coins < upgradeCost || actionLoading !== null}
+                          title={`+3 ATK (${upgradeCost} coin)`}
+                        >
+                          {actionLoading === `upgrade-${card.position}-atk` ? (
+                            <LoadingSpinner size="sm" inline />
+                          ) : (
+                            <>⚔️ +3</>
+                          )}
+                        </button>
+                        <button
+                          className="upgrade-btn upgrade-hp"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleUpgrade(card.position, 'hp')
+                          }}
+                          disabled={coins < upgradeCost || actionLoading !== null}
+                          title={`+3 HP (${upgradeCost} coin)`}
+                        >
+                          {actionLoading === `upgrade-${card.position}-hp` ? (
+                            <LoadingSpinner size="sm" inline />
+                          ) : (
+                            <>❤️ +3</>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </Reorder.Item>
                 ))}
               </Reorder.Group>

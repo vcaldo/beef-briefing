@@ -1571,6 +1571,57 @@ a:focus:not(:focus-visible),
   font-weight: 500;
 }
 
+/* Team Phase Card Upgrades */
+.team-phase-card-upgrades {
+  display: flex;
+  gap: 4px;
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+.team-phase-slot .upgrade-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 32px;
+  min-height: 28px;
+}
+
+.team-phase-slot .upgrade-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.team-phase-slot .upgrade-btn.upgrade-atk {
+  background: rgba(249, 115, 22, 0.2);
+  color: var(--arena-orange);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.team-phase-slot .upgrade-btn.upgrade-atk:hover:not(:disabled) {
+  background: rgba(249, 115, 22, 0.3);
+}
+
+.team-phase-slot .upgrade-btn.upgrade-hp {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--hp-full);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.team-phase-slot .upgrade-btn.upgrade-hp:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.3);
+}
+
 /* =============================================================================
    Battle Arena
    ============================================================================= */

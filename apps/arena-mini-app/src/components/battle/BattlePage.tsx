@@ -67,8 +67,8 @@ export function BattlePage({
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackSpeedIndex, setPlaybackSpeedIndex] = useState(1) // Default to 1x
 
-  // Card states for animation
-  const [cardStates, setCardStates] = useState<Map<number, CardSnapshot>>(new Map())
+  // Card states for animation (keyed by composite key: teamOwnerId_cardId)
+  const [cardStates, setCardStates] = useState<Map<string, CardSnapshot>>(new Map())
 
   // Victory screen state
   const [showVictory, setShowVictory] = useState(false)
@@ -102,11 +102,13 @@ export function BattlePage({
       setBattleData(data)
 
       // Initialize card states from initial team data
-      const initialStates = new Map<number, CardSnapshot>()
+      // Using composite keys (teamOwnerId_cardId) to handle same card on both teams
+      const initialStates = new Map<string, CardSnapshot>()
 
-      // Team A cards
+      // Team A cards (keyed by player_a_id)
       data.team_a_final.cards.forEach((card, index) => {
-        initialStates.set(card.card_id, {
+        const key = getCardKey(data.player_a_id, card.card_id)
+        initialStates.set(key, {
           card_id: card.card_id,
           user_id: card.user_id,
           name: card.name,
@@ -120,9 +122,10 @@ export function BattlePage({
         })
       })
 
-      // Team B cards
+      // Team B cards (keyed by player_b_id)
       data.team_b_final.cards.forEach((card, index) => {
-        initialStates.set(card.card_id, {
+        const key = getCardKey(data.player_b_id, card.card_id)
+        initialStates.set(key, {
           card_id: card.card_id,
           user_id: card.user_id,
           name: card.name,
@@ -174,10 +177,12 @@ export function BattlePage({
     (event: BattleEvent, eventIndex: number) => {
       // Mode 1: API provides complete card states snapshot
       // This is the preferred mode as it ensures UI matches server state exactly
+      // TODO: Update to use composite keys once API provides team owner IDs in card_states
       if (event.card_states && event.card_states.length > 0) {
-        const newStates = new Map<number, CardSnapshot>()
+        const newStates = new Map<string, CardSnapshot>()
         event.card_states.forEach((state) => {
-          newStates.set(state.card_id, state)
+          // Temporarily using card_id as key - will be updated when applyEvent gets composite key support
+          newStates.set(String(state.card_id), state)
         })
         setCardStates(newStates)
         return
@@ -185,13 +190,14 @@ export function BattlePage({
 
       // Mode 2: Compute state changes from event data (fallback)
       // Used when API doesn't provide card_states or for backwards compatibility
-      setCardStates((prevStates) => {
+      // TODO: Update to use composite keys with team owner IDs from events (separate task)
+      setCardStates((prevStates: Map<string, CardSnapshot>) => {
         const newStates = new Map(prevStates)
 
         // Reset attack/defend flags from previous event
         // This ensures only the current attacker/defender are highlighted
-        newStates.forEach((state, cardId) => {
-          newStates.set(cardId, {
+        newStates.forEach((state, cardKey) => {
+          newStates.set(cardKey, {
             ...state,
             is_attacking: false,
             is_defending: false,
@@ -200,10 +206,12 @@ export function BattlePage({
 
         if (event.type === 'attack' || event.type === 'damage') {
           // Highlight the attacking card with orange glow animation
+          // TODO: Use composite key with attacker_team_owner_id once API provides it
           if (event.attacker_card_id) {
-            const attacker = newStates.get(event.attacker_card_id)
+            const attackerKey = String(event.attacker_card_id)
+            const attacker = newStates.get(attackerKey)
             if (attacker) {
-              newStates.set(event.attacker_card_id, {
+              newStates.set(attackerKey, {
                 ...attacker,
                 is_attacking: true,
               })
@@ -212,10 +220,12 @@ export function BattlePage({
 
           // Highlight defender and update their HP for HP bar animation
           // hp_after is provided by the API after damage calculation
+          // TODO: Use composite key with defender_team_owner_id once API provides it
           if (event.defender_card_id) {
-            const defender = newStates.get(event.defender_card_id)
+            const defenderKey = String(event.defender_card_id)
+            const defender = newStates.get(defenderKey)
             if (defender) {
-              newStates.set(event.defender_card_id, {
+              newStates.set(defenderKey, {
                 ...defender,
                 is_defending: true,
                 hp: event.hp_after ?? defender.hp,
@@ -225,10 +235,12 @@ export function BattlePage({
         } else if (event.type === 'death') {
           // Mark card as dead - triggers grayscale + opacity styling
           // This happens when a card's HP reaches 0
+          // TODO: Use composite key with defender_team_owner_id once API provides it
           if (event.defender_card_id) {
-            const deadCard = newStates.get(event.defender_card_id)
+            const deadCardKey = String(event.defender_card_id)
+            const deadCard = newStates.get(deadCardKey)
             if (deadCard) {
-              newStates.set(event.defender_card_id, {
+              newStates.set(deadCardKey, {
                 ...deadCard,
                 is_alive: false,
                 hp: 0,
@@ -353,10 +365,11 @@ export function BattlePage({
     setIsPlaying(false)
     setShowVictory(false)
 
-    // Reset card states to initial
-    const initialStates = new Map<number, CardSnapshot>()
+    // Reset card states to initial (using composite keys for same card on both teams)
+    const initialStates = new Map<string, CardSnapshot>()
     battleData.team_a_final.cards.forEach((card, index) => {
-      initialStates.set(card.card_id, {
+      const key = getCardKey(battleData.player_a_id, card.card_id)
+      initialStates.set(key, {
         card_id: card.card_id,
         user_id: card.user_id,
         name: card.name,
@@ -370,7 +383,8 @@ export function BattlePage({
       })
     })
     battleData.team_b_final.cards.forEach((card, index) => {
-      initialStates.set(card.card_id, {
+      const key = getCardKey(battleData.player_b_id, card.card_id)
+      initialStates.set(key, {
         card_id: card.card_id,
         user_id: card.user_id,
         name: card.name,
@@ -439,7 +453,9 @@ export function BattlePage({
       placeholder_positions?: PlaceholderPositions | null
     }
   ) => {
-    const state = cardStates.get(cardId)
+    // Use composite key to look up state (handles same card on both teams)
+    const cardKey = getCardKey(teamOwnerId, cardId)
+    const state = cardStates.get(cardKey)
     if (!state) return null
 
     const isCurrentUser = teamOwnerId === userId

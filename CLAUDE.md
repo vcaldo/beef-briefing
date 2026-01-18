@@ -447,7 +447,20 @@ Turn-based card battle arena where users build teams from weekly stats cards and
 - Shop: 3s polling `/shop` (continues after team submission)
 - Battle/Stats: No polling (single fetch)
 
+**Battle Response Fields**:
+| Field | Type | Description |
+|-------|------|-------------|
+| `damage_dealt` | int | Total damage dealt by the requesting user's team |
+| `damage_taken` | int | Total damage taken by the requesting user's team (opponent's damage) |
+| `team_a_damage` | int | Total damage dealt by Player A's team (absolute value) |
+| `team_b_damage` | int | Total damage dealt by Player B's team (absolute value) |
+| `winner_id` | int64? | ID of the winning player, or null for draw |
+| `is_draw` | bool | True if both teams dealt equal damage |
+| `num_rounds` | int | Number of battle rounds that occurred |
+| `events` | array | Detailed battle events (attacks, deaths, etc.) |
+
 **Critical Implementation Notes**:
+- **Player-relative damage**: `damage_dealt` and `damage_taken` are calculated from the requesting user's perspective. If the user is Player A, `damage_dealt` = `team_a_damage` and `damage_taken` = `team_b_damage`. Values are swapped for Player B.
 - **React error #310**: Prevented by awaiting SDK init before render and initializing timer state to `0`
 - **Reroll mechanic**: Permanently disabled after first card purchase (not per-round)
 - **Shop polling**: Must continue after team submission to detect battle phase transition

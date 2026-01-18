@@ -3,7 +3,6 @@
  *
  * Features:
  * - Displays shop cards available for purchase
- * - Shows team display with upgrade options
  * - Polls for shop updates every 3 seconds
  * - Auto-navigates to Battle when match transitions to battle_phase
  * - Continues polling AFTER team submission to detect battle start
@@ -13,14 +12,13 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
-import { LoadingSpinner, CountdownTimer, CompactCard } from '../common'
+import { LoadingSpinner, CountdownTimer } from '../common'
 import TeamPhaseModal from './TeamPhaseModal'
 
 import type {
   Match,
   EnhancedShopResponse,
   EnhancedShopCard,
-  EnhancedTeamCard,
   GameConstants,
 } from '../../types'
 
@@ -63,7 +61,6 @@ export function ShopPage({
   const canReroll = shopData?.can_reroll ?? false
   const isSubmitted = shopData?.is_ready ?? false
   const teamCards = shopData?.team ?? []
-  const teamOrder = shopData?.team_order ?? []
   const shopCards = shopData?.cards ?? []
   const teamSize = gameConstants?.team_size ?? 3
   const cardCost = gameConstants?.card_cost ?? 3
@@ -332,62 +329,6 @@ export function ShopPage({
           <p className="shop-waiting-text">Waiting for opponent to submit their team...</p>
         </div>
       )}
-
-      {/* Team display - static card preview (reordering moved to TeamPhaseModal) */}
-      <section className="shop-team-section">
-        <h2 className="shop-section-title">Your Team ({teamCards.length}/{teamSize})</h2>
-        <div className="team-display">
-          {/* Static team cards - display in battle order */}
-          {teamCards.length > 0 && (() => {
-            // Apply team_order to display cards in battle order
-            const orderedTeam = teamOrder.length === teamCards.length
-              ? teamOrder
-                  .map((posIdx: number) => teamCards[posIdx])
-                  .filter((card: EnhancedTeamCard | undefined): card is EnhancedTeamCard => card !== undefined)
-              : teamCards
-
-            return orderedTeam.map((card: EnhancedTeamCard, idx: number) => (
-              <div key={card.card_id} className="team-slot filled">
-                <span className="team-slot-number">{idx + 1}</span>
-                {card.card_image_url ? (
-                  <CompactCard
-                    imageUrl={card.card_image_url}
-                    positions={card.placeholder_positions}
-                    currentStats={{
-                      atk: card.atk,
-                      def: card.def,
-                      hp: card.hp,
-                      maxHp: card.max_hp,
-                    }}
-                    hpBarThresholds={gameConstants?.hp_bar_thresholds}
-                    isAlive={true}
-                    showHpBar={true}
-                    cardName={card.name}
-                    cardId={card.card_id}
-                  />
-                ) : (
-                  <div className="team-card-simple">
-                    <div className="team-card-name">{card.name}</div>
-                    <div className="team-card-stats">
-                      <span className="stat atk">⚔️ {card.atk}</span>
-                      <span className="stat def">🛡️ {card.def}</span>
-                      <span className="stat hp">❤️ {card.hp}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))
-          })()}
-
-          {/* Empty slots */}
-          {Array.from({ length: teamSize - teamCards.length }).map((_, idx) => (
-            <div key={`empty-${idx}`} className="team-slot empty">
-              <span className="team-slot-number">{teamCards.length + idx + 1}</span>
-              <span className="team-slot-empty-text">Empty</span>
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* Done Shopping button - appears when team is complete */}
       {!isSubmitted && teamCards.length >= teamSize && (

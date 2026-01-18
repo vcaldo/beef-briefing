@@ -566,6 +566,21 @@ export function ShopPage({
         </div>
       </section>
 
+      {/* Done Shopping button - appears when team is complete */}
+      {!isSubmitted && teamCards.length >= teamSize && (
+        <div className="done-shopping-section">
+          <button
+            className="btn-primary btn-lg done-shopping-btn"
+            onClick={() => setIsTeamPhase(true)}
+          >
+            Done Shopping - Organize Team
+          </button>
+          <p className="done-shopping-hint">
+            Ready to organize your team? Click above to arrange positions and make final upgrades.
+          </p>
+        </div>
+      )}
+
       {/* Shop cards grid - only show if not submitted */}
       {!isSubmitted && (
         <section className="shop-cards-section">

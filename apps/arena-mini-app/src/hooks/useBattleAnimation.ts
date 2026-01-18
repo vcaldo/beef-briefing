@@ -204,6 +204,7 @@ export function useBattleAnimation(
   const phaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isPlayingRef = useRef(isPlaying)
   const currentEventIndexRef = useRef(currentEventIndex)
+  const advanceToNextEventRef = useRef<(() => void) | null>(null)
 
   // Keep currentEventIndex ref in sync
   useEffect(() => {
@@ -427,8 +428,9 @@ export function useBattleAnimation(
           clearAnimationStates()
 
           // Gap before next event
+          // Use ref to always call the latest advanceToNextEvent (avoids stale closure)
           phaseTimeoutRef.current = setTimeout(() => {
-            advanceToNextEvent()
+            advanceToNextEventRef.current?.()
           }, getScaledDuration(ANIMATION_DURATIONS.eventGap))
           break
         }
@@ -459,6 +461,12 @@ export function useBattleAnimation(
     setCurrentPhase('highlight')
     processPhase(nextEvent, 'highlight')
   }, [battleData, processPhase])
+
+  // Keep advanceToNextEvent ref in sync for use in processPhase
+  // (avoids circular dependency: processPhase -> advanceToNextEvent -> processPhase)
+  useEffect(() => {
+    advanceToNextEventRef.current = advanceToNextEvent
+  }, [advanceToNextEvent])
 
   /**
    * Start or resume playback.

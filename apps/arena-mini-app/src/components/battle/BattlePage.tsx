@@ -25,6 +25,21 @@ const PLAYBACK_SPEEDS = [
   { label: '2x', value: 500 },
 ]
 
+/**
+ * Generate a composite key for card state lookups.
+ *
+ * This is needed because the same card_id can appear on both teams (e.g., when
+ * both players purchase the same user's card). Using only card_id as the Map key
+ * would cause both instances to share state, leading to animation bugs where
+ * both cards animate together.
+ *
+ * @param teamOwnerId - The user ID of the team owner (player_a_id or player_b_id)
+ * @param cardId - The card's unique identifier
+ * @returns A composite key string in the format "teamOwnerId_cardId"
+ */
+const getCardKey = (teamOwnerId: number, cardId: number): string =>
+  `${teamOwnerId}_${cardId}`
+
 interface BattlePageProps {
   userId: number
   activeMatch: Match | null

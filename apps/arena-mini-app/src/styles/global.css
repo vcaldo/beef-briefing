@@ -388,10 +388,10 @@ a:focus:not(:focus-visible),
   opacity: 0.5;
 }
 
-/* Card dead/eliminated state */
+/* Card dead/eliminated state - !important to override animation states */
 .card-dead {
-  filter: grayscale(1);
-  opacity: 0.5;
+  filter: grayscale(1) !important;
+  opacity: 0.5 !important;
   transition: filter 0.3s ease, opacity 0.3s ease;
 }
 
@@ -473,22 +473,8 @@ a:focus:not(:focus-visible),
 .compact-card-hp-bar-fill {
   height: 100%;
   border-radius: 2px;
-  transition: width 0.3s ease, background-color 0.3s ease;
-}
-
-/* Compact card state modifiers */
-.compact-card-dead {
-  filter: grayscale(100%);
-  opacity: 0.5;
-}
-
-.compact-card-attacking {
-  box-shadow: 0 0 20px rgba(249, 115, 22, 0.8), 0 0 40px rgba(249, 115, 22, 0.4);
-  animation: attack-pulse 0.3s ease-out;
-}
-
-.compact-card-defending {
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 40px rgba(59, 130, 246, 0.4);
+  transition: width var(--hp-transition-duration, 0.3s) ease,
+              background-color var(--hp-transition-duration, 0.3s) ease;
 }
 
 /* Fallback stats display when positions not available */
@@ -535,7 +521,164 @@ a:focus:not(:focus-visible),
 .compact-card-hp-bar-fill-fallback {
   height: 100%;
   border-radius: 4px;
-  transition: width 0.3s ease, background-color 0.3s ease;
+  transition: width var(--hp-transition-duration, 0.3s) ease,
+              background-color var(--hp-transition-duration, 0.3s) ease;
+}
+
+/* Force HP bar to 0% immediately when card is dead */
+.card-dead .compact-card-hp-bar-fill,
+.card-dead .compact-card-hp-bar-fill-fallback {
+  width: 0% !important;
+  transition: none !important;
+}
+
+/* =============================================================================
+   Compact Card Animation States
+   Phase-based animation system for battle replay.
+   Maps to CardAnimationState type: 'idle' | 'attacking' | 'taking_damage' | 'dying' | 'dead'
+   ============================================================================= */
+
+/* Idle state - default, no animation active */
+.compact-card-anim-idle {
+  filter: none;
+  opacity: 1;
+  transform: scale(1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  transition: filter 0.3s ease, opacity 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Attacking state - orange glow with scale up, pulsing animation */
+.compact-card-anim-attacking {
+  transform: scale(1.05);
+  box-shadow:
+    0 0 20px rgba(249, 115, 22, 0.6),
+    0 0 40px rgba(249, 115, 22, 0.4),
+    0 0 60px rgba(249, 115, 22, 0.2);
+  animation: card-attack-pulse 0.4s ease-in-out;
+  z-index: 10;
+}
+
+/* Attack pulse keyframes - scale up with intensifying orange glow */
+@keyframes card-attack-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow:
+      0 0 25px rgba(249, 115, 22, 0.8),
+      0 0 50px rgba(249, 115, 22, 0.5),
+      0 0 75px rgba(249, 115, 22, 0.3);
+  }
+  100% {
+    transform: scale(1.05);
+    box-shadow:
+      0 0 20px rgba(249, 115, 22, 0.6),
+      0 0 40px rgba(249, 115, 22, 0.4),
+      0 0 60px rgba(249, 115, 22, 0.2);
+  }
+}
+
+/* Taking damage state - red glow with shake effect */
+.compact-card-anim-taking-damage {
+  animation: card-damage-shake 0.3s ease-in-out;
+  box-shadow:
+    0 0 15px rgba(239, 68, 68, 0.7),
+    0 0 30px rgba(239, 68, 68, 0.4);
+}
+
+/* Damage shake keyframes - rapid horizontal shake with red flash */
+@keyframes card-damage-shake {
+  0% {
+    transform: translateX(0);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  }
+  10% {
+    transform: translateX(-6px);
+    box-shadow:
+      0 0 20px rgba(239, 68, 68, 0.8),
+      0 0 40px rgba(239, 68, 68, 0.5);
+  }
+  20% {
+    transform: translateX(6px);
+  }
+  30% {
+    transform: translateX(-5px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  50% {
+    transform: translateX(-4px);
+  }
+  60% {
+    transform: translateX(4px);
+  }
+  70% {
+    transform: translateX(-2px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+  90% {
+    transform: translateX(-1px);
+  }
+  100% {
+    transform: translateX(0);
+    box-shadow:
+      0 0 15px rgba(239, 68, 68, 0.7),
+      0 0 30px rgba(239, 68, 68, 0.4);
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Damage Number Overlay
+   Displays the damage amount during the damage phase of battle animations.
+   Appears centered over the card with a "pop" effect and red styling.
+   ----------------------------------------------------------------------------- */
+.damage-number {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+
+  /* Typography */
+  font-family: 'Outfit', 'Orbitron', sans-serif;
+  font-size: 48px;
+  font-weight: 900;
+  color: #ef4444;
+
+  /* Text effects for visibility */
+  text-shadow:
+    0 0 10px rgba(239, 68, 68, 0.8),
+    0 0 20px rgba(239, 68, 68, 0.6),
+    0 2px 4px rgba(0, 0, 0, 0.8);
+
+  /* Ensure it appears above card content */
+  z-index: 20;
+
+  /* Prevent text selection */
+  user-select: none;
+  pointer-events: none;
+
+  /* Animation */
+  animation: damage-number-pop 0.3s ease-out forwards;
+}
+
+@keyframes damage-number-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 /* =============================================================================
@@ -2114,6 +2257,56 @@ a:focus:not(:focus-visible),
 
 .event-log-item.played {
   opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+/* Slide-in animation for new log entries */
+.event-log-item.slide-in {
+  animation: log-entry-slide 0.4s ease-out;
+}
+
+@keyframes log-entry-slide {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Highlight background for currently animating event */
+.event-log-item.animating {
+  background: linear-gradient(
+    90deg,
+    rgba(249, 115, 22, 0.15) 0%,
+    rgba(249, 115, 22, 0.05) 100%
+  );
+  border-left: 3px solid var(--arena-orange);
+  padding-left: 9px; /* Adjust for border (12px - 3px) */
+  transition: background 0.3s ease, border-left 0.3s ease, padding-left 0.3s ease;
+}
+
+/* Progress dot that pulses during event animation */
+.event-progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--arena-orange);
+  animation: progress-pulse 1.5s ease-in-out infinite;
+  margin-left: 8px;
+}
+
+@keyframes progress-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.3);
+  }
 }
 
 .event-round {

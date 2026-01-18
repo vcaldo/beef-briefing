@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import type { PlaceholderPositions, HpBarThresholds } from '../../types'
+import type { PlaceholderPositions, HpBarThresholds, CardAnimationState } from '../../types'
 
 /** Current stat values to display on the card */
 interface CardStats {
@@ -18,8 +18,6 @@ interface CompactCardProps {
   currentStats: CardStats
   /** HP bar color thresholds from backend */
   hpBarThresholds?: HpBarThresholds
-  /** Whether the card is alive (false = grayscale + reduced opacity) */
-  isAlive?: boolean
   /** Whether to show the HP bar (default true) */
   showHpBar?: boolean
   /** Optional card name for alt text */
@@ -28,10 +26,22 @@ interface CompactCardProps {
   cardId?: number
   /** Additional CSS classes */
   className?: string
-  /** Whether this card is currently attacking (for battle animations) */
-  isAttacking?: boolean
-  /** Whether this card is currently defending (for battle animations) */
-  isDefending?: boolean
+  /**
+   * Animation state for battle replay animations.
+   * Maps to CSS class: `compact-card-anim-${animationState}`
+   * @see CardAnimationState
+   */
+  animationState?: CardAnimationState
+  /**
+   * Damage number to display as an overlay during damage phase.
+   * Only rendered when provided and > 0.
+   */
+  damageNumber?: number
+  /**
+   * Whether the card is dead. If true, applies `.card-dead` class to force
+   * HP bar to 0% immediately. Defaults to checking if currentStats.hp <= 0.
+   */
+  isDead?: boolean
   /** Click handler */
   onClick?: () => void
 }
@@ -80,14 +90,12 @@ function getHpBarColor(hp: number, maxHp: number, thresholds?: HpBarThresholds):
  * />
  *
  * @example
- * // Battle card with alive state
+ * // Battle card with animation state
  * <CompactCard
  *   imageUrl={card.image_url}
  *   positions={card.placeholder_positions}
  *   currentStats={{ atk: card.atk, def: card.def, hp: card.hp, maxHp: card.max_hp }}
- *   isAlive={card.hp > 0}
- *   isAttacking={card.is_attacking}
- *   isDefending={card.is_defending}
+ *   animationState="attacking"
  *   cardId={card.card_id}
  *   cardName={card.name}
  * />
@@ -97,13 +105,13 @@ export function CompactCard({
   positions,
   currentStats,
   hpBarThresholds,
-  isAlive = true,
   showHpBar = true,
   cardName = 'Card',
   cardId,
   className = '',
-  isAttacking = false,
-  isDefending = false,
+  animationState,
+  damageNumber,
+  isDead,
   onClick,
 }: CompactCardProps): React.JSX.Element {
   // Calculate HP bar width and color
@@ -121,12 +129,16 @@ export function CompactCard({
   const combatStats = positions?.placeholders?.combat_stats
   const hpBar = positions?.placeholders?.hp_bar
 
+  // Determine if card is dead (explicit prop or derived from HP)
+  const isCardDead = isDead ?? currentStats.hp <= 0
+
   // Build class names for card state
   const cardClasses = [
     'compact-card',
-    !isAlive && 'compact-card-dead',
-    isAttacking && 'compact-card-attacking',
-    isDefending && 'compact-card-defending',
+    // Animation state class (e.g., compact-card-anim-attacking, compact-card-anim-taking_damage)
+    animationState && `compact-card-anim-${animationState}`,
+    // Dead card class forces HP bar to 0% immediately
+    isCardDead && 'card-dead',
     onClick && 'cursor-pointer',
     className,
   ]
@@ -149,15 +161,6 @@ export function CompactCard({
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       data-card-id={cardId}
-      data-is-alive={isAlive}
-      data-is-attacking={isAttacking}
-      data-is-defending={isDefending}
-      style={{
-        // Apply grayscale and reduced opacity when dead
-        filter: !isAlive ? 'grayscale(100%)' : undefined,
-        opacity: !isAlive ? 0.5 : 1,
-        transition: 'filter 0.3s ease, opacity 0.3s ease',
-      }}
     >
       {/* Base card image */}
       <img
@@ -256,6 +259,16 @@ export function CompactCard({
               // CSS transition handles animation (defined in global.css)
             }}
           />
+        </div>
+      )}
+
+      {/* Damage number overlay - displayed during damage phase */}
+      {damageNumber !== undefined && damageNumber > 0 && (
+        <div
+          className="damage-number"
+          aria-label={`Damage: ${damageNumber}`}
+        >
+          -{damageNumber}
         </div>
       )}
 

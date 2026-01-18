@@ -10,12 +10,20 @@
  * - Victory screen overlay
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, ErrorDisplay } from '../common'
 import { CompactCard } from '../common/CompactCard'
-import type { BattleResult, BattleEvent, CardSnapshot, Match, GameConstants, PlaceholderPositions } from '../../types'
+import { BattleLog } from './BattleLog'
+import { useBattleAnimation } from '../../hooks'
+import type {
+  BattleResult,
+  BattleEvent,
+  Match,
+  GameConstants,
+  PlaceholderPositions,
+} from '../../types'
 
 // Playback speed options (events per second)
 const PLAYBACK_SPEEDS = [
@@ -24,6 +32,21 @@ const PLAYBACK_SPEEDS = [
   { label: '1.5x', value: 667 },
   { label: '2x', value: 500 },
 ]
+
+/**
+ * Generate a composite key for card state lookups.
+ *
+ * This is needed because the same card_id can appear on both teams (e.g., when
+ * both players purchase the same user's card). Using only card_id as the Map key
+ * would cause both instances to share state, leading to animation bugs where
+ * both cards animate together.
+ *
+ * @param teamOwnerId - The user ID of the team owner (player_a_id or player_b_id)
+ * @param cardId - The card's unique identifier
+ * @returns A composite key string in the format "teamOwnerId_cardId"
+ */
+const getCardKey = (teamOwnerId: number, cardId: number): string =>
+  `${teamOwnerId}_${cardId}`
 
 interface BattlePageProps {
   userId: number
@@ -47,25 +70,37 @@ export function BattlePage({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Playback state
-  const [currentEventIndex, setCurrentEventIndex] = useState(-1)
-  const [isPlaying, setIsPlaying] = useState(false)
+  // Playback speed UI state (index into PLAYBACK_SPEEDS array)
   const [playbackSpeedIndex, setPlaybackSpeedIndex] = useState(1) // Default to 1x
 
-  // Card states for animation
-  const [cardStates, setCardStates] = useState<Map<number, CardSnapshot>>(new Map())
-
-  // Victory screen state
+  // Victory screen state (separate from animation completion for UI control)
   const [showVictory, setShowVictory] = useState(false)
 
-  // Refs for cleanup
-  const playbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const eventLogRef = useRef<HTMLDivElement>(null)
+  // Animation state machine hook
+  const {
+    cardStates,
+    animationStates,
+    currentEventIndex,
+    currentPhase,
+    isPlaying,
+    isComplete,
+    currentDamage,
+    damageTargetKey,
+    play,
+    pause,
+    reset,
+    skipToEnd: hookSkipToEnd,
+  } = useBattleAnimation(battleData, {
+    // Convert interval-based speed to multiplier (1000ms = 1x, 500ms = 2x)
+    playbackSpeed: 1000 / PLAYBACK_SPEEDS[playbackSpeedIndex].value,
+    playerAId: battleData?.player_a_id ?? 0,
+    playerBId: battleData?.player_b_id ?? 0,
+  })
 
   // Get match ID
   const matchId = activeMatch?.id
 
-  // Fetch battle data
+  // Fetch battle data (card state initialization is handled by the hook)
   const fetchBattle = useCallback(async () => {
     if (!matchId) {
       setError('No active match')
@@ -84,44 +119,8 @@ export function BattlePage({
         throw new Error('Battle data is incomplete - missing team cards')
       }
 
+      // Set battle data - the useBattleAnimation hook will initialize card states
       setBattleData(data)
-
-      // Initialize card states from initial team data
-      const initialStates = new Map<number, CardSnapshot>()
-
-      // Team A cards
-      data.team_a_final.cards.forEach((card, index) => {
-        initialStates.set(card.card_id, {
-          card_id: card.card_id,
-          user_id: card.user_id,
-          name: card.name,
-          hp: card.max_hp,
-          max_hp: card.max_hp,
-          atk: card.atk,
-          position: index,
-          is_alive: true,
-          is_attacking: false,
-          is_defending: false,
-        })
-      })
-
-      // Team B cards
-      data.team_b_final.cards.forEach((card, index) => {
-        initialStates.set(card.card_id, {
-          card_id: card.card_id,
-          user_id: card.user_id,
-          name: card.name,
-          hp: card.max_hp,
-          max_hp: card.max_hp,
-          atk: card.atk,
-          position: index,
-          is_alive: true,
-          is_attacking: false,
-          is_defending: false,
-        })
-      })
-
-      setCardStates(initialStates)
 
       addPageAction('battle_loaded', {
         match_id: matchId,
@@ -145,233 +144,48 @@ export function BattlePage({
     fetchBattle()
   }, [fetchBattle])
 
-  /**
-   * Apply a battle event to update card states for animation.
-   *
-   * Two modes of operation:
-   * 1. If the API provides card_states snapshot, use it directly (preferred)
-   * 2. Otherwise, compute state changes from event data (fallback)
-   *
-   * The card states drive the visual representation: HP bars, attack/defend
-   * highlighting, and dead card styling (grayscale + opacity).
-   */
-  const applyEvent = useCallback(
-    (event: BattleEvent, eventIndex: number) => {
-      // Mode 1: API provides complete card states snapshot
-      // This is the preferred mode as it ensures UI matches server state exactly
-      if (event.card_states && event.card_states.length > 0) {
-        const newStates = new Map<number, CardSnapshot>()
-        event.card_states.forEach((state) => {
-          newStates.set(state.card_id, state)
-        })
-        setCardStates(newStates)
-        return
-      }
-
-      // Mode 2: Compute state changes from event data (fallback)
-      // Used when API doesn't provide card_states or for backwards compatibility
-      setCardStates((prevStates) => {
-        const newStates = new Map(prevStates)
-
-        // Reset attack/defend flags from previous event
-        // This ensures only the current attacker/defender are highlighted
-        newStates.forEach((state, cardId) => {
-          newStates.set(cardId, {
-            ...state,
-            is_attacking: false,
-            is_defending: false,
-          })
-        })
-
-        if (event.type === 'attack' || event.type === 'damage') {
-          // Highlight the attacking card with orange glow animation
-          if (event.attacker_card_id) {
-            const attacker = newStates.get(event.attacker_card_id)
-            if (attacker) {
-              newStates.set(event.attacker_card_id, {
-                ...attacker,
-                is_attacking: true,
-              })
-            }
-          }
-
-          // Highlight defender and update their HP for HP bar animation
-          // hp_after is provided by the API after damage calculation
-          if (event.defender_card_id) {
-            const defender = newStates.get(event.defender_card_id)
-            if (defender) {
-              newStates.set(event.defender_card_id, {
-                ...defender,
-                is_defending: true,
-                hp: event.hp_after ?? defender.hp,
-              })
-            }
-          }
-        } else if (event.type === 'death') {
-          // Mark card as dead - triggers grayscale + opacity styling
-          // This happens when a card's HP reaches 0
-          if (event.defender_card_id) {
-            const deadCard = newStates.get(event.defender_card_id)
-            if (deadCard) {
-              newStates.set(event.defender_card_id, {
-                ...deadCard,
-                is_alive: false,
-                hp: 0,
-              })
-            }
-          }
-        }
-
-        return newStates
-      })
-
-      // Track event in analytics
-      addPageAction('battle_event_played', {
-        event_index: eventIndex,
-        event_type: event.type,
-      })
-    },
-    []
-  )
-
-  /**
-   * Advance playback to the next battle event.
-   *
-   * Called on each tick of the playback interval. The interval speed
-   * is determined by PLAYBACK_SPEEDS[playbackSpeedIndex].
-   *
-   * When the last event is reached, playback stops and the victory
-   * screen is displayed automatically.
-   */
-  const advanceEvent = useCallback(() => {
-    if (!battleData) return
-
-    setCurrentEventIndex((prevIndex) => {
-      const nextIndex = prevIndex + 1
-
-      // Check if we've reached the end of the battle events
-      if (nextIndex >= battleData.events.length) {
-        // Stop playback and show victory/defeat screen
-        setIsPlaying(false)
-        setShowVictory(true)
-        addPageAction('battle_playback_complete', {
-          match_id: matchId,
-        })
-        // Return previous index to prevent going out of bounds
-        return prevIndex
-      }
-
-      // Apply the event to update card states (HP, alive, attacking, etc.)
-      applyEvent(battleData.events[nextIndex], nextIndex)
-      return nextIndex
-    })
-  }, [battleData, matchId, applyEvent])
-
-  // Handle play/pause
-  const togglePlayback = useCallback(() => {
-    setIsPlaying((prev) => !prev)
-  }, [])
-
-  // Start/stop playback interval
-  useEffect(() => {
-    if (isPlaying && battleData) {
-      const speed = PLAYBACK_SPEEDS[playbackSpeedIndex].value
-      playbackIntervalRef.current = setInterval(advanceEvent, speed)
-    } else {
-      if (playbackIntervalRef.current) {
-        clearInterval(playbackIntervalRef.current)
-        playbackIntervalRef.current = null
-      }
-    }
-
-    return () => {
-      if (playbackIntervalRef.current) {
-        clearInterval(playbackIntervalRef.current)
-      }
-    }
-  }, [isPlaying, battleData, playbackSpeedIndex, advanceEvent])
-
-  // Auto-scroll event log
-  useEffect(() => {
-    if (eventLogRef.current && currentEventIndex >= 0) {
-      const activeItem = eventLogRef.current.querySelector('.current')
-      if (activeItem) {
-        activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      }
-    }
-  }, [currentEventIndex])
-
   // Auto-play battle after initial load
   useEffect(() => {
-    if (battleData && currentEventIndex === -1 && !isPlaying) {
+    if (battleData && currentEventIndex === -1 && !isPlaying && !isComplete) {
       const autoPlayTimer = setTimeout(() => {
-        setIsPlaying(true)
+        play()
         addPageAction('battle_autoplay_started', { match_id: matchId })
       }, 1500) // 1.5 second delay
 
       return () => clearTimeout(autoPlayTimer)
     }
-  }, [battleData, currentEventIndex, isPlaying, matchId])
+  }, [battleData, currentEventIndex, isPlaying, isComplete, matchId, play])
 
-  // Skip to end
-  const skipToEnd = useCallback(() => {
-    if (!battleData) return
-
-    setIsPlaying(false)
-    setCurrentEventIndex(battleData.events.length - 1)
-
-    // Apply final states
-    const lastEvent = battleData.events[battleData.events.length - 1]
-    if (lastEvent) {
-      applyEvent(lastEvent, battleData.events.length - 1)
+  // Show victory screen when animation completes
+  useEffect(() => {
+    if (isComplete && !showVictory) {
+      setShowVictory(true)
+      addPageAction('battle_playback_complete', { match_id: matchId })
     }
+  }, [isComplete, showVictory, matchId])
 
+  // Handle play/pause toggle
+  const togglePlayback = useCallback(() => {
+    if (isPlaying) {
+      pause()
+    } else {
+      play()
+    }
+  }, [isPlaying, play, pause])
+
+  // Skip to end wrapper (shows victory screen)
+  const skipToEnd = useCallback(() => {
+    hookSkipToEnd()
     setShowVictory(true)
     addPageAction('battle_skipped_to_end', { match_id: matchId })
-  }, [battleData, matchId, applyEvent])
+  }, [hookSkipToEnd, matchId])
 
-  // Reset playback
+  // Reset playback wrapper (hides victory screen)
   const resetPlayback = useCallback(() => {
-    if (!battleData?.team_a_final?.cards || !battleData?.team_b_final?.cards) return
-
-    setCurrentEventIndex(-1)
-    setIsPlaying(false)
+    reset()
     setShowVictory(false)
-
-    // Reset card states to initial
-    const initialStates = new Map<number, CardSnapshot>()
-    battleData.team_a_final.cards.forEach((card, index) => {
-      initialStates.set(card.card_id, {
-        card_id: card.card_id,
-        user_id: card.user_id,
-        name: card.name,
-        hp: card.max_hp,
-        max_hp: card.max_hp,
-        atk: card.atk,
-        position: index,
-        is_alive: true,
-        is_attacking: false,
-        is_defending: false,
-      })
-    })
-    battleData.team_b_final.cards.forEach((card, index) => {
-      initialStates.set(card.card_id, {
-        card_id: card.card_id,
-        user_id: card.user_id,
-        name: card.name,
-        hp: card.max_hp,
-        max_hp: card.max_hp,
-        atk: card.atk,
-        position: index,
-        is_alive: true,
-        is_attacking: false,
-        is_defending: false,
-      })
-    })
-    setCardStates(initialStates)
-
     addPageAction('battle_reset', { match_id: matchId })
-  }, [battleData, matchId])
+  }, [reset, matchId])
 
   // Handle return to lobby
   const handleReturnToLobby = useCallback(() => {
@@ -424,8 +238,18 @@ export function BattlePage({
       placeholder_positions?: PlaceholderPositions | null
     }
   ) => {
-    const state = cardStates.get(cardId)
+    // Use composite key to look up state (handles same card on both teams)
+    const cardKey = getCardKey(teamOwnerId, cardId)
+    const state = cardStates.get(cardKey)
     if (!state) return null
+
+    // Get animation state from the animation state machine
+    const animState = animationStates.get(cardKey)
+
+    // Check if this card is currently taking damage and should show damage number
+    const isDamageTarget = damageTargetKey === cardKey
+    const damageToShow =
+      isDamageTarget && currentDamage !== null ? currentDamage : undefined
 
     const isCurrentUser = teamOwnerId === userId
 
@@ -444,9 +268,9 @@ export function BattlePage({
             maxHp: state.max_hp,
           }}
           hpBarThresholds={gameConstants?.hp_bar_thresholds}
-          isAlive={state.is_alive}
-          isAttacking={state.is_attacking}
-          isDefending={state.is_defending}
+          animationState={animState}
+          damageNumber={damageToShow}
+          isDead={!state.is_alive}
           showHpBar={true}
           cardName={state.name}
           cardId={cardId}
@@ -492,7 +316,14 @@ export function BattlePage({
       </div>
 
       {/* Battle Arena */}
-      <div className="battle-arena">
+      <div
+        className="battle-arena"
+        style={{
+          // Scale HP bar transition duration with playback speed
+          // At 1x (value=1000), duration is 300ms; at 2x (value=500), duration is 150ms
+          '--hp-transition-duration': `${(PLAYBACK_SPEEDS[playbackSpeedIndex].value / 1000) * 300}ms`,
+        } as React.CSSProperties}
+      >
         {/* Team A (opponent or self) */}
         <div className="battle-team team-a">
           <div className="team-label">{battleData.player_a_name}</div>
@@ -565,18 +396,12 @@ export function BattlePage({
       </div>
 
       {/* Event Log */}
-      <div className="event-log" ref={eventLogRef}>
-        <div className="event-log-title">Battle Log</div>
-        {battleData.events.slice(0, currentEventIndex + 1).map((event, index) => (
-          <div
-            key={index}
-            className={`event-log-item ${event.type} ${index === currentEventIndex ? 'current' : ''} ${index < currentEventIndex ? 'played' : ''}`}
-          >
-            <span className="event-round">R{event.round}</span>
-            <span className="event-message">{getEventMessage(event)}</span>
-          </div>
-        ))}
-      </div>
+      <BattleLog
+        events={battleData.events}
+        currentEventIndex={currentEventIndex}
+        currentPhase={currentPhase}
+        getEventMessage={getEventMessage}
+      />
 
       {/* Victory Screen Overlay */}
       {showVictory && (

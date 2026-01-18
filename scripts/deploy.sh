@@ -7,6 +7,7 @@ set -e
 # Load common functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
+source "$SCRIPT_DIR/layer-transfer.sh"
 
 # =============================================================================
 # ARGUMENT PARSING
@@ -163,9 +164,6 @@ fi
 # =============================================================================
 # LAYER-AWARE IMAGE TRANSFER
 # =============================================================================
-# Source layer transfer functions
-source "$SCRIPT_DIR/layer-transfer.sh"
-
 # Transfer images using OCI directory format (only changed layers)
 transfer_images "$COMMIT_HASH" "$SSH_HOST"
 

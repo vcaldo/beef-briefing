@@ -1103,10 +1103,6 @@ a:focus:not(:focus-visible),
   margin: 16px 0 0;
 }
 
-.shop-team-section {
-  padding: 16px;
-}
-
 .shop-section-title {
   font-family: 'Outfit', sans-serif;
   font-size: 16px;
@@ -1135,6 +1131,30 @@ a:focus:not(:focus-visible),
   text-align: center;
   padding: 32px 16px;
   color: var(--tg-theme-hint-color);
+}
+
+.done-shopping-section {
+  padding: 20px 16px;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(255, 115, 0, 0.05) 0%, rgba(255, 115, 0, 0.02) 100%);
+  border-top: 1px solid rgba(255, 115, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 115, 0, 0.2);
+}
+
+.done-shopping-btn {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 14px 24px;
+}
+
+.done-shopping-hint {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--tg-theme-hint-color);
+  opacity: 0.8;
 }
 
 .shop-footer {
@@ -1178,118 +1198,6 @@ a:focus:not(:focus-visible),
   padding: 16px;
   text-align: center;
   color: var(--tg-theme-hint-color);
-}
-
-/* =============================================================================
-   Team Display
-   ============================================================================= */
-.team-display {
-  display: flex;
-  gap: 8px;
-  padding: 12px;
-  background: var(--arena-bg-medium);
-  border-radius: 12px;
-  justify-content: center;
-}
-
-.team-reorder-group {
-  display: flex;
-  gap: 8px;
-}
-
-.team-slot {
-  position: relative;
-  width: 80px;
-  height: 120px;
-  border-radius: 8px;
-  border: 2px dashed var(--arena-bg-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.team-slot.filled {
-  border-style: solid;
-  border-color: var(--arena-orange);
-  cursor: grab;
-}
-
-.team-slot.empty {
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.team-slot.filled:active {
-  cursor: grabbing;
-}
-
-.team-slot-number {
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--arena-bg-dark);
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--tg-theme-hint-color);
-}
-
-.team-slot-empty-text {
-  font-size: 12px;
-  color: var(--tg-theme-hint-color);
-  opacity: 0.5;
-}
-
-.team-card-simple {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  padding: 8px;
-  text-align: center;
-}
-
-.team-card-simple .team-card-name {
-  font-family: 'Outfit', sans-serif;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--tg-theme-text-color);
-  margin-bottom: 4px;
-  line-height: 1.2;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.team-card-simple .team-card-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-}
-
-.team-card-simple .stat {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.team-card-simple .stat.atk {
-  color: var(--arena-orange);
-}
-
-.team-card-simple .stat.def {
-  color: var(--arena-blue);
-}
-
-.team-card-simple .stat.hp {
-  color: var(--hp-full);
 }
 
 .team-card-upgrades {
@@ -1340,6 +1248,318 @@ a:focus:not(:focus-visible),
 
 .upgrade-btn.upgrade-hp:hover:not(:disabled) {
   background: rgba(34, 197, 94, 0.3);
+}
+
+/* =============================================================================
+   Team Phase Modal
+   ============================================================================= */
+.team-phase-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.team-phase-modal {
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  background: var(--arena-bg-dark);
+  border-radius: 16px;
+  border: 2px solid var(--arena-orange);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Modal Header */
+.team-phase-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--arena-bg-medium);
+  border-bottom: 1px solid var(--arena-bg-light);
+}
+
+.team-phase-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.team-phase-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--arena-orange);
+  margin: 0;
+}
+
+.team-phase-submitted-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--arena-green);
+  background: rgba(34, 197, 94, 0.15);
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--arena-green);
+}
+
+.team-phase-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.team-phase-timer {
+  display: flex;
+  align-items: center;
+}
+
+/* Modal Content */
+.team-phase-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.team-phase-cards-section {
+  margin-bottom: 20px;
+}
+
+.team-phase-section-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-theme-text-color);
+  margin: 0 0 16px 0;
+  text-align: center;
+}
+
+/* Card Row Layout */
+.team-phase-card-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.team-phase-slot {
+  position: relative;
+  width: 100px;
+  height: 150px;
+  border-radius: 8px;
+  border: 2px dashed var(--arena-bg-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.team-phase-slot.filled {
+  border-style: solid;
+  border-color: var(--arena-orange);
+  background: transparent;
+  cursor: grab;
+}
+
+.team-phase-slot.filled:active {
+  cursor: grabbing;
+}
+
+.team-phase-slot.reordering {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.team-phase-slot-number {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--arena-bg-dark);
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--arena-orange);
+  border: 1px solid var(--arena-orange);
+  z-index: 1;
+}
+
+.team-phase-card-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.team-phase-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.team-phase-card-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: var(--arena-bg-medium);
+  text-align: center;
+}
+
+.team-phase-card-name {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tg-theme-text-color);
+  margin-bottom: 8px;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.team-phase-card-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+.team-phase-card-stats .stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.team-phase-card-stats .stat.atk {
+  color: var(--arena-orange);
+}
+
+.team-phase-card-stats .stat.hp {
+  color: var(--arena-green);
+}
+
+.team-phase-empty-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.team-phase-empty-text {
+  font-size: 13px;
+  color: var(--tg-theme-hint-color);
+  opacity: 0.5;
+  font-weight: 500;
+}
+
+/* Team Phase Card Upgrades */
+.team-phase-card-upgrades {
+  display: flex;
+  gap: 4px;
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+.team-phase-slot .upgrade-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 32px;
+  min-height: 28px;
+}
+
+.team-phase-slot .upgrade-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.team-phase-slot .upgrade-btn.upgrade-atk {
+  background: rgba(249, 115, 22, 0.2);
+  color: var(--arena-orange);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.team-phase-slot .upgrade-btn.upgrade-atk:hover:not(:disabled) {
+  background: rgba(249, 115, 22, 0.3);
+}
+
+.team-phase-slot .upgrade-btn.upgrade-hp {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--hp-full);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.team-phase-slot .upgrade-btn.upgrade-hp:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.3);
+}
+
+/* Team Phase Footer */
+.team-phase-footer {
+  padding: 20px;
+  background: linear-gradient(to top, var(--arena-bg-dark) 50%, transparent);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: auto;
+}
+
+.team-phase-footer .submit-btn {
+  width: 100%;
+}
+
+.team-phase-footer .submit-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(34, 197, 94, 0.15);
+  padding: 12px 16px;
+  border-radius: 12px;
+}
+
+.team-phase-footer .submit-status-icon {
+  font-size: 18px;
+  color: var(--hp-full);
+}
+
+.team-phase-footer .submit-status-text {
+  font-size: 14px;
+  color: var(--hp-full);
 }
 
 /* =============================================================================

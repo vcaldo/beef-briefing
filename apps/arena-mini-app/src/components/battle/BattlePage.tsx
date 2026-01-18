@@ -10,11 +10,12 @@
  * - Victory screen overlay
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, ErrorDisplay } from '../common'
 import { CompactCard } from '../common/CompactCard'
+import { BattleLog } from './BattleLog'
 import { useBattleAnimation } from '../../hooks'
 import type {
   BattleResult,
@@ -74,9 +75,6 @@ export function BattlePage({
 
   // Victory screen state (separate from animation completion for UI control)
   const [showVictory, setShowVictory] = useState(false)
-
-  // Ref for event log auto-scroll
-  const eventLogRef = useRef<HTMLDivElement>(null)
 
   // Animation state machine hook
   const {
@@ -145,16 +143,6 @@ export function BattlePage({
   useEffect(() => {
     fetchBattle()
   }, [fetchBattle])
-
-  // Auto-scroll event log when current event changes
-  useEffect(() => {
-    if (eventLogRef.current && currentEventIndex >= 0) {
-      const activeItem = eventLogRef.current.querySelector('.current')
-      if (activeItem) {
-        activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      }
-    }
-  }, [currentEventIndex])
 
   // Auto-play battle after initial load
   useEffect(() => {
@@ -260,7 +248,8 @@ export function BattlePage({
 
     // Check if this card is currently taking damage and should show damage number
     const isDamageTarget = damageTargetKey === cardKey
-    const damageToShow = isDamageTarget ? currentDamage : undefined
+    const damageToShow =
+      isDamageTarget && currentDamage !== null ? currentDamage : undefined
 
     const isCurrentUser = teamOwnerId === userId
 
@@ -402,18 +391,12 @@ export function BattlePage({
       </div>
 
       {/* Event Log */}
-      <div className="event-log" ref={eventLogRef}>
-        <div className="event-log-title">Battle Log</div>
-        {battleData.events.slice(0, currentEventIndex + 1).map((event, index) => (
-          <div
-            key={index}
-            className={`event-log-item ${event.type} ${index === currentEventIndex ? 'current' : ''} ${index < currentEventIndex ? 'played' : ''}`}
-          >
-            <span className="event-round">R{event.round}</span>
-            <span className="event-message">{getEventMessage(event)}</span>
-          </div>
-        ))}
-      </div>
+      <BattleLog
+        events={battleData.events}
+        currentEventIndex={currentEventIndex}
+        currentPhase={currentPhase}
+        getEventMessage={getEventMessage}
+      />
 
       {/* Victory Screen Overlay */}
       {showVictory && (

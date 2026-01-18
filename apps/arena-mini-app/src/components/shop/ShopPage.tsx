@@ -10,7 +10,6 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Reorder } from 'framer-motion'
 
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
@@ -59,12 +58,6 @@ export function ShopPage({
   // Refs for cleanup and preventing stale closures
   const pollIntervalRef = useRef<number | null>(null)
   const isMountedRef = useRef(true)
-  const isDraggingRef = useRef(false)
-
-  // Local state for smooth drag-and-drop (decoupled from server state)
-  const [localTeamOrder, setLocalTeamOrder] = useState<EnhancedTeamCard[]>([])
-  // Ref to track current order (avoids stale closure in handleDragEnd)
-  const localTeamOrderRef = useRef<EnhancedTeamCard[]>([])
 
   // Derived state
   const coins = shopData?.coins ?? 0
@@ -78,73 +71,6 @@ export function ShopPage({
   const rerollCost = gameConstants?.reroll_cost ?? 1
   const upgradeCost = gameConstants?.upgrade_cost ?? 1
 
-  // Sync local team order with server state (when not dragging)
-  // Apply team_order to display cards in battle order
-  useEffect(() => {
-    if (!isDraggingRef.current && teamCards.length > 0) {
-      if (teamOrder.length === teamCards.length) {
-        // Reorder cards according to team_order (battle order)
-        // Filter out undefined values in case of stale/invalid indices
-        const orderedTeam = teamOrder
-          .map((posIdx: number) => teamCards[posIdx])
-          .filter((card: EnhancedTeamCard | undefined): card is EnhancedTeamCard => card !== undefined)
-        setLocalTeamOrder(orderedTeam.length > 0 ? orderedTeam : teamCards)
-      } else {
-        setLocalTeamOrder(teamCards)
-      }
-    }
-  }, [teamCards, teamOrder])
-
-  // Keep ref in sync with state (for handleDragEnd to avoid stale closure)
-  useEffect(() => {
-    localTeamOrderRef.current = localTeamOrder
-  }, [localTeamOrder])
-
-  // Instant visual update during drag (no API call)
-  const handleVisualReorder = useCallback((newOrder: EnhancedTeamCard[]) => {
-    setLocalTeamOrder(newOrder)
-  }, [])
-
-  // API call only when drag ends
-  const handleDragEnd = useCallback(async () => {
-    isDraggingRef.current = false
-
-    if (!activeMatch || isSubmitted) return
-
-    // Read current order from ref (avoids stale closure)
-    const currentOrder = localTeamOrderRef.current
-
-    // Compare with server order by card IDs
-    const newCardIds = currentOrder.map((c: EnhancedTeamCard) => c.card_id)
-    const oldCardIds = teamCards.map((c: EnhancedTeamCard) => c.card_id)
-
-    // Skip if order hasn't changed
-    if (JSON.stringify(newCardIds) === JSON.stringify(oldCardIds)) return
-
-    setActionLoading('reorder')
-    try {
-      // Send the original positions in new order
-      // e.g., if user dragged card from pos 2 to pos 0: [card2, card0, card1] → [2, 0, 1]
-      const newPositions = currentOrder.map((c: EnhancedTeamCard) => c.position)
-      const data = await apiClient.setTeamOrder(activeMatch.id, newPositions)
-      addPageAction('team_reordered', {
-        match_id: activeMatch.id,
-        old_order: oldCardIds,
-        new_order: newCardIds,
-      })
-      setShopData(data)
-    } catch (err) {
-      console.error('Failed to reorder team:', err)
-      // Revert to server state on error
-      setLocalTeamOrder(teamCards)
-      setError(err instanceof Error ? err.message : 'Failed to reorder team')
-      if (err instanceof Error) {
-        noticeError(err, { context: 'reorder_team', match_id: activeMatch.id })
-      }
-    } finally {
-      setActionLoading(null)
-    }
-  }, [activeMatch, teamCards, isSubmitted])
 
   // Fetch shop data from API
   const fetchShop = useCallback(async () => {
@@ -463,100 +389,53 @@ export function ShopPage({
         </div>
       )}
 
-      {/* Team display - sticky at top with drag-and-drop reordering */}
+      {/* Team display - static card preview (reordering moved to TeamPhaseModal) */}
       <section className="shop-team-section">
         <h2 className="shop-section-title">Your Team ({teamCards.length}/{teamSize})</h2>
         <div className="team-display">
-          {/* Draggable team cards */}
-          {localTeamOrder.length > 0 && (
-            <Reorder.Group
-              axis="x"
-              values={localTeamOrder}
-              onReorder={handleVisualReorder}
-              className="team-reorder-group"
-              as="div"
-            >
-              {localTeamOrder.map((card: EnhancedTeamCard, idx: number) => (
-                <Reorder.Item
-                  key={card.card_id}
-                  value={card}
-                  className="team-slot filled"
-                  drag={!isSubmitted}
-                  onDragStart={() => { isDraggingRef.current = true }}
-                  onDragEnd={handleDragEnd}
-                  whileDrag={{ scale: 1.05, opacity: 0.8 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                  as="div"
-                >
-                  <span className="team-slot-number">{idx + 1}</span>
-                  {card.card_image_url ? (
-                    <CompactCard
-                      imageUrl={card.card_image_url}
-                      positions={card.placeholder_positions}
-                      currentStats={{
-                        atk: card.atk,
-                        def: card.def,
-                        hp: card.hp,
-                        maxHp: card.max_hp,
-                      }}
-                      hpBarThresholds={gameConstants?.hp_bar_thresholds}
-                      isAlive={true}
-                      showHpBar={true}
-                      cardName={card.name}
-                      cardId={card.card_id}
-                    />
-                  ) : (
-                    <div className="team-card-simple">
-                      <div className="team-card-name">{card.name}</div>
-                      <div className="team-card-stats">
-                        <span className="stat atk">⚔️ {card.atk}</span>
-                        <span className="stat def">🛡️ {card.def}</span>
-                        <span className="stat hp">❤️ {card.hp}</span>
-                      </div>
-                    </div>
-                  )}
+          {/* Static team cards - display in battle order */}
+          {teamCards.length > 0 && (() => {
+            // Apply team_order to display cards in battle order
+            const orderedTeam = teamOrder.length === teamCards.length
+              ? teamOrder
+                  .map((posIdx: number) => teamCards[posIdx])
+                  .filter((card: EnhancedTeamCard | undefined): card is EnhancedTeamCard => card !== undefined)
+              : teamCards
 
-                  {/* Upgrade buttons - only show if not submitted */}
-                  {!isSubmitted && (
-                    <div className="team-card-upgrades">
-                      <button
-                        className="upgrade-btn upgrade-atk"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleUpgrade(card.position, 'atk')
-                        }}
-                        disabled={coins < upgradeCost || actionLoading !== null}
-                        title={`+3 ATK (${upgradeCost} coin)`}
-                      >
-                        {actionLoading === `upgrade-${card.position}-atk` ? (
-                          <LoadingSpinner size="sm" inline />
-                        ) : (
-                          <>⚔️ +3</>
-                        )}
-                      </button>
-                      <button
-                        className="upgrade-btn upgrade-hp"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleUpgrade(card.position, 'hp')
-                        }}
-                        disabled={coins < upgradeCost || actionLoading !== null}
-                        title={`+3 HP (${upgradeCost} coin)`}
-                      >
-                        {actionLoading === `upgrade-${card.position}-hp` ? (
-                          <LoadingSpinner size="sm" inline />
-                        ) : (
-                          <>❤️ +3</>
-                        )}
-                      </button>
+            return orderedTeam.map((card: EnhancedTeamCard, idx: number) => (
+              <div key={card.card_id} className="team-slot filled">
+                <span className="team-slot-number">{idx + 1}</span>
+                {card.card_image_url ? (
+                  <CompactCard
+                    imageUrl={card.card_image_url}
+                    positions={card.placeholder_positions}
+                    currentStats={{
+                      atk: card.atk,
+                      def: card.def,
+                      hp: card.hp,
+                      maxHp: card.max_hp,
+                    }}
+                    hpBarThresholds={gameConstants?.hp_bar_thresholds}
+                    isAlive={true}
+                    showHpBar={true}
+                    cardName={card.name}
+                    cardId={card.card_id}
+                  />
+                ) : (
+                  <div className="team-card-simple">
+                    <div className="team-card-name">{card.name}</div>
+                    <div className="team-card-stats">
+                      <span className="stat atk">⚔️ {card.atk}</span>
+                      <span className="stat def">🛡️ {card.def}</span>
+                      <span className="stat hp">❤️ {card.hp}</span>
                     </div>
-                  )}
-                </Reorder.Item>
-              ))}
-            </Reorder.Group>
-          )}
+                  </div>
+                )}
+              </div>
+            ))
+          })()}
 
-          {/* Empty slots (not draggable) */}
+          {/* Empty slots */}
           {Array.from({ length: teamSize - teamCards.length }).map((_, idx) => (
             <div key={`empty-${idx}`} className="team-slot empty">
               <span className="team-slot-number">{teamCards.length + idx + 1}</span>

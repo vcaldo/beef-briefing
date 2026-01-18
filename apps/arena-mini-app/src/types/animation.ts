@@ -5,8 +5,8 @@
  * system that orchestrates card animations and battle log synchronization.
  *
  * Key concepts:
- * - CardAnimationState: Visual state of individual cards (idle → attacking → taking_damage → dying → dead)
- * - EventAnimationPhase: Current phase of event processing (idle → highlight → attack → damage → death → complete)
+ * - CardAnimationState: Visual state of individual cards (idle → attacking → taking_damage)
+ * - EventAnimationPhase: Current phase of event processing (idle → highlight → attack → damage → complete)
  * - ANIMATION_DURATIONS: Timing constants for each animation phase (scaled by playback speed)
  *
  * @module types/animation
@@ -25,11 +25,6 @@
  * - `idle`: Default state, no animation active
  * - `attacking`: Card is performing an attack (orange glow, scale up)
  * - `taking_damage`: Card is receiving damage (shake effect, red flash)
- * - `dying`: Card's HP reached zero, playing death animation (fade to grayscale)
- * - `dead`: Final static state after death animation completes (grayscale + opacity)
- *
- * Important: The `dying` state is only applied AFTER the damage animation
- * completes, ensuring cards don't gray out prematurely during attacks.
  *
  * @example
  * // Map animation state to CSS class
@@ -39,12 +34,7 @@
  * // Check if card should show damage overlay
  * const showDamage = animationState === 'taking_damage';
  */
-export type CardAnimationState =
-  | 'idle'
-  | 'attacking'
-  | 'taking_damage'
-  | 'dying'
-  | 'dead'
+export type CardAnimationState = 'idle' | 'attacking' | 'taking_damage'
 
 // =============================================================================
 // EVENT ANIMATION PHASE
@@ -58,7 +48,6 @@ export type CardAnimationState =
  * - `highlight`: Event starts, attacker/defender are highlighted
  * - `attack`: Attack animation plays on attacker card
  * - `damage`: Damage number appears, HP bar updates
- * - `death`: If HP reaches zero, death animation plays
  * - `complete`: Event fully processed, ready for next event
  *
  * The BattleLog component uses this to show in-progress indicators
@@ -77,7 +66,6 @@ export type EventAnimationPhase =
   | 'highlight'
   | 'attack'
   | 'damage'
-  | 'death'
   | 'complete'
 
 // =============================================================================
@@ -97,10 +85,8 @@ export type EventAnimationPhase =
  * ```
  * 0ms     → highlight phase starts
  * 400ms   → attack animation completes, damage phase starts
- * 700ms   → HP transition completes
- * 700ms   → if HP=0: death phase starts
- * 1200ms  → death animation completes
- * 1400ms  → complete phase, gap before next event
+ * 700ms   → HP transition completes, event complete
+ * 900ms   → gap before next event
  * ```
  *
  * @example
@@ -122,9 +108,6 @@ export const ANIMATION_DURATIONS = {
 
   /** HP bar transition duration (CSS transition for smooth bar movement) */
   hpTransition: 300,
-
-  /** Death animation duration (fade to grayscale) */
-  death: 500,
 
   /** Gap between events (pause before next event starts) */
   eventGap: 200,

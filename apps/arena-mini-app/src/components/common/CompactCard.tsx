@@ -18,8 +18,6 @@ interface CompactCardProps {
   currentStats: CardStats
   /** HP bar color thresholds from backend */
   hpBarThresholds?: HpBarThresholds
-  /** Whether the card is alive (false = grayscale + reduced opacity) */
-  isAlive?: boolean
   /** Whether to show the HP bar (default true) */
   showHpBar?: boolean
   /** Optional card name for alt text */
@@ -28,14 +26,9 @@ interface CompactCardProps {
   cardId?: number
   /** Additional CSS classes */
   className?: string
-  /** Whether this card is currently attacking (for battle animations) */
-  isAttacking?: boolean
-  /** Whether this card is currently defending (for battle animations) */
-  isDefending?: boolean
   /**
    * Animation state for battle replay animations.
-   * When provided, maps to CSS class: `compact-card-anim-${animationState}`
-   * Takes precedence over isAttacking/isDefending for visual styling.
+   * Maps to CSS class: `compact-card-anim-${animationState}`
    * @see CardAnimationState
    */
   animationState?: CardAnimationState
@@ -92,14 +85,12 @@ function getHpBarColor(hp: number, maxHp: number, thresholds?: HpBarThresholds):
  * />
  *
  * @example
- * // Battle card with alive state
+ * // Battle card with animation state
  * <CompactCard
  *   imageUrl={card.image_url}
  *   positions={card.placeholder_positions}
  *   currentStats={{ atk: card.atk, def: card.def, hp: card.hp, maxHp: card.max_hp }}
- *   isAlive={card.hp > 0}
- *   isAttacking={card.is_attacking}
- *   isDefending={card.is_defending}
+ *   animationState="attacking"
  *   cardId={card.card_id}
  *   cardName={card.name}
  * />
@@ -109,13 +100,10 @@ export function CompactCard({
   positions,
   currentStats,
   hpBarThresholds,
-  isAlive = true,
   showHpBar = true,
   cardName = 'Card',
   cardId,
   className = '',
-  isAttacking = false,
-  isDefending = false,
   animationState,
   damageNumber,
   onClick,
@@ -136,15 +124,10 @@ export function CompactCard({
   const hpBar = positions?.placeholders?.hp_bar
 
   // Build class names for card state
-  // animationState takes precedence for visual styling when provided
   const cardClasses = [
     'compact-card',
     // Animation state class (e.g., compact-card-anim-attacking, compact-card-anim-taking_damage)
     animationState && `compact-card-anim-${animationState}`,
-    // Fallback to legacy props when animationState is not provided
-    !animationState && !isAlive && 'compact-card-dead',
-    !animationState && isAttacking && 'compact-card-attacking',
-    !animationState && isDefending && 'compact-card-defending',
     onClick && 'cursor-pointer',
     className,
   ]
@@ -167,20 +150,6 @@ export function CompactCard({
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       data-card-id={cardId}
-      data-is-alive={isAlive}
-      data-is-attacking={isAttacking}
-      data-is-defending={isDefending}
-      style={
-        // When animationState is provided, let CSS classes handle all styling
-        // Only apply inline styles for legacy isAlive prop (non-animation usage)
-        animationState
-          ? undefined
-          : {
-              filter: !isAlive ? 'grayscale(100%)' : undefined,
-              opacity: isAlive ? 1 : 0.5,
-              transition: 'filter 0.3s ease, opacity 0.3s ease',
-            }
-      }
     >
       {/* Base card image */}
       <img

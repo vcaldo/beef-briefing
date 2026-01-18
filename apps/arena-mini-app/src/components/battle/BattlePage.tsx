@@ -268,9 +268,6 @@ export function BattlePage({
             maxHp: state.max_hp,
           }}
           hpBarThresholds={gameConstants?.hp_bar_thresholds}
-          isAlive={state.is_alive}
-          isAttacking={state.is_attacking}
-          isDefending={state.is_defending}
           animationState={animState}
           damageNumber={damageToShow}
           showHpBar={true}

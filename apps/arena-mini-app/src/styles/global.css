@@ -476,21 +476,6 @@ a:focus:not(:focus-visible),
   transition: width 0.3s ease, background-color 0.3s ease;
 }
 
-/* Compact card state modifiers */
-.compact-card-dead {
-  filter: grayscale(100%);
-  opacity: 0.5;
-}
-
-.compact-card-attacking {
-  box-shadow: 0 0 20px rgba(249, 115, 22, 0.8), 0 0 40px rgba(249, 115, 22, 0.4);
-  animation: attack-pulse 0.3s ease-out;
-}
-
-.compact-card-defending {
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 40px rgba(59, 130, 246, 0.4);
-}
-
 /* Fallback stats display when positions not available */
 .compact-card-stats-fallback {
   position: absolute;
@@ -636,52 +621,6 @@ a:focus:not(:focus-visible),
       0 0 15px rgba(239, 68, 68, 0.7),
       0 0 30px rgba(239, 68, 68, 0.4);
   }
-}
-
-/* Dying state - fade to grayscale with scale down (500ms duration per ANIMATION_DURATIONS.death) */
-.compact-card-anim-dying {
-  animation: card-death 0.5s ease-out forwards;
-}
-
-/* Death keyframes - gradual fade to grayscale with opacity reduction and scale down */
-@keyframes card-death {
-  0% {
-    filter: grayscale(0) brightness(1);
-    opacity: 1;
-    transform: scale(1);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  }
-  30% {
-    filter: grayscale(0.4) brightness(0.9);
-    opacity: 0.9;
-    transform: scale(0.98);
-    box-shadow:
-      0 0 15px rgba(100, 100, 100, 0.5),
-      0 0 30px rgba(50, 50, 50, 0.3);
-  }
-  60% {
-    filter: grayscale(0.7) brightness(0.8);
-    opacity: 0.7;
-    transform: scale(0.95);
-  }
-  100% {
-    filter: grayscale(1) brightness(0.7);
-    opacity: 0.5;
-    transform: scale(0.92);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
-  }
-}
-
-/* Dead - static final state after death animation completes
- * This is applied after 'dying' animation finishes to maintain the dead appearance
- * Values match the 100% keyframe of card-death animation for visual continuity */
-.compact-card-anim-dead {
-  filter: grayscale(1) brightness(0.7);
-  opacity: 0.5;
-  transform: scale(0.92);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
-  /* No transitions - this is a static end state */
-  transition: none;
 }
 
 /* -----------------------------------------------------------------------------

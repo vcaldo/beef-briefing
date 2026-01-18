@@ -3,12 +3,12 @@
  *
  * This hook orchestrates the phase-based animation system for battle replays.
  * It separates data state (HP, is_alive) from visual animation state, ensuring
- * proper sequencing of attack, damage, and death animations.
+ * proper sequencing of attack and damage animations.
  *
  * Key concepts:
- * - Data state: Updated AFTER animations complete (e.g., is_alive only false after death animation)
- * - Animation state: Visual representation (attacking, taking_damage, dying, dead)
- * - Phase progression: Each event goes through highlight → attack → damage → death → complete
+ * - Data state: Updated during damage phase (HP updates, is_alive for game logic)
+ * - Animation state: Visual representation (attacking, taking_damage)
+ * - Phase progression: Each event goes through highlight → attack → damage → complete
  *
  * @module hooks/useBattleAnimation
  * @see {@link ../types/animation.ts} Animation type definitions
@@ -157,8 +157,7 @@ const initializeAnimationStates = (
  * 1. highlight (0ms): Attacker card gets 'attacking' state
  * 2. attack (400ms): Attack animation plays
  * 3. damage (700ms): HP bar updates, damage number shown
- * 4. death (1200ms): If HP=0, death animation plays
- * 5. complete (1400ms): Event fully processed, gap before next
+ * 4. complete (900ms): Event fully processed, gap before next
  *
  * @param battleData - Battle result data containing events and teams
  * @param options - Configuration options
@@ -256,11 +255,7 @@ export function useBattleAnimation(
     setAnimationStates((prev: Map<string, CardAnimationState>) => {
       const next = new Map(prev)
       next.forEach((_, key) => {
-        const currentState = next.get(key)
-        // Keep dead cards as dead, reset others to idle
-        if (currentState !== 'dead') {
-          next.set(key, 'idle')
-        }
+        next.set(key, 'idle')
       })
       return next
     })
@@ -345,6 +340,7 @@ export function useBattleAnimation(
                 next.set(defenderKey, {
                   ...defender,
                   hp: event.hp_after,
+                  is_alive: event.hp_after > 0,
                 })
               }
               return next
@@ -353,19 +349,9 @@ export function useBattleAnimation(
             // Clear damage number
             setCurrentDamage(null)
             setDamageTargetKey(null)
-
-            // Check if this leads to death
-            if (event.hp_after === 0) {
-              // Schedule death phase
-              phaseTimeoutRef.current = setTimeout(() => {
-                setCurrentPhase('death')
-                processPhase(event, 'death')
-              }, getScaledDuration(ANIMATION_DURATIONS.hpTransition))
-              return
-            }
           }
 
-          // No death, go to complete
+          // Go to complete after HP transition
           phaseTimeoutRef.current = setTimeout(() => {
             setCurrentPhase('complete')
             processPhase(event, 'complete')
@@ -373,58 +359,8 @@ export function useBattleAnimation(
           break
         }
 
-        case 'death': {
-          // Start death animation
-          if (event.defender_card_id && event.defender_team_owner_id) {
-            const defenderKey = getCardKey(
-              event.defender_team_owner_id,
-              event.defender_card_id
-            )
-
-            // Set to dying state (triggers grayscale fade animation)
-            setAnimationStates((prev: Map<string, CardAnimationState>) => {
-              const next = new Map(prev)
-              next.set(defenderKey, 'dying')
-              return next
-            })
-          }
-
-          // Schedule completion after death animation
-          phaseTimeoutRef.current = setTimeout(() => {
-            // Mark card as dead in both animation and data state
-            if (event.defender_card_id && event.defender_team_owner_id) {
-              const defenderKey = getCardKey(
-                event.defender_team_owner_id,
-                event.defender_card_id
-              )
-
-              setAnimationStates((prev: Map<string, CardAnimationState>) => {
-                const next = new Map(prev)
-                next.set(defenderKey, 'dead')
-                return next
-              })
-
-              setCardStates((prev: Map<string, CardSnapshot>) => {
-                const next = new Map(prev)
-                const defender = next.get(defenderKey)
-                if (defender) {
-                  next.set(defenderKey, {
-                    ...defender,
-                    is_alive: false,
-                  })
-                }
-                return next
-              })
-            }
-
-            setCurrentPhase('complete')
-            processPhase(event, 'complete')
-          }, getScaledDuration(ANIMATION_DURATIONS.death))
-          break
-        }
-
         case 'complete': {
-          // Clear non-dead animation states
+          // Clear animation states back to idle
           clearAnimationStates()
 
           // Gap before next event
@@ -563,23 +499,13 @@ export function useBattleAnimation(
         const defender = finalCardStates.get(defenderKey)
 
         if (defender) {
-          // Update HP
+          // Update HP and is_alive
           if (event.hp_after !== undefined) {
             finalCardStates.set(defenderKey, {
               ...defender,
               hp: event.hp_after,
               is_alive: event.hp_after > 0,
             })
-          }
-
-          // Mark dead cards
-          if (event.type === 'death' || event.hp_after === 0) {
-            finalCardStates.set(defenderKey, {
-              ...finalCardStates.get(defenderKey)!,
-              is_alive: false,
-              hp: 0,
-            })
-            finalAnimationStates.set(defenderKey, 'dead')
           }
         }
       }

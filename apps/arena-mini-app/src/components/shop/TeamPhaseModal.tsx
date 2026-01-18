@@ -278,7 +278,6 @@ export function TeamPhaseModal({
                           maxHp: card.max_hp,
                         }}
                         hpBarThresholds={gameConstants?.hp_bar_thresholds}
-                        isAlive={true}
                         showHpBar={true}
                         cardName={card.name}
                         cardId={card.card_id}

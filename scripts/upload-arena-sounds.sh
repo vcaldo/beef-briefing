@@ -114,8 +114,7 @@ upload_sounds() {
         echo -n "  Uploading $filename... "
 
         if mc cp "$sound_file" "${MC_ALIAS}/${bucket}/${target_path}/${filename}" \
-            --attr "Content-Type=audio/ogg" \
-            --attr "Cache-Control=${CACHE_CONTROL}" \
+            --attr "Content-Type=audio/ogg;Cache-Control=${CACHE_CONTROL};x-amz-acl=public-read" \
             &>/dev/null; then
             echo -e "${GREEN}done${NC}"
             ((++uploaded))

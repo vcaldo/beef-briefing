@@ -404,8 +404,14 @@ export function useBattleAnimation(
         }
 
         case 'complete': {
-          // Track if defender died (for sound playback after state update)
-          let defenderDied = false
+          // Determine if defender died using event data (not state)
+          // This avoids async state timing issues with setCardStates
+          const hpAfter =
+            event.hp_after ??
+            (event.hp_before !== undefined && event.damage !== undefined
+              ? event.hp_before - event.damage
+              : undefined)
+          const defenderDied = hpAfter !== undefined && hpAfter <= 0
 
           // Update is_alive state for any cards that died during this event
           // This is done AFTER animations complete so the card doesn't grey out mid-attack
@@ -418,8 +424,6 @@ export function useBattleAnimation(
               const next = new Map(prev)
               const defender = next.get(defenderKey)
               if (defender) {
-                defenderDied = defender.hp <= 0
-
                 // Now set is_alive based on current HP
                 next.set(defenderKey, {
                   ...defender,
@@ -429,7 +433,7 @@ export function useBattleAnimation(
               return next
             })
 
-            // Play death sound if defender died (after state update)
+            // Play death sound if defender died (using event data, outside setter)
             if (defenderDied) {
               onPlaySound?.('battle_death')
             }

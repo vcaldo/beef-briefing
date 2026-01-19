@@ -20,9 +20,59 @@ MC_ALIAS="arena-sounds-upload"
 # Cache headers: 1 year (31536000 seconds)
 CACHE_CONTROL="public,max-age=31536000"
 
+# Target sample rate for browser compatibility (44100 Hz is universally supported)
+TARGET_SAMPLE_RATE=44100
+
 # =============================================================================
 # FUNCTIONS
 # =============================================================================
+
+# Normalize audio files for browser compatibility
+# Re-encodes files with incompatible sample rates (e.g., 96000 Hz) to 44100 Hz
+normalize_sounds() {
+    if ! command -v ffprobe &> /dev/null || ! command -v ffmpeg &> /dev/null; then
+        log_warn "ffmpeg/ffprobe not found, skipping audio normalization"
+        return 0
+    fi
+
+    log_info "Checking audio files for browser compatibility..."
+    local normalized=0
+
+    for sound_file in "$SOUNDS_DIR"/*.ogg; do
+        [[ ! -f "$sound_file" ]] && continue
+
+        local filename
+        filename=$(basename "$sound_file")
+
+        # Get sample rate using ffprobe
+        local sample_rate
+        sample_rate=$(ffprobe -v quiet -select_streams a:0 -show_entries stream=sample_rate -of csv=p=0 "$sound_file" 2>/dev/null)
+
+        # Check if sample rate is browser-compatible (44100 or 48000)
+        if [[ -n "$sample_rate" ]] && [[ "$sample_rate" -ne 44100 ]] && [[ "$sample_rate" -ne 48000 ]]; then
+            echo -n "  Normalizing $filename (${sample_rate}Hz -> ${TARGET_SAMPLE_RATE}Hz)... "
+
+            local temp_file="${sound_file}.tmp.ogg"
+
+            if ffmpeg -y -i "$sound_file" -ar "$TARGET_SAMPLE_RATE" -c:a libvorbis -q:a 6 "$temp_file" &>/dev/null; then
+                mv "$temp_file" "$sound_file"
+                echo -e "${GREEN}done${NC}"
+                ((++normalized))
+            else
+                rm -f "$temp_file"
+                echo -e "${RED}failed${NC}"
+                log_warn "Could not normalize $filename, uploading as-is"
+            fi
+        fi
+    done
+
+    if [[ "$normalized" -gt 0 ]]; then
+        log_success "Normalized $normalized file(s) to ${TARGET_SAMPLE_RATE}Hz"
+    else
+        log_info "All files have compatible sample rates"
+    fi
+    echo ""
+}
 
 show_usage() {
     echo "Usage: $0 [--dev|--prod]"
@@ -200,6 +250,8 @@ fi
 if [[ "$ACTION" == "list" ]]; then
     list_sounds
 else
+    # Normalize audio files for browser compatibility before uploading
+    normalize_sounds
     upload_sounds
     echo ""
     log_success "Sounds uploaded successfully!"

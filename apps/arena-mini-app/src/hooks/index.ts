@@ -6,3 +6,6 @@ export type { UseErrorBannerOptions, UseErrorBannerReturn } from './useErrorBann
 
 export { useBattleAnimation } from './useBattleAnimation';
 export type { UseBattleAnimationReturn, UseBattleAnimationOptions } from './useBattleAnimation';
+
+export { useSound } from './useSound';
+export type { UseSoundOptions, UseSoundReturn, SoundId, SoundCategory } from './useSound';

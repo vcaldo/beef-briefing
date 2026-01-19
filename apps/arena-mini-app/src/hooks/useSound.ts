@@ -143,10 +143,11 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
     }
   }, [])
 
-  // Get URL for a sound file
+  // Get URL for a sound file (with cache-busting version param)
   const getSoundUrl = useCallback(
     (soundId: SoundId): string => {
-      return `${baseUrl}/${soundId}.ogg`
+      const version = import.meta.env.VITE_SOUND_VERSION || '1'
+      return `${baseUrl}/${soundId}.ogg?v=${version}`
     },
     [baseUrl]
   )

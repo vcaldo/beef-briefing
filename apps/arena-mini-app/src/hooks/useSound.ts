@@ -146,7 +146,7 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
   // Get URL for a sound file
   const getSoundUrl = useCallback(
     (soundId: SoundId): string => {
-      return `${baseUrl}/${soundId}.mp3`
+      return `${baseUrl}/${soundId}.ogg`
     },
     [baseUrl]
   )

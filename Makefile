@@ -99,13 +99,13 @@ dev-prune: ## Remove all dev containers, images, volumes, and networks
 # =============================================================================
 # PRODUCTION (prod-*)
 # =============================================================================
-prod-deploy: tf-sync-object-storage ## Deploy to production server
+prod-deploy: tf-sync-object-storage arena-sounds-upload-prod ## Deploy to production server
 	@$(SCRIPTS_DIR)/deploy.sh
 
-prod-deploy-skip-build: tf-sync-object-storage ## Deploy using existing images (skip build)
+prod-deploy-skip-build: tf-sync-object-storage arena-sounds-upload-prod ## Deploy using existing images (skip build)
 	@$(SCRIPTS_DIR)/deploy.sh --skip-build
 
-prod-deploy-skip-cleanup: tf-sync-object-storage ## Deploy without cleaning up old images
+prod-deploy-skip-cleanup: tf-sync-object-storage arena-sounds-upload-prod ## Deploy without cleaning up old images
 	@$(SCRIPTS_DIR)/deploy.sh --skip-cleanup
 
 prod-deploy-regenerate-certs: ## Deploy with fresh Let's Encrypt certificates

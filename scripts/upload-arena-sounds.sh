@@ -3,7 +3,7 @@
 # Usage: ./scripts/upload-arena-sounds.sh [--dev|--prod]
 #
 # Uploads sound files from apps/arena-mini-app/assets/sounds/ to
-# {bucket}/sounds/arena/{filename}.mp3 with appropriate headers.
+# {bucket}/sounds/arena/{filename}.ogg with appropriate headers.
 
 set -e
 
@@ -95,26 +95,26 @@ upload_sounds() {
 
     # Count files
     local total_files
-    total_files=$(find "$SOUNDS_DIR" -name "*.mp3" | wc -l)
+    total_files=$(find "$SOUNDS_DIR" -name "*.ogg" | wc -l)
 
     if [[ "$total_files" -eq 0 ]]; then
-        log_warn "No MP3 files found in $SOUNDS_DIR"
+        log_warn "No OGG files found in $SOUNDS_DIR"
         exit 0
     fi
 
-    log_info "Found $total_files MP3 files to upload"
+    log_info "Found $total_files OGG files to upload"
     log_info "Target: ${MC_ALIAS}/${bucket}/${target_path}/"
 
     echo ""
 
-    for sound_file in "$SOUNDS_DIR"/*.mp3; do
+    for sound_file in "$SOUNDS_DIR"/*.ogg; do
         local filename
         filename=$(basename "$sound_file")
 
         echo -n "  Uploading $filename... "
 
         if mc cp "$sound_file" "${MC_ALIAS}/${bucket}/${target_path}/${filename}" \
-            --attr "Content-Type=audio/mpeg" \
+            --attr "Content-Type=audio/ogg" \
             --attr "Cache-Control=${CACHE_CONTROL}" \
             --quiet 2>/dev/null; then
             echo -e "${GREEN}done${NC}"
@@ -205,5 +205,5 @@ else
     echo ""
     log_success "Sounds uploaded successfully!"
     echo ""
-    log_info "Files are available at: sounds/arena/{filename}.mp3"
+    log_info "Files are available at: sounds/arena/{filename}.ogg"
 fi

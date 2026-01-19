@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Reorder } from 'framer-motion'
 
+import { useSoundContext } from '../../contexts'
 import type {
   Match,
   EnhancedShopResponse,
@@ -43,6 +44,8 @@ export function TeamPhaseModal({
   onNavigateToBattle,
   onMatchChange,
 }: TeamPhaseModalProps) {
+  // Sound context
+  const { play } = useSoundContext()
 
   // Derived state
   const coins = shopData?.coins ?? 0
@@ -158,6 +161,7 @@ export function TeamPhaseModal({
       const newPositions = currentOrder.map((c: EnhancedTeamCard) => c.position)
       const data = await apiClient.setTeamOrder(activeMatch.id, newPositions)
       onShopDataChange(data)
+      play('team_place')
     } catch (err) {
       console.error('Failed to reorder team:', err)
       // Revert to server state on error
@@ -165,7 +169,7 @@ export function TeamPhaseModal({
     } finally {
       setActionLoading(null)
     }
-  }, [activeMatch, isSubmitted, teamCards, onShopDataChange])
+  }, [activeMatch, isSubmitted, teamCards, onShopDataChange, play])
 
   // Upgrade card handler
   const handleUpgrade = useCallback(
@@ -176,6 +180,7 @@ export function TeamPhaseModal({
       try {
         const data = await apiClient.upgradeCard(activeMatch.id, teamSlot, upgradeType)
         onShopDataChange(data)
+        play('team_upgrade')
       } catch (err) {
         console.error('Failed to upgrade card:', err)
         // Optionally show error to user via toast/banner
@@ -183,7 +188,7 @@ export function TeamPhaseModal({
         setActionLoading(null)
       }
     },
-    [activeMatch, actionLoading, isSubmitted, onShopDataChange]
+    [activeMatch, actionLoading, isSubmitted, onShopDataChange, play]
   )
 
   // Submit team handler
@@ -194,13 +199,14 @@ export function TeamPhaseModal({
     try {
       const data = await apiClient.submitTeam(activeMatch.id)
       onShopDataChange(data)
+      play('button_click')
     } catch (err) {
       console.error('Failed to submit team:', err)
       // Optionally show error to user via toast/banner
     } finally {
       setActionLoading(null)
     }
-  }, [activeMatch, actionLoading, isSubmitted, onShopDataChange])
+  }, [activeMatch, actionLoading, isSubmitted, onShopDataChange, play])
 
   // Coin display class based on affordability
   const getCoinClass = () => {

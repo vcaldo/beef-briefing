@@ -116,12 +116,12 @@ upload_sounds() {
         if mc cp "$sound_file" "${MC_ALIAS}/${bucket}/${target_path}/${filename}" \
             --attr "Content-Type=audio/ogg" \
             --attr "Cache-Control=${CACHE_CONTROL}" \
-            --quiet 2>/dev/null; then
+            &>/dev/null; then
             echo -e "${GREEN}done${NC}"
-            ((uploaded++))
+            ((++uploaded))
         else
             echo -e "${RED}failed${NC}"
-            ((failed++))
+            ((++failed))
         fi
     done
 

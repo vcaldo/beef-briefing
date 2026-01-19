@@ -2106,7 +2106,7 @@ a:focus:not(:focus-visible),
 /* Battle Card Wrapper (for compact cards with owner badge) */
 .battle-card-wrapper {
   position: relative;
-  width: 90px;
+  /* Width handled by card's negative margins */
 }
 
 /* Battle Card Owner Badge (positioned above the card) */
@@ -2133,7 +2133,10 @@ a:focus:not(:focus-visible),
   background: var(--arena-orange);
 }
 
-/* Battle Compact Card - Scale from 300x450 to 90x135 */
+/* Battle Compact Card - Scale from 300x450 with margin compensation
+   transform: scale() doesn't affect layout, so we use negative margins
+   to collapse the layout box to match the visual size.
+   Formula: margin = size * (scale - 1) / 2 */
 .battle-compact-card {
   width: 300px;
   height: 450px;
@@ -2142,6 +2145,8 @@ a:focus:not(:focus-visible),
   transform: scale(calc(var(--base-scale) * var(--anim-scale)));
   transform-origin: center;
   transition: transform 0.15s ease-out;
+  /* Collapse layout box to match visual size */
+  margin: calc(450px * (var(--base-scale) - 1) / 2) calc(300px * (var(--base-scale) - 1) / 2);
 }
 
 /* Scale stat overlays for battle */
@@ -3299,12 +3304,9 @@ a:focus:not(:focus-visible),
     padding: 8px;
   }
 
-  .battle-card-wrapper {
-    width: 75px;
-  }
-
   .battle-compact-card {
     --base-scale: 0.25;
+    /* Margins auto-adjust via calc() */
   }
 }
 

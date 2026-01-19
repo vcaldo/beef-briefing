@@ -581,7 +581,7 @@ a:focus:not(:focus-visible),
 }
 
 /* Taking damage state - red glow with shake effect */
-.compact-card-anim-taking-damage {
+.compact-card-anim-taking_damage {
   --anim-scale: 1;
   animation: card-damage-shake 0.3s ease-in-out;
   box-shadow:

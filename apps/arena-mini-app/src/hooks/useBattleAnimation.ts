@@ -326,6 +326,16 @@ export function useBattleAnimation(
         }
 
         case 'damage': {
+          // Debug logging to trace HP updates
+          console.log('[Battle Debug] Damage phase:', {
+            eventType: event.type,
+            defender_card_id: event.defender_card_id,
+            defender_team_owner_id: event.defender_team_owner_id,
+            hp_before: event.hp_before,
+            hp_after: event.hp_after,
+            damage: event.damage,
+          })
+
           // Update HP in card states (triggers HP bar animation via CSS transition)
           if (event.defender_card_id && event.defender_team_owner_id) {
             const defenderKey = getCardKey(
@@ -336,13 +346,36 @@ export function useBattleAnimation(
             setCardStates((prev: Map<string, CardSnapshot>) => {
               const next = new Map(prev)
               const defender = next.get(defenderKey)
-              if (defender && event.hp_after !== undefined) {
+
+              // Debug: log key lookup result
+              console.log('[Battle Debug] Key lookup:', {
+                defenderKey,
+                found: !!defender,
+                availableKeys: Array.from(prev.keys()),
+              })
+
+              // Calculate hp_after with fallback: prefer explicit value, else compute from hp_before - damage
+              const hpAfter =
+                event.hp_after ??
+                (event.hp_before !== undefined && event.damage !== undefined
+                  ? event.hp_before - event.damage
+                  : undefined)
+
+              console.log('[Battle Debug] HP calculation:', {
+                hp_after_from_event: event.hp_after,
+                hp_after_computed: hpAfter,
+                will_update: defender && hpAfter !== undefined,
+              })
+
+              if (defender && hpAfter !== undefined) {
                 // Clamp HP to 0 minimum - backend may send negative values for overkill damage
-                const clampedHp = Math.max(0, event.hp_after)
+                const clampedHp = Math.max(0, hpAfter)
+                // Only update HP here - is_alive will be set in 'complete' phase
+                // This ensures the card doesn't grey out while attack animation is still playing
                 next.set(defenderKey, {
                   ...defender,
                   hp: clampedHp,
-                  is_alive: clampedHp > 0,
+                  // Keep is_alive unchanged for now - will be updated in complete phase
                 })
               }
               return next
@@ -362,6 +395,27 @@ export function useBattleAnimation(
         }
 
         case 'complete': {
+          // Update is_alive state for any cards that died during this event
+          // This is done AFTER animations complete so the card doesn't grey out mid-attack
+          if (event.defender_card_id && event.defender_team_owner_id) {
+            const defenderKey = getCardKey(
+              event.defender_team_owner_id,
+              event.defender_card_id
+            )
+            setCardStates((prev: Map<string, CardSnapshot>) => {
+              const next = new Map(prev)
+              const defender = next.get(defenderKey)
+              if (defender) {
+                // Now set is_alive based on current HP
+                next.set(defenderKey, {
+                  ...defender,
+                  is_alive: defender.hp > 0,
+                })
+              }
+              return next
+            })
+          }
+
           // Clear animation states back to idle
           clearAnimationStates()
 
@@ -501,10 +555,17 @@ export function useBattleAnimation(
         const defender = finalCardStates.get(defenderKey)
 
         if (defender) {
+          // Calculate hp_after with fallback: prefer explicit value, else compute from hp_before - damage
+          const hpAfter =
+            event.hp_after ??
+            (event.hp_before !== undefined && event.damage !== undefined
+              ? event.hp_before - event.damage
+              : undefined)
+
           // Update HP and is_alive
-          if (event.hp_after !== undefined) {
+          if (hpAfter !== undefined) {
             // Clamp HP to 0 minimum - backend may send negative values for overkill damage
-            const clampedHp = Math.max(0, event.hp_after)
+            const clampedHp = Math.max(0, hpAfter)
             finalCardStates.set(defenderKey, {
               ...defender,
               hp: clampedHp,

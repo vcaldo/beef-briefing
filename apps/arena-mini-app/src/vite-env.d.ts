@@ -3,6 +3,8 @@
 interface ImportMetaEnv {
   readonly VITE_API_URL: string
   readonly VITE_CARD_API_URL?: string
+  // Sound system base URL (object storage)
+  readonly VITE_SOUND_BASE_URL?: string
   // New Relic Browser monitoring (optional)
   readonly VITE_NEW_RELIC_BROWSER_ACCOUNT_ID?: string
   readonly VITE_NEW_RELIC_BROWSER_APP_ID?: string

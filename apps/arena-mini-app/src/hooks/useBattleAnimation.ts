@@ -23,6 +23,7 @@ import type {
   CardAnimationState,
   EventAnimationPhase,
 } from '../types'
+import type { SoundId } from './useSound'
 import { ANIMATION_DURATIONS } from '../types'
 
 // =============================================================================
@@ -69,6 +70,8 @@ export interface UseBattleAnimationOptions {
   playerAId: number
   /** Player B's user ID (for composite keys) */
   playerBId: number
+  /** Optional callback to play sound effects during battle animation */
+  onPlaySound?: (soundId: SoundId) => void
 }
 
 // =============================================================================
@@ -181,7 +184,7 @@ export function useBattleAnimation(
   battleData: BattleResult | null,
   options: UseBattleAnimationOptions
 ): UseBattleAnimationReturn {
-  const { playbackSpeed, playerAId, playerBId } = options
+  const { playbackSpeed, playerAId, playerBId, onPlaySound } = options
 
   // Core state
   const [cardStates, setCardStates] = useState<Map<string, CardSnapshot>>(
@@ -283,6 +286,9 @@ export function useBattleAnimation(
               next.set(attackerKey, 'attacking')
               return next
             })
+
+            // Play attack sound when attacker starts attacking
+            onPlaySound?.('battle_attack')
           }
 
           // Schedule attack phase
@@ -315,6 +321,9 @@ export function useBattleAnimation(
             // Show damage number
             setCurrentDamage(event.damage)
             setDamageTargetKey(defenderKey)
+
+            // Play damage sound when defender takes damage
+            onPlaySound?.('battle_damage')
           }
 
           // Schedule damage phase
@@ -406,11 +415,18 @@ export function useBattleAnimation(
               const next = new Map(prev)
               const defender = next.get(defenderKey)
               if (defender) {
+                const defenderDied = defender.hp <= 0
+
                 // Now set is_alive based on current HP
                 next.set(defenderKey, {
                   ...defender,
                   is_alive: defender.hp > 0,
                 })
+
+                // Play death sound if defender died
+                if (defenderDied) {
+                  onPlaySound?.('battle_death')
+                }
               }
               return next
             })
@@ -428,7 +444,7 @@ export function useBattleAnimation(
         }
       }
     },
-    [getScaledDuration, clearAnimationStates]
+    [getScaledDuration, clearAnimationStates, onPlaySound]
   )
 
   /**

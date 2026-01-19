@@ -1,4 +1,5 @@
 import type { TabId } from '../../types'
+import { SoundSettings } from './SoundSettings'
 
 interface Tab {
   id: TabId
@@ -111,7 +112,7 @@ interface TabBarProps {
 
 /**
  * Bottom navigation bar for arena mini-app.
- * Fixed position at bottom of screen with 2 tabs.
+ * Fixed position at bottom of screen with 2 tabs + sound settings.
  * Uses CSS classes from global.css for styling.
  */
 export function TabBar({ activeTab, onTabChange }: TabBarProps) {
@@ -129,6 +130,7 @@ export function TabBar({ activeTab, onTabChange }: TabBarProps) {
           <span className="tab-label">{tab.label}</span>
         </button>
       ))}
+      <SoundSettings />
     </nav>
   )
 }

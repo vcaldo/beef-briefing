@@ -14,6 +14,7 @@ import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
 import { usePolling, useErrorBanner } from '../../hooks'
+import { useSoundContext } from '../../contexts'
 
 import type { Match, GameConstants } from '../../types'
 
@@ -50,8 +51,22 @@ export function LobbyPage({
   // Error banner with auto-dismiss
   const { error, showError, clearError } = useErrorBanner()
 
+  // Sound system
+  const { play, unlockAudio } = useSoundContext()
+
   // Track whether initial fetch is complete - used to distinguish page reload from real-time transitions
   const initialFetchDoneRef = useRef(false)
+
+  // Track whether audio has been unlocked (for mobile autoplay)
+  const audioUnlockedRef = useRef(false)
+
+  // Unlock audio on first user interaction (required for mobile)
+  const ensureAudioUnlocked = useCallback(() => {
+    if (!audioUnlockedRef.current) {
+      audioUnlockedRef.current = true
+      unlockAudio()
+    }
+  }, [unlockAudio])
 
   // Find user's active match from the list
   const findUserMatch = useCallback(
@@ -84,6 +99,7 @@ export function LobbyPage({
       if (userMatch && userMatch.status === 'shop_phase') {
         if (initialFetchDoneRef.current) {
           // Real-time transition - auto-navigate to shop
+          play('lobby_start')
           addPageAction('match_phase_transition', {
             match_id: userMatch.id,
             from_status: activeMatch?.status || 'open',
@@ -128,7 +144,7 @@ export function LobbyPage({
         initialFetchDoneRef.current = true
       }
     },
-    [findUserMatch, activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle, loading]
+    [findUserMatch, activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle, loading, play]
   )
 
   /**
@@ -152,6 +168,7 @@ export function LobbyPage({
     (match: Match) => {
       // Check for phase transition to shop
       if (match.status === 'shop_phase') {
+        play('lobby_start')
         addPageAction('match_phase_transition', {
           match_id: match.id,
           from_status: activeMatch?.status,
@@ -187,7 +204,7 @@ export function LobbyPage({
       // Update match state
       onMatchChange(match)
     },
-    [activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle]
+    [activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle, play]
   )
 
   /**
@@ -227,9 +244,11 @@ export function LobbyPage({
 
   // Create new match
   const handleCreateMatch = useCallback(async () => {
+    ensureAudioUnlocked()
     setActionLoading('create')
     try {
       const match = await apiClient.createMatch(chatId)
+      play('lobby_create')
       addPageAction('match_created', { match_id: match.id })
       onMatchChange(match)
       // usePolling will automatically refresh the list on next interval
@@ -242,14 +261,16 @@ export function LobbyPage({
     } finally {
       setActionLoading(null)
     }
-  }, [chatId, onMatchChange, showError])
+  }, [chatId, onMatchChange, showError, ensureAudioUnlocked, play])
 
   // Join match
   const handleJoinMatch = useCallback(
     async (matchId: string) => {
+      ensureAudioUnlocked()
       setActionLoading('join')
       try {
         const match = await apiClient.joinMatch(matchId)
+        play('lobby_join')
         addPageAction('match_joined', { match_id: matchId })
         onMatchChange(match)
       } catch (err) {
@@ -262,12 +283,13 @@ export function LobbyPage({
         setActionLoading(null)
       }
     },
-    [onMatchChange, showError]
+    [onMatchChange, showError, ensureAudioUnlocked, play]
   )
 
   // Leave match
   const handleLeaveMatch = useCallback(
     async (matchId: string) => {
+      ensureAudioUnlocked()
       setActionLoading('leave')
       try {
         await apiClient.leaveMatch(matchId)
@@ -284,12 +306,13 @@ export function LobbyPage({
         setActionLoading(null)
       }
     },
-    [onMatchChange, showError]
+    [onMatchChange, showError, ensureAudioUnlocked]
   )
 
   // Start match early (creator only)
   const handleStartMatch = useCallback(
     async (matchId: string) => {
+      ensureAudioUnlocked()
       setActionLoading('start')
       try {
         const match = await apiClient.startMatch(matchId)
@@ -297,6 +320,7 @@ export function LobbyPage({
 
         // If match transitioned to shop phase, navigate
         if (match.status === 'shop_phase') {
+          play('lobby_start')
           onMatchChange(match)
           onNavigateToShop()
         } else {
@@ -312,7 +336,7 @@ export function LobbyPage({
         setActionLoading(null)
       }
     },
-    [onMatchChange, onNavigateToShop, showError]
+    [onMatchChange, onNavigateToShop, showError, ensureAudioUnlocked, play]
   )
 
   // Loading state

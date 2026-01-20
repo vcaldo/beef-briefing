@@ -3882,3 +3882,216 @@ button,
   white-space: nowrap;
   border: 0;
 }
+
+/* =============================================================================
+   Battle Effects - Visual animations for combat
+   ============================================================================= */
+
+/* Base battle effect container */
+.battle-effect {
+  position: absolute;
+  pointer-events: none;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: effect-fade-in 0.1s ease-out;
+}
+
+.battle-effect img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.4));
+}
+
+/* Effect fade-in animation */
+@keyframes effect-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Effect pulse animation for looping effects */
+@keyframes effect-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.4));
+  }
+  50% {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.6));
+  }
+}
+
+/* Effect fade-out animation */
+@keyframes effect-fade-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/* Explosion sequence animation (9 steps for sprite sheet approach) */
+@keyframes explosion-sequence {
+  0% { opacity: 1; transform: scale(0.8); }
+  11% { opacity: 1; transform: scale(0.9); }
+  22% { opacity: 1; transform: scale(1); }
+  33% { opacity: 1; transform: scale(1.05); }
+  44% { opacity: 1; transform: scale(1.1); }
+  55% { opacity: 1; transform: scale(1.12); }
+  66% { opacity: 0.9; transform: scale(1.1); }
+  77% { opacity: 0.7; transform: scale(1.05); }
+  88% { opacity: 0.4; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.95); }
+}
+
+/* Attack effect variant (flame) */
+.battle-effect-attack {
+  animation: effect-fade-in 0.1s ease-out;
+}
+
+.battle-effect-attack img {
+  filter: drop-shadow(0 0 12px rgba(249, 115, 22, 0.8))
+          drop-shadow(0 0 24px rgba(239, 68, 68, 0.5));
+  animation: effect-pulse 0.2s ease-in-out infinite;
+}
+
+/* Damage effect variant (magic impact) */
+.battle-effect-damage {
+  animation: effect-fade-in 0.08s ease-out;
+}
+
+.battle-effect-damage img {
+  filter: drop-shadow(0 0 12px rgba(168, 85, 247, 0.8))
+          drop-shadow(0 0 20px rgba(236, 72, 153, 0.5));
+  animation: effect-pulse 0.16s ease-in-out infinite;
+}
+
+/* Death effect variant (explosion) */
+.battle-effect-death {
+  animation: explosion-sequence 0.63s ease-out forwards;
+}
+
+.battle-effect-death img {
+  filter: drop-shadow(0 0 16px rgba(239, 68, 68, 0.9))
+          drop-shadow(0 0 32px rgba(249, 115, 22, 0.6))
+          brightness(1.2);
+}
+
+/* Spark effect variant */
+.battle-effect-spark {
+  animation: effect-fade-in 0.06s ease-out;
+}
+
+.battle-effect-spark img {
+  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.9))
+          drop-shadow(0 0 16px rgba(254, 243, 199, 0.6));
+  animation: effect-pulse 0.12s ease-in-out infinite;
+}
+
+/* Effect container for positioning effects relative to cards */
+.battle-effect-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Screen shake animation for impact feedback */
+@keyframes effect-screen-shake {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-2px, -1px); }
+  20% { transform: translate(2px, 1px); }
+  30% { transform: translate(-1px, 2px); }
+  40% { transform: translate(1px, -1px); }
+  50% { transform: translate(-2px, 1px); }
+  60% { transform: translate(2px, -2px); }
+  70% { transform: translate(-1px, 1px); }
+  80% { transform: translate(1px, -1px); }
+  90% { transform: translate(-1px, -1px); }
+}
+
+.battle-shake {
+  animation: effect-screen-shake 0.3s ease-in-out;
+}
+
+/* Flash overlay for hit feedback */
+@keyframes effect-hit-flash {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.3; }
+}
+
+.battle-hit-flash {
+  position: absolute;
+  inset: 0;
+  background: white;
+  pointer-events: none;
+  animation: effect-hit-flash 0.15s ease-out;
+}
+
+/* Glow effect for active/selected cards during battle */
+@keyframes effect-battle-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(249, 115, 22, 0.4),
+                0 0 20px rgba(249, 115, 22, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.6),
+                0 0 40px rgba(249, 115, 22, 0.3);
+  }
+}
+
+.battle-card-active {
+  animation: effect-battle-glow 1s ease-in-out infinite;
+}
+
+/* Damage number floating animation */
+@keyframes effect-damage-float {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-20px) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40px) scale(0.8);
+  }
+}
+
+.battle-damage-number {
+  position: absolute;
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  color: #ef4444;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.8),
+               0 2px 4px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  animation: effect-damage-float 0.8s ease-out forwards;
+}
+
+/* Healing number (green variant) */
+.battle-heal-number {
+  position: absolute;
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  color: #22c55e;
+  text-shadow: 0 0 8px rgba(34, 197, 94, 0.8),
+               0 2px 4px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  animation: effect-damage-float 0.8s ease-out forwards;
+}

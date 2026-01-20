@@ -4228,3 +4228,80 @@ button,
 .game-button-primary:hover:not(.game-button-disabled)::after {
   left: 100%;
 }
+
+/* ==========================================================================
+   CoinDisplay Component
+   ========================================================================== */
+
+.coin-display {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--arena-gold, #ffd700);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  user-select: none;
+}
+
+.coin-display-icon {
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+  transition: transform 0.15s ease;
+}
+
+.coin-display-amount {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  min-width: 1.5em;
+  text-align: left;
+}
+
+/* Size variants */
+.coin-display-sm {
+  font-size: 0.875rem;
+}
+
+.coin-display-md {
+  font-size: 1.125rem;
+}
+
+.coin-display-lg {
+  font-size: 1.5rem;
+}
+
+/* Pulse animation on value change */
+.coin-display-pulse .coin-display-icon {
+  animation: coin-pulse 0.3s ease-out;
+}
+
+.coin-display-pulse .coin-display-amount {
+  animation: coin-amount-pulse 0.3s ease-out;
+}
+
+@keyframes coin-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes coin-amount-pulse {
+  0% {
+    transform: scale(1);
+    color: var(--arena-gold, #ffd700);
+  }
+  50% {
+    transform: scale(1.1);
+    color: #fff;
+    text-shadow: 0 0 8px var(--arena-gold, #ffd700), 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+  100% {
+    transform: scale(1);
+    color: var(--arena-gold, #ffd700);
+  }
+}

@@ -373,6 +373,16 @@ export function useBattleAnimation(
               if (defender && hpAfter !== undefined) {
                 // Clamp HP to 0 minimum - backend may send negative values for overkill damage
                 const clampedHp = Math.max(0, hpAfter)
+
+                // Check if HP crossed the critical threshold (25%)
+                // Play critical_hp sound when HP drops below 25% for the first time
+                const criticalThreshold = defender.max_hp * 0.25
+                const wasAboveCritical = defender.hp > criticalThreshold
+                const isNowCritical = clampedHp <= criticalThreshold && clampedHp > 0
+                if (wasAboveCritical && isNowCritical) {
+                  onPlaySound?.('critical_hp')
+                }
+
                 // Only update HP here - is_alive will be set in 'complete' phase
                 // This ensures the card doesn't grey out while attack animation is still playing
                 next.set(defenderKey, {

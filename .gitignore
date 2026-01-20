@@ -173,7 +173,9 @@ _metadata.json
 package.json
 
 # LLM automation
-plans/*
+plans/
 
 .pnpm-store/*
 pnpm-lock.yaml
+
+assets/*

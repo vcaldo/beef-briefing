@@ -7,3 +7,6 @@ export type { GameButtonProps, GameButtonVariant, GameButtonSize } from './GameB
 
 export { CoinDisplay } from './CoinDisplay'
 export type { CoinDisplayProps, CoinDisplaySize } from './CoinDisplay'
+
+export { CardSlot } from './CardSlot'
+export type { CardSlotProps, CardSlotVariant } from './CardSlot'

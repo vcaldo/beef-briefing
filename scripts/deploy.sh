@@ -167,6 +167,26 @@ fi
 # Transfer images using OCI directory format (only changed layers)
 transfer_images "$COMMIT_HASH" "$SSH_HOST"
 
+# =============================================================================
+# UPLOAD ASSETS TO OBJECT STORAGE
+# =============================================================================
+log_step "Uploading arena assets to object storage..."
+
+# Load environment to get storage credentials
+set -a
+source "$PROD_ENV_FILE"
+set +a
+
+# Upload arena images
+log_info "Uploading arena images..."
+"$SCRIPT_DIR/upload-arena-images.sh" --prod || log_warn "Arena images upload had warnings (non-fatal)"
+log_success "Arena images uploaded"
+
+# Upload arena sounds
+log_info "Uploading arena sounds..."
+"$SCRIPT_DIR/upload-arena-sounds.sh" --prod || log_warn "Arena sounds upload had warnings (non-fatal)"
+log_success "Arena sounds uploaded"
+
 log_step "Transferring config files to server..."
 
 # Transfer compose file

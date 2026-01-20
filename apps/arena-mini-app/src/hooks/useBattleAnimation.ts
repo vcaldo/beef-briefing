@@ -24,11 +24,24 @@ import type {
   EventAnimationPhase,
 } from '../types'
 import type { SoundId } from './useSound'
+import type { BattleEffectType, EffectPosition } from '../components/battle/BattleEffect'
 import { ANIMATION_DURATIONS } from '../types'
 
 // =============================================================================
 // TYPES
 // =============================================================================
+
+/**
+ * Active battle effect state - used to render BattleEffect components.
+ */
+export interface ActiveBattleEffect {
+  /** Type of effect to display */
+  type: BattleEffectType
+  /** Position to display the effect (center coordinates) */
+  position: EffectPosition
+  /** Card key the effect is associated with (for tracking) */
+  cardKey: string
+}
 
 /**
  * Return value from useBattleAnimation hook.
@@ -50,6 +63,10 @@ export interface UseBattleAnimationReturn {
   currentDamage: number | null
   /** Card key that should show damage number */
   damageTargetKey: string | null
+  /** Currently active battle effect (attack, damage, death, spark) */
+  activeEffect: ActiveBattleEffect | null
+  /** Callback to call when an effect animation completes */
+  onEffectComplete: () => void
   /** Start or resume playback */
   play: () => void
   /** Pause playback */
@@ -72,6 +89,12 @@ export interface UseBattleAnimationOptions {
   playerBId: number
   /** Optional callback to play sound effects during battle animation */
   onPlaySound?: (soundId: SoundId) => void
+  /**
+   * Optional callback to get card position for effect rendering.
+   * Returns the center position {x, y} of the card element on screen.
+   * If not provided, effects will not be displayed.
+   */
+  getCardPosition?: (cardKey: string) => EffectPosition | null
 }
 
 // =============================================================================
@@ -193,7 +216,7 @@ export function useBattleAnimation(
   battleData: BattleResult | null,
   options: UseBattleAnimationOptions
 ): UseBattleAnimationReturn {
-  const { playbackSpeed, playerAId, playerBId, onPlaySound } = options
+  const { playbackSpeed, playerAId, playerBId, onPlaySound, getCardPosition } = options
 
   // Core state
   const [cardStates, setCardStates] = useState<Map<string, CardSnapshot>>(
@@ -210,6 +233,9 @@ export function useBattleAnimation(
   // Damage display state
   const [currentDamage, setCurrentDamage] = useState<number | null>(null)
   const [damageTargetKey, setDamageTargetKey] = useState<string | null>(null)
+
+  // Battle effect state (attack, damage, death animations)
+  const [activeEffect, setActiveEffect] = useState<ActiveBattleEffect | null>(null)
 
   // Deferred death state - cards that should die after the round completes
   // This prevents cards from greying out before their attack animation plays
@@ -243,6 +269,7 @@ export function useBattleAnimation(
       setIsComplete(false)
       setCurrentDamage(null)
       setDamageTargetKey(null)
+      setActiveEffect(null)
       setPendingDeaths(new Set())
       currentRoundRef.current = 0
     }
@@ -281,6 +308,15 @@ export function useBattleAnimation(
     })
     setCurrentDamage(null)
     setDamageTargetKey(null)
+    setActiveEffect(null)
+  }, [])
+
+  /**
+   * Callback to signal that an effect animation has completed.
+   * Clears the active effect state.
+   */
+  const onEffectComplete = useCallback(() => {
+    setActiveEffect(null)
   }, [])
 
   /**
@@ -306,6 +342,18 @@ export function useBattleAnimation(
 
             // Play attack sound when attacker starts attacking
             onPlaySound?.('battle_attack')
+
+            // Trigger 'attack' visual effect on the attacker card
+            if (getCardPosition) {
+              const position = getCardPosition(attackerKey)
+              if (position) {
+                setActiveEffect({
+                  type: 'attack',
+                  position,
+                  cardKey: attackerKey,
+                })
+              }
+            }
           }
 
           // Schedule attack phase
@@ -341,6 +389,18 @@ export function useBattleAnimation(
 
             // Play damage sound when defender takes damage
             onPlaySound?.('battle_damage')
+
+            // Trigger 'damage' visual effect on the defender card
+            if (getCardPosition) {
+              const position = getCardPosition(defenderKey)
+              if (position) {
+                setActiveEffect({
+                  type: 'damage',
+                  position,
+                  cardKey: defenderKey,
+                })
+              }
+            }
           }
 
           // Schedule damage phase
@@ -444,11 +504,11 @@ export function useBattleAnimation(
         }
       }
     },
-    [getScaledDuration, clearAnimationStates, onPlaySound]
+    [getScaledDuration, clearAnimationStates, onPlaySound, getCardPosition]
   )
 
   /**
-   * Apply all pending deaths - set is_alive to false and play death sounds.
+   * Apply all pending deaths - set is_alive to false, play death sounds, and show death effects.
    * Called at round boundaries (when transitioning to non-attack events).
    */
   const applyPendingDeaths = useCallback(
@@ -470,10 +530,27 @@ export function useBattleAnimation(
       // Play death sound for each death
       deaths.forEach(() => onPlaySound?.('battle_death'))
 
+      // Trigger 'death' visual effect for the first death
+      // Note: We only show one death effect at a time to avoid visual clutter
+      // If multiple cards die simultaneously, they will still all be marked as dead
+      if (getCardPosition) {
+        const firstDeathKey = deaths.values().next().value
+        if (firstDeathKey) {
+          const position = getCardPosition(firstDeathKey)
+          if (position) {
+            setActiveEffect({
+              type: 'death',
+              position,
+              cardKey: firstDeathKey,
+            })
+          }
+        }
+      }
+
       // Clear pending deaths
       setPendingDeaths(new Set())
     },
-    [onPlaySound]
+    [onPlaySound, getCardPosition]
   )
 
   /**
@@ -604,6 +681,7 @@ export function useBattleAnimation(
     setIsComplete(false)
     setCurrentDamage(null)
     setDamageTargetKey(null)
+    setActiveEffect(null)
     setPendingDeaths(new Set())
     currentRoundRef.current = 0
   }, [battleData, playerAId, playerBId])
@@ -668,6 +746,7 @@ export function useBattleAnimation(
     setIsComplete(true)
     setCurrentDamage(null)
     setDamageTargetKey(null)
+    setActiveEffect(null)
     setPendingDeaths(new Set())
     currentRoundRef.current = 0
   }, [battleData, playerAId, playerBId])
@@ -681,6 +760,8 @@ export function useBattleAnimation(
     isComplete,
     currentDamage,
     damageTargetKey,
+    activeEffect,
+    onEffectComplete,
     play,
     pause,
     reset,

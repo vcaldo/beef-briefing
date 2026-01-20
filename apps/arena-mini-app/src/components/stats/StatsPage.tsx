@@ -14,6 +14,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner } from '../common'
+import { useImages } from '../../hooks'
+import { CardSlot } from '../ui'
 
 import type {
   StatsSubTab,
@@ -34,6 +36,11 @@ interface StatsPageProps {
 }
 
 export function StatsPage({ chatId, userId }: StatsPageProps) {
+  // Image assets
+  const { getUrl } = useImages()
+  const bannerHangingUrl = getUrl('panels', 'banner_hanging')
+  const starYellowUrl = getUrl('icons', 'star_yellow')
+
   // Sub-tab state
   const [activeSubTab, setActiveSubTab] = useState<StatsSubTab>('leaderboard')
 
@@ -359,14 +366,22 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
               {leaderboardData.entries.map((entry: LeaderboardEntry) => (
                 <div
                   key={entry.user_id}
-                  className={`leaderboard-item ${entry.user_id === userId ? 'current-user' : ''}`}
+                  className={`leaderboard-item leaderboard-item-themed ${entry.user_id === userId ? 'current-user' : ''}`}
+                  style={{ backgroundImage: `url(${bannerHangingUrl})` }}
                   onClick={() => handleSelectOpponent(entry.user_id)}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleSelectOpponent(entry.user_id))}
                 >
                   <div className={`leaderboard-rank ${getRankClass(entry.rank)}`}>
-                    {entry.rank}
+                    {entry.rank <= 3 ? (
+                      <img
+                        src={starYellowUrl}
+                        alt=""
+                        className="leaderboard-rank-star"
+                      />
+                    ) : null}
+                    <span className="leaderboard-rank-number">{entry.rank}</span>
                   </div>
                   <div className="leaderboard-user">
                     <div className="leaderboard-name">
@@ -463,115 +478,123 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
     return (
       <div className="stats-content">
-        {/* Profile header */}
-        <div className="profile-header">
-          <div className="profile-avatar">
-            {profileData.photo_url ? (
-              <img src={profileData.photo_url} alt={profileData.first_name} />
-            ) : (
-              <span className="avatar-placeholder">👤</span>
-            )}
+        {/* Profile header with hexagon frame */}
+        <CardSlot variant="default" className="profile-header-slot">
+          <div className="profile-header profile-header-themed">
+            <div className="profile-avatar">
+              {profileData.photo_url ? (
+                <img src={profileData.photo_url} alt={profileData.first_name} />
+              ) : (
+                <span className="avatar-placeholder">👤</span>
+              )}
+            </div>
+            <div className="profile-info">
+              <h2 className="profile-name">{profileData.first_name}</h2>
+              {profileData.username && <p className="profile-username">@{profileData.username}</p>}
+              {stats.tier && (
+                <span className={`profile-tier tier-${stats.tier.toLowerCase().replace(/\s+/g, '-')}`}>
+                  {stats.tier}
+                </span>
+              )}
+              {stats.rank && <p className="profile-rank">Rank #{stats.rank}</p>}
+            </div>
           </div>
-          <div className="profile-info">
-            <h2 className="profile-name">{profileData.first_name}</h2>
-            {profileData.username && <p className="profile-username">@{profileData.username}</p>}
-            {stats.tier && (
-              <span className={`profile-tier tier-${stats.tier.toLowerCase().replace(/\s+/g, '-')}`}>
-                {stats.tier}
-              </span>
-            )}
-            {stats.rank && <p className="profile-rank">Rank #{stats.rank}</p>}
-          </div>
-        </div>
+        </CardSlot>
 
-        {/* Overall stats */}
-        <div className="profile-section">
-          <h3 className="profile-section-title">Overall</h3>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <span className="stat-value">{stats.total_matches}</span>
-              <span className="stat-label">Matches</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-value">{stats.total_wins}</span>
-              <span className="stat-label">Wins</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-value">{stats.total_damage_dealt.toLocaleString()}</span>
-              <span className="stat-label">Damage</span>
+        {/* Overall stats with hexagon frame */}
+        <CardSlot variant="default" className="profile-section-slot">
+          <div className="profile-section profile-section-themed">
+            <h3 className="profile-section-title">Overall</h3>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <span className="stat-value">{stats.total_matches}</span>
+                <span className="stat-label">Matches</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{stats.total_wins}</span>
+                <span className="stat-label">Wins</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{stats.total_damage_dealt.toLocaleString()}</span>
+                <span className="stat-label">Damage</span>
+              </div>
             </div>
           </div>
-        </div>
+        </CardSlot>
 
-        {/* Ranked stats */}
-        <div className="profile-section">
-          <h3 className="profile-section-title">🏆 Ranked</h3>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <span className="stat-value stat-wins">{stats.ranked_wins}</span>
-              <span className="stat-label">Wins</span>
+        {/* Ranked stats with hexagon frame */}
+        <CardSlot variant="default" className="profile-section-slot">
+          <div className="profile-section profile-section-themed">
+            <h3 className="profile-section-title">🏆 Ranked</h3>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <span className="stat-value stat-wins">{stats.ranked_wins}</span>
+                <span className="stat-label">Wins</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value stat-losses">{stats.ranked_losses}</span>
+                <span className="stat-label">Losses</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{stats.ranked_draws}</span>
+                <span className="stat-label">Draws</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{(stats.ranked_win_rate * 100).toFixed(1)}%</span>
+                <span className="stat-label">Win Rate</span>
+              </div>
             </div>
-            <div className="stat-card">
-              <span className="stat-value stat-losses">{stats.ranked_losses}</span>
-              <span className="stat-label">Losses</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-value">{stats.ranked_draws}</span>
-              <span className="stat-label">Draws</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-value">{(stats.ranked_win_rate * 100).toFixed(1)}%</span>
-              <span className="stat-label">Win Rate</span>
+            <div className="stats-row">
+              <div className="stat-mini">
+                <span className="stat-mini-value">🔥 {stats.ranked_current_streak}</span>
+                <span className="stat-mini-label">Current Streak</span>
+              </div>
+              <div className="stat-mini">
+                <span className="stat-mini-value">⭐ {stats.ranked_best_streak}</span>
+                <span className="stat-mini-label">Best Streak</span>
+              </div>
+              <div className="stat-mini">
+                <span className="stat-mini-value">🏅 {stats.ranked_tournaments_won}/{stats.ranked_tournaments_played}</span>
+                <span className="stat-mini-label">Tournaments</span>
+              </div>
             </div>
           </div>
-          <div className="stats-row">
-            <div className="stat-mini">
-              <span className="stat-mini-value">🔥 {stats.ranked_current_streak}</span>
-              <span className="stat-mini-label">Current Streak</span>
-            </div>
-            <div className="stat-mini">
-              <span className="stat-mini-value">⭐ {stats.ranked_best_streak}</span>
-              <span className="stat-mini-label">Best Streak</span>
-            </div>
-            <div className="stat-mini">
-              <span className="stat-mini-value">🏅 {stats.ranked_tournaments_won}/{stats.ranked_tournaments_played}</span>
-              <span className="stat-mini-label">Tournaments</span>
-            </div>
-          </div>
-        </div>
+        </CardSlot>
 
-        {/* Casual stats */}
-        <div className="profile-section">
-          <h3 className="profile-section-title">⚔️ Casual</h3>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <span className="stat-value stat-wins">{stats.regular_wins}</span>
-              <span className="stat-label">Wins</span>
+        {/* Casual stats with hexagon frame */}
+        <CardSlot variant="default" className="profile-section-slot">
+          <div className="profile-section profile-section-themed">
+            <h3 className="profile-section-title">⚔️ Casual</h3>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <span className="stat-value stat-wins">{stats.regular_wins}</span>
+                <span className="stat-label">Wins</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value stat-losses">{stats.regular_losses}</span>
+                <span className="stat-label">Losses</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{stats.regular_draws}</span>
+                <span className="stat-label">Draws</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{(stats.regular_win_rate * 100).toFixed(1)}%</span>
+                <span className="stat-label">Win Rate</span>
+              </div>
             </div>
-            <div className="stat-card">
-              <span className="stat-value stat-losses">{stats.regular_losses}</span>
-              <span className="stat-label">Losses</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-value">{stats.regular_draws}</span>
-              <span className="stat-label">Draws</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-value">{(stats.regular_win_rate * 100).toFixed(1)}%</span>
-              <span className="stat-label">Win Rate</span>
+            <div className="stats-row">
+              <div className="stat-mini">
+                <span className="stat-mini-value">🔥 {stats.regular_current_streak}</span>
+                <span className="stat-mini-label">Current Streak</span>
+              </div>
+              <div className="stat-mini">
+                <span className="stat-mini-value">⭐ {stats.regular_best_streak}</span>
+                <span className="stat-mini-label">Best Streak</span>
+              </div>
             </div>
           </div>
-          <div className="stats-row">
-            <div className="stat-mini">
-              <span className="stat-mini-value">🔥 {stats.regular_current_streak}</span>
-              <span className="stat-mini-label">Current Streak</span>
-            </div>
-            <div className="stat-mini">
-              <span className="stat-mini-value">⭐ {stats.regular_best_streak}</span>
-              <span className="stat-mini-label">Best Streak</span>
-            </div>
-          </div>
-        </div>
+        </CardSlot>
 
         {/* Refresh button */}
         <button className="refresh-btn" onClick={fetchProfile} disabled={profileLoading}>

@@ -2858,6 +2858,139 @@ a:focus:not(:focus-visible),
   margin-top: 2px;
 }
 
+/* Stats Page - Themed Styles */
+
+/* Leaderboard item with banner_hanging background */
+.leaderboard-item.leaderboard-item-themed {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Dark overlay for leaderboard item text readability */
+.leaderboard-item.leaderboard-item-themed::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.75) 0%,
+    rgba(0, 0, 0, 0.6) 50%,
+    rgba(0, 0, 0, 0.75) 100%
+  );
+  z-index: 0;
+  border-radius: inherit;
+}
+
+/* Ensure content is above overlay */
+.leaderboard-item.leaderboard-item-themed > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Rank badge with star icon for top 3 */
+.leaderboard-rank {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.leaderboard-rank-star {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  animation: star-pulse 2s ease-in-out infinite;
+}
+
+@keyframes star-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  }
+  50% {
+    transform: scale(1.1);
+    filter: drop-shadow(0 2px 8px rgba(255, 215, 0, 0.5));
+  }
+}
+
+.leaderboard-rank-number {
+  position: relative;
+  z-index: 1;
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Gold rank styling with star */
+.leaderboard-rank.gold .leaderboard-rank-star {
+  filter: drop-shadow(0 2px 8px rgba(255, 215, 0, 0.6)) brightness(1.1);
+}
+
+.leaderboard-rank.gold .leaderboard-rank-number {
+  color: #1a1a1a;
+  font-size: 13px;
+}
+
+/* Silver rank styling with star */
+.leaderboard-rank.silver .leaderboard-rank-star {
+  filter: drop-shadow(0 2px 6px rgba(192, 192, 192, 0.5)) brightness(0.9);
+}
+
+.leaderboard-rank.silver .leaderboard-rank-number {
+  color: #1a1a1a;
+  font-size: 13px;
+}
+
+/* Bronze rank styling with star */
+.leaderboard-rank.bronze .leaderboard-rank-star {
+  filter: drop-shadow(0 2px 6px rgba(205, 127, 50, 0.5)) brightness(0.8) sepia(0.3);
+}
+
+.leaderboard-rank.bronze .leaderboard-rank-number {
+  color: #fff;
+  font-size: 13px;
+}
+
+/* Profile slots with hexagon framing */
+.profile-header-slot,
+.profile-section-slot {
+  padding: 0;
+}
+
+.profile-header-slot .card-slot-content,
+.profile-section-slot .card-slot-content {
+  width: 100%;
+}
+
+/* Themed profile header */
+.profile-header.profile-header-themed {
+  background: transparent;
+  border-radius: 0;
+  width: 100%;
+}
+
+/* Themed profile section */
+.profile-section.profile-section-themed {
+  background: transparent;
+  border-radius: 0;
+  width: 100%;
+}
+
+/* Adjust stat cards inside themed sections for better visibility */
+.profile-section-themed .stat-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.profile-section-themed .stat-mini {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 /* History styles */
 .history-list {
   display: flex;

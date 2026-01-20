@@ -52,6 +52,8 @@ export function ShopPage({
   // Sound effects
   const { play, preloadCategory } = useSoundContext()
   const soundsPreloadedRef = useRef(false)
+  // Track if initial shop cards have been loaded (for card_draw sound)
+  const initialCardsLoadedRef = useRef(false)
 
   // Preload shop and team sounds on mount
   useEffect(() => {
@@ -116,9 +118,14 @@ export function ShopPage({
           team_cards: data.team.length,
           can_reroll: data.can_reroll,
         })
+        // Play card_draw sound when shop cards first appear
+        if (!initialCardsLoadedRef.current && data.cards.length > 0) {
+          initialCardsLoadedRef.current = true
+          play('card_draw')
+        }
       }
     },
-    [activeMatch?.id, onNavigateToBattle, onMatchChange, loading]
+    [activeMatch?.id, onNavigateToBattle, onMatchChange, loading, play]
   )
 
   /**
@@ -186,9 +193,12 @@ export function ShopPage({
         // After buying, data.can_reroll will be false (server enforces this)
         setShopData(data)
         play('shop_buy')
+        play('coin_spend')
+        play('success')
       } catch (err) {
         console.error('Failed to buy card:', err)
         showError(err, 'Failed to buy card')
+        play('error')
         if (err instanceof Error) {
           noticeError(err, { context: 'buy_card', match_id: activeMatch.id })
         }
@@ -215,6 +225,8 @@ export function ShopPage({
     if (!activeMatch || actionLoading || !canReroll) return
 
     setActionLoading('reroll')
+    // Play card_shuffle sound during reroll animation (before API call)
+    play('card_shuffle')
     try {
       const data = await apiClient.rerollShop(activeMatch.id)
       addPageAction('shop_rerolled', {
@@ -224,9 +236,11 @@ export function ShopPage({
       // Note: After reroll, canReroll remains true until a card is bought
       setShopData(data)
       play('shop_reroll')
+      play('card_draw')
     } catch (err) {
       console.error('Failed to reroll shop:', err)
       showError(err, 'Failed to reroll shop')
+      play('error')
       if (err instanceof Error) {
         noticeError(err, { context: 'reroll_shop', match_id: activeMatch.id })
       }

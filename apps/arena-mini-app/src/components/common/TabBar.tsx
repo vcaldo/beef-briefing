@@ -1,5 +1,6 @@
 import type { TabId } from '../../types'
 import { SoundSettings } from './SoundSettings'
+import { useSoundContext } from '../../contexts'
 
 interface Tab {
   id: TabId
@@ -116,13 +117,23 @@ interface TabBarProps {
  * Uses CSS classes from global.css for styling.
  */
 export function TabBar({ activeTab, onTabChange }: TabBarProps) {
+  const { play } = useSoundContext()
+
+  const handleTabClick = (tabId: TabId) => {
+    // Only play sound when switching to a different tab
+    if (tabId !== activeTab) {
+      play('tab_switch')
+    }
+    onTabChange(tabId)
+  }
+
   return (
     <nav className="tab-bar" role="navigation" aria-label="Main navigation">
       {TABS.map((tab) => (
         <button
           key={tab.id}
           className={`tab-item ${activeTab === tab.id ? 'active' : ''}`}
-          onClick={() => onTabChange(tab.id)}
+          onClick={() => handleTabClick(tab.id)}
           aria-current={activeTab === tab.id ? 'page' : undefined}
           aria-label={tab.label}
         >

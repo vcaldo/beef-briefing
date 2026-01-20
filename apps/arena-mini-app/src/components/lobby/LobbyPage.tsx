@@ -60,6 +60,9 @@ export function LobbyPage({
   // Track whether audio has been unlocked (for mobile autoplay)
   const audioUnlockedRef = useRef(false)
 
+  // Track last second we played a countdown sound to prevent duplicate plays
+  const lastTickSoundRef = useRef<number | null>(null)
+
   // Unlock audio on first user interaction (required for mobile)
   const ensureAudioUnlocked = useCallback(() => {
     if (!audioUnlockedRef.current) {
@@ -67,6 +70,30 @@ export function LobbyPage({
       unlockAudio()
     }
   }, [unlockAudio])
+
+  // Handle countdown timer tick - play sounds at thresholds
+  // countdown_tick: plays when timer is 10s or less
+  // countdown_warning: plays when timer is 3s or less
+  const handleCountdownTick = useCallback(
+    (remainingSeconds: number) => {
+      // Prevent duplicate sounds for the same second
+      if (lastTickSoundRef.current === remainingSeconds) {
+        return
+      }
+
+      // Play warning sound at 3s, 2s, 1s
+      if (remainingSeconds <= 3 && remainingSeconds > 0) {
+        play('countdown_warning')
+        lastTickSoundRef.current = remainingSeconds
+      }
+      // Play tick sound at 10s down to 4s (before warning kicks in)
+      else if (remainingSeconds <= 10 && remainingSeconds > 3) {
+        play('countdown_tick')
+        lastTickSoundRef.current = remainingSeconds
+      }
+    },
+    [play]
+  )
 
   // Find user's active match from the list
   const findUserMatch = useCallback(
@@ -419,6 +446,7 @@ export function LobbyPage({
                     onExpire={() => {
                       addPageAction('match_auto_start', { match_id: activeMatch.id })
                     }}
+                    onTick={handleCountdownTick}
                     timerThresholds={gameConstants?.timer_thresholds}
                   />
                 </div>

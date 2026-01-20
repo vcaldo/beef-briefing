@@ -81,8 +81,17 @@ export interface UseBattleAnimationOptions {
 /**
  * Generate a composite key for card state lookups.
  * Uses teamOwnerId + cardId to distinguish same card on different teams.
+ *
+ * This is needed because the same card_id can appear on both teams (e.g., when
+ * both players purchase the same user's card). Using only card_id as the Map key
+ * would cause both instances to share state, leading to animation bugs where
+ * both cards animate together.
+ *
+ * @param teamOwnerId - The user ID of the team owner (player_a_id or player_b_id)
+ * @param cardId - The card's unique identifier
+ * @returns A composite key string in the format "teamOwnerId_cardId"
  */
-const getCardKey = (teamOwnerId: number, cardId: number): string =>
+export const getCardKey = (teamOwnerId: number, cardId: number): string =>
   `${teamOwnerId}_${cardId}`
 
 /**
@@ -335,16 +344,6 @@ export function useBattleAnimation(
         }
 
         case 'damage': {
-          // Debug logging to trace HP updates
-          console.log('[Battle Debug] Damage phase:', {
-            eventType: event.type,
-            defender_card_id: event.defender_card_id,
-            defender_team_owner_id: event.defender_team_owner_id,
-            hp_before: event.hp_before,
-            hp_after: event.hp_after,
-            damage: event.damage,
-          })
-
           // Update HP in card states (triggers HP bar animation via CSS transition)
           if (event.defender_card_id && event.defender_team_owner_id) {
             const defenderKey = getCardKey(
@@ -356,25 +355,12 @@ export function useBattleAnimation(
               const next = new Map(prev)
               const defender = next.get(defenderKey)
 
-              // Debug: log key lookup result
-              console.log('[Battle Debug] Key lookup:', {
-                defenderKey,
-                found: !!defender,
-                availableKeys: Array.from(prev.keys()),
-              })
-
               // Calculate hp_after with fallback: prefer explicit value, else compute from hp_before - damage
               const hpAfter =
                 event.hp_after ??
                 (event.hp_before !== undefined && event.damage !== undefined
                   ? event.hp_before - event.damage
                   : undefined)
-
-              console.log('[Battle Debug] HP calculation:', {
-                hp_after_from_event: event.hp_after,
-                hp_after_computed: hpAfter,
-                will_update: defender && hpAfter !== undefined,
-              })
 
               if (defender && hpAfter !== undefined) {
                 // Clamp HP to 0 minimum - backend may send negative values for overkill damage
@@ -497,7 +483,7 @@ export function useBattleAnimation(
       // Small delay before starting
       phaseTimeoutRef.current = setTimeout(() => {
         advanceToNextEvent()
-      }, 100)
+      }, ANIMATION_DURATIONS.playStart)
     } else if (currentPhase === 'idle') {
       // Resume from current position
       advanceToNextEvent()

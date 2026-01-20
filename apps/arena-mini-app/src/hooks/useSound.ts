@@ -108,12 +108,16 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
   // Volume state with localStorage persistence
   const [volume, setVolumeState] = useState(() => {
     if (typeof window === 'undefined') return DEFAULT_VOLUME
-    const stored = localStorage.getItem(STORAGE_VOLUME_KEY)
-    if (stored !== null) {
-      const parsed = parseFloat(stored)
-      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
-        return parsed
+    try {
+      const stored = localStorage.getItem(STORAGE_VOLUME_KEY)
+      if (stored !== null) {
+        const parsed = parseFloat(stored)
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+          return parsed
+        }
       }
+    } catch {
+      // localStorage may be unavailable in private browsing mode
     }
     return DEFAULT_VOLUME
   })
@@ -121,7 +125,12 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
   // Mute state with localStorage persistence
   const [isMuted, setIsMuted] = useState(() => {
     if (typeof window === 'undefined') return false
-    return localStorage.getItem(STORAGE_MUTED_KEY) === 'true'
+    try {
+      return localStorage.getItem(STORAGE_MUTED_KEY) === 'true'
+    } catch {
+      // localStorage may be unavailable in private browsing mode
+      return false
+    }
   })
 
   // Create silent audio for mobile unlock trick
@@ -140,6 +149,21 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
         silentAudioRef.current.pause()
         silentAudioRef.current = null
       }
+    }
+  }, [])
+
+  // Cleanup all audio elements on unmount
+  useEffect(() => {
+    return () => {
+      audioPoolRef.current.forEach((pool) => {
+        pool.forEach((audio) => {
+          audio.pause()
+          audio.src = ''
+        })
+      })
+      audioPoolRef.current.clear()
+      poolIndexRef.current.clear()
+      loadedSoundsRef.current.clear()
     }
   }, [])
 
@@ -272,7 +296,11 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
   const setVolume = useCallback((newVolume: number): void => {
     const clampedVolume = Math.max(0, Math.min(1, newVolume))
     setVolumeState(clampedVolume)
-    localStorage.setItem(STORAGE_VOLUME_KEY, clampedVolume.toString())
+    try {
+      localStorage.setItem(STORAGE_VOLUME_KEY, clampedVolume.toString())
+    } catch {
+      // localStorage may be unavailable in private browsing mode
+    }
 
     // Update all audio elements
     audioPoolRef.current.forEach((pool) => {
@@ -286,7 +314,11 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
   const toggleMute = useCallback((): void => {
     setIsMuted((prev) => {
       const newMuted = !prev
-      localStorage.setItem(STORAGE_MUTED_KEY, newMuted.toString())
+      try {
+        localStorage.setItem(STORAGE_MUTED_KEY, newMuted.toString())
+      } catch {
+        // localStorage may be unavailable in private browsing mode
+      }
 
       // Update all audio elements
       audioPoolRef.current.forEach((pool) => {

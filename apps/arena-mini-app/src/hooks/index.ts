@@ -4,7 +4,7 @@ export type { UsePollingOptions } from './usePolling';
 export { useErrorBanner } from './useErrorBanner';
 export type { UseErrorBannerOptions, UseErrorBannerReturn } from './useErrorBanner';
 
-export { useBattleAnimation } from './useBattleAnimation';
+export { useBattleAnimation, getCardKey } from './useBattleAnimation';
 export type { UseBattleAnimationReturn, UseBattleAnimationOptions } from './useBattleAnimation';
 
 export { useSound } from './useSound';

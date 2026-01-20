@@ -36,6 +36,25 @@ const SoundContext = createContext<UseSoundReturn | undefined>(undefined)
 export function SoundProvider({ baseUrl, children }: SoundProviderProps) {
   const sound = useSound({ baseUrl })
   const hasPreloadedRef = useRef(false)
+  const hasWarnedRef = useRef(false)
+
+  // Warn if baseUrl is empty or invalid (only in development)
+  useEffect(() => {
+    if (hasWarnedRef.current) return
+    hasWarnedRef.current = true
+
+    if (!baseUrl) {
+      console.warn(
+        '[SoundProvider] baseUrl is empty. Sound URLs will be malformed. ' +
+        'Set VITE_SOUND_BASE_URL environment variable.'
+      )
+    } else if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+      console.warn(
+        `[SoundProvider] baseUrl "${baseUrl}" does not look like a valid URL. ` +
+        'Sound loading may fail.'
+      )
+    }
+  }, [baseUrl])
 
   // Preload lobby sounds on mount (once only)
   useEffect(() => {

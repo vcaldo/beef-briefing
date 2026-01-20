@@ -3,3 +3,4 @@
  */
 
 export { BattlePage } from './BattlePage'
+export { HPBar } from './HPBar'

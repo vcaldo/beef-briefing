@@ -164,6 +164,7 @@ export function TeamPhaseModal({
       play('team_place')
     } catch (err) {
       console.error('Failed to reorder team:', err)
+      play('error')
       // Revert to server state on error
       setLocalTeamOrder(teamCards)
     } finally {
@@ -181,9 +182,10 @@ export function TeamPhaseModal({
         const data = await apiClient.upgradeCard(activeMatch.id, teamSlot, upgradeType)
         onShopDataChange(data)
         play('team_upgrade')
+        play('powerup')
       } catch (err) {
         console.error('Failed to upgrade card:', err)
-        // Optionally show error to user via toast/banner
+        play('error')
       } finally {
         setActionLoading(null)
       }
@@ -200,13 +202,22 @@ export function TeamPhaseModal({
       const data = await apiClient.submitTeam(activeMatch.id)
       onShopDataChange(data)
       play('button_click')
+      play('team_ready')
     } catch (err) {
       console.error('Failed to submit team:', err)
-      // Optionally show error to user via toast/banner
+      play('error')
     } finally {
       setActionLoading(null)
     }
   }, [activeMatch, actionLoading, isSubmitted, onShopDataChange, play])
+
+  // Play modal_open sound on mount, modal_close on unmount
+  useEffect(() => {
+    play('modal_open')
+    return () => {
+      play('modal_close')
+    }
+  }, [play])
 
   // Coin display class based on affordability
   const getCoinClass = () => {

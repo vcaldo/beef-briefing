@@ -401,6 +401,7 @@ export function BattlePage({
         {/* Battle Effect - renders animated effect at card positions */}
         {activeEffect && (
           <BattleEffect
+            key={`${activeEffect.type}-${activeEffect.cardKey}`}
             type={activeEffect.type}
             position={activeEffect.position}
             onComplete={onEffectComplete}

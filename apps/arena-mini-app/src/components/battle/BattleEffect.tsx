@@ -192,6 +192,10 @@ export function BattleEffect({
   }
 
   const currentFrameId = config.frames[currentFrame]
+  // Defensive: if frame index is out of bounds (can happen if type prop changes mid-animation)
+  if (!currentFrameId) {
+    return null
+  }
   const imageUrl = getUrlById(currentFrameId)
 
   // Calculate position offset to center the effect

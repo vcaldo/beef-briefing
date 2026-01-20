@@ -72,6 +72,10 @@ export function getImageUrl(category: ImageCategory, filename: string): string {
  */
 export function getImageUrlById(imageId: ImageId): string {
   const config = IMAGE_CONFIGS[imageId]
+  if (!config) {
+    console.error(`[images] Unknown imageId: ${imageId}`)
+    return ''
+  }
   return getImageUrl(config.category, config.filename)
 }
 

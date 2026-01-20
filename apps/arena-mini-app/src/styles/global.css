@@ -291,6 +291,65 @@ a:focus:not(:focus-visible),
   letter-spacing: 0.5px;
 }
 
+/* Themed tab items with button image backgrounds */
+.tab-item-themed {
+  border-radius: var(--radius-md);
+  margin: 4px 6px;
+  flex: 0 1 auto;
+  min-width: 80px;
+  padding: 6px 12px;
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease, color 0.2s ease;
+  font-family: 'Outfit', system-ui, sans-serif;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Inactive themed tab - grey button styling */
+.tab-item-themed:not(.active) {
+  color: #1a1a2e;
+  filter: brightness(0.95);
+}
+
+.tab-item-themed:not(.active):hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Active themed tab - primary (yellow) button styling */
+.tab-item-themed.active {
+  color: #3d2800;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  filter: brightness(1.05);
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+}
+
+.tab-item-themed.active:hover {
+  filter: brightness(1.1);
+}
+
+/* Active state press effect for themed tabs */
+.tab-item-themed:active {
+  filter: brightness(0.95);
+  transform: translateY(1px) scale(0.97);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+/* Icon styling for themed tabs */
+.tab-item-themed .tab-icon {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
+}
+
+.tab-item-themed.active .tab-icon {
+  transform: scale(1.15);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+/* Label styling for themed tabs */
+.tab-item-themed .tab-label {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 /* Page container with bottom padding for tab bar */
 .page-container {
   flex: 1;

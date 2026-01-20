@@ -211,6 +211,12 @@ export function useBattleAnimation(
   const [currentDamage, setCurrentDamage] = useState<number | null>(null)
   const [damageTargetKey, setDamageTargetKey] = useState<string | null>(null)
 
+  // Deferred death state - cards that should die after the round completes
+  // This prevents cards from greying out before their attack animation plays
+  // Note: We only use the setter with callbacks, so we don't destructure the state value
+  const [, setPendingDeaths] = useState<Set<string>>(() => new Set())
+  const currentRoundRef = useRef<number>(0)
+
   // Refs for cleanup and state access in callbacks
   const phaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isPlayingRef = useRef(isPlaying)
@@ -237,6 +243,8 @@ export function useBattleAnimation(
       setIsComplete(false)
       setCurrentDamage(null)
       setDamageTargetKey(null)
+      setPendingDeaths(new Set())
+      currentRoundRef.current = 0
     }
   }, [battleData, playerAId, playerBId])
 
@@ -399,30 +407,19 @@ export function useBattleAnimation(
               : undefined)
           const defenderDied = hpAfter !== undefined && hpAfter <= 0
 
-          // Update is_alive state for any cards that died during this event
-          // This is done AFTER animations complete so the card doesn't grey out mid-attack
-          if (event.defender_card_id && event.defender_team_owner_id) {
+          // Queue death for end of round instead of applying immediately.
+          // This ensures cards don't grey out before their attack animation plays
+          // in simultaneous combat (both cards attack in same round).
+          if (
+            defenderDied &&
+            event.defender_card_id &&
+            event.defender_team_owner_id
+          ) {
             const defenderKey = getCardKey(
               event.defender_team_owner_id,
               event.defender_card_id
             )
-            setCardStates((prev: Map<string, CardSnapshot>) => {
-              const next = new Map(prev)
-              const defender = next.get(defenderKey)
-              if (defender) {
-                // Now set is_alive based on current HP
-                next.set(defenderKey, {
-                  ...defender,
-                  is_alive: defender.hp > 0,
-                })
-              }
-              return next
-            })
-
-            // Play death sound if defender died (using event data, outside setter)
-            if (defenderDied) {
-              onPlaySound?.('battle_death')
-            }
+            setPendingDeaths((prev) => new Set(prev).add(defenderKey))
           }
 
           // Clear animation states back to idle
@@ -441,6 +438,35 @@ export function useBattleAnimation(
   )
 
   /**
+   * Apply all pending deaths - set is_alive to false and play death sounds.
+   * Called at round boundaries (when transitioning to non-attack events).
+   */
+  const applyPendingDeaths = useCallback(
+    (deaths: Set<string>) => {
+      if (deaths.size === 0) return
+
+      // Apply all deaths to card states
+      setCardStates((prev: Map<string, CardSnapshot>) => {
+        const next = new Map(prev)
+        deaths.forEach((cardKey) => {
+          const card = next.get(cardKey)
+          if (card) {
+            next.set(cardKey, { ...card, is_alive: false })
+          }
+        })
+        return next
+      })
+
+      // Play death sound for each death
+      deaths.forEach(() => onPlaySound?.('battle_death'))
+
+      // Clear pending deaths
+      setPendingDeaths(new Set())
+    },
+    [onPlaySound]
+  )
+
+  /**
    * Advance to the next event in the sequence.
    */
   const advanceToNextEvent = useCallback(() => {
@@ -449,7 +475,13 @@ export function useBattleAnimation(
     const nextIndex = currentEventIndexRef.current + 1
 
     if (nextIndex >= battleData.events.length) {
-      // All events processed
+      // All events processed - apply any remaining pending deaths
+      setPendingDeaths((currentPendingDeaths: Set<string>) => {
+        if (currentPendingDeaths.size > 0) {
+          applyPendingDeaths(currentPendingDeaths)
+        }
+        return new Set()
+      })
       setIsPlaying(false)
       isPlayingRef.current = false
       setIsComplete(true)
@@ -458,10 +490,42 @@ export function useBattleAnimation(
     }
 
     const nextEvent = battleData.events[nextIndex]
+    const prevRound = currentRoundRef.current
+    const isNonAttackEvent = nextEvent.type !== 'attack'
+    const isRoundTransition = nextEvent.round !== prevRound && prevRound !== 0
+
+    // Apply pending deaths at round boundaries:
+    // - When transitioning to a different round
+    // - When processing non-attack events (death, advance, summary, victory)
+    if (isNonAttackEvent || isRoundTransition) {
+      setPendingDeaths((currentPendingDeaths: Set<string>) => {
+        if (currentPendingDeaths.size > 0) {
+          applyPendingDeaths(currentPendingDeaths)
+        }
+        return new Set()
+      })
+    }
+
+    // Update current round tracking
+    currentRoundRef.current = nextEvent.round
+
+    // Skip animation for non-attack events (death, advance, summary, victory)
+    // These are informational - the visual state is handled via pending deaths
+    if (isNonAttackEvent) {
+      setCurrentEventIndex(nextIndex)
+      setCurrentPhase('idle')
+      // Small gap then advance to next event
+      phaseTimeoutRef.current = setTimeout(() => {
+        advanceToNextEventRef.current?.()
+      }, getScaledDuration(ANIMATION_DURATIONS.eventGap))
+      return
+    }
+
+    // Process attack event with full animation sequence
     setCurrentEventIndex(nextIndex)
     setCurrentPhase('highlight')
     processPhase(nextEvent, 'highlight')
-  }, [battleData, processPhase])
+  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration])
 
   // Keep advanceToNextEvent ref in sync for use in processPhase
   // (avoids circular dependency: processPhase -> advanceToNextEvent -> processPhase)
@@ -530,6 +594,8 @@ export function useBattleAnimation(
     setIsComplete(false)
     setCurrentDamage(null)
     setDamageTargetKey(null)
+    setPendingDeaths(new Set())
+    currentRoundRef.current = 0
   }, [battleData, playerAId, playerBId])
 
   /**
@@ -592,6 +658,8 @@ export function useBattleAnimation(
     setIsComplete(true)
     setCurrentDamage(null)
     setDamageTargetKey(null)
+    setPendingDeaths(new Set())
+    currentRoundRef.current = 0
   }, [battleData, playerAId, playerBId])
 
   return {

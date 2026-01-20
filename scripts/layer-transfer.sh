@@ -184,22 +184,27 @@ cleanup_remote_cache() {
     local size_before
     size_before=$(remote_exec "$ssh_host" "du -sh $REMOTE_LAYER_CACHE_DIR 2>/dev/null | cut -f1" || echo "0")
 
+    # Expand tilde locally before sending to remote
+    local expanded_remote_dir
+    expanded_remote_dir=$(echo "$REMOTE_LAYER_CACHE_DIR" | sed "s|^~|\$HOME|")
+
     remote_exec "$ssh_host" "
-        if [[ -d $REMOTE_LAYER_CACHE_DIR ]]; then
-            dir_count=\$(ls -1 $REMOTE_LAYER_CACHE_DIR 2>/dev/null | wc -l)
+        CACHE_DIR=$expanded_remote_dir
+        if [[ -d \$CACHE_DIR ]]; then
+            dir_count=\$(ls -1 \$CACHE_DIR 2>/dev/null | wc -l)
             if [[ \"\$dir_count\" -gt $keep_tags ]]; then
                 echo \"Found \$dir_count versions, removing oldest \$((dir_count - keep_tags))\"
-                ls -t $REMOTE_LAYER_CACHE_DIR | tail -n +$((keep_tags + 1)) | while read dir; do
-                    size=\$(du -sh \"${REMOTE_LAYER_CACHE_DIR}/\$dir\" 2>/dev/null | cut -f1)
+                ls -t \$CACHE_DIR | tail -n +$((keep_tags + 1)) | while read dir; do
+                    size=\$(du -sh \"\$CACHE_DIR/\$dir\" 2>/dev/null | cut -f1)
                     echo \"  Removing \$dir (\$size)\"
-                    rm -rf \"${REMOTE_LAYER_CACHE_DIR}/\$dir\"
+                    rm -rf \"\$CACHE_DIR/\$dir\"
                 done
             else
                 echo \"Cache has \$dir_count versions (keeping last $keep_tags)\"
             fi
 
             # Verify cleanup
-            remaining=\$(ls -1 $REMOTE_LAYER_CACHE_DIR 2>/dev/null | wc -l)
+            remaining=\$(ls -1 \$CACHE_DIR 2>/dev/null | wc -l)
             if [[ \"\$remaining\" -gt $keep_tags ]]; then
                 echo \"WARNING: Cleanup incomplete, \$remaining versions remain (expected $keep_tags)\"
             fi
@@ -280,13 +285,18 @@ show_cache_stats() {
 
     echo ""
     echo "Remote cache ($REMOTE_LAYER_CACHE_DIR):"
+    # Expand tilde locally before sending to remote
+    local expanded_remote_dir
+    expanded_remote_dir=$(echo "$REMOTE_LAYER_CACHE_DIR" | sed "s|^~|\$HOME|")
+
     remote_exec "$ssh_host" "
-        if [[ -d $REMOTE_LAYER_CACHE_DIR ]]; then
-            ls -1 $REMOTE_LAYER_CACHE_DIR 2>/dev/null | while read dir; do
-                size=\$(du -sh \"${REMOTE_LAYER_CACHE_DIR}/\$dir\" 2>/dev/null | cut -f1)
+        CACHE_DIR=$expanded_remote_dir
+        if [[ -d \$CACHE_DIR ]]; then
+            ls -1 \$CACHE_DIR 2>/dev/null | while read dir; do
+                size=\$(du -sh \"\$CACHE_DIR/\$dir\" 2>/dev/null | cut -f1)
                 blobs=0
-                if [[ -d \"${REMOTE_LAYER_CACHE_DIR}/\$dir/blobs/sha256\" ]]; then
-                    blobs=\$(ls -1 \"${REMOTE_LAYER_CACHE_DIR}/\$dir/blobs/sha256\" 2>/dev/null | wc -l)
+                if [[ -d \"\$CACHE_DIR/\$dir/blobs/sha256\" ]]; then
+                    blobs=\$(ls -1 \"\$CACHE_DIR/\$dir/blobs/sha256\" 2>/dev/null | wc -l)
                 fi
                 echo \"  \$dir: \$size (\$blobs blobs)\"
             done

@@ -4922,3 +4922,476 @@ button,
 .card-slot-empty.card-slot-interactive:hover {
   animation: none;
 }
+
+/* =============================================================================
+   Panel Background Utility Classes
+
+   These utility classes allow applying panel backgrounds using CSS variables.
+   Set the --panel-image CSS variable with the image URL from useImages hook.
+
+   Usage with React:
+   ```tsx
+   const { getUrlById } = useImages()
+   <div
+     className="panel-modern"
+     style={{ '--panel-image': `url(${getUrlById('banner_modern')})` }}
+   >
+     Content
+   </div>
+   ```
+
+   Usage with inline style only:
+   ```tsx
+   <div
+     className="panel-base"
+     style={{
+       '--panel-image': `url(${imageUrl})`,
+       backgroundImage: 'var(--panel-image)'
+     }}
+   >
+     Content
+   </div>
+   ```
+   ============================================================================= */
+
+/* Base panel styles - apply to any element that needs panel styling */
+.panel-base {
+  position: relative;
+  background-image: var(--panel-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Panel with dark overlay for text readability */
+.panel-base::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(10, 10, 20, 0.85) 0%,
+    rgba(20, 20, 35, 0.80) 50%,
+    rgba(10, 10, 20, 0.85) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.panel-base > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Modern banner panel - sleek, geometric look */
+.panel-modern {
+  position: relative;
+  background-image: var(--panel-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 120, 150, 0.3);
+  overflow: hidden;
+}
+
+.panel-modern::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(15, 15, 30, 0.88) 0%,
+    rgba(25, 25, 45, 0.82) 40%,
+    rgba(15, 20, 35, 0.85) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.panel-modern > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Classic curtain banner - decorative, theatrical feel */
+.panel-curtain {
+  position: relative;
+  background-image: var(--panel-image);
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  border-radius: 12px;
+  border: 1px solid rgba(140, 100, 80, 0.4);
+  overflow: hidden;
+}
+
+.panel-curtain::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 15, 12, 0.75) 0%,
+    rgba(25, 20, 18, 0.85) 30%,
+    rgba(15, 12, 10, 0.90) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.panel-curtain > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Hanging banner - rustic, medieval feel */
+.panel-banner {
+  position: relative;
+  background-image: var(--panel-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 6px;
+  border: 1px solid rgba(120, 90, 70, 0.35);
+  overflow: hidden;
+}
+
+.panel-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(25, 20, 15, 0.78) 0%,
+    rgba(30, 25, 20, 0.72) 50%,
+    rgba(20, 15, 12, 0.82) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.panel-banner > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Hexagon panel - geometric sci-fi feel */
+.panel-hexagon {
+  position: relative;
+  background-image: var(--panel-image);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  padding: 16px;
+}
+
+.panel-hexagon::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  background: linear-gradient(
+    135deg,
+    rgba(15, 18, 25, 0.92) 0%,
+    rgba(20, 25, 35, 0.88) 100%
+  );
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.panel-hexagon > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* =============================================================================
+   Button Image Utility Classes
+
+   For use when not using the GameButton component.
+   Set --button-image CSS variable with the button image URL.
+
+   Usage:
+   ```tsx
+   const { getUrlById } = useImages()
+   <button
+     className="btn-image btn-image-primary"
+     style={{ '--button-image': `url(${getUrlById('primary')})` }}
+   >
+     Click Me
+   </button>
+   ```
+   ============================================================================= */
+
+/* Base button image styles */
+.btn-image {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-image: var(--button-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  padding: 0 20px;
+  min-height: 44px;
+  min-width: 100px;
+}
+
+.btn-image:hover:not(:disabled) {
+  filter: brightness(1.1) saturate(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn-image:active:not(:disabled) {
+  filter: brightness(0.95) saturate(1.05);
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-image:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.6) brightness(0.7);
+  opacity: 0.7;
+}
+
+.btn-image:focus-visible {
+  outline: 2px solid var(--arena-orange);
+  outline-offset: 2px;
+}
+
+/* Primary button variant (yellow/gold) */
+.btn-image-primary {
+  color: #3d2800;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Secondary button variant (blue) */
+.btn-image-secondary {
+  color: #0a1a3d;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Neutral button variant (grey) */
+.btn-image-neutral {
+  color: #1a1a2e;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Danger button variant (red) */
+.btn-image-danger {
+  color: #3d0a0a;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Size variants */
+.btn-image-sm {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 0.75rem;
+  min-width: 80px;
+}
+
+.btn-image-lg {
+  min-height: 56px;
+  padding: 0 28px;
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  min-width: 140px;
+}
+
+/* =============================================================================
+   Themed Loading Spinner
+
+   Enhanced loading spinner that matches the arena game theme.
+   Uses arena orange color with glow effects and pulsing animation.
+   ============================================================================= */
+
+/* Themed spinner base */
+.spinner-themed {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(30, 30, 50, 0.6);
+  border-top-color: var(--arena-orange, #f97316);
+  border-right-color: rgba(249, 115, 22, 0.4);
+  border-radius: 50%;
+  animation: spinner-themed-rotate 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.4));
+}
+
+.spinner-themed-sm {
+  width: 24px;
+  height: 24px;
+  border-width: 2px;
+  filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.3));
+}
+
+.spinner-themed-lg {
+  width: 56px;
+  height: 56px;
+  border-width: 4px;
+  filter: drop-shadow(0 0 12px rgba(249, 115, 22, 0.5));
+}
+
+@keyframes spinner-themed-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Dual-ring spinner for loading states */
+.spinner-dual {
+  position: relative;
+  width: 48px;
+  height: 48px;
+}
+
+.spinner-dual::before,
+.spinner-dual::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+}
+
+.spinner-dual::before {
+  border-top-color: var(--arena-orange, #f97316);
+  animation: spinner-dual-outer 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.5));
+}
+
+.spinner-dual::after {
+  inset: 6px;
+  border-bottom-color: rgba(249, 115, 22, 0.6);
+  animation: spinner-dual-inner 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite reverse;
+}
+
+@keyframes spinner-dual-outer {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spinner-dual-inner {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Pulsing dot spinner for subtle loading indication */
+.spinner-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.spinner-dots span {
+  width: 8px;
+  height: 8px;
+  background: var(--arena-orange, #f97316);
+  border-radius: 50%;
+  animation: spinner-dot-pulse 1.4s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
+}
+
+.spinner-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.spinner-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes spinner-dot-pulse {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Loading container themed version */
+.loading-container-themed {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  gap: 20px;
+  padding: 24px;
+}
+
+.loading-container-themed p {
+  color: var(--tg-theme-hint-color, rgba(255, 255, 255, 0.6));
+  font-size: 14px;
+  font-family: 'Outfit', sans-serif;
+  letter-spacing: 0.02em;
+  animation: loading-text-pulse 2s ease-in-out infinite;
+}
+
+@keyframes loading-text-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Full-page loading overlay */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(
+    135deg,
+    rgba(10, 10, 20, 0.95) 0%,
+    rgba(15, 15, 30, 0.98) 50%,
+    rgba(10, 10, 20, 0.95) 100%
+  );
+  z-index: 9999;
+  gap: 24px;
+}
+
+.loading-overlay .spinner-themed {
+  width: 64px;
+  height: 64px;
+  border-width: 4px;
+  filter: drop-shadow(0 0 16px rgba(249, 115, 22, 0.6));
+}
+
+.loading-overlay p {
+  color: var(--arena-orange, #f97316);
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 20px rgba(249, 115, 22, 0.4);
+}

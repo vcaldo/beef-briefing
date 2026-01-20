@@ -5,6 +5,7 @@ import { apiClient } from './api/client'
 import { setCustomAttribute, addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { ErrorBoundary } from '@beef-briefing/shared-mini-app/components'
 import { TabBar, SplashScreen, ErrorDisplay, LoadingSpinner } from './components/common'
+import { SoundProvider } from './contexts'
 
 import type { TabId, AppState, GameConstants, Match } from './types'
 
@@ -264,20 +265,22 @@ function App() {
 
   // Main app with tab navigation
   return (
-    <div className="app">
-      {/* Skip link for keyboard users to bypass navigation */}
-      <a href="#main-content" className="skip-link">
-        Skip to main content
-      </a>
-      <main id="main-content" role="main" aria-label={`${activeTab} page`}>
-        <ErrorBoundary key={activeTab} onReset={handleErrorReset} name={`arena-${activeTab}`}>
-          <Suspense fallback={<LoadingSpinner message="Loading..." />}>
-            {renderPage()}
-          </Suspense>
-        </ErrorBoundary>
-      </main>
-      <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
-    </div>
+    <SoundProvider baseUrl={import.meta.env.VITE_SOUND_BASE_URL || ''}>
+      <div className="app">
+        {/* Skip link for keyboard users to bypass navigation */}
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+        <main id="main-content" role="main" aria-label={`${activeTab} page`}>
+          <ErrorBoundary key={activeTab} onReset={handleErrorReset} name={`arena-${activeTab}`}>
+            <Suspense fallback={<LoadingSpinner message="Loading..." />}>
+              {renderPage()}
+            </Suspense>
+          </ErrorBoundary>
+        </main>
+        <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
+      </div>
+    </SoundProvider>
   )
 }
 

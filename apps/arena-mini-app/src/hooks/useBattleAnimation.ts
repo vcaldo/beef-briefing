@@ -23,6 +23,7 @@ import type {
   CardAnimationState,
   EventAnimationPhase,
 } from '../types'
+import type { SoundId } from './useSound'
 import { ANIMATION_DURATIONS } from '../types'
 
 // =============================================================================
@@ -69,6 +70,8 @@ export interface UseBattleAnimationOptions {
   playerAId: number
   /** Player B's user ID (for composite keys) */
   playerBId: number
+  /** Optional callback to play sound effects during battle animation */
+  onPlaySound?: (soundId: SoundId) => void
 }
 
 // =============================================================================
@@ -78,8 +81,17 @@ export interface UseBattleAnimationOptions {
 /**
  * Generate a composite key for card state lookups.
  * Uses teamOwnerId + cardId to distinguish same card on different teams.
+ *
+ * This is needed because the same card_id can appear on both teams (e.g., when
+ * both players purchase the same user's card). Using only card_id as the Map key
+ * would cause both instances to share state, leading to animation bugs where
+ * both cards animate together.
+ *
+ * @param teamOwnerId - The user ID of the team owner (player_a_id or player_b_id)
+ * @param cardId - The card's unique identifier
+ * @returns A composite key string in the format "teamOwnerId_cardId"
  */
-const getCardKey = (teamOwnerId: number, cardId: number): string =>
+export const getCardKey = (teamOwnerId: number, cardId: number): string =>
   `${teamOwnerId}_${cardId}`
 
 /**
@@ -181,7 +193,7 @@ export function useBattleAnimation(
   battleData: BattleResult | null,
   options: UseBattleAnimationOptions
 ): UseBattleAnimationReturn {
-  const { playbackSpeed, playerAId, playerBId } = options
+  const { playbackSpeed, playerAId, playerBId, onPlaySound } = options
 
   // Core state
   const [cardStates, setCardStates] = useState<Map<string, CardSnapshot>>(
@@ -283,6 +295,9 @@ export function useBattleAnimation(
               next.set(attackerKey, 'attacking')
               return next
             })
+
+            // Play attack sound when attacker starts attacking
+            onPlaySound?.('battle_attack')
           }
 
           // Schedule attack phase
@@ -315,6 +330,9 @@ export function useBattleAnimation(
             // Show damage number
             setCurrentDamage(event.damage)
             setDamageTargetKey(defenderKey)
+
+            // Play damage sound when defender takes damage
+            onPlaySound?.('battle_damage')
           }
 
           // Schedule damage phase
@@ -326,16 +344,6 @@ export function useBattleAnimation(
         }
 
         case 'damage': {
-          // Debug logging to trace HP updates
-          console.log('[Battle Debug] Damage phase:', {
-            eventType: event.type,
-            defender_card_id: event.defender_card_id,
-            defender_team_owner_id: event.defender_team_owner_id,
-            hp_before: event.hp_before,
-            hp_after: event.hp_after,
-            damage: event.damage,
-          })
-
           // Update HP in card states (triggers HP bar animation via CSS transition)
           if (event.defender_card_id && event.defender_team_owner_id) {
             const defenderKey = getCardKey(
@@ -347,25 +355,12 @@ export function useBattleAnimation(
               const next = new Map(prev)
               const defender = next.get(defenderKey)
 
-              // Debug: log key lookup result
-              console.log('[Battle Debug] Key lookup:', {
-                defenderKey,
-                found: !!defender,
-                availableKeys: Array.from(prev.keys()),
-              })
-
               // Calculate hp_after with fallback: prefer explicit value, else compute from hp_before - damage
               const hpAfter =
                 event.hp_after ??
                 (event.hp_before !== undefined && event.damage !== undefined
                   ? event.hp_before - event.damage
                   : undefined)
-
-              console.log('[Battle Debug] HP calculation:', {
-                hp_after_from_event: event.hp_after,
-                hp_after_computed: hpAfter,
-                will_update: defender && hpAfter !== undefined,
-              })
 
               if (defender && hpAfter !== undefined) {
                 // Clamp HP to 0 minimum - backend may send negative values for overkill damage
@@ -395,6 +390,15 @@ export function useBattleAnimation(
         }
 
         case 'complete': {
+          // Determine if defender died using event data (not state)
+          // This avoids async state timing issues with setCardStates
+          const hpAfter =
+            event.hp_after ??
+            (event.hp_before !== undefined && event.damage !== undefined
+              ? event.hp_before - event.damage
+              : undefined)
+          const defenderDied = hpAfter !== undefined && hpAfter <= 0
+
           // Update is_alive state for any cards that died during this event
           // This is done AFTER animations complete so the card doesn't grey out mid-attack
           if (event.defender_card_id && event.defender_team_owner_id) {
@@ -414,6 +418,11 @@ export function useBattleAnimation(
               }
               return next
             })
+
+            // Play death sound if defender died (using event data, outside setter)
+            if (defenderDied) {
+              onPlaySound?.('battle_death')
+            }
           }
 
           // Clear animation states back to idle
@@ -428,7 +437,7 @@ export function useBattleAnimation(
         }
       }
     },
-    [getScaledDuration, clearAnimationStates]
+    [getScaledDuration, clearAnimationStates, onPlaySound]
   )
 
   /**
@@ -474,7 +483,7 @@ export function useBattleAnimation(
       // Small delay before starting
       phaseTimeoutRef.current = setTimeout(() => {
         advanceToNextEvent()
-      }, 100)
+      }, ANIMATION_DURATIONS.playStart)
     } else if (currentPhase === 'idle') {
       // Resume from current position
       advanceToNextEvent()

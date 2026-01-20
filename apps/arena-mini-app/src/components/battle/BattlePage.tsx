@@ -10,13 +10,14 @@
  * - Victory screen overlay
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, ErrorDisplay } from '../common'
 import { CompactCard } from '../common/CompactCard'
 import { BattleLog } from './BattleLog'
-import { useBattleAnimation } from '../../hooks'
+import { useBattleAnimation, getCardKey } from '../../hooks'
+import { useSoundContext } from '../../contexts'
 import type {
   BattleResult,
   BattleEvent,
@@ -32,21 +33,6 @@ const PLAYBACK_SPEEDS = [
   { label: '1.5x', value: 667 },
   { label: '2x', value: 500 },
 ]
-
-/**
- * Generate a composite key for card state lookups.
- *
- * This is needed because the same card_id can appear on both teams (e.g., when
- * both players purchase the same user's card). Using only card_id as the Map key
- * would cause both instances to share state, leading to animation bugs where
- * both cards animate together.
- *
- * @param teamOwnerId - The user ID of the team owner (player_a_id or player_b_id)
- * @param cardId - The card's unique identifier
- * @returns A composite key string in the format "teamOwnerId_cardId"
- */
-const getCardKey = (teamOwnerId: number, cardId: number): string =>
-  `${teamOwnerId}_${cardId}`
 
 interface BattlePageProps {
   userId: number
@@ -76,6 +62,10 @@ export function BattlePage({
   // Victory screen state (separate from animation completion for UI control)
   const [showVictory, setShowVictory] = useState(false)
 
+  // Sound context for battle audio
+  const { play: playSound, preloadCategory } = useSoundContext()
+  const soundsPreloadedRef = useRef(false)
+
   // Animation state machine hook
   const {
     cardStates,
@@ -95,6 +85,7 @@ export function BattlePage({
     playbackSpeed: 1000 / PLAYBACK_SPEEDS[playbackSpeedIndex].value,
     playerAId: battleData?.player_a_id ?? 0,
     playerBId: battleData?.player_b_id ?? 0,
+    onPlaySound: playSound,
   })
 
   // Get match ID
@@ -144,6 +135,16 @@ export function BattlePage({
     fetchBattle()
   }, [fetchBattle])
 
+  // Preload battle sounds on mount
+  useEffect(() => {
+    if (!soundsPreloadedRef.current) {
+      soundsPreloadedRef.current = true
+      preloadCategory('battle').catch((err) => {
+        console.warn('Failed to preload battle sounds:', err)
+      })
+    }
+  }, [preloadCategory])
+
   // Auto-play battle after initial load
   useEffect(() => {
     if (battleData && currentEventIndex === -1 && !isPlaying && !isComplete) {
@@ -156,13 +157,22 @@ export function BattlePage({
     }
   }, [battleData, currentEventIndex, isPlaying, isComplete, matchId, play])
 
-  // Show victory screen when animation completes
+  // Show victory screen when animation completes and play win/lose sound
   useEffect(() => {
     if (isComplete && !showVictory) {
       setShowVictory(true)
       addPageAction('battle_playback_complete', { match_id: matchId })
+
+      // Play win/lose sound based on battle outcome
+      if (battleData) {
+        const isUserWinner = battleData.winner_id === userId
+        const isDraw = battleData.is_draw
+        if (!isDraw) {
+          playSound(isUserWinner ? 'battle_win' : 'battle_lose')
+        }
+      }
     }
-  }, [isComplete, showVictory, matchId])
+  }, [isComplete, showVictory, matchId, battleData, userId, playSound])
 
   // Handle play/pause toggle
   const togglePlayback = useCallback(() => {

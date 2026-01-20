@@ -8,9 +8,10 @@
  * - Continues polling AFTER team submission to detect battle start
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 
 import { apiClient } from '../../api/client'
+import { useSoundContext } from '../../contexts'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
 import { usePolling, useErrorBanner } from '../../hooks'
@@ -47,6 +48,23 @@ export function ShopPage({
 
   // Error banner with auto-dismiss
   const { error, showError, clearError } = useErrorBanner()
+
+  // Sound effects
+  const { play, preloadCategory } = useSoundContext()
+  const soundsPreloadedRef = useRef(false)
+
+  // Preload shop and team sounds on mount
+  useEffect(() => {
+    if (soundsPreloadedRef.current) return
+    soundsPreloadedRef.current = true
+
+    preloadCategory('shop').catch((err) => {
+      console.warn('Failed to preload shop sounds:', err)
+    })
+    preloadCategory('team').catch((err) => {
+      console.warn('Failed to preload team sounds:', err)
+    })
+  }, [preloadCategory])
 
   // Derived state
   const coins = shopData?.coins ?? 0
@@ -167,6 +185,7 @@ export function ShopPage({
         })
         // After buying, data.can_reroll will be false (server enforces this)
         setShopData(data)
+        play('shop_buy')
       } catch (err) {
         console.error('Failed to buy card:', err)
         showError(err, 'Failed to buy card')
@@ -177,7 +196,7 @@ export function ShopPage({
         setActionLoading(null)
       }
     },
-    [activeMatch, actionLoading, showError]
+    [activeMatch, actionLoading, showError, play]
   )
 
   /**
@@ -204,6 +223,7 @@ export function ShopPage({
       })
       // Note: After reroll, canReroll remains true until a card is bought
       setShopData(data)
+      play('shop_reroll')
     } catch (err) {
       console.error('Failed to reroll shop:', err)
       showError(err, 'Failed to reroll shop')
@@ -213,7 +233,7 @@ export function ShopPage({
     } finally {
       setActionLoading(null)
     }
-  }, [activeMatch, actionLoading, canReroll, showError])
+  }, [activeMatch, actionLoading, canReroll, showError, play])
 
   // No active match - should not be on this page
   if (!activeMatch) {

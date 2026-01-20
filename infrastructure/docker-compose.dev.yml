@@ -303,6 +303,8 @@ services:
       VITE_NEW_RELIC_BROWSER_APP_ID: ${NEW_RELIC_BROWSER_ARENA_APP_ID:-}
       VITE_NEW_RELIC_BROWSER_LICENSE_KEY: ${NEW_RELIC_BROWSER_LICENSE_KEY:-}
       VITE_ENVIRONMENT: development
+      VITE_SOUND_BASE_URL: http://localhost:9000/${MINIO_BUCKET}/sounds/arena
+      VITE_SOUND_VERSION: ${SOUND_VERSION:-1}
     networks:
       - beef-dev-network
 

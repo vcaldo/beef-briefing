@@ -111,6 +111,9 @@ export const ANIMATION_DURATIONS = {
 
   /** Gap between events (pause before next event starts) */
   eventGap: 200,
+
+  /** Delay before starting the first event on play */
+  playStart: 100,
 } as const
 
 /**

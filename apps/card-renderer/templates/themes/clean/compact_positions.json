@@ -11,11 +11,11 @@
     "combat_stats": {
       "atk": {
         "x": 81,
-        "y": 308,
-        "width": 60,
-        "height": 30,
+        "y": 296,
+        "width": 70,
+        "height": 40,
         "anchor": "center",
-        "font_size": 22,
+        "font_size": 26,
         "font_weight": "bold",
         "color": "#ffffff",
         "text_align": "center",
@@ -23,15 +23,15 @@
         "container_y": 246,
         "container_width": 130,
         "container_height": 70,
-        "note": "First combat stat box (ATK). Position is for value text within .combat-value element."
+        "note": "First combat stat box (ATK). Inline header (emoji + label) takes ~22px, value area has 40px height."
       },
       "hp": {
         "x": 219,
-        "y": 308,
-        "width": 60,
-        "height": 30,
+        "y": 296,
+        "width": 70,
+        "height": 40,
         "anchor": "center",
-        "font_size": 22,
+        "font_size": 26,
         "font_weight": "bold",
         "color": "#ffffff",
         "text_align": "center",
@@ -39,7 +39,7 @@
         "container_y": 246,
         "container_width": 130,
         "container_height": 70,
-        "note": "Second combat stat box (HP). Position is for value text within .combat-value element."
+        "note": "Second combat stat box (HP). Inline header (emoji + label) takes ~22px, value area has 40px height."
       }
     }
   },

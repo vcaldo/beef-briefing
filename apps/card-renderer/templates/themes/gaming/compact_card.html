@@ -286,36 +286,45 @@
 
         .combat-stat {
             flex: 1;
-            padding: 12px;
+            padding: 10px 12px;
             border-radius: 8px;
             border: 1px solid rgba(255, 255, 255, 0.2);
             background: rgba(0, 0, 0, 0.2);
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             min-height: 70px;
         }
 
+        .combat-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
         .combat-icon {
-            font-size: 24px;
+            font-size: 18px;
+            line-height: 1;
         }
 
         .combat-label {
             font-family: var(--font-header);
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             color: var(--text-secondary);
             letter-spacing: 0.5px;
+            line-height: 1;
         }
 
         .combat-value {
             flex: 1;
             display: flex;
-            align-items: flex-end;
+            align-items: center;
             justify-content: center;
-            min-height: 20px;
+            min-height: 40px;
         }
 
         /* HP Progress Bar - no label */
@@ -389,13 +398,17 @@
         <!-- Combat Stats Placeholders -->
         <div class="combat-stats-container">
             <div class="combat-stat">
-                <div class="combat-icon">⚔️</div>
-                <div class="combat-label">ATK</div>
+                <div class="combat-header">
+                    <span class="combat-icon">⚔️</span>
+                    <span class="combat-label">ATK</span>
+                </div>
                 <div class="combat-value"></div>
             </div>
             <div class="combat-stat">
-                <div class="combat-icon">🥩</div>
-                <div class="combat-label">HP</div>
+                <div class="combat-header">
+                    <span class="combat-icon">🥩</span>
+                    <span class="combat-label">HP</span>
+                </div>
                 <div class="combat-value"></div>
             </div>
         </div>

@@ -177,3 +177,5 @@ plans/*
 
 .pnpm-store/*
 pnpm-lock.yaml
+
+assets/

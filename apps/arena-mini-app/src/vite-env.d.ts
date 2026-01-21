@@ -7,6 +7,10 @@ interface ImportMetaEnv {
   readonly VITE_SOUND_BASE_URL?: string
   // Sound version for cache busting (bump when sounds change)
   readonly VITE_SOUND_VERSION?: string
+  // Image system base URL (object storage)
+  readonly VITE_IMAGE_BASE_URL?: string
+  // Image version for cache busting (bump when images change)
+  readonly VITE_IMAGE_VERSION?: string
   // New Relic Browser monitoring (optional)
   readonly VITE_NEW_RELIC_BROWSER_ACCOUNT_ID?: string
   readonly VITE_NEW_RELIC_BROWSER_APP_ID?: string

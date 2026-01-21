@@ -23,7 +23,8 @@ import type {
 import { CountdownTimer, LoadingSpinner } from '../common'
 import { CompactCard } from '../common/CompactCard'
 import { apiClient } from '../../api/client'
-import { usePolling } from '../../hooks'
+import { usePolling, useImages } from '../../hooks'
+import { GameButton, CoinDisplay } from '../ui'
 
 const POLL_INTERVAL = 3000 // 3 seconds
 
@@ -46,6 +47,11 @@ export function TeamPhaseModal({
 }: TeamPhaseModalProps) {
   // Sound context
   const { play } = useSoundContext()
+
+  // Image URLs for icons and panel background
+  const { getUrlById } = useImages()
+  const arrowUpUrl = getUrlById('arrow_up')
+  const bannerCurtainUrl = getUrlById('banner_classic_curtain')
 
   // Derived state
   const coins = shopData?.coins ?? 0
@@ -164,6 +170,7 @@ export function TeamPhaseModal({
       play('team_place')
     } catch (err) {
       console.error('Failed to reorder team:', err)
+      play('error')
       // Revert to server state on error
       setLocalTeamOrder(teamCards)
     } finally {
@@ -181,9 +188,10 @@ export function TeamPhaseModal({
         const data = await apiClient.upgradeCard(activeMatch.id, teamSlot, upgradeType)
         onShopDataChange(data)
         play('team_upgrade')
+        play('powerup')
       } catch (err) {
         console.error('Failed to upgrade card:', err)
-        // Optionally show error to user via toast/banner
+        play('error')
       } finally {
         setActionLoading(null)
       }
@@ -200,24 +208,34 @@ export function TeamPhaseModal({
       const data = await apiClient.submitTeam(activeMatch.id)
       onShopDataChange(data)
       play('button_click')
+      play('team_ready')
     } catch (err) {
       console.error('Failed to submit team:', err)
-      // Optionally show error to user via toast/banner
+      play('error')
     } finally {
       setActionLoading(null)
     }
   }, [activeMatch, actionLoading, isSubmitted, onShopDataChange, play])
 
-  // Coin display class based on affordability
-  const getCoinClass = () => {
-    if (coins >= upgradeCost * 2) return 'coin-display can-afford'
-    if (coins > 0) return 'coin-display limited'
-    return 'coin-display empty'
-  }
+  // Play modal_open sound on mount, modal_close on unmount
+  useEffect(() => {
+    play('modal_open')
+    return () => {
+      play('modal_close')
+    }
+  }, [play])
 
   return (
     <div className="team-phase-backdrop">
-      <div className="team-phase-modal">
+      <div
+        className="team-phase-modal"
+        style={{
+          backgroundImage: `url(${bannerCurtainUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center top',
+          backgroundRepeat: 'no-repeat',
+        }}
+      >
         {/* Header with title, coins, and timer */}
         <header className="team-phase-header">
           <div className="team-phase-header-left">
@@ -227,10 +245,7 @@ export function TeamPhaseModal({
             )}
           </div>
           <div className="team-phase-header-right">
-            <div className={getCoinClass()}>
-              <span className="coin-icon">🪙</span>
-              <span className="coin-amount">{coins}</span>
-            </div>
+            <CoinDisplay amount={coins} size="lg" animated />
             {shopData?.deadline && (
               <div className="team-phase-timer">
                 <CountdownTimer
@@ -294,36 +309,40 @@ export function TeamPhaseModal({
                     {/* Upgrade buttons - only show if not submitted */}
                     {!isSubmitted && (
                       <div className="team-phase-card-upgrades">
-                        <button
-                          className="upgrade-btn upgrade-atk"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleUpgrade(card.position, 'atk')
-                          }}
+                        <GameButton
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleUpgrade(card.position, 'atk')}
                           disabled={coins < upgradeCost || actionLoading !== null}
                           title={`+3 ATK (${upgradeCost} coin)`}
+                          className="upgrade-btn upgrade-atk"
                         >
                           {actionLoading === `upgrade-${card.position}-atk` ? (
                             <LoadingSpinner size="sm" inline />
                           ) : (
-                            <>⚔️ +3</>
+                            <span className="upgrade-btn-content">
+                              <img src={arrowUpUrl} alt="" className="upgrade-icon" />
+                              <span>ATK</span>
+                            </span>
                           )}
-                        </button>
-                        <button
-                          className="upgrade-btn upgrade-hp"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleUpgrade(card.position, 'hp')
-                          }}
+                        </GameButton>
+                        <GameButton
+                          variant="primary"
+                          size="sm"
+                          onClick={() => handleUpgrade(card.position, 'hp')}
                           disabled={coins < upgradeCost || actionLoading !== null}
                           title={`+3 HP (${upgradeCost} coin)`}
+                          className="upgrade-btn upgrade-hp"
                         >
                           {actionLoading === `upgrade-${card.position}-hp` ? (
                             <LoadingSpinner size="sm" inline />
                           ) : (
-                            <>❤️ +3</>
+                            <span className="upgrade-btn-content">
+                              <img src={arrowUpUrl} alt="" className="upgrade-icon" />
+                              <span>HP</span>
+                            </span>
                           )}
-                        </button>
+                        </GameButton>
                       </div>
                     )}
                   </Reorder.Item>
@@ -348,10 +367,12 @@ export function TeamPhaseModal({
         {/* Footer with Submit Team button or waiting state */}
         <footer className="team-phase-footer">
           {!isSubmitted ? (
-            <button
-              className="btn-primary btn-lg submit-btn"
+            <GameButton
+              variant="primary"
+              size="lg"
               onClick={handleSubmitTeam}
               disabled={!canSubmit || actionLoading !== null}
+              className="submit-btn"
             >
               {actionLoading === 'submit' ? (
                 <LoadingSpinner size="sm" inline />
@@ -360,7 +381,7 @@ export function TeamPhaseModal({
               ) : (
                 `Need ${teamSize - teamCards.length} more card${teamSize - teamCards.length > 1 ? 's' : ''}`
               )}
-            </button>
+            </GameButton>
           ) : (
             <div className="submit-status">
               <span className="submit-status-icon">✓</span>

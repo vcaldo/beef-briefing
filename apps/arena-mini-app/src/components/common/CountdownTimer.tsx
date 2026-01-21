@@ -23,6 +23,12 @@ interface CountdownTimerProps {
   onExpire?: () => void
 
   /**
+   * Callback fired every second with the remaining time in seconds.
+   * Useful for triggering sounds or other effects at specific thresholds.
+   */
+  onTick?: (remainingSeconds: number) => void
+
+  /**
    * Additional CSS class names.
    */
   className?: string
@@ -66,6 +72,7 @@ export function CountdownTimer({
   deadline,
   timeRemaining,
   onExpire,
+  onTick,
   className = '',
   showIcon = true,
   label,
@@ -143,6 +150,13 @@ export function CountdownTimer({
       onExpire()
     }
   }, [remainingSeconds, onExpire])
+
+  // Handle tick callback (called every second when timer is initialized and > 0)
+  useEffect(() => {
+    if (isInitializedRef.current && remainingSeconds > 0 && onTick) {
+      onTick(remainingSeconds)
+    }
+  }, [remainingSeconds, onTick])
 
   // Format seconds as MM:SS
   const formatTime = (seconds: number): string => {

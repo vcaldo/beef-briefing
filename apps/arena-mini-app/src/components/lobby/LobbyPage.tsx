@@ -13,7 +13,8 @@ import { useState, useCallback, useRef } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
-import { usePolling, useErrorBanner } from '../../hooks'
+import { GameButton } from '../ui'
+import { usePolling, useErrorBanner, useImages } from '../../hooks'
 import { useSoundContext } from '../../contexts'
 
 import type { Match, GameConstants } from '../../types'
@@ -54,11 +55,19 @@ export function LobbyPage({
   // Sound system
   const { play, unlockAudio } = useSoundContext()
 
+  // Image assets
+  const { getUrl } = useImages()
+  const bannerModernUrl = getUrl('panels', 'banner_modern')
+  const hexagonGreyUrl = getUrl('panels', 'hexagon_grey')
+
   // Track whether initial fetch is complete - used to distinguish page reload from real-time transitions
   const initialFetchDoneRef = useRef(false)
 
   // Track whether audio has been unlocked (for mobile autoplay)
   const audioUnlockedRef = useRef(false)
+
+  // Track last second we played a countdown sound to prevent duplicate plays
+  const lastTickSoundRef = useRef<number | null>(null)
 
   // Unlock audio on first user interaction (required for mobile)
   const ensureAudioUnlocked = useCallback(() => {
@@ -67,6 +76,30 @@ export function LobbyPage({
       unlockAudio()
     }
   }, [unlockAudio])
+
+  // Handle countdown timer tick - play sounds at thresholds
+  // countdown_tick: plays when timer is 10s or less
+  // countdown_warning: plays when timer is 3s or less
+  const handleCountdownTick = useCallback(
+    (remainingSeconds: number) => {
+      // Prevent duplicate sounds for the same second
+      if (lastTickSoundRef.current === remainingSeconds) {
+        return
+      }
+
+      // Play warning sound at 3s, 2s, 1s
+      if (remainingSeconds <= 3 && remainingSeconds > 0) {
+        play('countdown_warning')
+        lastTickSoundRef.current = remainingSeconds
+      }
+      // Play tick sound at 10s down to 4s (before warning kicks in)
+      else if (remainingSeconds <= 10 && remainingSeconds > 3) {
+        play('countdown_tick')
+        lastTickSoundRef.current = remainingSeconds
+      }
+    },
+    [play]
+  )
 
   // Find user's active match from the list
   const findUserMatch = useCallback(
@@ -371,7 +404,12 @@ export function LobbyPage({
       {/* Active match card */}
       {activeMatch && (
         <section className="lobby-active-match">
-          <div className="match-card active">
+          <div
+            className="match-card active lobby-match-card-themed"
+            style={{
+              backgroundImage: `url(${bannerModernUrl})`,
+            }}
+          >
             <div className="match-card-header">
               <span className="match-card-badge">Your Match</span>
               <span className={`match-card-status status-${activeMatch.status}`}>
@@ -384,8 +422,13 @@ export function LobbyPage({
             </div>
 
             <div className="match-card-body">
-              {/* Participants */}
-              <div className="match-card-participants">
+              {/* Participants panel with hexagon frame */}
+              <div
+                className="match-card-participants lobby-info-panel"
+                style={{
+                  backgroundImage: `url(${hexagonGreyUrl})`,
+                }}
+              >
                 <span className="participants-label">Players:</span>
                 <div className="participants-list">
                   {activeMatch.participants?.map((p) => (
@@ -410,15 +453,16 @@ export function LobbyPage({
                 </span>
               </div>
 
-              {/* Countdown timer */}
+              {/* Countdown timer with Sci-fi glassPanel styling */}
               {activeMatch.status === 'open' && activeMatch.join_deadline && (
-                <div className="match-card-timer">
+                <div className="match-card-timer lobby-timer-badge">
                   <span className="timer-label">Match starts in:</span>
                   <CountdownTimer
                     deadline={activeMatch.join_deadline}
                     onExpire={() => {
                       addPageAction('match_auto_start', { match_id: activeMatch.id })
                     }}
+                    onTick={handleCountdownTick}
                     timerThresholds={gameConstants?.timer_thresholds}
                   />
                 </div>
@@ -428,32 +472,33 @@ export function LobbyPage({
             <div className="match-card-actions">
               {activeMatch.status === 'shop_phase' ? (
                 /* Continue to Shop button for shop_phase */
-                <button
-                  className="btn-primary btn-lg"
+                <GameButton
+                  variant="primary"
+                  size="lg"
                   onClick={onNavigateToShop}
                 >
                   Continue to Shop
-                </button>
+                </GameButton>
               ) : (
                 <>
                   {/* Leave button */}
-                  <button
-                    className="btn-secondary"
+                  <GameButton
+                    variant="neutral"
                     onClick={() => handleLeaveMatch(activeMatch.id)}
                     disabled={actionLoading !== null}
                   >
                     {actionLoading === 'leave' ? <LoadingSpinner size="sm" inline /> : 'Leave Match'}
-                  </button>
+                  </GameButton>
 
                   {/* Start early button (creator only with 2+ players) */}
                   {canStartEarly && (
-                    <button
-                      className="btn-primary"
+                    <GameButton
+                      variant="primary"
                       onClick={() => handleStartMatch(activeMatch.id)}
                       disabled={actionLoading !== null}
                     >
                       {actionLoading === 'start' ? <LoadingSpinner size="sm" inline /> : 'Start Now'}
-                    </button>
+                    </GameButton>
                   )}
                 </>
               )}
@@ -467,13 +512,15 @@ export function LobbyPage({
         <section className="lobby-matches">
           <div className="lobby-section-header">
             <h2 className="lobby-section-title">Available Matches</h2>
-            <button
-              className="btn-primary create-match-btn"
+            <GameButton
+              variant="primary"
+              size="sm"
               onClick={handleCreateMatch}
               disabled={actionLoading !== null}
+              className="create-match-btn"
             >
               {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : '+ New Match'}
-            </button>
+            </GameButton>
           </div>
 
           {matches.length === 0 ? (
@@ -481,13 +528,14 @@ export function LobbyPage({
               <div className="empty-state-icon">⚔️</div>
               <h3 className="empty-state-title">No Active Matches</h3>
               <p className="empty-state-text">Create a new match to challenge your friends!</p>
-              <button
-                className="btn-primary btn-lg"
+              <GameButton
+                variant="primary"
+                size="lg"
                 onClick={handleCreateMatch}
                 disabled={actionLoading !== null}
               >
                 {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : 'Create Match'}
-              </button>
+              </GameButton>
             </div>
           ) : (
             <div className="match-list">
@@ -498,7 +546,13 @@ export function LobbyPage({
                   const participantCount = match.participants?.length || 0
 
                   return (
-                    <div key={match.id} className="match-card">
+                    <div
+                      key={match.id}
+                      className="match-card lobby-match-card-themed"
+                      style={{
+                        backgroundImage: `url(${bannerModernUrl})`,
+                      }}
+                    >
                       <div className="match-card-header">
                         <span className="match-card-type">
                           {match.match_type === 'ranked' ? '🏆 Ranked' : '⚔️ Casual'}
@@ -526,9 +580,9 @@ export function LobbyPage({
                           <span className="participants-count">{participantCount} players</span>
                         </div>
 
-                        {/* Timer */}
+                        {/* Timer with Sci-fi glassPanel styling */}
                         {match.join_deadline && (
-                          <div className="match-card-timer compact">
+                          <div className="match-card-timer compact lobby-timer-badge">
                             <CountdownTimer
                               deadline={match.join_deadline}
                               timerThresholds={gameConstants?.timer_thresholds}
@@ -539,13 +593,14 @@ export function LobbyPage({
 
                       <div className="match-card-actions">
                         {!isInMatch && (
-                          <button
-                            className="btn-primary"
+                          <GameButton
+                            variant="primary"
+                            size="sm"
                             onClick={() => handleJoinMatch(match.id)}
                             disabled={actionLoading !== null}
                           >
                             {actionLoading === 'join' ? <LoadingSpinner size="sm" inline /> : 'Join'}
-                          </button>
+                          </GameButton>
                         )}
                       </div>
                     </div>

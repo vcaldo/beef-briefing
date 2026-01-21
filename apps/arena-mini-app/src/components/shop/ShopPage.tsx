@@ -14,6 +14,7 @@ import { apiClient } from '../../api/client'
 import { useSoundContext } from '../../contexts'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
+import { GameButton, CoinDisplay, CardSlot } from '../ui'
 import { usePolling, useErrorBanner } from '../../hooks'
 import TeamPhaseModal from './TeamPhaseModal'
 
@@ -52,6 +53,8 @@ export function ShopPage({
   // Sound effects
   const { play, preloadCategory } = useSoundContext()
   const soundsPreloadedRef = useRef(false)
+  // Track if initial shop cards have been loaded (for card_draw sound)
+  const initialCardsLoadedRef = useRef(false)
 
   // Preload shop and team sounds on mount
   useEffect(() => {
@@ -116,9 +119,14 @@ export function ShopPage({
           team_cards: data.team.length,
           can_reroll: data.can_reroll,
         })
+        // Play card_draw sound when shop cards first appear
+        if (!initialCardsLoadedRef.current && data.cards.length > 0) {
+          initialCardsLoadedRef.current = true
+          play('card_draw')
+        }
       }
     },
-    [activeMatch?.id, onNavigateToBattle, onMatchChange, loading]
+    [activeMatch?.id, onNavigateToBattle, onMatchChange, loading, play]
   )
 
   /**
@@ -186,9 +194,12 @@ export function ShopPage({
         // After buying, data.can_reroll will be false (server enforces this)
         setShopData(data)
         play('shop_buy')
+        play('coin_spend')
+        play('success')
       } catch (err) {
         console.error('Failed to buy card:', err)
         showError(err, 'Failed to buy card')
+        play('error')
         if (err instanceof Error) {
           noticeError(err, { context: 'buy_card', match_id: activeMatch.id })
         }
@@ -215,6 +226,8 @@ export function ShopPage({
     if (!activeMatch || actionLoading || !canReroll) return
 
     setActionLoading('reroll')
+    // Play card_shuffle sound during reroll animation (before API call)
+    play('card_shuffle')
     try {
       const data = await apiClient.rerollShop(activeMatch.id)
       addPageAction('shop_rerolled', {
@@ -224,9 +237,11 @@ export function ShopPage({
       // Note: After reroll, canReroll remains true until a card is bought
       setShopData(data)
       play('shop_reroll')
+      play('card_draw')
     } catch (err) {
       console.error('Failed to reroll shop:', err)
       showError(err, 'Failed to reroll shop')
+      play('error')
       if (err instanceof Error) {
         noticeError(err, { context: 'reroll_shop', match_id: activeMatch.id })
       }
@@ -255,13 +270,6 @@ export function ShopPage({
     )
   }
 
-  // Coin display class based on affordability
-  const getCoinClass = () => {
-    if (coins >= cardCost) return 'coin-display can-afford'
-    if (coins > 0) return 'coin-display limited'
-    return 'coin-display empty'
-  }
-
   // Render TeamPhaseModal when in team phase
   if (isTeamPhase && shopData && activeMatch) {
     return (
@@ -287,10 +295,7 @@ export function ShopPage({
           )}
         </div>
         <div className="shop-header-right">
-          <div className={getCoinClass()}>
-            <span className="coin-icon">🪙</span>
-            <span className="coin-amount">{coins}</span>
-          </div>
+          <CoinDisplay amount={coins} size="lg" animated />
           {shopData?.deadline && (
             <div className="shop-timer">
               <CountdownTimer
@@ -328,8 +333,9 @@ export function ShopPage({
           <div className="shop-section-header">
             <h2 className="shop-section-title">Available Cards</h2>
             {/* Reroll button */}
-            <button
-              className="btn-secondary reroll-btn"
+            <GameButton
+              variant="neutral"
+              size="sm"
               onClick={handleReroll}
               disabled={!canReroll || coins < rerollCost || actionLoading !== null}
               title={canReroll ? `Reroll (${rerollCost} coin)` : 'Cannot reroll after buying'}
@@ -339,7 +345,7 @@ export function ShopPage({
               ) : (
                 <>🔄 Reroll ({rerollCost})</>
               )}
-            </button>
+            </GameButton>
           </div>
 
           <div className="shop-grid">
@@ -348,60 +354,71 @@ export function ShopPage({
               const canAfford = card.can_afford
               const teamFull = teamCards.length >= teamSize
 
+              // Determine CardSlot variant based on state
+              const slotVariant = isPurchased
+                ? 'default'
+                : canAfford && !teamFull
+                  ? 'hover'
+                  : 'default'
+
               return (
-                <div
+                <CardSlot
                   key={card.index}
-                  className={`shop-card ${isPurchased ? 'shop-card-purchased' : ''} ${
+                  variant={slotVariant}
+                  className={`shop-card-slot ${isPurchased ? 'shop-card-purchased' : ''} ${
                     !canAfford && !isPurchased ? 'shop-card-disabled' : ''
                   }`}
                 >
-                  {/* Card image or fallback */}
-                  {card.card_image_url ? (
-                    <div className="shop-card-image">
-                      <img
-                        src={card.card_image_url}
-                        alt={card.name}
-                        loading="lazy"
-                      />
+                  <div className="shop-card">
+                    {/* Card image or fallback */}
+                    {card.card_image_url ? (
+                      <div className="shop-card-image">
+                        <img
+                          src={card.card_image_url}
+                          alt={card.name}
+                          loading="lazy"
+                        />
+                      </div>
+                    ) : (
+                      <div className="shop-card-fallback">
+                        <div className="shop-card-name">{card.name}</div>
+                        {card.username && (
+                          <div className="shop-card-username">@{card.username}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Card stats */}
+                    <div className="shop-card-stats">
+                      <span className="stat atk" title="Attack">⚔️ {card.atk}</span>
+                      <span className="stat def" title="Defense">🛡️ {card.def}</span>
+                      <span className="stat hp" title="Health">❤️ {card.hp}</span>
                     </div>
-                  ) : (
-                    <div className="shop-card-fallback">
-                      <div className="shop-card-name">{card.name}</div>
-                      {card.username && (
-                        <div className="shop-card-username">@{card.username}</div>
+
+                    {/* Buy button or status */}
+                    <div className="shop-card-footer">
+                      {isPurchased ? (
+                        <span className="shop-card-purchased-badge">Purchased</span>
+                      ) : (
+                        <GameButton
+                          variant="primary"
+                          size="sm"
+                          onClick={() => handleBuyCard(card.index)}
+                          disabled={!canAfford || teamFull || actionLoading !== null}
+                          className="shop-card-buy"
+                        >
+                          {actionLoading === 'buy' ? (
+                            <LoadingSpinner size="sm" inline />
+                          ) : (
+                            <>
+                              Buy <CoinDisplay amount={cardCost} size="sm" />
+                            </>
+                          )}
+                        </GameButton>
                       )}
                     </div>
-                  )}
-
-                  {/* Card stats */}
-                  <div className="shop-card-stats">
-                    <span className="stat atk" title="Attack">⚔️ {card.atk}</span>
-                    <span className="stat def" title="Defense">🛡️ {card.def}</span>
-                    <span className="stat hp" title="Health">❤️ {card.hp}</span>
                   </div>
-
-                  {/* Buy button or status */}
-                  <div className="shop-card-footer">
-                    {isPurchased ? (
-                      <span className="shop-card-purchased-badge">Purchased</span>
-                    ) : (
-                      <button
-                        className="btn-primary shop-card-buy"
-                        onClick={() => handleBuyCard(card.index)}
-                        disabled={!canAfford || teamFull || actionLoading !== null}
-                      >
-                        {actionLoading === 'buy' ? (
-                          <LoadingSpinner size="sm" inline />
-                        ) : (
-                          <>
-                            Buy <span className="cost">🪙 {cardCost}</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </div>
-
-                </div>
+                </CardSlot>
               )
             })}
           </div>
@@ -417,12 +434,14 @@ export function ShopPage({
       {/* Done Shopping button - appears when team is complete */}
       {!isSubmitted && teamCards.length >= teamSize && (
         <div className="done-shopping-section">
-          <button
-            className="btn-primary btn-lg done-shopping-btn"
+          <GameButton
+            variant="primary"
+            size="lg"
             onClick={() => setIsTeamPhase(true)}
+            className="done-shopping-btn"
           >
             Done Shopping - Organize Team
-          </button>
+          </GameButton>
           <p className="done-shopping-hint">
             Ready to organize your team? Click above to arrange positions and make final upgrades.
           </p>

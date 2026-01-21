@@ -305,6 +305,8 @@ services:
       VITE_ENVIRONMENT: development
       VITE_SOUND_BASE_URL: http://localhost:9000/${MINIO_BUCKET}/sounds/arena
       VITE_SOUND_VERSION: ${SOUND_VERSION:-1}
+      VITE_IMAGE_BASE_URL: http://localhost:9000/${MINIO_BUCKET}/images/arena
+      VITE_IMAGE_VERSION: ${IMAGE_VERSION:-1}
     networks:
       - beef-dev-network
 

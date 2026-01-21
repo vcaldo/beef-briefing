@@ -99,13 +99,13 @@ dev-prune: ## Remove all dev containers, images, volumes, and networks
 # =============================================================================
 # PRODUCTION (prod-*)
 # =============================================================================
-prod-deploy: tf-sync-object-storage arena-sounds-upload-prod ## Deploy to production server
+prod-deploy: tf-sync-object-storage ## Deploy to production server
 	@$(SCRIPTS_DIR)/deploy.sh
 
-prod-deploy-skip-build: tf-sync-object-storage arena-sounds-upload-prod ## Deploy using existing images (skip build)
+prod-deploy-skip-build: tf-sync-object-storage ## Deploy using existing images (skip build)
 	@$(SCRIPTS_DIR)/deploy.sh --skip-build
 
-prod-deploy-skip-cleanup: tf-sync-object-storage arena-sounds-upload-prod ## Deploy without cleaning up old images
+prod-deploy-skip-cleanup: tf-sync-object-storage ## Deploy without cleaning up old images
 	@$(SCRIPTS_DIR)/deploy.sh --skip-cleanup
 
 prod-deploy-regenerate-certs: ## Deploy with fresh Let's Encrypt certificates
@@ -860,6 +860,21 @@ arena-sounds-list-prod: ## List arena sounds in production storage
 	@$(SCRIPTS_DIR)/upload-arena-sounds.sh --prod --list
 
 # =============================================================================
+# ARENA IMAGES (arena-images-*)
+# =============================================================================
+arena-images-upload: ## Upload arena images to development storage (MinIO)
+	@$(SCRIPTS_DIR)/upload-arena-images.sh --dev
+
+arena-images-upload-prod: ## Upload arena images to production storage (Linode)
+	@$(SCRIPTS_DIR)/upload-arena-images.sh --prod
+
+arena-images-list: ## List arena images in development storage
+	@$(SCRIPTS_DIR)/upload-arena-images.sh --dev --list
+
+arena-images-list-prod: ## List arena images in production storage
+	@$(SCRIPTS_DIR)/upload-arena-images.sh --prod --list
+
+# =============================================================================
 # MINIO CLIENT (mc-*)
 # =============================================================================
 mc-setup-prod: ## Configure MinIO Client alias for production
@@ -910,4 +925,5 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	ranked-enable-all ranked-enable-all-prod ranked-disable-all ranked-disable-all-prod \
 	ranked-status ranked-status-prod ranked-status-chat ranked-status-chat-prod \
 	arena-sounds-upload arena-sounds-upload-prod arena-sounds-list arena-sounds-list-prod \
+	arena-images-upload arena-images-upload-prod arena-images-list arena-images-list-prod \
 	mc-setup-prod

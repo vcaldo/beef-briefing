@@ -9,3 +9,6 @@ export type { UseBattleAnimationReturn, UseBattleAnimationOptions } from './useB
 
 export { useSound } from './useSound';
 export type { UseSoundOptions, UseSoundReturn, SoundId, SoundCategory } from './useSound';
+
+export { useImages } from './useImages';
+export type { UseImagesReturn } from './useImages';

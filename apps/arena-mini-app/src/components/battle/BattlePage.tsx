@@ -16,6 +16,8 @@ import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, ErrorDisplay } from '../common'
 import { CompactCard } from '../common/CompactCard'
 import { BattleLog } from './BattleLog'
+import { BattleEffect } from './BattleEffect'
+import type { EffectPosition } from './BattleEffect'
 import { useBattleAnimation, getCardKey } from '../../hooks'
 import { useSoundContext } from '../../contexts'
 import type {
@@ -66,6 +68,32 @@ export function BattlePage({
   const { play: playSound, preloadCategory } = useSoundContext()
   const soundsPreloadedRef = useRef(false)
 
+  // Refs for card positions (used to place battle effects)
+  const battleArenaRef = useRef<HTMLDivElement>(null)
+  const cardRefsMap = useRef<Map<string, HTMLDivElement>>(new Map())
+
+  /**
+   * Get the center position of a card element relative to the battle arena.
+   * Used by useBattleAnimation to position battle effects.
+   */
+  const getCardPosition = useCallback((cardKey: string): EffectPosition | null => {
+    const cardElement = cardRefsMap.current.get(cardKey)
+    const arenaElement = battleArenaRef.current
+
+    if (!cardElement || !arenaElement) {
+      return null
+    }
+
+    const cardRect = cardElement.getBoundingClientRect()
+    const arenaRect = arenaElement.getBoundingClientRect()
+
+    // Calculate center position relative to arena
+    const x = cardRect.left - arenaRect.left + cardRect.width / 2
+    const y = cardRect.top - arenaRect.top + cardRect.height / 2
+
+    return { x, y }
+  }, [])
+
   // Animation state machine hook
   const {
     cardStates,
@@ -76,6 +104,8 @@ export function BattlePage({
     isComplete,
     currentDamage,
     damageTargetKey,
+    activeEffect,
+    onEffectComplete,
     play,
     pause,
     reset,
@@ -86,6 +116,7 @@ export function BattlePage({
     playerAId: battleData?.player_a_id ?? 0,
     playerBId: battleData?.player_b_id ?? 0,
     onPlaySound: playSound,
+    getCardPosition,
   })
 
   // Get match ID
@@ -263,8 +294,17 @@ export function BattlePage({
 
     const isCurrentUser = teamOwnerId === userId
 
+    // Ref callback to register card element for effect positioning
+    const setCardRef = (el: HTMLDivElement | null) => {
+      if (el) {
+        cardRefsMap.current.set(cardKey, el)
+      } else {
+        cardRefsMap.current.delete(cardKey)
+      }
+    }
+
     return (
-      <div key={cardId} className="battle-card-wrapper">
+      <div key={cardId} className="battle-card-wrapper" ref={setCardRef}>
         <div className={`battle-card-owner-badge ${isCurrentUser ? 'you' : ''}`}>
           {isCurrentUser ? 'You' : ''}
         </div>
@@ -327,7 +367,8 @@ export function BattlePage({
 
       {/* Battle Arena */}
       <div
-        className="battle-arena"
+        ref={battleArenaRef}
+        className="battle-arena battle-effect-container"
         style={{
           // Scale HP bar transition duration with playback speed
           // At 1x (value=1000), duration is 300ms; at 2x (value=500), duration is 150ms
@@ -356,6 +397,17 @@ export function BattlePage({
             )}
           </div>
         </div>
+
+        {/* Battle Effect - renders animated effect at card positions */}
+        {activeEffect && (
+          <BattleEffect
+            key={`${activeEffect.type}-${activeEffect.cardKey}`}
+            type={activeEffect.type}
+            position={activeEffect.position}
+            onComplete={onEffectComplete}
+            size={80}
+          />
+        )}
       </div>
 
       {/* Playback Controls */}

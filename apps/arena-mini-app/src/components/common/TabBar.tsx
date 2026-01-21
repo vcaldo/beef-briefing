@@ -1,5 +1,7 @@
 import type { TabId } from '../../types'
 import { SoundSettings } from './SoundSettings'
+import { useSoundContext } from '../../contexts'
+import { useImages } from '../../hooks/useImages'
 
 interface Tab {
   id: TabId
@@ -116,20 +118,46 @@ interface TabBarProps {
  * Uses CSS classes from global.css for styling.
  */
 export function TabBar({ activeTab, onTabChange }: TabBarProps) {
+  const { play } = useSoundContext()
+  const { getUrlById } = useImages()
+
+  // Get button image URLs for active and inactive states
+  const activeButtonUrl = getUrlById('primary')
+  const inactiveButtonUrl = getUrlById('neutral')
+
+  const handleTabClick = (tabId: TabId) => {
+    // Only play sound when switching to a different tab
+    if (tabId !== activeTab) {
+      play('tab_switch')
+    }
+    onTabChange(tabId)
+  }
+
   return (
     <nav className="tab-bar" role="navigation" aria-label="Main navigation">
-      {TABS.map((tab) => (
-        <button
-          key={tab.id}
-          className={`tab-item ${activeTab === tab.id ? 'active' : ''}`}
-          onClick={() => onTabChange(tab.id)}
-          aria-current={activeTab === tab.id ? 'page' : undefined}
-          aria-label={tab.label}
-        >
-          <span className="tab-icon">{tab.icon}</span>
-          <span className="tab-label">{tab.label}</span>
-        </button>
-      ))}
+      {TABS.map((tab) => {
+        const isActive = activeTab === tab.id
+        const buttonUrl = isActive ? activeButtonUrl : inactiveButtonUrl
+
+        return (
+          <button
+            key={tab.id}
+            className={`tab-item tab-item-themed ${isActive ? 'active' : ''}`}
+            onClick={() => handleTabClick(tab.id)}
+            aria-current={isActive ? 'page' : undefined}
+            aria-label={tab.label}
+            style={{
+              backgroundImage: `url(${buttonUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+            }}
+          >
+            <span className="tab-icon">{tab.icon}</span>
+            <span className="tab-label">{tab.label}</span>
+          </button>
+        )
+      })}
       <SoundSettings />
     </nav>
   )

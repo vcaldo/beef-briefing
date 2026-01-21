@@ -13,7 +13,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { apiClient } from '../../api/client'
 import { useSoundContext } from '../../contexts'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
-import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
+import { LoadingSpinner, CountdownTimer, ErrorBanner, CompactCard } from '../common'
 import { GameButton, CoinDisplay, CardSlot } from '../ui'
 import { usePolling, useErrorBanner } from '../../hooks'
 import TeamPhaseModal from './TeamPhaseModal'
@@ -370,29 +370,41 @@ export function ShopPage({
                   }`}
                 >
                   <div className="shop-card">
-                    {/* Card image or fallback */}
-                    {card.card_image_url ? (
-                      <div className="shop-card-image">
-                        <img
-                          src={card.card_image_url}
-                          alt={card.name}
-                          loading="lazy"
+                    {/* Card image with compact card or fallback */}
+                    <div className="shop-card-compact">
+                      {card.compact_card_image_url ? (
+                        <CompactCard
+                          imageUrl={card.compact_card_image_url}
+                          positions={card.placeholder_positions}
+                          currentStats={{
+                            atk: card.atk,
+                            hp: card.hp,
+                            maxHp: card.hp,
+                          }}
+                          cardName={card.name}
+                          cardId={card.card_id}
+                          className="shop-compact-card"
                         />
-                      </div>
-                    ) : (
-                      <div className="shop-card-fallback">
-                        <div className="shop-card-name">{card.name}</div>
-                        {card.username && (
-                          <div className="shop-card-username">@{card.username}</div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Card stats */}
-                    <div className="shop-card-stats">
-                      <span className="stat atk" title="Attack">⚔️ {card.atk}</span>
-                      <span className="stat def" title="Defense">🛡️ {card.def}</span>
-                      <span className="stat hp" title="Health">❤️ {card.hp}</span>
+                      ) : card.card_image_url ? (
+                        <div className="shop-card-image">
+                          <img
+                            src={card.card_image_url}
+                            alt={card.name}
+                            loading="lazy"
+                          />
+                          <div className="shop-card-stats">
+                            <span className="stat atk" title="Attack">⚔️ {card.atk}</span>
+                            <span className="stat hp" title="Health">❤️ {card.hp}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="shop-card-fallback">
+                          <div className="shop-card-name">{card.name}</div>
+                          {card.username && (
+                            <div className="shop-card-username">@{card.username}</div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Buy button or status */}

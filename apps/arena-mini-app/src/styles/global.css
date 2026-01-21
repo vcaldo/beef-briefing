@@ -1246,10 +1246,6 @@ a:focus:not(:focus-visible),
   color: var(--arena-orange);
 }
 
-.shop-card-stats .stat.def {
-  color: var(--arena-blue);
-}
-
 .shop-card-stats .stat.hp {
   color: var(--hp-full);
 }
@@ -1267,6 +1263,42 @@ a:focus:not(:focus-visible),
 .shop-card-buy .cost {
   opacity: 0.8;
   margin-left: 4px;
+}
+
+/* Shop Compact Card Container */
+.shop-card-compact {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Shop Compact Card - Scale from 300x450 to fit grid */
+.shop-compact-card {
+  width: 300px;
+  height: 450px;
+  transform: scale(0.5);
+  transform-origin: center center;
+  /* Collapse layout box to match visual size */
+  margin: calc(450px * (0.5 - 1) / 2) calc(300px * (0.5 - 1) / 2);
+}
+
+/* Responsive scaling for larger screens */
+@media (min-width: 400px) {
+  .shop-compact-card {
+    transform: scale(0.55);
+    margin: calc(450px * (0.55 - 1) / 2) calc(300px * (0.55 - 1) / 2);
+  }
+}
+
+@media (min-width: 480px) {
+  .shop-compact-card {
+    transform: scale(0.6);
+    margin: calc(450px * (0.6 - 1) / 2) calc(300px * (0.6 - 1) / 2);
+  }
 }
 
 /* =============================================================================

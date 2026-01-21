@@ -196,11 +196,10 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 0;
+            margin-bottom: 6px;
         }
 
-        .beef-meter-tier {
-            font-family: var(--font-header);
+        .beef-meter-label {
             font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 2px;
@@ -250,30 +249,12 @@
         }
 
         /* Tier-specific colors with contrast text */
-        .beef-meter-fill.tier-1 {
-            background: linear-gradient(90deg, var(--tier-1-start), var(--tier-1-end));
-            color: var(--tier-1-contrast);
-        }
-        .beef-meter-fill.tier-2 {
-            background: linear-gradient(90deg, var(--tier-2-start), var(--tier-2-end));
-            color: var(--tier-2-contrast);
-        }
-        .beef-meter-fill.tier-3 {
-            background: linear-gradient(90deg, var(--tier-3-start), var(--tier-3-end));
-            color: var(--tier-3-contrast);
-        }
-        .beef-meter-fill.tier-4 {
-            background: linear-gradient(90deg, var(--tier-4-start), var(--tier-4-end));
-            color: var(--tier-4-contrast);
-        }
-        .beef-meter-fill.tier-5 {
-            background: linear-gradient(90deg, var(--tier-5-start), var(--tier-5-end));
-            color: var(--tier-5-contrast);
-        }
-        .beef-meter-fill.tier-6 {
-            background: linear-gradient(90deg, var(--tier-6-start), var(--tier-6-end));
-            color: var(--tier-6-contrast);
-        }
+        .beef-meter-fill.tier-1 { background: linear-gradient(90deg, var(--tier-1-start), var(--tier-1-end)); color: var(--tier-1-contrast); }
+        .beef-meter-fill.tier-2 { background: linear-gradient(90deg, var(--tier-2-start), var(--tier-2-end)); color: var(--tier-2-contrast); }
+        .beef-meter-fill.tier-3 { background: linear-gradient(90deg, var(--tier-3-start), var(--tier-3-end)); color: var(--tier-3-contrast); }
+        .beef-meter-fill.tier-4 { background: linear-gradient(90deg, var(--tier-4-start), var(--tier-4-end)); color: var(--tier-4-contrast); }
+        .beef-meter-fill.tier-5 { background: linear-gradient(90deg, var(--tier-5-start), var(--tier-5-end)); color: var(--tier-5-contrast); }
+        .beef-meter-fill.tier-6 { background: linear-gradient(90deg, var(--tier-6-start), var(--tier-6-end)); color: var(--tier-6-contrast); }
 
         /* Combat Stats Placeholders */
         .combat-stats-container {
@@ -389,8 +370,11 @@
             <span class="beef-meter-rank">{% if rank %}#{{ rank }}{% else %}-{% endif %}</span>
             <div class="beef-meter-content">
                 <div class="beef-meter-header">
-                    <span class="beef-meter-tier">{{ overall.label }}</span>
+                    <span class="beef-meter-label">{{ overall.label }}</span>
                     <span class="beef-meter-value">{{ overall.score|round|int }}</span>
+                </div>
+                <div class="beef-meter-bar">
+                    <div class="beef-meter-fill {{ overall.tier_class }}" style="width: {{ overall.score }}%;"></div>
                 </div>
             </div>
         </div>

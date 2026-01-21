@@ -159,10 +159,10 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 0;
+            margin-bottom: 6px;
         }
 
-        .beef-meter-tier {
+        .beef-meter-label {
             font-family: var(--font-header);
             font-size: 10px;
             text-transform: uppercase;
@@ -352,8 +352,11 @@
             <span class="beef-meter-rank">{% if rank %}#{{ rank }}{% else %}-{% endif %}</span>
             <div class="beef-meter-content">
                 <div class="beef-meter-header">
-                    <span class="beef-meter-tier">{{ overall.label }}</span>
+                    <span class="beef-meter-label">{{ overall.label }}</span>
                     <span class="beef-meter-value">{{ overall.score|round|int }}</span>
+                </div>
+                <div class="beef-meter-bar">
+                    <div class="beef-meter-fill {{ overall.tier_class }}" style="width: {{ overall.score }}%;"></div>
                 </div>
             </div>
         </div>

@@ -159,10 +159,11 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 6px;
+            margin-bottom: 0;
         }
 
         .beef-meter-tier {
+            font-family: var(--font-header);
             font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 2px;
@@ -260,11 +261,12 @@
         }
 
         .combat-icon {
-            font-size: 18px;
+            font-size: 24px;
         }
 
         .combat-label {
-            font-size: 10px;
+            font-family: var(--font-header);
+            font-size: 12px;
             font-weight: 700;
             text-transform: uppercase;
             color: var(--text-secondary);
@@ -344,9 +346,6 @@
                     <span class="beef-meter-tier">{{ overall.label }}</span>
                     <span class="beef-meter-value">{{ overall.score|round|int }}</span>
                 </div>
-                <div class="beef-meter-bar">
-                    <div class="beef-meter-fill {{ overall.tier_class }}" style="width: {{ overall.score }}%;"></div>
-                </div>
             </div>
         </div>
 
@@ -358,23 +357,13 @@
                 <div class="combat-value"></div>
             </div>
             <div class="combat-stat">
-                <div class="combat-icon">🛡️</div>
-                <div class="combat-label">DEF</div>
-                <div class="combat-value"></div>
-            </div>
-            <div class="combat-stat">
                 <div class="combat-icon">🥩</div>
                 <div class="combat-label">HP</div>
                 <div class="combat-value"></div>
             </div>
         </div>
 
-        <!-- HP Progress Bar Placeholder -->
-        <div class="hp-bar-container">
-            <div class="hp-bar-background">
-                <div class="hp-bar-fill"></div>
-            </div>
-        </div>
+        <!-- Empty space (HP bar removed) -->
 
         <!-- Footer -->
         <div class="card-footer">

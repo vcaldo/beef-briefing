@@ -1109,15 +1109,13 @@ export interface StatPosition {
 }
 
 /**
- * Positions for all three combat stat overlays.
+ * Positions for combat stat overlays (ATK and HP).
  *
  * @see {@link StatPosition} Individual stat position
  */
 export interface CombatStatsPositions {
   /** ATK stat position */
   atk: StatPosition
-  /** DEF stat position */
-  def: StatPosition
   /** HP stat position */
   hp: StatPosition
 }
@@ -1188,10 +1186,10 @@ export interface HpBarPositions {
  * @see {@link PlaceholderPositions} Root metadata structure
  */
 export interface Placeholders {
-  /** ATK/DEF/HP stat positions */
+  /** ATK/HP stat positions */
   combat_stats: CombatStatsPositions
-  /** HP bar container and fill positions */
-  hp_bar: HpBarPositions
+  /** HP bar container and fill positions (optional, may not be present) */
+  hp_bar?: HpBarPositions
 }
 
 /**
@@ -1223,8 +1221,6 @@ export interface TierVariation {
   combat_stats?: {
     /** ATK position overrides */
     atk?: Partial<StatPosition>
-    /** DEF position overrides */
-    def?: Partial<StatPosition>
     /** HP position overrides */
     hp?: Partial<StatPosition>
   }

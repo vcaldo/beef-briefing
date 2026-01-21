@@ -48,7 +48,7 @@ interface BattlePageProps {
 export function BattlePage({
   userId,
   activeMatch,
-  gameConstants,
+  gameConstants: _gameConstants,
   onNavigateToStats,
   onNavigateToLobby,
   onMatchChange,
@@ -313,15 +313,12 @@ export function BattlePage({
           positions={originalCard.placeholder_positions}
           currentStats={{
             atk: state.atk,
-            def: 0,
             hp: state.hp,
             maxHp: state.max_hp,
           }}
-          hpBarThresholds={gameConstants?.hp_bar_thresholds}
           animationState={animState}
           damageNumber={damageToShow}
           isDead={!state.is_alive}
-          showHpBar={true}
           cardName={state.name}
           cardId={cardId}
           className="battle-compact-card"

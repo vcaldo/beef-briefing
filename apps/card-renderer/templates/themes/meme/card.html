@@ -207,13 +207,13 @@
             display: flex;
             flex-direction: column;
             align-items: stretch;
-            padding: 6px 10px;
+            padding: 10px 14px;
             border-radius: 8px;
             border: 3px solid var(--tier-border);
             position: relative;
             overflow: hidden;
-            min-width: 65px;
-            gap: 2px;
+            min-width: 75px;
+            gap: 6px;
             transform: rotate(3deg);
         }
 
@@ -250,24 +250,24 @@
         }
 
         .combat-icon {
-            font-size: 12px;
-            width: 16px;
+            font-size: 16px;
+            width: 20px;
             text-align: center;
         }
 
         .combat-label {
             font-family: var(--font-header);
-            font-size: 9px;
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: var(--text-secondary);
-            width: 24px;
+            width: 28px;
         }
 
         .combat-value {
             font-family: var(--font-header);
-            font-size: 14px;
+            font-size: 20px;
             font-weight: 900;
             color: var(--text-primary);
             text-shadow: 2px 2px 0 #000;
@@ -631,11 +631,6 @@
                     <span class="combat-icon">⚔️</span>
                     <span class="combat-label">ATK</span>
                     <span class="combat-value">{{ combat.atk if combat else 1 }}</span>
-                </div>
-                <div class="combat-stat">
-                    <span class="combat-icon">🛡️</span>
-                    <span class="combat-label">DEF</span>
-                    <span class="combat-value">{{ combat.def_ if combat else 1 }}</span>
                 </div>
                 <div class="combat-stat">
                     <span class="combat-icon">🥩</span>

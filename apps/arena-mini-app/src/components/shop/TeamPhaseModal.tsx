@@ -294,12 +294,9 @@ export function TeamPhaseModal({
                         positions={card.placeholder_positions}
                         currentStats={{
                           atk: card.atk,
-                          def: card.def,
                           hp: card.hp,
                           maxHp: card.max_hp,
                         }}
-                        hpBarThresholds={gameConstants?.hp_bar_thresholds}
-                        showHpBar={true}
                         cardName={card.name}
                         cardId={card.card_id}
                         className="team-phase-compact-card"

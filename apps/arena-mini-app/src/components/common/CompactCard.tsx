@@ -1,10 +1,9 @@
-import React, { useMemo } from 'react'
-import type { PlaceholderPositions, HpBarThresholds, CardAnimationState } from '../../types'
+import React from 'react'
+import type { PlaceholderPositions, CardAnimationState } from '../../types'
 
 /** Current stat values to display on the card */
 interface CardStats {
   atk: number
-  def: number
   hp: number
   maxHp: number
 }
@@ -16,10 +15,6 @@ interface CompactCardProps {
   positions?: PlaceholderPositions | null
   /** Current card stats to overlay on the image */
   currentStats: CardStats
-  /** HP bar color thresholds from backend */
-  hpBarThresholds?: HpBarThresholds
-  /** Whether to show the HP bar (default true) */
-  showHpBar?: boolean
   /** Optional card name for alt text */
   cardName?: string
   /** Optional card ID for data attributes */
@@ -38,8 +33,8 @@ interface CompactCardProps {
    */
   damageNumber?: number
   /**
-   * Whether the card is dead. If true, applies `.card-dead` class to force
-   * HP bar to 0% immediately. Defaults to checking if currentStats.hp <= 0.
+   * Whether the card is dead. If true, applies `.card-dead` class.
+   * Defaults to checking if currentStats.hp <= 0.
    */
   isDead?: boolean
   /** Click handler */
@@ -47,35 +42,11 @@ interface CompactCardProps {
 }
 
 /**
- * Calculates HP bar color based on percentage and thresholds.
- * Uses backend-provided thresholds if available, otherwise falls back to defaults.
- *
- * @param hp Current HP value
- * @param maxHp Maximum HP value
- * @param thresholds Optional HP bar thresholds from backend
- * @returns CSS color string for HP bar
- */
-function getHpBarColor(hp: number, maxHp: number, thresholds?: HpBarThresholds): string {
-  // Fallback thresholds if backend values not available
-  const highThreshold = thresholds?.high ?? 66
-  const mediumThreshold = thresholds?.medium ?? 33
-  const highColor = thresholds?.colors?.high ?? '#22c55e'
-  const mediumColor = thresholds?.colors?.medium ?? '#eab308'
-  const lowColor = thresholds?.colors?.low ?? '#ef4444'
-
-  if (maxHp <= 0) return lowColor // Red for invalid
-  const percentage = (hp / maxHp) * 100
-  if (percentage > highThreshold) return highColor
-  if (percentage >= mediumThreshold) return mediumColor
-  return lowColor
-}
-
-/**
  * CompactCard - Displays a 300x450 compact card image with stat overlays
  *
  * This component renders a compact card image from the card-renderer API
- * and overlays dynamic stat values (ATK, DEF, HP) and an animated HP bar
- * using position metadata provided by the API.
+ * and overlays dynamic stat values (ATK, HP) using position metadata
+ * provided by the API.
  *
  * The positions are provided in logical pixels (300x450) which match the
  * card dimensions. If displaying at a different size, the component scales
@@ -86,7 +57,7 @@ function getHpBarColor(hp: number, maxHp: number, thresholds?: HpBarThresholds):
  * <CompactCard
  *   imageUrl="https://example.com/card.png"
  *   positions={placeholderPositions}
- *   currentStats={{ atk: 15, def: 8, hp: 45, maxHp: 50 }}
+ *   currentStats={{ atk: 15, hp: 45, maxHp: 50 }}
  * />
  *
  * @example
@@ -94,7 +65,7 @@ function getHpBarColor(hp: number, maxHp: number, thresholds?: HpBarThresholds):
  * <CompactCard
  *   imageUrl={card.image_url}
  *   positions={card.placeholder_positions}
- *   currentStats={{ atk: card.atk, def: card.def, hp: card.hp, maxHp: card.max_hp }}
+ *   currentStats={{ atk: card.atk, hp: card.hp, maxHp: card.max_hp }}
  *   animationState="attacking"
  *   cardId={card.card_id}
  *   cardName={card.name}
@@ -104,8 +75,6 @@ export function CompactCard({
   imageUrl,
   positions,
   currentStats,
-  hpBarThresholds,
-  showHpBar = true,
   cardName = 'Card',
   cardId,
   className = '',
@@ -114,20 +83,8 @@ export function CompactCard({
   isDead,
   onClick,
 }: CompactCardProps): React.JSX.Element {
-  // Calculate HP bar width and color
-  const hpPercentage = useMemo(() => {
-    if (currentStats.maxHp <= 0) return 0
-    return Math.max(0, Math.min(100, (currentStats.hp / currentStats.maxHp) * 100))
-  }, [currentStats.hp, currentStats.maxHp])
-
-  const hpBarColor = useMemo(
-    () => getHpBarColor(currentStats.hp, currentStats.maxHp, hpBarThresholds),
-    [currentStats.hp, currentStats.maxHp, hpBarThresholds]
-  )
-
   // Extract position data with fallbacks
   const combatStats = positions?.placeholders?.combat_stats
-  const hpBar = positions?.placeholders?.hp_bar
 
   // Determine if card is dead (explicit prop or derived from HP)
   const isCardDead = isDead ?? currentStats.hp <= 0
@@ -192,25 +149,6 @@ export function CompactCard({
             {currentStats.atk}
           </div>
 
-          {/* DEF overlay */}
-          <div
-            className="compact-card-stat"
-            style={{
-              left: `${combatStats.def.x}px`,
-              top: `${combatStats.def.y}px`,
-              width: `${combatStats.def.width}px`,
-              fontSize: `${combatStats.def.font_size}px`,
-              fontWeight: combatStats.def.font_weight || 'bold',
-              color: combatStats.def.color,
-              textAlign: (combatStats.def.text_align as React.CSSProperties['textAlign']) || 'center',
-              transform: combatStats.def.anchor === 'center' ? 'translateX(-50%)' : undefined,
-              textShadow: combatStats.def.text_shadow || '0 1px 3px rgba(0, 0, 0, 0.8)',
-            }}
-            aria-label={`Defense: ${currentStats.def}`}
-          >
-            {currentStats.def}
-          </div>
-
           {/* HP overlay */}
           <div
             className="compact-card-stat"
@@ -232,36 +170,6 @@ export function CompactCard({
         </>
       )}
 
-      {/* HP bar - only render if positions are provided and showHpBar is true */}
-      {showHpBar && hpBar && (
-        <div
-          className="compact-card-hp-bar"
-          style={{
-            left: `${hpBar.container.x}px`,
-            top: `${hpBar.container.y}px`,
-            width: `${hpBar.container.width}px`,
-            height: `${hpBar.container.height}px`,
-            borderRadius: `${hpBar.container.border_radius}px`,
-            backgroundColor: hpBar.fill.background_color || 'rgba(0, 0, 0, 0.6)',
-          }}
-          role="progressbar"
-          aria-valuenow={currentStats.hp}
-          aria-valuemin={0}
-          aria-valuemax={currentStats.maxHp}
-          aria-label={`HP: ${currentStats.hp} of ${currentStats.maxHp}`}
-        >
-          <div
-            className="compact-card-hp-bar-fill"
-            style={{
-              width: `${hpPercentage}%`,
-              backgroundColor: hpBarColor,
-              borderRadius: `${hpBar.fill.border_radius}px`,
-              // CSS transition handles animation (defined in global.css)
-            }}
-          />
-        </div>
-      )}
-
       {/* Damage number overlay - displayed during damage phase */}
       {damageNumber !== undefined && damageNumber > 0 && (
         <div
@@ -276,27 +184,7 @@ export function CompactCard({
       {!combatStats && (
         <div className="compact-card-stats-fallback">
           <span className="stat-atk">ATK: {currentStats.atk}</span>
-          <span className="stat-def">DEF: {currentStats.def}</span>
           <span className="stat-hp">HP: {currentStats.hp}/{currentStats.maxHp}</span>
-        </div>
-      )}
-
-      {/* Fallback HP bar when positions not available but showHpBar is true */}
-      {showHpBar && !hpBar && (
-        <div
-          className="compact-card-hp-bar-fallback"
-          role="progressbar"
-          aria-valuenow={currentStats.hp}
-          aria-valuemin={0}
-          aria-valuemax={currentStats.maxHp}
-        >
-          <div
-            className="compact-card-hp-bar-fill-fallback"
-            style={{
-              width: `${hpPercentage}%`,
-              backgroundColor: hpBarColor,
-            }}
-          />
         </div>
       )}
     </div>

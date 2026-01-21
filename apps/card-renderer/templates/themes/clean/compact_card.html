@@ -162,7 +162,8 @@
             margin-bottom: 6px;
         }
 
-        .beef-meter-tier {
+        .beef-meter-label {
+            font-family: var(--font-header);
             font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 2px;
@@ -248,35 +249,45 @@
 
         .combat-stat {
             flex: 1;
-            padding: 12px;
+            padding: 10px 12px;
             border-radius: 6px;
             border: 1px solid var(--border-color);
             background: rgba(0, 0, 0, 0.05);
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             min-height: 70px;
+        }
+
+        .combat-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
 
         .combat-icon {
             font-size: 18px;
+            line-height: 1;
         }
 
         .combat-label {
-            font-size: 10px;
+            font-family: var(--font-header);
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             color: var(--text-secondary);
             letter-spacing: 0.5px;
+            line-height: 1;
         }
 
         .combat-value {
             flex: 1;
             display: flex;
-            align-items: flex-end;
+            align-items: center;
             justify-content: center;
-            min-height: 20px;
+            min-height: 40px;
         }
 
         /* HP Progress Bar - no label */
@@ -341,7 +352,7 @@
             <span class="beef-meter-rank">{% if rank %}#{{ rank }}{% else %}-{% endif %}</span>
             <div class="beef-meter-content">
                 <div class="beef-meter-header">
-                    <span class="beef-meter-tier">{{ overall.label }}</span>
+                    <span class="beef-meter-label">{{ overall.label }}</span>
                     <span class="beef-meter-value">{{ overall.score|round|int }}</span>
                 </div>
                 <div class="beef-meter-bar">
@@ -353,28 +364,22 @@
         <!-- Combat Stats Placeholders -->
         <div class="combat-stats-container">
             <div class="combat-stat">
-                <div class="combat-icon">⚔️</div>
-                <div class="combat-label">ATK</div>
+                <div class="combat-header">
+                    <span class="combat-icon">⚔️</span>
+                    <span class="combat-label">ATK</span>
+                </div>
                 <div class="combat-value"></div>
             </div>
             <div class="combat-stat">
-                <div class="combat-icon">🛡️</div>
-                <div class="combat-label">DEF</div>
-                <div class="combat-value"></div>
-            </div>
-            <div class="combat-stat">
-                <div class="combat-icon">🥩</div>
-                <div class="combat-label">HP</div>
+                <div class="combat-header">
+                    <span class="combat-icon">🥩</span>
+                    <span class="combat-label">HP</span>
+                </div>
                 <div class="combat-value"></div>
             </div>
         </div>
 
-        <!-- HP Progress Bar Placeholder -->
-        <div class="hp-bar-container">
-            <div class="hp-bar-background">
-                <div class="hp-bar-fill"></div>
-            </div>
-        </div>
+        <!-- Empty space (HP bar removed) -->
 
         <!-- Footer -->
         <div class="card-footer">

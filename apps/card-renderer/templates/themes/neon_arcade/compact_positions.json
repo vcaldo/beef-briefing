@@ -10,72 +10,36 @@
   "placeholders": {
     "combat_stats": {
       "atk": {
-        "x": 58,
-        "y": 308,
-        "width": 50,
-        "height": 25,
+        "x": 81,
+        "y": 296,
+        "width": 70,
+        "height": 40,
         "anchor": "center",
-        "font_size": 18,
+        "font_size": 26,
         "font_weight": "bold",
         "color": "#ffffff",
         "text_align": "center",
         "container_x": 16,
         "container_y": 246,
-        "container_width": 84,
+        "container_width": 130,
         "container_height": 70,
-        "note": "First combat stat box (ATK). Position is for value text within .combat-value element."
-      },
-      "def": {
-        "x": 150,
-        "y": 308,
-        "width": 50,
-        "height": 25,
-        "anchor": "center",
-        "font_size": 18,
-        "font_weight": "bold",
-        "color": "#ffffff",
-        "text_align": "center",
-        "container_x": 108,
-        "container_y": 246,
-        "container_width": 84,
-        "container_height": 70,
-        "note": "Second combat stat box (DEF). Position is for value text within .combat-value element."
+        "note": "First combat stat box (ATK). Inline header (emoji + label) takes ~22px, value area has 40px height."
       },
       "hp": {
-        "x": 242,
-        "y": 308,
-        "width": 50,
-        "height": 25,
+        "x": 219,
+        "y": 296,
+        "width": 70,
+        "height": 40,
         "anchor": "center",
-        "font_size": 18,
+        "font_size": 26,
         "font_weight": "bold",
         "color": "#ffffff",
         "text_align": "center",
-        "container_x": 200,
+        "container_x": 154,
         "container_y": 246,
-        "container_width": 84,
+        "container_width": 130,
         "container_height": 70,
-        "note": "Third combat stat box (HP). Position is for value text within .combat-value element."
-      }
-    },
-    "hp_bar": {
-      "container": {
-        "x": 16,
-        "y": 410,
-        "width": 268,
-        "height": 18,
-        "border_radius": 9,
-        "note": "HP bar background container. React should render progress fill inside this."
-      },
-      "fill": {
-        "x": 16,
-        "y": 410,
-        "max_width": 268,
-        "height": 18,
-        "border_radius": 9,
-        "color": "#22c55e",
-        "background_color": "rgba(34, 197, 94, 0.2)",
-        "note": "HP bar fill element. Width should be: (hp / max_hp) * 268"
+        "note": "Second combat stat box (HP). Inline header (emoji + label) takes ~22px, value area has 40px height."
       }
     }
   },
@@ -83,10 +47,6 @@
     "tier-1": {
       "combat_stats": {
         "atk": {
-          "color": "#ffd700",
-          "text_shadow": "0 0 8px rgba(255, 215, 0, 0.5)"
-        },
-        "def": {
           "color": "#ffd700",
           "text_shadow": "0 0 8px rgba(255, 215, 0, 0.5)"
         },
@@ -102,10 +62,6 @@
           "color": "#c0c0c0",
           "text_shadow": "0 0 8px rgba(192, 192, 192, 0.5)"
         },
-        "def": {
-          "color": "#c0c0c0",
-          "text_shadow": "0 0 8px rgba(192, 192, 192, 0.5)"
-        },
         "hp": {
           "color": "#c0c0c0",
           "text_shadow": "0 0 8px rgba(192, 192, 192, 0.5)"
@@ -115,9 +71,6 @@
     "tier-3": {
       "combat_stats": {
         "atk": {
-          "color": "#cd7f32"
-        },
-        "def": {
           "color": "#cd7f32"
         },
         "hp": {
@@ -130,9 +83,6 @@
         "atk": {
           "color": "#ffffff"
         },
-        "def": {
-          "color": "#ffffff"
-        },
         "hp": {
           "color": "#ffffff"
         }
@@ -143,9 +93,6 @@
         "atk": {
           "color": "#b0e0e6"
         },
-        "def": {
-          "color": "#b0e0e6"
-        },
         "hp": {
           "color": "#b0e0e6"
         }
@@ -154,9 +101,6 @@
     "tier-6": {
       "combat_stats": {
         "atk": {
-          "color": "#ffffff"
-        },
-        "def": {
           "color": "#ffffff"
         },
         "hp": {
@@ -170,7 +114,6 @@
     "coordinate_system": "Top-left origin (0,0). X increases rightward, Y increases downward.",
     "react_integration": "Use these positions to absolutely-position text overlays on top of the card image.",
     "scaling": "If displaying card at different size, scale coordinates proportionally. E.g., if displayed at 150x225 (0.5x), multiply all coordinates by 0.5.",
-    "value_positioning": "Combat stats positions assume text should be centered within the .combat-value element. Use text-align: center and vertical alignment.",
-    "hp_bar": "HP bar fill width = (current_hp / max_hp) * max_width (268px)"
+    "value_positioning": "Combat stats positions assume text should be centered within the .combat-value element. Use text-align: center and vertical alignment."
   }
 }

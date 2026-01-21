@@ -179,3 +179,5 @@ plans/
 pnpm-lock.yaml
 
 assets/*
+
+apps/arena-mini-app/assets/candidates/*

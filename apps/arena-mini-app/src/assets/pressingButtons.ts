@@ -66,8 +66,8 @@ export type GameButtonVariant = 'primary' | 'secondary' | 'neutral' | 'danger'
 export const variantToColor: Record<GameButtonVariant, ButtonColor> = {
   primary: 'brown',
   secondary: 'blue',
-  neutral: 'grey',
-  danger: 'beige',
+  neutral: 'beige',
+  danger: 'grey',
 }
 
 /**

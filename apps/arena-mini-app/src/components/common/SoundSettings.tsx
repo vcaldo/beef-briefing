@@ -1,21 +1,22 @@
 /**
- * SoundSettings - Mute toggle button with volume slider popover
+ * SoundSettings - Simple mute/unmute toggle button
  *
- * Provides quick access to sound controls in the TabBar.
- * Clicking the speaker icon opens a popover with a volume slider.
+ * Provides quick sound toggle in the TabBar.
+ * Clicking the speaker icon toggles mute state directly (no popover).
+ * Volume is fixed at 50%.
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSoundContext } from '../../contexts'
 import { GameButton } from '../ui/GameButton'
 
 /**
- * Speaker icon that changes based on mute/volume state
+ * Speaker icon that shows muted or unmuted state
+ * - Muted: speaker with X
+ * - Unmuted: speaker with 2 sound waves (fixed 50% volume)
  */
-const SpeakerIcon = ({ isMuted, volume }: { isMuted: boolean; volume: number }) => {
-  // Determine which icon to show based on state
-  if (isMuted || volume === 0) {
-    // Muted / Volume off - speaker with X
+const SpeakerIcon = ({ isMuted }: { isMuted: boolean }) => {
+  if (isMuted) {
+    // Muted - speaker with X
     return (
       <svg
         width="24"
@@ -34,26 +35,7 @@ const SpeakerIcon = ({ isMuted, volume }: { isMuted: boolean; volume: number }) 
     )
   }
 
-  if (volume < 0.5) {
-    // Low volume - speaker with one wave
-    return (
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-      </svg>
-    )
-  }
-
-  // High volume - speaker with two waves
+  // Unmuted - speaker with two sound waves
   return (
     <svg
       width="24"
@@ -74,120 +56,28 @@ const SpeakerIcon = ({ isMuted, volume }: { isMuted: boolean; volume: number }) 
 
 /**
  * Sound settings component for TabBar
- * Shows a speaker icon that toggles a volume slider popover
+ * Simple toggle button - click to mute/unmute
+ * Styled consistently with tab items (icon + label)
  */
 export function SoundSettings() {
-  const { volume, setVolume, isMuted, toggleMute } = useSoundContext()
-  const [isOpen, setIsOpen] = useState(false)
-  const popoverRef = useRef<HTMLDivElement>(null)
-  const buttonRef = useRef<HTMLDivElement>(null)
-
-  // Close popover when clicking outside
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(event.target as Node) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isOpen])
-
-  // Close popover on escape key
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsOpen(false)
-        // Focus the button inside the wrapper
-        const button = buttonRef.current?.querySelector('button')
-        button?.focus()
-      }
-    }
-
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen])
-
-  const handleVolumeChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const newVolume = parseFloat(event.target.value)
-      setVolume(newVolume)
-    },
-    [setVolume]
-  )
-
-  const handleMuteClick = useCallback(() => {
-    toggleMute()
-  }, [toggleMute])
-
-  const handleTogglePopover = useCallback(() => {
-    setIsOpen((prev) => !prev)
-  }, [])
+  const { isMuted, toggleMute } = useSoundContext()
 
   return (
     <div className="sound-settings">
-      <div ref={buttonRef} className="sound-settings-btn-wrapper">
-        <GameButton
-          variant="neutral"
-          shape="square"
-          size="lg"
-          className="sound-settings-game-btn"
-          onClick={handleTogglePopover}
-          aria-label={isMuted ? 'Sound muted, click to open settings' : 'Sound on, click to open settings'}
-          aria-expanded={isOpen}
-          aria-haspopup="true"
-        >
-          <SpeakerIcon isMuted={isMuted} volume={volume} />
-        </GameButton>
-      </div>
-
-      {isOpen && (
-        <div ref={popoverRef} className="sound-settings-popover" role="dialog" aria-label="Sound settings">
-          <div className="sound-settings-header">
-            <span className="sound-settings-title">Sound</span>
-            <button
-              className={`sound-mute-btn ${isMuted ? 'muted' : ''}`}
-              onClick={handleMuteClick}
-              aria-label={isMuted ? 'Unmute sound' : 'Mute sound'}
-              aria-pressed={isMuted}
-            >
-              {isMuted ? 'OFF' : 'ON'}
-            </button>
-          </div>
-
-          <div className="sound-volume-control">
-            <label htmlFor="volume-slider" className="visually-hidden">
-              Volume
-            </label>
-            <input
-              id="volume-slider"
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={volume}
-              onChange={handleVolumeChange}
-              className="sound-volume-slider"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(volume * 100)}
-              aria-valuetext={`${Math.round(volume * 100)}%`}
-              disabled={isMuted}
-            />
-            <span className="sound-volume-value">{Math.round(volume * 100)}%</span>
-          </div>
-        </div>
-      )}
+      <GameButton
+        variant="neutral"
+        shape="square"
+        size="lg"
+        className="sound-settings-game-btn"
+        onClick={toggleMute}
+        aria-label={isMuted ? 'Sound muted, click to unmute' : 'Sound on, click to mute'}
+        aria-pressed={isMuted}
+      >
+        <span className="tab-icon">
+          <SpeakerIcon isMuted={isMuted} />
+        </span>
+        <span className="tab-label">{isMuted ? 'Muted' : 'Sound'}</span>
+      </GameButton>
     </div>
   )
 }

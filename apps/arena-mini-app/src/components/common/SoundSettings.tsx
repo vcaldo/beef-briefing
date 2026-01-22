@@ -7,6 +7,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSoundContext } from '../../contexts'
+import { GameButton } from '../ui/GameButton'
 
 /**
  * Speaker icon that changes based on mute/volume state
@@ -79,7 +80,7 @@ export function SoundSettings() {
   const { volume, setVolume, isMuted, toggleMute } = useSoundContext()
   const [isOpen, setIsOpen] = useState(false)
   const popoverRef = useRef<HTMLDivElement>(null)
-  const buttonRef = useRef<HTMLButtonElement>(null)
+  const buttonRef = useRef<HTMLDivElement>(null)
 
   // Close popover when clicking outside
   useEffect(() => {
@@ -107,7 +108,9 @@ export function SoundSettings() {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsOpen(false)
-        buttonRef.current?.focus()
+        // Focus the button inside the wrapper
+        const button = buttonRef.current?.querySelector('button')
+        button?.focus()
       }
     }
 
@@ -133,16 +136,20 @@ export function SoundSettings() {
 
   return (
     <div className="sound-settings">
-      <button
-        ref={buttonRef}
-        className="sound-settings-btn"
-        onClick={handleTogglePopover}
-        aria-label={isMuted ? 'Sound muted, click to open settings' : 'Sound on, click to open settings'}
-        aria-expanded={isOpen}
-        aria-haspopup="true"
-      >
-        <SpeakerIcon isMuted={isMuted} volume={volume} />
-      </button>
+      <div ref={buttonRef} className="sound-settings-btn-wrapper">
+        <GameButton
+          variant="neutral"
+          shape="square"
+          size="lg"
+          className="sound-settings-game-btn"
+          onClick={handleTogglePopover}
+          aria-label={isMuted ? 'Sound muted, click to open settings' : 'Sound on, click to open settings'}
+          aria-expanded={isOpen}
+          aria-haspopup="true"
+        >
+          <SpeakerIcon isMuted={isMuted} volume={volume} />
+        </GameButton>
+      </div>
 
       {isOpen && (
         <div ref={popoverRef} className="sound-settings-popover" role="dialog" aria-label="Sound settings">

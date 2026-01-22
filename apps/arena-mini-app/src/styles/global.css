@@ -350,6 +350,41 @@ a:focus:not(:focus-visible),
   letter-spacing: 0.04em;
 }
 
+/* =============================================================================
+   Tab Bar GameButton Styles
+   ============================================================================= */
+/* GameButton-based tab items */
+.tab-item-game {
+  flex: 0 1 auto;
+  margin: 4px 6px;
+}
+
+.tab-item-game .game-button-content {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tab-item-game .tab-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.tab-item-game .tab-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Active state icon scaling */
+.tab-item-game.active .tab-icon {
+  transform: scale(1.1);
+}
+
 /* Page container with bottom padding for tab bar */
 .page-container {
   flex: 1;
@@ -4160,6 +4195,22 @@ button,
   background: var(--arena-orange-10);
 }
 
+/* GameButton-based sound settings */
+.sound-settings-btn-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px 6px;
+}
+
+.sound-settings-game-btn {
+  color: var(--tg-theme-hint-color);
+}
+
+.sound-settings-game-btn[aria-expanded="true"] {
+  color: var(--arena-orange);
+}
+
 .sound-settings-popover {
   position: absolute;
   bottom: calc(100% + 12px);
@@ -4562,7 +4613,7 @@ button,
 }
 
 /* =============================================================================
-   GameButton Component Styles
+   GameButton Component Styles - Pressing Buttons
    ============================================================================= */
 
 /* Base game button styles */
@@ -4571,19 +4622,21 @@ button,
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: 0;
   cursor: pointer;
   font-family: 'Outfit', system-ui, sans-serif;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #1a1a2e;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
-  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  color: #2a1a0a;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: filter 0.1s ease;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  background-color: transparent;
+  image-rendering: pixelated;
 }
 
 /* Button content wrapper */
@@ -4592,21 +4645,19 @@ button,
   z-index: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  transition: transform 0.05s ease;
 }
 
-/* Hover state - brightens the button */
-.game-button:hover:not(.game-button-disabled) {
-  filter: brightness(1.1) saturate(1.1);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+/* Pressed state - content moves down to simulate press */
+.game-button-pressed .game-button-content {
+  transform: translateY(2px);
 }
 
-/* Active/pressed state - darkens and scales down */
-.game-button:active:not(.game-button-disabled) {
-  filter: brightness(0.95) saturate(1.05);
-  transform: translateY(1px) scale(0.98);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+/* Hover state - subtle brightness */
+.game-button:hover:not(.game-button-disabled):not(.game-button-pressed) {
+  filter: brightness(1.05);
 }
 
 /* Focus state for accessibility */
@@ -4618,80 +4669,72 @@ button,
 /* Disabled state */
 .game-button-disabled {
   cursor: not-allowed;
-  filter: grayscale(0.6) brightness(0.7);
-  opacity: 0.7;
+  filter: grayscale(0.5) brightness(0.8);
+  opacity: 0.6;
 }
 
-/* Variant-specific text colors for better contrast */
+/* Shape variants */
+.game-button-long {
+  border-radius: 0;
+}
+
+.game-button-square {
+  border-radius: 0;
+  aspect-ratio: 1;
+}
+
+/* Variant-specific text colors for pressing buttons */
 .game-button-primary {
-  color: #3d2800;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  /* Brown button */
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .game-button-secondary {
-  color: #0a1a3d;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+  /* Blue button */
+  color: #1a2a4a;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .game-button-neutral {
-  color: #1a1a2e;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+  /* Grey button */
+  color: #2a2a2a;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .game-button-danger {
-  color: #3d0a0a;
+  /* Beige button */
+  color: #3a2a1a;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 /* Size-specific adjustments */
 .game-button-sm {
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
 }
 
 .game-button-md {
-  font-size: 0.875rem;
+  font-size: 0.8rem;
 }
 
 .game-button-lg {
-  font-size: 1rem;
-  letter-spacing: 0.06em;
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
 }
 
 /* Pulse animation for call-to-action buttons */
 @keyframes game-button-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4);
+    filter: brightness(1);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+    filter: brightness(1.15);
   }
 }
 
-.game-button-pulse {
-  animation: game-button-pulse 2s infinite;
-}
-
-/* Shine effect on hover for primary buttons */
-.game-button-primary::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.2),
-    transparent
-  );
-  transition: left 0.4s ease;
-  pointer-events: none;
-}
-
-.game-button-primary:hover:not(.game-button-disabled)::after {
-  left: 100%;
+.game-button-pulse:not(.game-button-disabled) {
+  animation: game-button-pulse 1.5s ease-in-out infinite;
 }
 
 /* ==========================================================================

@@ -1,9 +1,9 @@
 /**
- * GameButton - Themed button using image assets
+ * GameButton - Animated pressing button component
  *
- * A button component styled with game UI image assets as backgrounds.
- * Supports multiple variants (primary, secondary, danger, neutral) with
- * hover, active, and disabled states using CSS filters.
+ * A button component with press animation using normal/pressed image states.
+ * Supports multiple variants (primary, secondary, danger, neutral) and shapes
+ * (long, square) with visual feedback on interaction.
  *
  * Usage:
  * ```tsx
@@ -11,23 +11,28 @@
  *   Buy Card
  * </GameButton>
  *
- * <GameButton variant="danger" size="sm" disabled>
- *   Delete
+ * <GameButton variant="danger" size="sm" shape="square" disabled>
+ *   X
  * </GameButton>
  * ```
  */
 
-import { ButtonHTMLAttributes, ReactNode } from 'react'
-import { useImages } from '../../hooks/useImages'
-import { ButtonImageId } from '../../types/images'
+import { ButtonHTMLAttributes, ReactNode, useState, useCallback } from 'react'
+import {
+  getVariantButtonImages,
+  GameButtonVariant,
+  ButtonShape,
+} from '../../assets/pressingButtons'
 
-export type GameButtonVariant = 'primary' | 'secondary' | 'danger' | 'neutral'
+export type { GameButtonVariant }
 export type GameButtonSize = 'sm' | 'md' | 'lg'
 
 export interface GameButtonProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
   /** Button style variant */
   variant: GameButtonVariant
+  /** Button shape - long (default) or square */
+  shape?: ButtonShape
   /** Button size */
   size?: GameButtonSize
   /** Whether the button is disabled */
@@ -40,21 +45,35 @@ export interface GameButtonProps
   className?: string
 }
 
-// Size configurations for each button size
-const SIZE_CONFIGS: Record<GameButtonSize, { height: number; padding: string; fontSize: string }> = {
-  sm: { height: 32, padding: '0 12px', fontSize: '0.75rem' },
-  md: { height: 44, padding: '0 20px', fontSize: '0.875rem' },
-  lg: { height: 56, padding: '0 28px', fontSize: '1rem' },
+// Size configurations for long buttons
+const LONG_SIZE_CONFIGS: Record<
+  GameButtonSize,
+  { height: number; minWidth: number; padding: string; fontSize: string }
+> = {
+  sm: { height: 32, minWidth: 80, padding: '0 12px', fontSize: '0.75rem' },
+  md: { height: 44, minWidth: 110, padding: '0 20px', fontSize: '0.875rem' },
+  lg: { height: 56, minWidth: 140, padding: '0 28px', fontSize: '1rem' },
+}
+
+// Size configurations for square buttons
+const SQUARE_SIZE_CONFIGS: Record<
+  GameButtonSize,
+  { size: number; padding: string; fontSize: string }
+> = {
+  sm: { size: 32, padding: '0', fontSize: '0.75rem' },
+  md: { size: 44, padding: '0', fontSize: '0.875rem' },
+  lg: { size: 56, padding: '0', fontSize: '1rem' },
 }
 
 /**
- * GameButton component with image-based styling.
+ * GameButton component with press animation.
  *
- * Uses button images from object storage as backgrounds with CSS
- * filters for hover, active, and disabled states.
+ * Uses pressing button images that swap between normal and pressed states
+ * on mousedown/touchstart for tactile visual feedback.
  */
 export function GameButton({
   variant,
+  shape = 'long',
   size = 'md',
   disabled = false,
   onClick,
@@ -62,32 +81,68 @@ export function GameButton({
   className = '',
   ...buttonProps
 }: GameButtonProps) {
-  const { getUrlById } = useImages()
+  const [isPressed, setIsPressed] = useState(false)
 
-  // Get the button image URL for the variant
-  const buttonImageUrl = getUrlById(variant as ButtonImageId)
+  // Get button images for this variant and shape
+  const buttonImages = getVariantButtonImages(variant, shape)
+  const currentImage = isPressed && !disabled ? buttonImages.pressed : buttonImages.normal
 
-  // Get size configuration
-  const sizeConfig = SIZE_CONFIGS[size]
+  // Press handlers
+  const handlePressStart = useCallback(() => {
+    if (!disabled) {
+      setIsPressed(true)
+    }
+  }, [disabled])
+
+  const handlePressEnd = useCallback(() => {
+    setIsPressed(false)
+  }, [])
+
+  // Get size configuration based on shape
+  const isSquare = shape === 'square'
+  const longConfig = LONG_SIZE_CONFIGS[size]
+  const squareConfig = SQUARE_SIZE_CONFIGS[size]
+
+  const style = isSquare
+    ? {
+        backgroundImage: `url(${currentImage})`,
+        backgroundSize: '100% 100%',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        width: squareConfig.size,
+        height: squareConfig.size,
+        minWidth: squareConfig.size,
+        padding: squareConfig.padding,
+        fontSize: squareConfig.fontSize,
+      }
+    : {
+        backgroundImage: `url(${currentImage})`,
+        backgroundSize: '100% 100%',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        height: longConfig.height,
+        minWidth: longConfig.minWidth,
+        padding: longConfig.padding,
+        fontSize: longConfig.fontSize,
+      }
 
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={disabled ? undefined : onClick}
+      onMouseDown={handlePressStart}
+      onMouseUp={handlePressEnd}
+      onMouseLeave={handlePressEnd}
+      onTouchStart={handlePressStart}
+      onTouchEnd={handlePressEnd}
+      onTouchCancel={handlePressEnd}
       className={`game-button game-button-${variant} game-button-${size} ${
+        isSquare ? 'game-button-square' : 'game-button-long'
+      } ${isPressed && !disabled ? 'game-button-pressed' : ''} ${
         disabled ? 'game-button-disabled' : ''
       } ${className}`}
-      style={{
-        backgroundImage: `url(${buttonImageUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        height: sizeConfig.height,
-        padding: sizeConfig.padding,
-        fontSize: sizeConfig.fontSize,
-        minWidth: sizeConfig.height * 2.5,
-      }}
+      style={style}
       {...buttonProps}
     >
       <span className="game-button-content">{children}</span>

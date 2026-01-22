@@ -1,8 +1,7 @@
 /**
- * CardSlot - Hexagon frame for cards
+ * CardSlot - Container for cards
  *
- * A container component that provides a hexagonal frame around card content
- * using the hexagon_grey panel asset. Supports empty state, click interactions,
+ * A container component for card content. Supports empty state, click interactions,
  * and visual variants for different states.
  *
  * Usage:
@@ -22,7 +21,6 @@
  */
 
 import { ReactNode, MouseEvent } from 'react'
-import { useImages } from '../../hooks/useImages'
 
 export type CardSlotVariant = 'default' | 'hover' | 'selected'
 
@@ -40,10 +38,9 @@ export interface CardSlotProps {
 }
 
 /**
- * CardSlot component providing a hexagonal frame for cards.
+ * CardSlot component providing a container for cards.
  *
- * Uses the hexagon_grey panel asset as a decorative frame around
- * card content with support for empty states and interaction variants.
+ * Supports empty states and interaction variants.
  */
 export function CardSlot({
   children,
@@ -52,11 +49,6 @@ export function CardSlot({
   variant = 'default',
   className = '',
 }: CardSlotProps) {
-  const { getUrlById } = useImages()
-
-  // Get the hexagon frame image URL
-  const hexagonFrameUrl = getUrlById('hexagon_grey')
-
   // Determine if the slot is interactive
   const isInteractive = !!onClick
 
@@ -88,28 +80,6 @@ export function CardSlot({
           : undefined
       }
     >
-      {/* Hexagon frame overlay - positioned at corners */}
-      <div
-        className="card-slot-frame card-slot-frame-tl"
-        style={{ backgroundImage: `url(${hexagonFrameUrl})` }}
-        aria-hidden="true"
-      />
-      <div
-        className="card-slot-frame card-slot-frame-tr"
-        style={{ backgroundImage: `url(${hexagonFrameUrl})` }}
-        aria-hidden="true"
-      />
-      <div
-        className="card-slot-frame card-slot-frame-bl"
-        style={{ backgroundImage: `url(${hexagonFrameUrl})` }}
-        aria-hidden="true"
-      />
-      <div
-        className="card-slot-frame card-slot-frame-br"
-        style={{ backgroundImage: `url(${hexagonFrameUrl})` }}
-        aria-hidden="true"
-      />
-
       {/* Content area */}
       <div className="card-slot-content">
         {empty ? (

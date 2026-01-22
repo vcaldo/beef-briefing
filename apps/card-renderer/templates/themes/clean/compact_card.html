@@ -343,7 +343,7 @@
             </div>
             <div class="user-info">
                 <div class="username">{{ user.first_name }}{% if user.last_name %} {{ user.last_name }}{% endif %}</div>
-                {% if user.username %}<div class="handle">@{{ user.username }}</div>{% endif %}
+                <div class="handle">{% if user.username %}@{{ user.username }}{% else %}&nbsp;{% endif %}</div>
             </div>
         </div>
 

@@ -1,5 +1,6 @@
 import React from 'react'
 import type { PlaceholderPositions, CardAnimationState } from '../../types'
+import { HPBar } from '../battle/HPBar'
 
 /** Current stat values to display on the card */
 interface CardStats {
@@ -7,6 +8,16 @@ interface CardStats {
   hp: number
   maxHp: number
 }
+
+/**
+ * Position adjustments for stat overlays.
+ * These offsets move stats toward the center and down to avoid
+ * overlapping with pre-rendered card text.
+ */
+const STAT_X_OFFSET = 26 // Move ATK right, HP left (toward center)
+const STAT_Y_OFFSET = -3 // Move both stats down
+const STAT_FONT_SCALE = 2.8 // Scale up font size ~40% (26px → 36px)
+const HP_BAR_Y_OFFSET = 10 // Negative moves bar up
 
 interface CompactCardProps {
   /** Presigned URL to the compact card image (300x450) */
@@ -85,6 +96,7 @@ export function CompactCard({
 }: CompactCardProps): React.JSX.Element {
   // Extract position data with fallbacks
   const combatStats = positions?.placeholders?.combat_stats
+  const hpBarPositions = positions?.placeholders?.hp_bar
 
   // Determine if card is dead (explicit prop or derived from HP)
   const isCardDead = isDead ?? currentStats.hp <= 0
@@ -130,44 +142,75 @@ export function CompactCard({
       {/* Stat overlays - only render if positions are provided */}
       {combatStats && (
         <>
-          {/* ATK overlay */}
+          {/* ATK overlay - offset toward center and down */}
           <div
             className="compact-card-stat"
             style={{
-              left: `${combatStats.atk.x}px`,
-              top: `${combatStats.atk.y}px`,
+              left: `${combatStats.atk.x + STAT_X_OFFSET}px`,
+              top: `${combatStats.atk.y + STAT_Y_OFFSET}px`,
               width: `${combatStats.atk.width}px`,
-              fontSize: `${combatStats.atk.font_size}px`,
+              fontSize: `${Math.round(combatStats.atk.font_size * STAT_FONT_SCALE)}px`,
               fontWeight: combatStats.atk.font_weight || 'bold',
               color: combatStats.atk.color,
               textAlign: (combatStats.atk.text_align as React.CSSProperties['textAlign']) || 'center',
               transform: combatStats.atk.anchor === 'center' ? 'translateX(-50%)' : undefined,
-              textShadow: combatStats.atk.text_shadow || '0 1px 3px rgba(0, 0, 0, 0.8)',
+              textShadow: combatStats.atk.text_shadow || '0 2px 4px rgba(0, 0, 0, 0.9)',
             }}
             aria-label={`Attack: ${currentStats.atk}`}
           >
             {currentStats.atk}
           </div>
 
-          {/* HP overlay */}
+          {/* HP overlay - offset toward center and down */}
           <div
             className="compact-card-stat"
             style={{
-              left: `${combatStats.hp.x}px`,
-              top: `${combatStats.hp.y}px`,
+              left: `${combatStats.hp.x - STAT_X_OFFSET}px`,
+              top: `${combatStats.hp.y + STAT_Y_OFFSET}px`,
               width: `${combatStats.hp.width}px`,
-              fontSize: `${combatStats.hp.font_size}px`,
+              fontSize: `${Math.round(combatStats.hp.font_size * STAT_FONT_SCALE)}px`,
               fontWeight: combatStats.hp.font_weight || 'bold',
               color: combatStats.hp.color,
               textAlign: (combatStats.hp.text_align as React.CSSProperties['textAlign']) || 'center',
               transform: combatStats.hp.anchor === 'center' ? 'translateX(-50%)' : undefined,
-              textShadow: combatStats.hp.text_shadow || '0 1px 3px rgba(0, 0, 0, 0.8)',
+              textShadow: combatStats.hp.text_shadow || '0 2px 4px rgba(0, 0, 0, 0.9)',
             }}
             aria-label={`HP: ${currentStats.hp} / ${currentStats.maxHp}`}
           >
             {currentStats.hp}
           </div>
         </>
+      )}
+
+      {/* HP Bar - positioned using API coordinates or fallback */}
+      {/* Bar is moved up by its height so bottom edge aligns with API y position */}
+      {hpBarPositions ? (
+        <div
+          className="compact-card-hp-bar"
+          style={{
+            left: `${hpBarPositions.container.x}px`,
+            top: `${hpBarPositions.container.y - hpBarPositions.container.height - HP_BAR_Y_OFFSET}px`,
+            width: `${hpBarPositions.container.width}px`,
+            height: `${hpBarPositions.container.height}px`,
+            borderRadius: `${hpBarPositions.container.border_radius}px`,
+          }}
+        >
+          <HPBar
+            current={currentStats.hp}
+            max={currentStats.maxHp}
+            width={hpBarPositions.container.width}
+            height={hpBarPositions.container.height}
+          />
+        </div>
+      ) : (
+        <div className="compact-card-hp-bar-fallback">
+          <HPBar
+            current={currentStats.hp}
+            max={currentStats.maxHp}
+            width={268}
+            height={8}
+          />
+        </div>
       )}
 
       {/* Damage number overlay - displayed during damage phase */}

@@ -60,8 +60,8 @@ const STORAGE_MUTED_KEY = 'arena-sound-muted'
 // Audio pool size for overlapping sounds
 const POOL_SIZE = 4
 
-// Default volume (0-1)
-const DEFAULT_VOLUME = 0.7
+// Default volume (0-1) - fixed at 50%
+const DEFAULT_VOLUME = 0.5
 
 export interface UseSoundOptions {
   /** Base URL for sound files (e.g., "http://localhost:9000/beef-briefing/sounds/arena") */

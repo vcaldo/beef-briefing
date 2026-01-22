@@ -4139,6 +4139,167 @@ button,
   min-width: auto;
 }
 
+/* =============================================================================
+   RPG Panel Styles (9-slice border-image)
+   ============================================================================= */
+
+.rpg-panel {
+  box-sizing: border-box;
+  border-style: solid;
+  border-image-repeat: stretch;
+  image-rendering: pixelated;
+}
+
+/* Outer brown wooden frame - thin margin style */
+.rpg-panel-outer {
+  border-width: 10px;
+  border-image-slice: 24 fill;
+  padding: 2px;
+  background: transparent;
+}
+
+/* Inner beige inset panel */
+.rpg-panel-inner {
+  border-width: 14px;
+  border-image-slice: 18 fill;
+  padding: 12px;
+  background: transparent;
+}
+
+/* Nested structure: outer contains inner */
+.rpg-panel-outer .rpg-panel-inner {
+  margin: 0;
+}
+
+/* ============================================
+   RPG Match Card (Lobby Active Match)
+   ============================================ */
+
+.rpg-match-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+}
+
+/* Inner content panel - contains timer, participants, status */
+.rpg-match-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Timer styling - inside beige panel */
+.rpg-match-card-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  color: #4a3a2a;
+  border-bottom: 1px solid rgba(90, 74, 58, 0.2);
+  padding-bottom: 8px;
+}
+
+.rpg-match-card-timer .timer-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6a5a4a;
+}
+
+.rpg-match-card-timer .countdown-timer {
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  color: #3a2a1a;
+}
+
+/* Timer urgent state for RPG panel */
+.rpg-match-card-timer .countdown-timer.urgent {
+  color: #8a2a2a;
+}
+
+.rpg-match-card-timer .countdown-timer.warning {
+  color: #7a4a1a;
+}
+
+/* Participants section */
+.rpg-match-card-participants {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rpg-match-card-participants .participants-label {
+  font-size: 12px;
+  color: #5a4a3a;
+  font-weight: 600;
+}
+
+.rpg-match-card-participants .participants-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rpg-match-card-participants .participants-count {
+  font-size: 11px;
+  color: #6a5a4a;
+  margin-top: auto;
+}
+
+/* Status styling - inside beige panel at bottom */
+.rpg-match-card-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 4px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  font-style: italic;
+  border-top: 1px solid rgba(90, 74, 58, 0.2);
+}
+
+/* Status colors - warm tones matching beige theme */
+.rpg-match-card-status.status-open {
+  color: #5a6a3a;
+}
+
+.rpg-match-card-status.status-shop_phase {
+  color: #3a5a6a;
+}
+
+/* Participant chip styling for RPG theme */
+.rpg-match-card .participant-chip {
+  background: rgba(90, 74, 58, 0.15);
+  border: 1px solid rgba(90, 74, 58, 0.3);
+  color: #4a3a2a;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+}
+
+.rpg-match-card .participant-chip.is-you {
+  background: rgba(90, 74, 58, 0.25);
+  border-color: rgba(90, 74, 58, 0.5);
+}
+
+.rpg-match-card .participant-creator-badge {
+  font-size: 12px;
+}
+
+/* Actions area - in outer brown frame */
+.rpg-match-card-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 12px;
+  justify-content: center;
+}
+
 /* App container */
 .app {
   min-height: 100vh;

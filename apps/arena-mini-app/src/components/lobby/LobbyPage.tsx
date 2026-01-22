@@ -13,7 +13,7 @@ import { useState, useCallback, useRef } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
-import { GameButton } from '../ui'
+import { GameButton, RPGPanel } from '../ui'
 import { usePolling, useErrorBanner, useImages } from '../../hooks'
 import { useSoundContext } from '../../contexts'
 
@@ -58,7 +58,6 @@ export function LobbyPage({
   // Image assets
   const { getUrl } = useImages()
   const bannerModernUrl = getUrl('panels', 'banner_modern')
-  const hexagonGreyUrl = getUrl('panels', 'hexagon_grey')
 
   // Track whether initial fetch is complete - used to distinguish page reload from real-time transitions
   const initialFetchDoneRef = useRef(false)
@@ -401,34 +400,29 @@ export function LobbyPage({
         />
       )}
 
-      {/* Active match card */}
+      {/* Active match card - RPG Panel style */}
       {activeMatch && (
         <section className="lobby-active-match">
-          <div
-            className="match-card active lobby-match-card-themed"
-            style={{
-              backgroundImage: `url(${bannerModernUrl})`,
-            }}
-          >
-            <div className="match-card-header">
-              <span className="match-card-badge">Your Match</span>
-              <span className={`match-card-status status-${activeMatch.status}`}>
-                {activeMatch.status === 'open'
-                  ? 'Waiting for players'
-                  : activeMatch.status === 'shop_phase'
-                    ? 'Shopping Phase'
-                    : activeMatch.status.replace('_', ' ')}
-              </span>
-            </div>
+          <RPGPanel variant="outer" className="rpg-match-card">
+            {/* Inner beige panel with timer, participants, and status */}
+            <RPGPanel variant="inner" className="rpg-match-card-content">
+              {/* Timer at top - inside inner panel */}
+              {activeMatch.status === 'open' && activeMatch.join_deadline && (
+                <div className="rpg-match-card-timer">
+                  <span className="timer-label">Starts in:</span>
+                  <CountdownTimer
+                    deadline={activeMatch.join_deadline}
+                    onExpire={() => {
+                      addPageAction('match_auto_start', { match_id: activeMatch.id })
+                    }}
+                    onTick={handleCountdownTick}
+                    timerThresholds={gameConstants?.timer_thresholds}
+                  />
+                </div>
+              )}
 
-            <div className="match-card-body">
-              {/* Participants panel with hexagon frame */}
-              <div
-                className="match-card-participants lobby-info-panel"
-                style={{
-                  backgroundImage: `url(${hexagonGreyUrl})`,
-                }}
-              >
+              {/* Participants */}
+              <div className="rpg-match-card-participants">
                 <span className="participants-label">Players:</span>
                 <div className="participants-list">
                   {activeMatch.participants?.map((p) => (
@@ -453,56 +447,43 @@ export function LobbyPage({
                 </span>
               </div>
 
-              {/* Countdown timer with Sci-fi glassPanel styling */}
-              {activeMatch.status === 'open' && activeMatch.join_deadline && (
-                <div className="match-card-timer lobby-timer-badge">
-                  <span className="timer-label">Match starts in:</span>
-                  <CountdownTimer
-                    deadline={activeMatch.join_deadline}
-                    onExpire={() => {
-                      addPageAction('match_auto_start', { match_id: activeMatch.id })
-                    }}
-                    onTick={handleCountdownTick}
-                    timerThresholds={gameConstants?.timer_thresholds}
-                  />
-                </div>
-              )}
-            </div>
+              {/* Status at bottom - inside inner panel */}
+              <div className={`rpg-match-card-status status-${activeMatch.status}`}>
+                {activeMatch.status === 'open'
+                  ? 'Waiting for player...'
+                  : activeMatch.status === 'shop_phase'
+                    ? 'Shopping Phase'
+                    : activeMatch.status.replace('_', ' ')}
+              </div>
+            </RPGPanel>
+          </RPGPanel>
 
-            <div className="match-card-actions">
-              {activeMatch.status === 'shop_phase' ? (
-                /* Continue to Shop button for shop_phase */
+          {/* Action buttons - outside both panels */}
+          <div className="rpg-match-card-actions">
+            {activeMatch.status === 'shop_phase' ? (
+              <GameButton variant="primary" size="lg" onClick={onNavigateToShop}>
+                Continue to Shop
+              </GameButton>
+            ) : (
+              <>
                 <GameButton
-                  variant="primary"
-                  size="lg"
-                  onClick={onNavigateToShop}
+                  variant="neutral"
+                  onClick={() => handleLeaveMatch(activeMatch.id)}
+                  disabled={actionLoading !== null}
                 >
-                  Continue to Shop
+                  {actionLoading === 'leave' ? <LoadingSpinner size="sm" inline /> : 'Leave Match'}
                 </GameButton>
-              ) : (
-                <>
-                  {/* Leave button */}
+                {canStartEarly && (
                   <GameButton
-                    variant="neutral"
-                    onClick={() => handleLeaveMatch(activeMatch.id)}
+                    variant="primary"
+                    onClick={() => handleStartMatch(activeMatch.id)}
                     disabled={actionLoading !== null}
                   >
-                    {actionLoading === 'leave' ? <LoadingSpinner size="sm" inline /> : 'Leave Match'}
+                    {actionLoading === 'start' ? <LoadingSpinner size="sm" inline /> : 'Start Now'}
                   </GameButton>
-
-                  {/* Start early button (creator only with 2+ players) */}
-                  {canStartEarly && (
-                    <GameButton
-                      variant="primary"
-                      onClick={() => handleStartMatch(activeMatch.id)}
-                      disabled={actionLoading !== null}
-                    >
-                      {actionLoading === 'start' ? <LoadingSpinner size="sm" inline /> : 'Start Now'}
-                    </GameButton>
-                  )}
-                </>
-              )}
-            </div>
+                )}
+              </>
+            )}
           </div>
         </section>
       )}

@@ -226,8 +226,6 @@ export function ShopPage({
     if (!activeMatch || actionLoading || !canReroll) return
 
     setActionLoading('reroll')
-    // Play card_shuffle sound during reroll animation (before API call)
-    play('card_shuffle')
     try {
       const data = await apiClient.rerollShop(activeMatch.id)
       addPageAction('shop_rerolled', {
@@ -236,7 +234,7 @@ export function ShopPage({
       })
       // Note: After reroll, canReroll remains true until a card is bought
       setShopData(data)
-      play('shop_reroll')
+      play('card_shuffle')
       play('card_draw')
     } catch (err) {
       console.error('Failed to reroll shop:', err)

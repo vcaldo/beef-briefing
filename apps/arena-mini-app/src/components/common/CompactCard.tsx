@@ -14,10 +14,10 @@ interface CardStats {
  * These offsets move stats toward the center and down to avoid
  * overlapping with pre-rendered card text.
  */
-const STAT_X_OFFSET = 15 // Move ATK right, HP left (toward center)
-const STAT_Y_OFFSET = 4 // Move both stats down
+const STAT_X_OFFSET = 26 // Move ATK right, HP left (toward center)
+const STAT_Y_OFFSET = -3 // Move both stats down
 const STAT_FONT_SCALE = 2.8 // Scale up font size ~40% (26px → 36px)
-const HP_BAR_Y_OFFSET = 10 // Move HP bar up
+const HP_BAR_Y_OFFSET = 10 // Negative moves bar up
 
 interface CompactCardProps {
   /** Presigned URL to the compact card image (300x450) */

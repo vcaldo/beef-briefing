@@ -206,8 +206,8 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
     (soundId: SoundId, variant?: number): string => {
       const version = import.meta.env.VITE_SOUND_VERSION || '1'
       if (variant !== undefined) {
-        // Variant sounds are stored in subdirectories: arena_battle_attack/arena_battle_attack_1.ogg
-        return `${baseUrl}/${soundId}/${soundId}_${variant}.ogg?v=${version}`
+        // Variant sounds use suffix: arena_battle_attack_1.ogg
+        return `${baseUrl}/${soundId}_${variant}.ogg?v=${version}`
       }
       return `${baseUrl}/${soundId}.ogg?v=${version}`
     },

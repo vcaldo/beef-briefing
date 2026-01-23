@@ -10,12 +10,12 @@ All sounds are `.ogg` format stored at `{VITE_SOUND_BASE_URL}/{soundId}.ogg`.
 
 ### Sound Variants
 
-Some sounds have multiple variants that are randomly selected at play time for variety. Variant sounds are stored in subdirectories:
+Some sounds have multiple variants that are randomly selected at play time for variety. Variant sounds use a numbered suffix:
 
 | Sound ID | Variants | Path Pattern |
 |----------|----------|--------------|
-| `arena_battle_attack` | 10 | `arena_battle_attack/arena_battle_attack_{1-10}.ogg` |
-| `arena_battle_damage` | 10 | `arena_battle_damage/arena_battle_damage_{1-10}.ogg` |
+| `arena_battle_attack` | 10 | `arena_battle_attack_{1-10}.ogg` |
+| `arena_battle_damage` | 10 | `arena_battle_damage_{1-10}.ogg` |
 
 When `play('arena_battle_attack')` is called, a random variant (1-10) is selected and played. All variants are preloaded together when the `battle` category is preloaded.
 

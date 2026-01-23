@@ -46,7 +46,7 @@ export function TeamPhaseModal({
   onMatchChange,
 }: TeamPhaseModalProps) {
   // Sound context
-  const { play } = useSoundContext()
+  const { play, playSequence } = useSoundContext()
 
   // Image URLs for icons and panel background
   const { getUrlById } = useImages()
@@ -206,14 +206,14 @@ export function TeamPhaseModal({
     try {
       const data = await apiClient.submitTeam(activeMatch.id)
       onShopDataChange(data)
-      play('arena_button_click')
+      playSequence(['arena_button_click', 'arena_success'])
     } catch (err) {
       console.error('Failed to submit team:', err)
       play('arena_error')
     } finally {
       setActionLoading(null)
     }
-  }, [activeMatch, actionLoading, isSubmitted, onShopDataChange, play])
+  }, [activeMatch, actionLoading, isSubmitted, onShopDataChange, play, playSequence])
 
   return (
     <div className="team-phase-backdrop">

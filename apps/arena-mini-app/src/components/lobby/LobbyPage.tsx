@@ -84,12 +84,12 @@ export function LobbyPage({
 
       // Play warning sound at 3s, 2s, 1s
       if (remainingSeconds <= 3 && remainingSeconds > 0) {
-        play('countdown_warning')
+        play('arena_countdown_warning')
         lastTickSoundRef.current = remainingSeconds
       }
       // Play tick sound at 10s down to 4s (before warning kicks in)
       else if (remainingSeconds <= 10 && remainingSeconds > 3) {
-        play('countdown_tick')
+        play('arena_countdown_tick')
         lastTickSoundRef.current = remainingSeconds
       }
     },
@@ -127,7 +127,7 @@ export function LobbyPage({
       if (userMatch && userMatch.status === 'shop_phase') {
         if (initialFetchDoneRef.current) {
           // Real-time transition - auto-navigate to shop
-          play('lobby_start')
+          play('arena_lobby_start')
           addPageAction('match_phase_transition', {
             match_id: userMatch.id,
             from_status: activeMatch?.status || 'open',
@@ -196,7 +196,7 @@ export function LobbyPage({
     (match: Match) => {
       // Check for phase transition to shop
       if (match.status === 'shop_phase') {
-        play('lobby_start')
+        play('arena_lobby_start')
         addPageAction('match_phase_transition', {
           match_id: match.id,
           from_status: activeMatch?.status,
@@ -276,7 +276,7 @@ export function LobbyPage({
     setActionLoading('create')
     try {
       const match = await apiClient.createMatch(chatId)
-      play('lobby_create')
+      play('arena_lobby_create')
       addPageAction('match_created', { match_id: match.id })
       onMatchChange(match)
       // usePolling will automatically refresh the list on next interval
@@ -298,7 +298,7 @@ export function LobbyPage({
       setActionLoading('join')
       try {
         const match = await apiClient.joinMatch(matchId)
-        play('lobby_join')
+        play('arena_lobby_join')
         addPageAction('match_joined', { match_id: matchId })
         onMatchChange(match)
       } catch (err) {
@@ -348,7 +348,7 @@ export function LobbyPage({
 
         // If match transitioned to shop phase, navigate
         if (match.status === 'shop_phase') {
-          play('lobby_start')
+          play('arena_lobby_start')
           onMatchChange(match)
           onNavigateToShop()
         } else {

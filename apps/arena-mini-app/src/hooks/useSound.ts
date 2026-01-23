@@ -13,25 +13,25 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 
 // All available sound IDs in the game
 export type SoundId =
-  | 'lobby_create'
-  | 'lobby_join'
-  | 'lobby_start'
-  | 'button_click'
-  | 'team_place'
-  | 'team_upgrade'
-  | 'battle_attack'
-  | 'battle_damage'
-  | 'battle_death'
-  | 'battle_win'
-  | 'battle_lose'
-  | 'error'
-  | 'coin_spend'
-  | 'card_draw'
-  | 'card_shuffle'
-  | 'countdown_tick'
-  | 'countdown_warning'
-  | 'success'
-  | 'critical_hp'
+  | 'arena_lobby_create'
+  | 'arena_lobby_join'
+  | 'arena_lobby_start'
+  | 'arena_button_click'
+  | 'arena_team_place'
+  | 'arena_team_upgrade'
+  | 'arena_battle_attack'
+  | 'arena_battle_damage'
+  | 'arena_battle_death'
+  | 'arena_battle_win'
+  | 'arena_battle_lose'
+  | 'arena_error'
+  | 'arena_coin_spend'
+  | 'arena_card_draw'
+  | 'arena_card_shuffle'
+  | 'arena_countdown_tick'
+  | 'arena_countdown_warning'
+  | 'arena_success'
+  | 'arena_critical_hp'
 
 // Sound categories for preloading
 export type SoundCategory = 'lobby' | 'shop' | 'team' | 'battle'
@@ -54,17 +54,17 @@ export interface PlaySequenceOptions {
 
 // Map categories to their sound IDs
 const CATEGORY_SOUNDS: Record<SoundCategory, SoundId[]> = {
-  lobby: ['lobby_create', 'lobby_join', 'lobby_start', 'countdown_tick', 'countdown_warning'],
-  shop: ['button_click', 'card_draw', 'card_shuffle', 'coin_spend', 'error', 'success'],
-  team: ['team_place', 'team_upgrade', 'button_click', 'error'],
-  battle: ['battle_attack', 'battle_damage', 'battle_death', 'battle_win', 'battle_lose', 'critical_hp'],
+  lobby: ['arena_lobby_create', 'arena_lobby_join', 'arena_lobby_start', 'arena_countdown_tick', 'arena_countdown_warning'],
+  shop: ['arena_button_click', 'arena_card_draw', 'arena_card_shuffle', 'arena_coin_spend', 'arena_error', 'arena_success'],
+  team: ['arena_team_place', 'arena_team_upgrade', 'arena_button_click', 'arena_error'],
+  battle: ['arena_battle_attack', 'arena_battle_damage', 'arena_battle_death', 'arena_battle_win', 'arena_battle_lose', 'arena_critical_hp'],
 }
 
 // Sounds with multiple variants (randomly selected at play time)
 // Maps soundId to number of variants available
 const SOUND_VARIANTS: Partial<Record<SoundId, number>> = {
-  battle_attack: 10,
-  battle_damage: 10,
+  arena_battle_attack: 10,
+  arena_battle_damage: 10,
 }
 
 // localStorage keys
@@ -121,7 +121,7 @@ export interface UseSoundReturn {
  * preloadCategory('lobby')
  *
  * // Play a sound
- * play('lobby_create')
+ * play('arena_lobby_create')
  * ```
  */
 export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
@@ -205,7 +205,7 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
     (soundId: SoundId, variant?: number): string => {
       const version = import.meta.env.VITE_SOUND_VERSION || '1'
       if (variant !== undefined) {
-        // Variant sounds are stored in subdirectories: battle_attack/battle_attack_1.ogg
+        // Variant sounds are stored in subdirectories: arena_battle_attack/arena_battle_attack_1.ogg
         return `${baseUrl}/${soundId}/${soundId}_${variant}.ogg?v=${version}`
       }
       return `${baseUrl}/${soundId}.ogg?v=${version}`

@@ -341,7 +341,7 @@ export function useBattleAnimation(
             })
 
             // Play attack sound when attacker starts attacking
-            onPlaySound?.('battle_attack')
+            onPlaySound?.('arena_battle_attack')
 
             // Trigger 'attack' visual effect on the attacker card
             if (getCardPosition) {
@@ -388,7 +388,7 @@ export function useBattleAnimation(
             setDamageTargetKey(defenderKey)
 
             // Play damage sound when defender takes damage
-            onPlaySound?.('battle_damage')
+            onPlaySound?.('arena_battle_damage')
 
             // Trigger 'damage' visual effect on the defender card
             if (getCardPosition) {
@@ -440,7 +440,7 @@ export function useBattleAnimation(
                 const wasAboveCritical = defender.hp > criticalThreshold
                 const isNowCritical = clampedHp <= criticalThreshold && clampedHp > 0
                 if (wasAboveCritical && isNowCritical) {
-                  onPlaySound?.('critical_hp')
+                  onPlaySound?.('arena_critical_hp')
                 }
 
                 // Only update HP here - is_alive will be set in 'complete' phase
@@ -528,7 +528,7 @@ export function useBattleAnimation(
       })
 
       // Play death sound for each death
-      deaths.forEach(() => onPlaySound?.('battle_death'))
+      deaths.forEach(() => onPlaySound?.('arena_battle_death'))
 
       // Trigger 'death' visual effect for the first death
       // Note: We only show one death effect at a time to avoid visual clutter

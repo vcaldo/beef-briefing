@@ -199,7 +199,7 @@ export function BattlePage({
         const isUserWinner = battleData.winner_id === userId
         const isDraw = battleData.is_draw
         if (!isDraw) {
-          playSound(isUserWinner ? 'battle_win' : 'battle_lose')
+          playSound(isUserWinner ? 'arena_battle_win' : 'arena_battle_lose')
         }
       }
     }

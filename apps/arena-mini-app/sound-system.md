@@ -14,34 +14,34 @@ Some sounds have multiple variants that are randomly selected at play time for v
 
 | Sound ID | Variants | Path Pattern |
 |----------|----------|--------------|
-| `battle_attack` | 10 | `battle_attack/battle_attack_{1-10}.ogg` |
-| `battle_damage` | 10 | `battle_damage/battle_damage_{1-10}.ogg` |
+| `arena_battle_attack` | 10 | `arena_battle_attack/arena_battle_attack_{1-10}.ogg` |
+| `arena_battle_damage` | 10 | `arena_battle_damage/arena_battle_damage_{1-10}.ogg` |
 
-When `play('battle_attack')` is called, a random variant (1-10) is selected and played. All variants are preloaded together when the `battle` category is preloaded.
+When `play('arena_battle_attack')` is called, a random variant (1-10) is selected and played. All variants are preloaded together when the `battle` category is preloaded.
 
 ## Sound Registry
 
 | Sound ID | Category | Description |
 |----------|----------|-------------|
-| `lobby_create` | lobby | Match created by user |
-| `lobby_join` | lobby | User joined a match |
-| `lobby_start` | lobby | Match transitioned to shop phase |
-| `countdown_tick` | lobby | Timer tick (10s to 4s remaining) |
-| `countdown_warning` | lobby | Timer warning (3s to 1s remaining) |
-| `button_click` | shop/team | Generic button interaction |
-| `card_draw` | shop | Cards dealt/drawn |
-| `card_shuffle` | shop | Cards shuffled (reroll) |
-| `coin_spend` | shop | Coins spent |
-| `error` | shop/team | Action failed |
-| `success` | shop | Action succeeded |
-| `team_place` | team | Card placed/reordered in team |
-| `team_upgrade` | team | Card upgraded |
-| `battle_attack` | battle | Attacker initiates attack (10 variants) |
-| `battle_damage` | battle | Defender takes damage (10 variants) |
-| `battle_death` | battle | Card dies |
-| `battle_win` | battle | User won the battle |
-| `battle_lose` | battle | User lost the battle |
-| `critical_hp` | battle | Card HP drops below 25% |
+| `arena_lobby_create` | lobby | Match created by user |
+| `arena_lobby_join` | lobby | User joined a match |
+| `arena_lobby_start` | lobby | Match transitioned to shop phase |
+| `arena_countdown_tick` | lobby | Timer tick (10s to 4s remaining) |
+| `arena_countdown_warning` | lobby | Timer warning (3s to 1s remaining) |
+| `arena_button_click` | shop/team | Generic button interaction |
+| `arena_card_draw` | shop | Cards dealt/drawn |
+| `arena_card_shuffle` | shop | Cards shuffled (reroll) |
+| `arena_coin_spend` | shop | Coins spent |
+| `arena_error` | shop/team | Action failed |
+| `arena_success` | shop | Action succeeded |
+| `arena_team_place` | team | Card placed/reordered in team |
+| `arena_team_upgrade` | team | Card upgraded |
+| `arena_battle_attack` | battle | Attacker initiates attack (10 variants) |
+| `arena_battle_damage` | battle | Defender takes damage (10 variants) |
+| `arena_battle_death` | battle | Card dies |
+| `arena_battle_win` | battle | User won the battle |
+| `arena_battle_lose` | battle | User lost the battle |
+| `arena_critical_hp` | battle | Card HP drops below 25% |
 
 ## Where Sounds Are Played
 
@@ -49,47 +49,47 @@ When `play('battle_attack')` is called, a random variant (1-10) is selected and 
 
 | Sound | Trigger | Line |
 |-------|---------|------|
-| `countdown_warning` | Timer at 3s, 2s, or 1s remaining | 87 |
-| `countdown_tick` | Timer between 10s and 4s remaining | 92 |
-| `lobby_start` | Match transitions to shop_phase (real-time) | 130 |
-| `lobby_start` | Match details show shop_phase transition | 199 |
-| `lobby_create` | User creates a new match | 279 |
-| `lobby_join` | User joins an existing match | 301 |
-| `lobby_start` | User manually starts match early | 351 |
+| `arena_countdown_warning` | Timer at 3s, 2s, or 1s remaining | 87 |
+| `arena_countdown_tick` | Timer between 10s and 4s remaining | 92 |
+| `arena_lobby_start` | Match transitions to shop_phase (real-time) | 130 |
+| `arena_lobby_start` | Match details show shop_phase transition | 199 |
+| `arena_lobby_create` | User creates a new match | 279 |
+| `arena_lobby_join` | User joins an existing match | 301 |
+| `arena_lobby_start` | User manually starts match early | 351 |
 
 ### ShopPage.tsx
 
 | Sound | Trigger | Line |
 |-------|---------|------|
-| `card_draw` | Initial shop cards loaded | 125 |
-| `coin_spend` | Card purchased successfully | 196 |
-| `success` | Card purchased (with coin_spend) | 197 |
-| `error` | Card purchase failed | 201 |
-| `card_shuffle` | Shop rerolled successfully | 237 |
-| `card_draw` | Shop rerolled (new cards dealt) | 238 |
-| `error` | Reroll failed | 242 |
+| `arena_card_draw` | Initial shop cards loaded | 125 |
+| `arena_coin_spend` | Card purchased successfully | 196 |
+| `arena_success` | Card purchased (with coin_spend) | 197 |
+| `arena_error` | Card purchase failed | 201 |
+| `arena_card_shuffle` | Shop rerolled successfully | 237 |
+| `arena_card_draw` | Shop rerolled (new cards dealt) | 238 |
+| `arena_error` | Reroll failed | 242 |
 
 ### TeamPhaseModal.tsx
 
 | Sound | Trigger | Line |
 |-------|---------|------|
-| `team_place` | Card drag-and-drop reorder completed | 170 |
-| `error` | Reorder failed | 173 |
-| `team_upgrade` | Card ATK/HP upgrade successful | 190 |
-| `error` | Card upgrade failed | 193 |
-| `button_click` | Team submitted successfully | 210 |
-| `error` | Team submission failed | 213 |
+| `arena_team_place` | Card drag-and-drop reorder completed | 170 |
+| `arena_error` | Reorder failed | 173 |
+| `arena_team_upgrade` | Card ATK/HP upgrade successful | 190 |
+| `arena_error` | Card upgrade failed | 193 |
+| `arena_button_click` | Team submitted successfully | 210 |
+| `arena_error` | Team submission failed | 213 |
 
 ### BattlePage.tsx (via useBattleAnimation hook)
 
 | Sound | Trigger | Line (hook) |
 |-------|---------|-------------|
-| `battle_attack` | Attack animation starts (highlight phase) | 344 |
-| `battle_damage` | Damage animation plays (attack phase) | 391 |
-| `critical_hp` | Card HP drops below 25% threshold | 443 |
-| `battle_death` | Card is_alive set to false | 531 |
-| `battle_win` | Battle complete, user is winner | 202 (BattlePage) |
-| `battle_lose` | Battle complete, user is loser | 202 (BattlePage) |
+| `arena_battle_attack` | Attack animation starts (highlight phase) | 344 |
+| `arena_battle_damage` | Damage animation plays (attack phase) | 391 |
+| `arena_critical_hp` | Card HP drops below 25% threshold | 443 |
+| `arena_battle_death` | Card is_alive set to false | 531 |
+| `arena_battle_win` | Battle complete, user is winner | 202 (BattlePage) |
+| `arena_battle_lose` | Battle complete, user is loser | 202 (BattlePage) |
 
 ## Preloading Strategy
 
@@ -97,10 +97,10 @@ Sounds are preloaded by category to ensure they're ready when needed:
 
 | Category | When Preloaded | Sounds |
 |----------|----------------|--------|
-| `lobby` | App mount (SoundProvider) | lobby_create, lobby_join, lobby_start, countdown_tick, countdown_warning |
-| `shop` | ShopPage mount | button_click, card_draw, card_shuffle, coin_spend, error, success |
-| `team` | ShopPage mount | team_place, team_upgrade, button_click, error |
-| `battle` | BattlePage mount | battle_attack, battle_damage, battle_death, battle_win, battle_lose, critical_hp |
+| `lobby` | App mount (SoundProvider) | arena_lobby_create, arena_lobby_join, arena_lobby_start, arena_countdown_tick, arena_countdown_warning |
+| `shop` | ShopPage mount | arena_button_click, arena_card_draw, arena_card_shuffle, arena_coin_spend, arena_error, arena_success |
+| `team` | ShopPage mount | arena_team_place, arena_team_upgrade, arena_button_click, arena_error |
+| `battle` | BattlePage mount | arena_battle_attack, arena_battle_damage, arena_battle_death, arena_battle_win, arena_battle_lose, arena_critical_hp |
 
 ## Mobile Audio Unlock
 
@@ -119,10 +119,10 @@ For actions that trigger multiple sounds, use `playSequence()` to play them in o
 const { playSequence } = useSoundContext()
 
 // Simple usage with default 150ms delay between sounds
-playSequence(['coin_spend', 'success'])
+playSequence(['arena_coin_spend', 'arena_success'])
 
 // Custom delay after specific sound (300ms after shuffle, then draw)
-playSequence([['card_shuffle', 300], 'card_draw'])
+playSequence([['arena_card_shuffle', 300], 'arena_card_draw'])
 
 // Custom default delay for all sounds
 playSequence(['sound1', 'sound2', 'sound3'], { defaultDelay: 200 })
@@ -132,7 +132,7 @@ playSequence(['sound1', 'sound2', 'sound3'], { defaultDelay: 200 })
 
 | Location | Sounds | Purpose |
 |----------|--------|---------|
-| ShopPage - Card purchase | `coin_spend` → `success` | Purchase confirmation |
-| ShopPage - Reroll | `card_shuffle` → `card_draw` | Shuffle then deal |
-| ShopPage - Done shopping | `button_click` → `success` | Button + confirmation |
-| TeamPhaseModal - Upgrade | `team_upgrade` | Upgrade sound |
+| ShopPage - Card purchase | `arena_coin_spend` → `arena_success` | Purchase confirmation |
+| ShopPage - Reroll | `arena_card_shuffle` → `arena_card_draw` | Shuffle then deal |
+| ShopPage - Done shopping | `arena_button_click` → `arena_success` | Button + confirmation |
+| TeamPhaseModal - Upgrade | `arena_team_upgrade` | Upgrade sound |

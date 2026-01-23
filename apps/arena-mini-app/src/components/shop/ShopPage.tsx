@@ -122,7 +122,7 @@ export function ShopPage({
         // Play card_draw sound when shop cards first appear
         if (!initialCardsLoadedRef.current && data.cards.length > 0) {
           initialCardsLoadedRef.current = true
-          play('card_draw')
+          play('arena_card_draw')
         }
       }
     },
@@ -193,11 +193,11 @@ export function ShopPage({
         })
         // After buying, data.can_reroll will be false (server enforces this)
         setShopData(data)
-        playSequence(['coin_spend', 'success'])
+        playSequence(['arena_coin_spend', 'arena_success'])
       } catch (err) {
         console.error('Failed to buy card:', err)
         showError(err, 'Failed to buy card')
-        play('error')
+        play('arena_error')
         if (err instanceof Error) {
           noticeError(err, { context: 'buy_card', match_id: activeMatch.id })
         }
@@ -232,11 +232,11 @@ export function ShopPage({
       })
       // Note: After reroll, canReroll remains true until a card is bought
       setShopData(data)
-      playSequence(['card_shuffle', 'card_draw'])
+      playSequence(['arena_card_shuffle', 'arena_card_draw'])
     } catch (err) {
       console.error('Failed to reroll shop:', err)
       showError(err, 'Failed to reroll shop')
-      play('error')
+      play('arena_error')
       if (err instanceof Error) {
         noticeError(err, { context: 'reroll_shop', match_id: activeMatch.id })
       }
@@ -445,7 +445,7 @@ export function ShopPage({
             variant="primary"
             size="lg"
             onClick={() => {
-              playSequence(['button_click', 'success'])
+              playSequence(['arena_button_click', 'arena_success'])
               setIsTeamPhase(true)
             }}
             className="done-shopping-btn"

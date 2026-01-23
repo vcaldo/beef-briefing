@@ -93,7 +93,7 @@ export function SoundProvider({ baseUrl, children }: SoundProviderProps) {
  * unlockAudio()
  *
  * // Play a sound
- * play('lobby_create')
+ * play('arena_lobby_create')
  * ```
  */
 export function useSoundContext(): UseSoundReturn {

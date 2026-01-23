@@ -963,29 +963,30 @@ a:focus:not(:focus-visible),
 .countdown-timer {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: var(--arena-bg-light);
-  border-radius: 20px;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #d9c9a5;
+  border: 2px solid #6a5040;
+  border-radius: 6px;
   font-family: 'JetBrains Mono', monospace;
   font-weight: 600;
-  font-size: 18px;
+  font-size: 14px;
 }
 
 .countdown-timer-icon {
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .countdown-timer.safe {
-  color: var(--hp-full);
+  color: #4a5a3a;
 }
 
 .countdown-timer.warning {
-  color: var(--hp-medium);
+  color: #7a4a1a;
 }
 
 .countdown-timer.urgent {
-  color: var(--hp-low);
+  color: #8a2a2a;
   animation: timer-pulse 1s ease-in-out infinite;
 }
 
@@ -3969,37 +3970,6 @@ button,
    Lobby Themed Components (Phase 5)
    ============================================================================= */
 
-/* Match card with banner_modern background */
-.lobby-match-card-themed {
-  position: relative;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  border: 1px solid rgba(249, 115, 22, 0.3);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3),
-              inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-.lobby-match-card-themed::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(15, 15, 20, 0.85) 0%,
-    rgba(25, 25, 35, 0.8) 50%,
-    rgba(15, 15, 20, 0.9) 100%
-  );
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.lobby-match-card-themed > * {
-  position: relative;
-  z-index: 1;
-}
-
 /* Match info panel with hexagon_grey frame */
 .lobby-info-panel {
   position: relative;
@@ -4032,102 +4002,11 @@ button,
   z-index: 1;
 }
 
-/* Timer badge with Sci-fi glassPanel look */
+/* Timer badge - simple wrapper for countdown timer in match cards */
 .lobby-timer-badge {
-  position: relative;
-  padding: 10px 16px;
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.15) 0%,
-    rgba(139, 92, 246, 0.1) 50%,
-    rgba(59, 130, 246, 0.2) 100%
-  );
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  border-radius: 12px;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 2px 12px rgba(59, 130, 246, 0.2),
-              inset 0 1px 0 rgba(255, 255, 255, 0.15),
-              inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-}
-
-.lobby-timer-badge::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 50%;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.08) 0%,
-    transparent 100%
-  );
-  border-radius: 12px 12px 0 0;
-  pointer-events: none;
-}
-
-.lobby-timer-badge .timer-label {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 600;
-}
-
-.lobby-timer-badge .countdown-timer {
-  font-family: 'Outfit', sans-serif;
-  font-weight: 700;
-  text-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
-}
-
-/* Timer urgent state enhancement */
-.lobby-timer-badge:has(.countdown-timer.urgent) {
-  border-color: rgba(239, 68, 68, 0.5);
-  background: linear-gradient(
-    135deg,
-    rgba(239, 68, 68, 0.15) 0%,
-    rgba(249, 115, 22, 0.1) 50%,
-    rgba(239, 68, 68, 0.2) 100%
-  );
-  box-shadow: 0 2px 12px rgba(239, 68, 68, 0.25),
-              inset 0 1px 0 rgba(255, 255, 255, 0.15),
-              inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-  animation: timer-badge-pulse 1s ease-in-out infinite;
-}
-
-.lobby-timer-badge:has(.countdown-timer.urgent) .countdown-timer {
-  text-shadow: 0 0 12px rgba(239, 68, 68, 0.7);
-}
-
-@keyframes timer-badge-pulse {
-  0%, 100% {
-    box-shadow: 0 2px 12px rgba(239, 68, 68, 0.25),
-                inset 0 1px 0 rgba(255, 255, 255, 0.15),
-                inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-  }
-  50% {
-    box-shadow: 0 2px 20px rgba(239, 68, 68, 0.4),
-                inset 0 1px 0 rgba(255, 255, 255, 0.2),
-                inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-  }
-}
-
-/* Timer warning state enhancement */
-.lobby-timer-badge:has(.countdown-timer.warning) {
-  border-color: rgba(249, 115, 22, 0.5);
-  background: linear-gradient(
-    135deg,
-    rgba(249, 115, 22, 0.15) 0%,
-    rgba(234, 179, 8, 0.1) 50%,
-    rgba(249, 115, 22, 0.2) 100%
-  );
-  box-shadow: 0 2px 12px rgba(249, 115, 22, 0.2),
-              inset 0 1px 0 rgba(255, 255, 255, 0.15),
-              inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-}
-
-.lobby-timer-badge:has(.countdown-timer.warning) .countdown-timer {
-  text-shadow: 0 0 12px rgba(249, 115, 22, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Ensure GameButton looks correct in lobby context */
@@ -4137,6 +4016,179 @@ button,
 
 .lobby-section-header .game-button {
   min-width: auto;
+}
+
+/* =============================================================================
+   RPG Panel Styles (9-slice border-image)
+   ============================================================================= */
+
+.rpg-panel {
+  box-sizing: border-box;
+  border-style: solid;
+  border-image-repeat: stretch;
+  image-rendering: pixelated;
+}
+
+/* Outer brown wooden frame - thin margin style */
+.rpg-panel-outer {
+  border-width: 10px;
+  border-image-slice: 24 fill;
+  padding: 2px;
+  background: transparent;
+}
+
+/* Inner beige inset panel */
+.rpg-panel-inner {
+  border-width: 14px;
+  border-image-slice: 18 fill;
+  padding: 12px;
+  background: transparent;
+}
+
+/* Nested structure: outer contains inner */
+.rpg-panel-outer .rpg-panel-inner {
+  margin: 0;
+}
+
+/* ============================================
+   RPG Match Card (Lobby Active Match)
+   ============================================ */
+
+.rpg-match-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+}
+
+/* Inner content panel - contains timer, participants, status */
+.rpg-match-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Timer styling - inside beige panel */
+.rpg-match-card-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  color: #4a3a2a;
+  border-bottom: 1px solid rgba(90, 74, 58, 0.2);
+  padding-bottom: 8px;
+}
+
+.rpg-match-card-timer .timer-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6a5a4a;
+}
+
+/* Participants section */
+.rpg-match-card-participants {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rpg-match-card-participants .participants-label {
+  font-size: 12px;
+  color: #5a4a3a;
+  font-weight: 600;
+}
+
+.rpg-match-card-participants .participants-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rpg-match-card-participants .participants-count {
+  font-size: 11px;
+  color: #6a5a4a;
+  margin-top: auto;
+}
+
+/* Status styling - inside beige panel at bottom */
+.rpg-match-card-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 4px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  font-style: italic;
+  border-top: 1px solid rgba(90, 74, 58, 0.2);
+}
+
+/* Status colors - warm tones matching beige theme */
+.rpg-match-card-status.status-open {
+  color: #5a6a3a;
+}
+
+.rpg-match-card-status.status-shop_phase {
+  color: #3a5a6a;
+}
+
+/* Participant chip styling for RPG theme */
+.rpg-match-card .participant-chip {
+  background: rgba(90, 74, 58, 0.15);
+  border: 1px solid rgba(90, 74, 58, 0.3);
+  color: #4a3a2a;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+}
+
+.rpg-match-card .participant-chip.is-you {
+  background: rgba(90, 74, 58, 0.25);
+  border-color: rgba(90, 74, 58, 0.5);
+}
+
+.rpg-match-card .participant-creator-badge {
+  font-size: 12px;
+}
+
+/* Title row for pre-lobby cards (Casual 1v1) */
+.rpg-match-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.rpg-match-card-title .match-type-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a3a2a;
+}
+
+.rpg-match-card-title .match-format-label {
+  font-size: 12px;
+  color: #6a5a4a;
+  background: rgba(90, 74, 58, 0.15);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+/* Pre-lobby section wrapper */
+.lobby-pre-match {
+  margin-bottom: 16px;
+}
+
+/* Actions area - in outer brown frame */
+.rpg-match-card-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 12px;
+  justify-content: center;
 }
 
 /* App container */

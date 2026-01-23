@@ -12,7 +12,7 @@ export type ImageCategory = 'buttons' | 'panels' | 'bars' | 'icons' | 'effects'
 export type ButtonImageId = 'primary' | 'secondary' | 'neutral' | 'danger'
 
 // Panel image IDs
-export type PanelImageId = 'hexagon_grey' | 'banner_modern' | 'banner_classic_curtain' | 'banner_hanging'
+export type PanelImageId = 'hexagon_grey' | 'banner_modern' | 'banner_classic_curtain' | 'banner_hanging' | 'panel_brown' | 'panelInset_beige'
 
 // HP Bar image IDs (left/mid/right segments for green/red variants)
 export type BarImageId =
@@ -80,6 +80,8 @@ export const IMAGE_CONFIGS: Record<ImageId, ImageConfig> = {
   banner_modern: { category: 'panels', filename: 'banner_modern', width: 190, height: 45 },
   banner_classic_curtain: { category: 'panels', filename: 'banner_classic_curtain', width: 254, height: 179 },
   banner_hanging: { category: 'panels', filename: 'banner_hanging', width: 190, height: 171 },
+  panel_brown: { category: 'panels', filename: 'panel_brown', width: 100, height: 100 },
+  panelInset_beige: { category: 'panels', filename: 'panelInset_beige', width: 93, height: 94 },
 
   // HP Bars (green segments)
   barHorizontal_green_left: { category: 'bars', filename: 'barHorizontal_green_left', width: 8, height: 16 },

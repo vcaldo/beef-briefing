@@ -10,3 +10,6 @@ export type { CoinDisplayProps, CoinDisplaySize } from './CoinDisplay'
 
 export { CardSlot } from './CardSlot'
 export type { CardSlotProps, CardSlotVariant } from './CardSlot'
+
+export { RPGPanel } from './RPGPanel'
+export type { RPGPanelProps, RPGPanelVariant } from './RPGPanel'

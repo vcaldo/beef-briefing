@@ -3,7 +3,7 @@
  *
  * Provides quick sound toggle in the TabBar.
  * Clicking the speaker icon toggles mute state directly (no popover).
- * Volume is fixed at 50%.
+ * Volume is fixed at 25%.
  */
 
 import { useSoundContext } from '../../contexts'
@@ -12,7 +12,7 @@ import { GameButton } from '../ui/GameButton'
 /**
  * Speaker icon that shows muted or unmuted state
  * - Muted: speaker with X
- * - Unmuted: speaker with 2 sound waves (fixed 50% volume)
+ * - Unmuted: speaker with 2 sound waves (fixed 25% volume)
  */
 const SpeakerIcon = ({ isMuted }: { isMuted: boolean }) => {
   if (isMuted) {

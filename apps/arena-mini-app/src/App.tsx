@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 
 import { apiClient } from './api/client'
+import { preloadCriticalAssets } from './utils/assetPreloader'
 import { setCustomAttribute, addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { ErrorBoundary } from '@beef-briefing/shared-mini-app/components'
 import { TabBar, SplashScreen, ErrorDisplay, LoadingSpinner } from './components/common'
@@ -114,8 +115,9 @@ function App() {
 
         setAppState('authenticated')
 
-        // Prefetch game constants while splash screen is still showing
+        // Prefetch game constants and preload critical assets while splash screen is still showing
         prefetchGameConstants()
+        preloadCriticalAssets()
       } catch (err) {
         console.error('Authentication failed:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')

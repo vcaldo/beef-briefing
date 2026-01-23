@@ -38,3 +38,26 @@ export function preloadCriticalAssets(): void {
     console.warn('[assetPreloader] Failed to preload critical assets:', err)
   })
 }
+
+/**
+ * Categories to preload during shop phase.
+ * These are needed for battle animations.
+ */
+const BATTLE_IMAGE_CATEGORIES: ImageCategory[] = ['effects', 'bars']
+
+/**
+ * Preload battle assets during shop phase.
+ *
+ * Called after shop UI is ready, while user is selecting cards.
+ * This ensures battle animations play smoothly without on-demand loading.
+ *
+ * @example
+ * // In ShopPage, after loading = false
+ * preloadBattleAssets()
+ */
+export function preloadBattleAssets(): void {
+  preloadCategories(BATTLE_IMAGE_CATEGORIES).catch((err) => {
+    // Non-fatal: images will load on-demand if preload fails
+    console.warn('[assetPreloader] Failed to preload battle assets:', err)
+  })
+}

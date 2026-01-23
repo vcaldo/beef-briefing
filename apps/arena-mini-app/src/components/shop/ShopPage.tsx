@@ -11,6 +11,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 
 import { apiClient } from '../../api/client'
+import { preloadBattleAssets } from '../../utils/assetPreloader'
 import { useSoundContext } from '../../contexts'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer, ErrorBanner, CompactCard } from '../common'
@@ -68,6 +69,20 @@ export function ShopPage({
       console.warn('Failed to preload team sounds:', err)
     })
   }, [preloadCategory])
+
+  // Preload battle assets after shop UI is ready (while user is selecting cards)
+  const battleAssetsPreloadedRef = useRef(false)
+  useEffect(() => {
+    if (loading || !shopData || battleAssetsPreloadedRef.current) return
+    battleAssetsPreloadedRef.current = true
+
+    // Preload battle images (effects, HP bars) for smooth animations
+    preloadBattleAssets()
+    // Preload battle sounds
+    preloadCategory('battle').catch((err) => {
+      console.warn('Failed to preload battle sounds:', err)
+    })
+  }, [loading, shopData, preloadCategory])
 
   // Derived state
   const coins = shopData?.coins ?? 0

@@ -56,14 +56,18 @@ export function SoundProvider({ baseUrl, children }: SoundProviderProps) {
     }
   }, [baseUrl])
 
-  // Preload lobby sounds on mount (once only)
+  // Preload lobby and shop sounds on mount (once only)
+  // Shop sounds are preloaded early since players transition to shop quickly
   useEffect(() => {
     if (hasPreloadedRef.current) return
     hasPreloadedRef.current = true
 
-    sound.preloadCategory('lobby').catch((err) => {
+    Promise.all([
+      sound.preloadCategory('lobby'),
+      sound.preloadCategory('shop'),
+    ]).catch((err) => {
       // Non-fatal: sounds will load on-demand if preload fails
-      console.warn('Failed to preload lobby sounds:', err)
+      console.warn('Failed to preload sounds:', err)
     })
   }, [sound])
 

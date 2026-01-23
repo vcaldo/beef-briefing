@@ -127,7 +127,6 @@ export function LobbyPage({
       if (userMatch && userMatch.status === 'shop_phase') {
         if (initialFetchDoneRef.current) {
           // Real-time transition - auto-navigate to shop
-          play('arena_lobby_start')
           addPageAction('match_phase_transition', {
             match_id: userMatch.id,
             from_status: activeMatch?.status || 'open',
@@ -196,7 +195,6 @@ export function LobbyPage({
     (match: Match) => {
       // Check for phase transition to shop
       if (match.status === 'shop_phase') {
-        play('arena_lobby_start')
         addPageAction('match_phase_transition', {
           match_id: match.id,
           from_status: activeMatch?.status,
@@ -348,7 +346,6 @@ export function LobbyPage({
 
         // If match transitioned to shop phase, navigate
         if (match.status === 'shop_phase') {
-          play('arena_lobby_start')
           onMatchChange(match)
           onNavigateToShop()
         } else {

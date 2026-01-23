@@ -25,7 +25,6 @@ When `play('arena_battle_attack')` is called, a random variant (1-10) is selecte
 |----------|----------|-------------|
 | `arena_lobby_create` | lobby | Match created by user |
 | `arena_lobby_join` | lobby | User joined a match |
-| `arena_lobby_start` | lobby | Match transitioned to shop phase |
 | `arena_countdown_tick` | lobby | Timer tick (10s to 4s remaining) |
 | `arena_countdown_warning` | lobby | Timer warning (3s to 1s remaining) |
 | `arena_button_click` | shop/team | Generic button interaction |
@@ -51,11 +50,8 @@ When `play('arena_battle_attack')` is called, a random variant (1-10) is selecte
 |-------|---------|------|
 | `arena_countdown_warning` | Timer at 3s, 2s, or 1s remaining | 87 |
 | `arena_countdown_tick` | Timer between 10s and 4s remaining | 92 |
-| `arena_lobby_start` | Match transitions to shop_phase (real-time) | 130 |
-| `arena_lobby_start` | Match details show shop_phase transition | 199 |
-| `arena_lobby_create` | User creates a new match | 279 |
-| `arena_lobby_join` | User joins an existing match | 301 |
-| `arena_lobby_start` | User manually starts match early | 351 |
+| `arena_lobby_create` | User creates a new match | 278 |
+| `arena_lobby_join` | User joins an existing match | 300 |
 
 ### ShopPage.tsx
 
@@ -97,7 +93,7 @@ Sounds are preloaded by category to ensure they're ready when needed:
 
 | Category | When Preloaded | Sounds |
 |----------|----------------|--------|
-| `lobby` | App mount (SoundProvider) | arena_lobby_create, arena_lobby_join, arena_lobby_start, arena_countdown_tick, arena_countdown_warning |
+| `lobby` | App mount (SoundProvider) | arena_lobby_create, arena_lobby_join, arena_countdown_tick, arena_countdown_warning |
 | `shop` | ShopPage mount | arena_button_click, arena_card_draw, arena_card_shuffle, arena_coin_spend, arena_error, arena_success |
 | `team` | ShopPage mount | arena_team_place, arena_team_upgrade, arena_button_click, arena_error |
 | `battle` | BattlePage mount | arena_battle_attack, arena_battle_damage, arena_battle_death, arena_battle_win, arena_battle_lose, arena_critical_hp |

@@ -15,7 +15,6 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 export type SoundId =
   | 'arena_lobby_create'
   | 'arena_lobby_join'
-  | 'arena_lobby_start'
   | 'arena_button_click'
   | 'arena_team_place'
   | 'arena_team_upgrade'
@@ -57,7 +56,7 @@ export interface PlaySequenceOptions {
 
 // Map categories to their sound IDs
 const CATEGORY_SOUNDS: Record<SoundCategory, SoundId[]> = {
-  lobby: ['arena_lobby_create', 'arena_lobby_join', 'arena_lobby_start', 'arena_countdown_tick', 'arena_countdown_warning'],
+  lobby: ['arena_lobby_create', 'arena_lobby_join', 'arena_countdown_tick', 'arena_countdown_warning'],
   shop: ['arena_button_click', 'arena_card_draw', 'arena_card_shuffle', 'arena_coin_spend', 'arena_error', 'arena_success'],
   team: ['arena_team_place', 'arena_team_upgrade', 'arena_button_click', 'arena_error'],
   battle: ['arena_battle_attack', 'arena_battle_damage', 'arena_battle_death', 'arena_battle_win', 'arena_battle_lose', 'arena_battle_draw', 'arena_critical_hp'],

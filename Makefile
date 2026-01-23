@@ -865,6 +865,12 @@ arena-sounds-clean: ## Delete all arena sounds from development storage (MinIO)
 arena-sounds-clean-prod: ## Delete all arena sounds from production storage (Linode)
 	@$(SCRIPTS_DIR)/upload-arena-sounds.sh --prod --clean
 
+arena-sounds-normalize: ## Normalize arena sounds loudness (EBU R128) - backs up originals
+	@$(SCRIPTS_DIR)/normalize-audio.sh
+
+arena-sounds-normalize-dry: ## Preview audio normalization without making changes
+	@$(SCRIPTS_DIR)/normalize-audio.sh --dry-run
+
 # =============================================================================
 # ARENA IMAGES (arena-images-*)
 # =============================================================================

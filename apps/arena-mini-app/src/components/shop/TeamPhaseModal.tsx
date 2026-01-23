@@ -46,7 +46,7 @@ export function TeamPhaseModal({
   onMatchChange,
 }: TeamPhaseModalProps) {
   // Sound context
-  const { play } = useSoundContext()
+  const { play, playSequence } = useSoundContext()
 
   // Image URLs for icons and panel background
   const { getUrlById } = useImages()
@@ -188,7 +188,6 @@ export function TeamPhaseModal({
         const data = await apiClient.upgradeCard(activeMatch.id, teamSlot, upgradeType)
         onShopDataChange(data)
         play('team_upgrade')
-        play('powerup')
       } catch (err) {
         console.error('Failed to upgrade card:', err)
         play('error')

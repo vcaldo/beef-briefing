@@ -31,17 +31,32 @@ export type SoundId =
   | 'countdown_tick'
   | 'countdown_warning'
   | 'success'
-  | 'powerup'
   | 'critical_hp'
 
 // Sound categories for preloading
 export type SoundCategory = 'lobby' | 'shop' | 'team' | 'battle'
 
+/**
+ * A sound item in a sequence.
+ * Can be either:
+ * - A SoundId (uses default delay after it)
+ * - A tuple of [SoundId, delayMs] to specify custom delay after this sound
+ */
+export type SequenceItem = SoundId | [SoundId, number]
+
+/**
+ * Options for playSequence
+ */
+export interface PlaySequenceOptions {
+  /** Default delay between sounds in milliseconds (default: 150) */
+  defaultDelay?: number
+}
+
 // Map categories to their sound IDs
 const CATEGORY_SOUNDS: Record<SoundCategory, SoundId[]> = {
   lobby: ['lobby_create', 'lobby_join', 'lobby_start', 'countdown_tick', 'countdown_warning'],
   shop: ['button_click', 'card_draw', 'card_shuffle', 'coin_spend', 'error', 'success'],
-  team: ['team_place', 'team_upgrade', 'button_click', 'powerup', 'error'],
+  team: ['team_place', 'team_upgrade', 'button_click', 'error'],
   battle: ['battle_attack', 'battle_damage', 'battle_death', 'battle_win', 'battle_lose', 'critical_hp'],
 }
 
@@ -63,6 +78,8 @@ export interface UseSoundOptions {
 export interface UseSoundReturn {
   /** Play a sound by ID */
   play: (soundId: SoundId) => void
+  /** Play multiple sounds in sequence with configurable delays */
+  playSequence: (sounds: SequenceItem[], options?: PlaySequenceOptions) => void
   /** Preload specific sounds */
   preload: (soundIds: SoundId[]) => Promise<void>
   /** Preload all sounds in a category */
@@ -282,6 +299,41 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
     [isMuted, volume, createAudioPool]
   )
 
+  // Default delay between sounds in a sequence (ms)
+  const DEFAULT_SEQUENCE_DELAY = 150
+
+  // Play multiple sounds in sequence with configurable delays
+  const playSequence = useCallback(
+    (sounds: SequenceItem[], options?: PlaySequenceOptions): void => {
+      if (sounds.length === 0) return
+
+      const defaultDelay = options?.defaultDelay ?? DEFAULT_SEQUENCE_DELAY
+      let cumulativeDelay = 0
+
+      sounds.forEach((item, index) => {
+        // Parse the item - either SoundId or [SoundId, delayMs]
+        const soundId: SoundId = Array.isArray(item) ? item[0] : item
+        const delayAfter: number = Array.isArray(item) ? item[1] : defaultDelay
+
+        if (cumulativeDelay === 0) {
+          // First sound plays immediately
+          play(soundId)
+        } else {
+          // Subsequent sounds play after cumulative delay
+          setTimeout(() => {
+            play(soundId)
+          }, cumulativeDelay)
+        }
+
+        // Add delay for next sound (skip for last item)
+        if (index < sounds.length - 1) {
+          cumulativeDelay += delayAfter
+        }
+      })
+    },
+    [play]
+  )
+
   // Unlock audio on mobile (must be called from user interaction)
   const unlockAudio = useCallback((): void => {
     if (isReady) return
@@ -340,6 +392,7 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
 
   return {
     play,
+    playSequence,
     preload,
     preloadCategory,
     volume,

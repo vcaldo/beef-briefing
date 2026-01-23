@@ -51,7 +51,7 @@ export function ShopPage({
   const { error, showError, clearError } = useErrorBanner()
 
   // Sound effects
-  const { play, preloadCategory } = useSoundContext()
+  const { play, playSequence, preloadCategory } = useSoundContext()
   const soundsPreloadedRef = useRef(false)
   // Track if initial shop cards have been loaded (for card_draw sound)
   const initialCardsLoadedRef = useRef(false)
@@ -193,8 +193,7 @@ export function ShopPage({
         })
         // After buying, data.can_reroll will be false (server enforces this)
         setShopData(data)
-        play('coin_spend')
-        play('success')
+        playSequence(['coin_spend', 'success'])
       } catch (err) {
         console.error('Failed to buy card:', err)
         showError(err, 'Failed to buy card')
@@ -233,8 +232,7 @@ export function ShopPage({
       })
       // Note: After reroll, canReroll remains true until a card is bought
       setShopData(data)
-      play('card_shuffle')
-      play('card_draw')
+      playSequence(['card_shuffle', 'card_draw'])
     } catch (err) {
       console.error('Failed to reroll shop:', err)
       showError(err, 'Failed to reroll shop')
@@ -447,8 +445,7 @@ export function ShopPage({
             variant="primary"
             size="lg"
             onClick={() => {
-              play('button_click')
-              play('success')
+              playSequence(['button_click', 'success'])
               setIsTeamPhase(true)
             }}
             className="done-shopping-btn"

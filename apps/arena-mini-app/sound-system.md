@@ -25,7 +25,6 @@ All sounds are `.ogg` format stored at `{VITE_SOUND_BASE_URL}/{soundId}.ogg`.
 | `success` | shop | Action succeeded |
 | `team_place` | team | Card placed/reordered in team |
 | `team_upgrade` | team | Card upgraded |
-| `powerup` | team | Upgrade effect |
 | `battle_attack` | battle | Attacker initiates attack |
 | `battle_damage` | battle | Defender takes damage |
 | `battle_death` | battle | Card dies |
@@ -66,8 +65,7 @@ All sounds are `.ogg` format stored at `{VITE_SOUND_BASE_URL}/{soundId}.ogg`.
 | `team_place` | Card drag-and-drop reorder completed | 170 |
 | `error` | Reorder failed | 173 |
 | `team_upgrade` | Card ATK/HP upgrade successful | 190 |
-| `powerup` | Card upgrade (with team_upgrade) | 191 |
-| `error` | Card upgrade failed | 194 |
+| `error` | Card upgrade failed | 193 |
 | `button_click` | Team submitted successfully | 210 |
 | `error` | Team submission failed | 213 |
 
@@ -90,7 +88,7 @@ Sounds are preloaded by category to ensure they're ready when needed:
 |----------|----------------|--------|
 | `lobby` | App mount (SoundProvider) | lobby_create, lobby_join, lobby_start, countdown_tick, countdown_warning |
 | `shop` | ShopPage mount | button_click, card_draw, card_shuffle, coin_spend, error, success |
-| `team` | ShopPage mount | team_place, team_upgrade, button_click, powerup, error |
+| `team` | ShopPage mount | team_place, team_upgrade, button_click, error |
 | `battle` | BattlePage mount | battle_attack, battle_damage, battle_death, battle_win, battle_lose, critical_hp |
 
 ## Mobile Audio Unlock
@@ -101,3 +99,29 @@ Mobile browsers block autoplay until user interaction. The sound system:
 3. This unlocks the audio context for subsequent sounds
 
 `unlockAudio()` is called in LobbyPage via `ensureAudioUnlocked()` on match create/join/leave/start actions.
+
+## Sequential Sound Playback
+
+For actions that trigger multiple sounds, use `playSequence()` to play them in order with delays:
+
+```tsx
+const { playSequence } = useSoundContext()
+
+// Simple usage with default 150ms delay between sounds
+playSequence(['coin_spend', 'success'])
+
+// Custom delay after specific sound (300ms after shuffle, then draw)
+playSequence([['card_shuffle', 300], 'card_draw'])
+
+// Custom default delay for all sounds
+playSequence(['sound1', 'sound2', 'sound3'], { defaultDelay: 200 })
+```
+
+### Current Sequential Sound Pairs
+
+| Location | Sounds | Purpose |
+|----------|--------|---------|
+| ShopPage - Card purchase | `coin_spend` → `success` | Purchase confirmation |
+| ShopPage - Reroll | `card_shuffle` → `card_draw` | Shuffle then deal |
+| ShopPage - Done shopping | `button_click` → `success` | Button + confirmation |
+| TeamPhaseModal - Upgrade | `team_upgrade` | Upgrade sound |

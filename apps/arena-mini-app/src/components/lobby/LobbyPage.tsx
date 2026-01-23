@@ -561,9 +561,9 @@ export function LobbyPage({
                           <span className="participants-count">{participantCount} players</span>
                         </div>
 
-                        {/* Timer with Sci-fi glassPanel styling */}
+                        {/* Timer */}
                         {match.join_deadline && (
-                          <div className="match-card-timer compact lobby-timer-badge">
+                          <div className="match-card-timer">
                             <CountdownTimer
                               deadline={match.join_deadline}
                               timerThresholds={gameConstants?.timer_thresholds}

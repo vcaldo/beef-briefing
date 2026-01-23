@@ -188,17 +188,19 @@ export function BattlePage({
     }
   }, [battleData, currentEventIndex, isPlaying, isComplete, matchId, play])
 
-  // Show victory screen when animation completes and play win/lose sound
+  // Show victory screen when animation completes and play win/lose/draw sound
   useEffect(() => {
     if (isComplete && !showVictory) {
       setShowVictory(true)
       addPageAction('battle_playback_complete', { match_id: matchId })
 
-      // Play win/lose sound based on battle outcome
+      // Play win/lose/draw sound based on battle outcome
       if (battleData) {
-        const isUserWinner = battleData.winner_id === userId
         const isDraw = battleData.is_draw
-        if (!isDraw) {
+        if (isDraw) {
+          playSound('arena_battle_draw')
+        } else {
+          const isUserWinner = battleData.winner_id === userId
           playSound(isUserWinner ? 'arena_battle_win' : 'arena_battle_lose')
         }
       }

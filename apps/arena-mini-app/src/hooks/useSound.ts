@@ -49,8 +49,10 @@ export type SequenceItem = SoundId | [SoundId, number]
  * Options for playSequence
  */
 export interface PlaySequenceOptions {
-  /** Default delay between sounds in milliseconds (default: 150) */
-  defaultDelay?: number
+  /** Default gap between sounds (after previous sound ends) in milliseconds (default: 150) */
+  defaultGap?: number
+  /** AbortSignal to cancel the sequence */
+  signal?: AbortSignal
 }
 
 // Map categories to their sound IDs
@@ -84,10 +86,12 @@ export interface UseSoundOptions {
 }
 
 export interface UseSoundReturn {
-  /** Play a sound by ID */
-  play: (soundId: SoundId) => void
-  /** Play multiple sounds in sequence with configurable delays */
-  playSequence: (sounds: SequenceItem[], options?: PlaySequenceOptions) => void
+  /** Play a sound by ID. Returns a Promise that resolves when the sound finishes. */
+  play: (soundId: SoundId) => Promise<void>
+  /** Play multiple sounds in sequence, waiting for each to finish before playing next */
+  playSequence: (sounds: SequenceItem[], options?: PlaySequenceOptions) => Promise<void>
+  /** Cancel any currently playing sequence */
+  cancelSequence: () => void
   /** Preload specific sounds */
   preload: (soundIds: SoundId[]) => Promise<void>
   /** Preload all sounds in a category */
@@ -137,6 +141,8 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
   const [isReady, setIsReady] = useState(false)
   // Silent audio element for mobile unlock
   const silentAudioRef = useRef<HTMLAudioElement | null>(null)
+  // Track active sequence for cancellation
+  const sequenceAbortControllerRef = useRef<AbortController | null>(null)
 
   // Volume state with localStorage persistence
   const [volume, setVolumeState] = useState(() => {
@@ -185,9 +191,16 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
     }
   }, [])
 
-  // Cleanup all audio elements on unmount
+  // Cleanup all audio elements and cancel sequences on unmount
   useEffect(() => {
     return () => {
+      // Cancel any active sequence
+      if (sequenceAbortControllerRef.current) {
+        sequenceAbortControllerRef.current.abort()
+        sequenceAbortControllerRef.current = null
+      }
+
+      // Cleanup audio pools
       audioPoolRef.current.forEach((pool) => {
         pool.forEach((audio) => {
           audio.pause()
@@ -310,80 +323,147 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
   )
 
   // Play a sound (randomly selects variant for sounds with variants)
+  // Returns a Promise that resolves when the sound finishes playing
   const play = useCallback(
-    (soundId: SoundId): void => {
-      // Don't play if muted
-      if (isMuted) return
+    (soundId: SoundId): Promise<void> => {
+      return new Promise((resolve) => {
+        // Don't play if muted - resolve immediately
+        if (isMuted) {
+          resolve()
+          return
+        }
 
-      // Check if this sound has variants
-      const variantCount = SOUND_VARIANTS[soundId]
-      let cacheKey: string
-      let variant: number | undefined
+        // Check if this sound has variants
+        const variantCount = SOUND_VARIANTS[soundId]
+        let cacheKey: string
+        let variant: number | undefined
 
-      if (variantCount) {
-        // Randomly select a variant (1 to variantCount)
-        variant = Math.floor(Math.random() * variantCount) + 1
-        cacheKey = getCacheKey(soundId, variant)
-      } else {
-        cacheKey = soundId
-      }
+        if (variantCount) {
+          // Randomly select a variant (1 to variantCount)
+          variant = Math.floor(Math.random() * variantCount) + 1
+          cacheKey = getCacheKey(soundId, variant)
+        } else {
+          cacheKey = soundId
+        }
 
-      // Get or create audio pool
-      let pool = audioPoolRef.current.get(cacheKey)
-      if (!pool) {
-        pool = createAudioPool(soundId, variant)
-        audioPoolRef.current.set(cacheKey, pool)
-        poolIndexRef.current.set(cacheKey, 0)
-      }
+        // Get or create audio pool
+        let pool = audioPoolRef.current.get(cacheKey)
+        if (!pool) {
+          pool = createAudioPool(soundId, variant)
+          audioPoolRef.current.set(cacheKey, pool)
+          poolIndexRef.current.set(cacheKey, 0)
+        }
 
-      // Get next audio element (round-robin)
-      const index = poolIndexRef.current.get(cacheKey) ?? 0
-      const audio = pool[index]
+        // Get next audio element (round-robin)
+        const index = poolIndexRef.current.get(cacheKey) ?? 0
+        const audio = pool[index]
 
-      // Update pool index
-      poolIndexRef.current.set(cacheKey, (index + 1) % POOL_SIZE)
+        // Update pool index
+        poolIndexRef.current.set(cacheKey, (index + 1) % POOL_SIZE)
 
-      // Reset and play
-      audio.currentTime = 0
-      audio.volume = volume
-      audio.play().catch(() => {
-        // Ignore autoplay errors - user hasn't unlocked audio yet
+        // Create handlers for sound completion
+        const onEnded = () => {
+          audio.removeEventListener('ended', onEnded)
+          audio.removeEventListener('error', onError)
+          resolve()
+        }
+
+        const onError = () => {
+          audio.removeEventListener('ended', onEnded)
+          audio.removeEventListener('error', onError)
+          resolve() // Resolve even on error to not block sequence
+        }
+
+        // Add listeners before playing
+        audio.addEventListener('ended', onEnded)
+        audio.addEventListener('error', onError)
+
+        // Reset and play
+        audio.currentTime = 0
+        audio.volume = volume
+        audio.play().catch(() => {
+          // Autoplay blocked - remove listeners and resolve
+          audio.removeEventListener('ended', onEnded)
+          audio.removeEventListener('error', onError)
+          resolve()
+        })
       })
     },
     [isMuted, volume, createAudioPool]
   )
 
-  // Default delay between sounds in a sequence (ms)
-  const DEFAULT_SEQUENCE_DELAY = 150
+  // Default gap between sounds in a sequence (ms)
+  const DEFAULT_SEQUENCE_GAP = 150
 
-  // Play multiple sounds in sequence with configurable delays
+  // Cancel any active sequence
+  const cancelSequence = useCallback((): void => {
+    if (sequenceAbortControllerRef.current) {
+      sequenceAbortControllerRef.current.abort()
+      sequenceAbortControllerRef.current = null
+    }
+  }, [])
+
+  // Play multiple sounds in sequence, waiting for each to complete
   const playSequence = useCallback(
-    (sounds: SequenceItem[], options?: PlaySequenceOptions): void => {
+    async (sounds: SequenceItem[], options?: PlaySequenceOptions): Promise<void> => {
       if (sounds.length === 0) return
 
-      const defaultDelay = options?.defaultDelay ?? DEFAULT_SEQUENCE_DELAY
-      let cumulativeDelay = 0
+      const defaultGap = options?.defaultGap ?? DEFAULT_SEQUENCE_GAP
 
-      sounds.forEach((item, index) => {
-        // Parse the item - either SoundId or [SoundId, delayMs]
+      // Create internal abort controller, but also respect external signal
+      const internalController = new AbortController()
+      sequenceAbortControllerRef.current = internalController
+
+      // If external signal provided, link it to internal controller
+      const externalSignal = options?.signal
+      if (externalSignal) {
+        if (externalSignal.aborted) {
+          return // Already aborted
+        }
+        externalSignal.addEventListener('abort', () => {
+          internalController.abort()
+        })
+      }
+
+      const signal = internalController.signal
+
+      for (let i = 0; i < sounds.length; i++) {
+        // Check for cancellation before each sound
+        if (signal.aborted) {
+          break
+        }
+
+        const item = sounds[i]
         const soundId: SoundId = Array.isArray(item) ? item[0] : item
-        const delayAfter: number = Array.isArray(item) ? item[1] : defaultDelay
+        const gapAfter: number = Array.isArray(item) ? item[1] : defaultGap
 
-        if (cumulativeDelay === 0) {
-          // First sound plays immediately
-          play(soundId)
-        } else {
-          // Subsequent sounds play after cumulative delay
-          setTimeout(() => {
-            play(soundId)
-          }, cumulativeDelay)
+        // Play the sound and wait for it to complete
+        await play(soundId)
+
+        // Check for cancellation after sound completes
+        if (signal.aborted) {
+          break
         }
 
-        // Add delay for next sound (skip for last item)
-        if (index < sounds.length - 1) {
-          cumulativeDelay += delayAfter
+        // Add gap between sounds (skip for last sound)
+        if (i < sounds.length - 1 && gapAfter > 0) {
+          await new Promise<void>((resolve) => {
+            const timeoutId = setTimeout(resolve, gapAfter)
+
+            // If aborted during gap, clear timeout and resolve
+            const abortHandler = () => {
+              clearTimeout(timeoutId)
+              resolve()
+            }
+            signal.addEventListener('abort', abortHandler, { once: true })
+          })
         }
-      })
+      }
+
+      // Clear the ref when sequence completes or is cancelled
+      if (sequenceAbortControllerRef.current === internalController) {
+        sequenceAbortControllerRef.current = null
+      }
     },
     [play]
   )
@@ -447,6 +527,7 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
   return {
     play,
     playSequence,
+    cancelSequence,
     preload,
     preloadCategory,
     volume,

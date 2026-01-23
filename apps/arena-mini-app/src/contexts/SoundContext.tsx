@@ -75,7 +75,9 @@ export function SoundProvider({ baseUrl, children }: SoundProviderProps) {
  * Must be used within a SoundProvider.
  *
  * Returns the same interface as useSound:
- * - play(soundId): Play a sound
+ * - play(soundId): Play a sound (returns Promise that resolves when sound ends)
+ * - playSequence(sounds, options): Play sounds in sequence, waiting for each to complete
+ * - cancelSequence(): Cancel any currently playing sequence
  * - preload(soundIds): Preload specific sounds
  * - preloadCategory(category): Preload all sounds in a category
  * - volume: Current volume (0-1)
@@ -87,13 +89,16 @@ export function SoundProvider({ baseUrl, children }: SoundProviderProps) {
  *
  * Usage:
  * ```tsx
- * const { play, unlockAudio, isMuted, toggleMute } = useSoundContext()
+ * const { play, playSequence, unlockAudio, isMuted, toggleMute } = useSoundContext()
  *
  * // On first user interaction
  * unlockAudio()
  *
  * // Play a sound
  * play('arena_lobby_create')
+ *
+ * // Play sounds in sequence (waits for each to finish)
+ * playSequence(['arena_coin_spend', 'arena_success'])
  * ```
  */
 export function useSoundContext(): UseSoundReturn {

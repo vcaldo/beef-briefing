@@ -859,6 +859,18 @@ arena-sounds-list: ## List arena sounds in development storage
 arena-sounds-list-prod: ## List arena sounds in production storage
 	@$(SCRIPTS_DIR)/upload-arena-sounds.sh --prod --list
 
+arena-sounds-clean: ## Delete all arena sounds from development storage (MinIO)
+	@$(SCRIPTS_DIR)/upload-arena-sounds.sh --dev --clean
+
+arena-sounds-clean-prod: ## Delete all arena sounds from production storage (Linode)
+	@$(SCRIPTS_DIR)/upload-arena-sounds.sh --prod --clean
+
+arena-sounds-normalize: ## Normalize arena sounds loudness (EBU R128) - backs up originals
+	@$(SCRIPTS_DIR)/normalize-audio.sh
+
+arena-sounds-normalize-dry: ## Preview audio normalization without making changes
+	@$(SCRIPTS_DIR)/normalize-audio.sh --dry-run
+
 # =============================================================================
 # ARENA IMAGES (arena-images-*)
 # =============================================================================
@@ -873,6 +885,21 @@ arena-images-list: ## List arena images in development storage
 
 arena-images-list-prod: ## List arena images in production storage
 	@$(SCRIPTS_DIR)/upload-arena-images.sh --prod --list
+
+arena-images-clean: ## Delete all arena images from development storage (MinIO)
+	@$(SCRIPTS_DIR)/upload-arena-images.sh --dev --clean
+
+arena-images-clean-prod: ## Delete all arena images from production storage (Linode)
+	@$(SCRIPTS_DIR)/upload-arena-images.sh --prod --clean
+
+# =============================================================================
+# ARENA ASSET VERSIONS (arena-assets-*)
+# =============================================================================
+arena-assets-version: ## Check arena asset versions in development storage
+	@$(SCRIPTS_DIR)/check-asset-versions.sh --dev
+
+arena-assets-version-prod: ## Check arena asset versions in production storage
+	@$(SCRIPTS_DIR)/check-asset-versions.sh --prod
 
 # =============================================================================
 # MINIO CLIENT (mc-*)
@@ -925,5 +952,8 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	ranked-enable-all ranked-enable-all-prod ranked-disable-all ranked-disable-all-prod \
 	ranked-status ranked-status-prod ranked-status-chat ranked-status-chat-prod \
 	arena-sounds-upload arena-sounds-upload-prod arena-sounds-list arena-sounds-list-prod \
+	arena-sounds-clean arena-sounds-clean-prod \
 	arena-images-upload arena-images-upload-prod arena-images-list arena-images-list-prod \
+	arena-images-clean arena-images-clean-prod \
+	arena-assets-version arena-assets-version-prod \
 	mc-setup-prod

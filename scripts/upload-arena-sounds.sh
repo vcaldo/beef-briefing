@@ -23,6 +23,146 @@ CACHE_CONTROL="public,max-age=31536000"
 # Target sample rate for browser compatibility (44100 Hz is universally supported)
 TARGET_SAMPLE_RATE=44100
 
+# Manifest file name for version tracking
+MANIFEST_FILE=".manifest.json"
+
+# =============================================================================
+# VERSION MANAGEMENT FUNCTIONS
+# =============================================================================
+
+# Generate content hash of all sound files
+# Creates a deterministic hash that changes only when file contents change
+generate_content_hash() {
+    if [[ ! -d "$SOUNDS_DIR" ]]; then
+        echo ""
+        return
+    fi
+
+    # Hash all .ogg files, sort for determinism, then hash the result
+    find "$SOUNDS_DIR" -name "*.ogg" -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1
+}
+
+# Get deployed manifest from object storage
+# Returns JSON or empty object if not found
+get_deployed_manifest() {
+    local bucket="$MINIO_BUCKET"
+    local manifest_path="sounds/arena/${MANIFEST_FILE}"
+
+    mc cat "${MC_ALIAS}/${bucket}/${manifest_path}" 2>/dev/null || echo '{}'
+}
+
+# Extract value from JSON (simple parser without jq dependency)
+json_get() {
+    local json="$1"
+    local key="$2"
+    echo "$json" | grep -o "\"${key}\"[[:space:]]*:[[:space:]]*[^,}]*" | sed 's/.*:[[:space:]]*"\?\([^",}]*\)"\?.*/\1/'
+}
+
+# Update version in environment file
+bump_env_version() {
+    local env_file="$1"
+    local var_name="$2"
+    local new_version="$3"
+
+    if [[ -f "$env_file" ]]; then
+        sed -i "s/^${var_name}=.*/${var_name}=${new_version}/" "$env_file"
+        log_success "Updated ${var_name}=${new_version} in $(basename "$env_file")"
+    else
+        log_warn "Environment file not found: $env_file"
+    fi
+}
+
+# Upload manifest file to object storage
+upload_manifest() {
+    local bucket="$MINIO_BUCKET"
+    local manifest_path="sounds/arena/${MANIFEST_FILE}"
+    local version="$1"
+    local hash="$2"
+    local file_count="$3"
+    local uploaded_at
+    uploaded_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    # Create temporary manifest file
+    local temp_manifest
+    temp_manifest=$(mktemp)
+    cat > "$temp_manifest" << EOF
+{
+  "version": ${version},
+  "hash": "${hash}",
+  "uploaded_at": "${uploaded_at}",
+  "file_count": ${file_count}
+}
+EOF
+
+    echo -n "  Uploading manifest... "
+    if mc cp "$temp_manifest" "${MC_ALIAS}/${bucket}/${manifest_path}" \
+        --attr "Content-Type=application/json;Cache-Control=no-cache" \
+        &>/dev/null; then
+        echo -e "${GREEN}done${NC}"
+    else
+        echo -e "${RED}failed${NC}"
+        log_warn "Failed to upload manifest"
+    fi
+
+    rm -f "$temp_manifest"
+}
+
+# Check and auto-bump version if content changed
+check_and_bump_version() {
+    local env_file="$1"
+    local var_name="SOUND_VERSION"
+
+    log_info "Checking for content changes..."
+
+    # Generate local content hash
+    local local_hash
+    local_hash=$(generate_content_hash)
+
+    if [[ -z "$local_hash" ]]; then
+        log_warn "Could not generate content hash"
+        return 1
+    fi
+
+    # Get deployed manifest
+    local manifest
+    manifest=$(get_deployed_manifest)
+
+    local deployed_hash
+    local deployed_version
+    deployed_hash=$(json_get "$manifest" "hash")
+    deployed_version=$(json_get "$manifest" "version")
+
+    # Default version to 0 if not found
+    if [[ -z "$deployed_version" ]] || [[ "$deployed_version" == "null" ]]; then
+        deployed_version=0
+    fi
+
+    # Compare hashes
+    if [[ "$local_hash" == "$deployed_hash" ]]; then
+        log_info "Content unchanged (hash: ${local_hash:0:12}...)"
+        log_info "${var_name} stays at ${deployed_version}"
+        echo "$deployed_version" > /tmp/arena_sound_version
+        echo "$local_hash" > /tmp/arena_sound_hash
+        return 0
+    fi
+
+    # Content changed - bump version
+    local new_version=$((deployed_version + 1))
+
+    if [[ -n "$deployed_hash" ]] && [[ "$deployed_hash" != "null" ]]; then
+        log_info "Content hash changed: ${deployed_hash:0:12}... -> ${local_hash:0:12}..."
+    else
+        log_info "No previous manifest found, initializing version"
+    fi
+
+    log_info "Bumping ${var_name}: ${deployed_version} -> ${new_version}"
+    bump_env_version "$env_file" "$var_name" "$new_version"
+
+    echo "$new_version" > /tmp/arena_sound_version
+    echo "$local_hash" > /tmp/arena_sound_hash
+    return 0
+}
+
 # =============================================================================
 # FUNCTIONS
 # =============================================================================
@@ -75,16 +215,19 @@ normalize_sounds() {
 }
 
 show_usage() {
-    echo "Usage: $0 [--dev|--prod]"
+    echo "Usage: $0 [--dev|--prod] [--list|--clean]"
     echo ""
     echo "Options:"
     echo "  --dev   Upload to development MinIO (default)"
     echo "  --prod  Upload to production Linode Object Storage"
+    echo "  --list  List uploaded sounds"
+    echo "  --clean Delete all sounds from storage"
     echo ""
     echo "Examples:"
-    echo "  $0 --dev     # Upload to local MinIO"
-    echo "  $0 --prod    # Upload to production"
-    echo "  $0           # Same as --dev"
+    echo "  $0 --dev      # Upload to local MinIO"
+    echo "  $0 --prod     # Upload to production"
+    echo "  $0 --clean    # Delete all sounds from dev storage"
+    echo "  $0            # Same as --dev"
 }
 
 # Load environment variables from file
@@ -194,6 +337,35 @@ list_sounds() {
     }
 }
 
+# Delete all sounds from storage
+clean_sounds() {
+    local bucket="$MINIO_BUCKET"
+    local target_path="sounds/arena"
+
+    log_warn "This will delete ALL sounds from ${MC_ALIAS}/${bucket}/${target_path}/"
+    echo ""
+
+    # List what will be deleted
+    local file_count
+    file_count=$(mc ls "${MC_ALIAS}/${bucket}/${target_path}/" 2>/dev/null | wc -l)
+
+    if [[ "$file_count" -eq 0 ]]; then
+        log_info "No files to delete"
+        return 0
+    fi
+
+    log_info "Found $file_count file(s) to delete"
+    echo ""
+
+    # Delete all files in the path
+    if mc rm --recursive --force "${MC_ALIAS}/${bucket}/${target_path}/" &>/dev/null; then
+        log_success "Deleted all sounds from storage"
+    else
+        log_error "Failed to delete sounds"
+        exit 1
+    fi
+}
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -216,6 +388,10 @@ while [[ $# -gt 0 ]]; do
             ACTION="list"
             shift
             ;;
+        --clean)
+            ACTION="clean"
+            shift
+            ;;
         --help|-h)
             show_usage
             exit 0
@@ -228,7 +404,14 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-log_step "Arena Sounds Upload ($ENV_MODE)"
+# Set step title based on action
+STEP_TITLE="Arena Sounds"
+case "$ACTION" in
+    upload) STEP_TITLE="Arena Sounds Upload" ;;
+    list)   STEP_TITLE="Arena Sounds List" ;;
+    clean)  STEP_TITLE="Arena Sounds Clean" ;;
+esac
+log_step "$STEP_TITLE ($ENV_MODE)"
 
 # Check mc is installed
 if ! command -v mc &> /dev/null; then
@@ -247,14 +430,43 @@ else
 fi
 
 # Execute action
-if [[ "$ACTION" == "list" ]]; then
-    list_sounds
-else
-    # Normalize audio files for browser compatibility before uploading
-    normalize_sounds
-    upload_sounds
-    echo ""
-    log_success "Sounds uploaded successfully!"
-    echo ""
-    log_info "Files are available at: sounds/arena/{filename}.ogg"
-fi
+case "$ACTION" in
+    list)
+        list_sounds
+        ;;
+    clean)
+        clean_sounds
+        ;;
+    upload)
+        # Determine which env file to update
+        ENV_FILE_TO_UPDATE="$DEV_ENV_FILE"
+        if [[ "$ENV_MODE" == "prod" ]]; then
+            ENV_FILE_TO_UPDATE="$PROD_ENV_FILE"
+        fi
+
+        # Check for content changes and auto-bump version if needed
+        check_and_bump_version "$ENV_FILE_TO_UPDATE"
+
+        # Normalize audio files for browser compatibility before uploading
+        normalize_sounds
+
+        # Upload sound files
+        upload_sounds
+
+        # Upload manifest with version info
+        FINAL_VERSION=$(cat /tmp/arena_sound_version 2>/dev/null || echo "1")
+        FINAL_HASH=$(cat /tmp/arena_sound_hash 2>/dev/null || echo "")
+        FILE_COUNT=$(find "$SOUNDS_DIR" -name "*.ogg" | wc -l)
+
+        upload_manifest "$FINAL_VERSION" "$FINAL_HASH" "$FILE_COUNT"
+
+        # Cleanup temp files
+        rm -f /tmp/arena_sound_version /tmp/arena_sound_hash
+
+        echo ""
+        log_success "Sounds uploaded successfully!"
+        echo ""
+        log_info "Files are available at: sounds/arena/{filename}.ogg"
+        log_info "Current SOUND_VERSION: ${FINAL_VERSION}"
+        ;;
+esac

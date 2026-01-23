@@ -104,7 +104,7 @@ export function BattlePage({
     isComplete,
     currentDamage,
     damageTargetKey,
-    activeEffect,
+    activeEffects,
     onEffectComplete,
     play,
     pause,
@@ -188,18 +188,20 @@ export function BattlePage({
     }
   }, [battleData, currentEventIndex, isPlaying, isComplete, matchId, play])
 
-  // Show victory screen when animation completes and play win/lose sound
+  // Show victory screen when animation completes and play win/lose/draw sound
   useEffect(() => {
     if (isComplete && !showVictory) {
       setShowVictory(true)
       addPageAction('battle_playback_complete', { match_id: matchId })
 
-      // Play win/lose sound based on battle outcome
+      // Play win/lose/draw sound based on battle outcome
       if (battleData) {
-        const isUserWinner = battleData.winner_id === userId
         const isDraw = battleData.is_draw
-        if (!isDraw) {
-          playSound(isUserWinner ? 'battle_win' : 'battle_lose')
+        if (isDraw) {
+          playSound('arena_battle_draw')
+        } else {
+          const isUserWinner = battleData.winner_id === userId
+          playSound(isUserWinner ? 'arena_battle_win' : 'arena_battle_lose')
         }
       }
     }
@@ -395,16 +397,16 @@ export function BattlePage({
           </div>
         </div>
 
-        {/* Battle Effect - renders animated effect at card positions */}
-        {activeEffect && (
+        {/* Battle Effects - renders animated effects at card positions (supports multiple simultaneous effects) */}
+        {activeEffects.map((effect) => (
           <BattleEffect
-            key={`${activeEffect.type}-${activeEffect.cardKey}`}
-            type={activeEffect.type}
-            position={activeEffect.position}
-            onComplete={onEffectComplete}
+            key={`${effect.type}-${effect.cardKey}`}
+            type={effect.type}
+            position={effect.position}
+            onComplete={() => onEffectComplete(effect.cardKey)}
             size={80}
           />
-        )}
+        ))}
       </div>
 
       {/* Playback Controls */}

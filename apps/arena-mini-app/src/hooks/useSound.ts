@@ -13,44 +13,60 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 
 // All available sound IDs in the game
 export type SoundId =
-  | 'lobby_create'
-  | 'lobby_join'
-  | 'lobby_start'
-  | 'shop_reroll'
-  | 'shop_buy'
-  | 'button_click'
-  | 'team_place'
-  | 'team_upgrade'
-  | 'battle_attack'
-  | 'battle_damage'
-  | 'battle_death'
-  | 'battle_win'
-  | 'battle_lose'
-  | 'error'
-  | 'coin_spend'
-  | 'card_draw'
-  | 'card_shuffle'
-  | 'countdown_tick'
-  | 'countdown_warning'
-  | 'tab_switch'
-  | 'modal_open'
-  | 'modal_close'
-  | 'card_hover'
-  | 'success'
-  | 'powerup'
-  | 'critical_hp'
-  | 'round_start'
-  | 'team_ready'
+  | 'arena_lobby_create'
+  | 'arena_lobby_join'
+  | 'arena_button_click'
+  | 'arena_team_place'
+  | 'arena_team_upgrade'
+  | 'arena_battle_attack'
+  | 'arena_battle_damage'
+  | 'arena_battle_death'
+  | 'arena_battle_win'
+  | 'arena_battle_lose'
+  | 'arena_battle_draw'
+  | 'arena_error'
+  | 'arena_coin_spend'
+  | 'arena_card_draw'
+  | 'arena_card_shuffle'
+  | 'arena_countdown_tick'
+  | 'arena_countdown_warning'
+  | 'arena_success'
+  | 'arena_critical_hp'
 
 // Sound categories for preloading
 export type SoundCategory = 'lobby' | 'shop' | 'team' | 'battle'
 
+/**
+ * A sound item in a sequence.
+ * Can be either:
+ * - A SoundId (uses default delay after it)
+ * - A tuple of [SoundId, delayMs] to specify custom delay after this sound
+ */
+export type SequenceItem = SoundId | [SoundId, number]
+
+/**
+ * Options for playSequence
+ */
+export interface PlaySequenceOptions {
+  /** Default gap between sounds (after previous sound ends) in milliseconds (default: 150) */
+  defaultGap?: number
+  /** AbortSignal to cancel the sequence */
+  signal?: AbortSignal
+}
+
 // Map categories to their sound IDs
 const CATEGORY_SOUNDS: Record<SoundCategory, SoundId[]> = {
-  lobby: ['lobby_create', 'lobby_join', 'lobby_start', 'countdown_tick', 'countdown_warning', 'tab_switch'],
-  shop: ['shop_reroll', 'shop_buy', 'button_click', 'card_draw', 'card_shuffle', 'coin_spend', 'error', 'card_hover', 'success'],
-  team: ['team_place', 'team_upgrade', 'button_click', 'modal_open', 'modal_close', 'team_ready', 'powerup', 'error'],
-  battle: ['battle_attack', 'battle_damage', 'battle_death', 'battle_win', 'battle_lose', 'round_start', 'critical_hp'],
+  lobby: ['arena_lobby_create', 'arena_lobby_join', 'arena_countdown_tick', 'arena_countdown_warning'],
+  shop: ['arena_button_click', 'arena_card_draw', 'arena_card_shuffle', 'arena_coin_spend', 'arena_error', 'arena_success'],
+  team: ['arena_team_place', 'arena_team_upgrade', 'arena_button_click', 'arena_error'],
+  battle: ['arena_battle_attack', 'arena_battle_damage', 'arena_battle_death', 'arena_battle_win', 'arena_battle_lose', 'arena_battle_draw', 'arena_critical_hp'],
+}
+
+// Sounds with multiple variants (randomly selected at play time)
+// Maps soundId to number of variants available
+const SOUND_VARIANTS: Partial<Record<SoundId, number>> = {
+  arena_battle_attack: 10,
+  arena_battle_damage: 10,
 }
 
 // localStorage keys
@@ -60,8 +76,15 @@ const STORAGE_MUTED_KEY = 'arena-sound-muted'
 // Audio pool size for overlapping sounds
 const POOL_SIZE = 4
 
-// Default volume (0-1) - fixed at 50%
-const DEFAULT_VOLUME = 0.5
+// Default volume (0-1) - fixed at 25%
+const DEFAULT_VOLUME = 0.25
+
+// Primer sound ID (internal, not part of regular sounds)
+// Plays before every sound to wake up dormant audio contexts
+const PRIMER_SOUND_ID = 'arena_primer'
+
+// Primer volume - nearly silent but audible enough to wake audio context
+const PRIMER_VOLUME = 0.01
 
 export interface UseSoundOptions {
   /** Base URL for sound files (e.g., "http://localhost:9000/beef-briefing/sounds/arena") */
@@ -69,8 +92,12 @@ export interface UseSoundOptions {
 }
 
 export interface UseSoundReturn {
-  /** Play a sound by ID */
-  play: (soundId: SoundId) => void
+  /** Play a sound by ID. Returns a Promise that resolves when the sound finishes. */
+  play: (soundId: SoundId) => Promise<void>
+  /** Play multiple sounds in sequence, waiting for each to finish before playing next */
+  playSequence: (sounds: SequenceItem[], options?: PlaySequenceOptions) => Promise<void>
+  /** Cancel any currently playing sequence */
+  cancelSequence: () => void
   /** Preload specific sounds */
   preload: (soundIds: SoundId[]) => Promise<void>
   /** Preload all sounds in a category */
@@ -105,20 +132,25 @@ export interface UseSoundReturn {
  * preloadCategory('lobby')
  *
  * // Play a sound
- * play('lobby_create')
+ * play('arena_lobby_create')
  * ```
  */
 export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
-  // Audio cache: soundId -> HTMLAudioElement[]
-  const audioPoolRef = useRef<Map<SoundId, HTMLAudioElement[]>>(new Map())
+  // Audio cache: cacheKey -> HTMLAudioElement[]
+  // Cache keys are soundId for regular sounds, or "soundId:variant" for variant sounds
+  const audioPoolRef = useRef<Map<string, HTMLAudioElement[]>>(new Map())
   // Track next audio element index for round-robin pooling
-  const poolIndexRef = useRef<Map<SoundId, number>>(new Map())
-  // Track loaded sounds
-  const loadedSoundsRef = useRef<Set<SoundId>>(new Set())
+  const poolIndexRef = useRef<Map<string, number>>(new Map())
+  // Track loaded sounds (by cache key)
+  const loadedSoundsRef = useRef<Set<string>>(new Set())
   // Track if audio is unlocked on mobile
   const [isReady, setIsReady] = useState(false)
   // Silent audio element for mobile unlock
   const silentAudioRef = useRef<HTMLAudioElement | null>(null)
+  // Track active sequence for cancellation
+  const sequenceAbortControllerRef = useRef<AbortController | null>(null)
+  // Primer audio element for waking up dormant audio contexts
+  const primerRef = useRef<HTMLAudioElement | null>(null)
 
   // Volume state with localStorage persistence
   const [volume, setVolumeState] = useState(() => {
@@ -167,9 +199,34 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
     }
   }, [])
 
-  // Cleanup all audio elements on unmount
+  // Create and preload primer audio for waking up dormant audio contexts
+  // This plays before every sound to ensure the audio system is active
+  useEffect(() => {
+    const version = import.meta.env.VITE_SOUND_VERSION || '1'
+    const primerUrl = `${baseUrl}/${PRIMER_SOUND_ID}.ogg?v=${version}`
+    const primer = new Audio(primerUrl)
+    primer.preload = 'auto'
+    primer.volume = PRIMER_VOLUME
+    primerRef.current = primer
+
+    return () => {
+      if (primerRef.current) {
+        primerRef.current.pause()
+        primerRef.current = null
+      }
+    }
+  }, [baseUrl])
+
+  // Cleanup all audio elements and cancel sequences on unmount
   useEffect(() => {
     return () => {
+      // Cancel any active sequence
+      if (sequenceAbortControllerRef.current) {
+        sequenceAbortControllerRef.current.abort()
+        sequenceAbortControllerRef.current = null
+      }
+
+      // Cleanup audio pools
       audioPoolRef.current.forEach((pool) => {
         pool.forEach((audio) => {
           audio.pause()
@@ -183,19 +240,29 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
   }, [])
 
   // Get URL for a sound file (with cache-busting version param)
+  // For sounds with variants, pass the variant number to get the specific file
   const getSoundUrl = useCallback(
-    (soundId: SoundId): string => {
+    (soundId: SoundId, variant?: number): string => {
       const version = import.meta.env.VITE_SOUND_VERSION || '1'
+      if (variant !== undefined) {
+        // Variant sounds use suffix: arena_battle_attack_1.ogg
+        return `${baseUrl}/${soundId}_${variant}.ogg?v=${version}`
+      }
       return `${baseUrl}/${soundId}.ogg?v=${version}`
     },
     [baseUrl]
   )
 
-  // Create audio pool for a sound
+  // Get internal cache key for a sound (includes variant number for variant sounds)
+  const getCacheKey = (soundId: SoundId, variant?: number): string => {
+    return variant !== undefined ? `${soundId}:${variant}` : soundId
+  }
+
+  // Create audio pool for a sound (optionally for a specific variant)
   const createAudioPool = useCallback(
-    (soundId: SoundId): HTMLAudioElement[] => {
+    (soundId: SoundId, variant?: number): HTMLAudioElement[] => {
       const pool: HTMLAudioElement[] = []
-      const url = getSoundUrl(soundId)
+      const url = getSoundUrl(soundId, variant)
 
       for (let i = 0; i < POOL_SIZE; i++) {
         const audio = new Audio(url)
@@ -209,18 +276,20 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
     [getSoundUrl, volume, isMuted]
   )
 
-  // Preload a single sound
-  const preloadSound = useCallback(
-    async (soundId: SoundId): Promise<void> => {
+  // Preload a single sound variant
+  const preloadSoundVariant = useCallback(
+    async (soundId: SoundId, variant?: number): Promise<void> => {
+      const cacheKey = getCacheKey(soundId, variant)
+
       // Skip if already loaded
-      if (loadedSoundsRef.current.has(soundId)) {
+      if (loadedSoundsRef.current.has(cacheKey)) {
         return
       }
 
       // Create audio pool
-      const pool = createAudioPool(soundId)
-      audioPoolRef.current.set(soundId, pool)
-      poolIndexRef.current.set(soundId, 0)
+      const pool = createAudioPool(soundId, variant)
+      audioPoolRef.current.set(cacheKey, pool)
+      poolIndexRef.current.set(cacheKey, 0)
 
       // Wait for all to be ready
       await Promise.all(
@@ -237,9 +306,29 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
         )
       )
 
-      loadedSoundsRef.current.add(soundId)
+      loadedSoundsRef.current.add(cacheKey)
     },
     [createAudioPool]
+  )
+
+  // Preload a sound (including all variants if applicable)
+  const preloadSound = useCallback(
+    async (soundId: SoundId): Promise<void> => {
+      const variantCount = SOUND_VARIANTS[soundId]
+
+      if (variantCount) {
+        // Preload all variants in parallel
+        const variantPromises = []
+        for (let i = 1; i <= variantCount; i++) {
+          variantPromises.push(preloadSoundVariant(soundId, i))
+        }
+        await Promise.all(variantPromises)
+      } else {
+        // Preload single sound
+        await preloadSoundVariant(soundId)
+      }
+    },
+    [preloadSoundVariant]
   )
 
   // Preload multiple sounds
@@ -259,35 +348,165 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
     [preload]
   )
 
-  // Play a sound
+  // Play primer to wake up dormant audio context
+  // Called before every sound to ensure audio system is active
+  const playPrimer = useCallback(async (): Promise<void> => {
+    if (!primerRef.current) return
+    try {
+      primerRef.current.currentTime = 0
+      await primerRef.current.play()
+    } catch {
+      // Primer failed, continue anyway - don't block the real sound
+    }
+  }, [])
+
+  // Play a sound (randomly selects variant for sounds with variants)
+  // Returns a Promise that resolves when the sound finishes playing
   const play = useCallback(
-    (soundId: SoundId): void => {
-      // Don't play if muted
-      if (isMuted) return
+    async (soundId: SoundId): Promise<void> => {
+      // Don't play if muted - resolve immediately
+      if (isMuted) {
+        return
+      }
+
+      // Wake up dormant audio context with primer
+      await playPrimer()
+
+      // Check if this sound has variants
+      const variantCount = SOUND_VARIANTS[soundId]
+      let cacheKey: string
+      let variant: number | undefined
+
+      if (variantCount) {
+        // Randomly select a variant (1 to variantCount)
+        variant = Math.floor(Math.random() * variantCount) + 1
+        cacheKey = getCacheKey(soundId, variant)
+      } else {
+        cacheKey = soundId
+      }
 
       // Get or create audio pool
-      let pool = audioPoolRef.current.get(soundId)
+      let pool = audioPoolRef.current.get(cacheKey)
       if (!pool) {
-        pool = createAudioPool(soundId)
-        audioPoolRef.current.set(soundId, pool)
-        poolIndexRef.current.set(soundId, 0)
+        pool = createAudioPool(soundId, variant)
+        audioPoolRef.current.set(cacheKey, pool)
+        poolIndexRef.current.set(cacheKey, 0)
       }
 
       // Get next audio element (round-robin)
-      const index = poolIndexRef.current.get(soundId) ?? 0
+      const index = poolIndexRef.current.get(cacheKey) ?? 0
       const audio = pool[index]
 
       // Update pool index
-      poolIndexRef.current.set(soundId, (index + 1) % POOL_SIZE)
+      poolIndexRef.current.set(cacheKey, (index + 1) % POOL_SIZE)
 
-      // Reset and play
-      audio.currentTime = 0
-      audio.volume = volume
-      audio.play().catch(() => {
-        // Ignore autoplay errors - user hasn't unlocked audio yet
+      // Play sound and wait for completion
+      return new Promise<void>((resolve) => {
+        // Create handlers for sound completion
+        const onEnded = () => {
+          audio.removeEventListener('ended', onEnded)
+          audio.removeEventListener('error', onError)
+          resolve()
+        }
+
+        const onError = () => {
+          audio.removeEventListener('ended', onEnded)
+          audio.removeEventListener('error', onError)
+          resolve() // Resolve even on error to not block sequence
+        }
+
+        // Add listeners before playing
+        audio.addEventListener('ended', onEnded)
+        audio.addEventListener('error', onError)
+
+        // Reset and play
+        audio.currentTime = 0
+        audio.volume = volume
+        audio.play().catch(() => {
+          // Autoplay blocked - remove listeners and resolve
+          audio.removeEventListener('ended', onEnded)
+          audio.removeEventListener('error', onError)
+          resolve()
+        })
       })
     },
-    [isMuted, volume, createAudioPool]
+    [isMuted, volume, createAudioPool, playPrimer]
+  )
+
+  // Default gap between sounds in a sequence (ms)
+  const DEFAULT_SEQUENCE_GAP = 150
+
+  // Cancel any active sequence
+  const cancelSequence = useCallback((): void => {
+    if (sequenceAbortControllerRef.current) {
+      sequenceAbortControllerRef.current.abort()
+      sequenceAbortControllerRef.current = null
+    }
+  }, [])
+
+  // Play multiple sounds in sequence, waiting for each to complete
+  const playSequence = useCallback(
+    async (sounds: SequenceItem[], options?: PlaySequenceOptions): Promise<void> => {
+      if (sounds.length === 0) return
+
+      const defaultGap = options?.defaultGap ?? DEFAULT_SEQUENCE_GAP
+
+      // Create internal abort controller, but also respect external signal
+      const internalController = new AbortController()
+      sequenceAbortControllerRef.current = internalController
+
+      // If external signal provided, link it to internal controller
+      const externalSignal = options?.signal
+      if (externalSignal) {
+        if (externalSignal.aborted) {
+          return // Already aborted
+        }
+        externalSignal.addEventListener('abort', () => {
+          internalController.abort()
+        })
+      }
+
+      const signal = internalController.signal
+
+      for (let i = 0; i < sounds.length; i++) {
+        // Check for cancellation before each sound
+        if (signal.aborted) {
+          break
+        }
+
+        const item = sounds[i]
+        const soundId: SoundId = Array.isArray(item) ? item[0] : item
+        const gapAfter: number = Array.isArray(item) ? item[1] : defaultGap
+
+        // Play the sound and wait for it to complete
+        await play(soundId)
+
+        // Check for cancellation after sound completes
+        if (signal.aborted) {
+          break
+        }
+
+        // Add gap between sounds (skip for last sound)
+        if (i < sounds.length - 1 && gapAfter > 0) {
+          await new Promise<void>((resolve) => {
+            const timeoutId = setTimeout(resolve, gapAfter)
+
+            // If aborted during gap, clear timeout and resolve
+            const abortHandler = () => {
+              clearTimeout(timeoutId)
+              resolve()
+            }
+            signal.addEventListener('abort', abortHandler, { once: true })
+          })
+        }
+      }
+
+      // Clear the ref when sequence completes or is cancelled
+      if (sequenceAbortControllerRef.current === internalController) {
+        sequenceAbortControllerRef.current = null
+      }
+    },
+    [play]
   )
 
   // Unlock audio on mobile (must be called from user interaction)
@@ -348,6 +567,8 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
 
   return {
     play,
+    playSequence,
+    cancelSequence,
     preload,
     preloadCategory,
     volume,

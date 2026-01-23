@@ -60,6 +60,13 @@ const CATEGORY_SOUNDS: Record<SoundCategory, SoundId[]> = {
   battle: ['battle_attack', 'battle_damage', 'battle_death', 'battle_win', 'battle_lose', 'critical_hp'],
 }
 
+// Sounds with multiple variants (randomly selected at play time)
+// Maps soundId to number of variants available
+const SOUND_VARIANTS: Partial<Record<SoundId, number>> = {
+  battle_attack: 10,
+  battle_damage: 10,
+}
+
 // localStorage keys
 const STORAGE_VOLUME_KEY = 'arena-sound-volume'
 const STORAGE_MUTED_KEY = 'arena-sound-muted'
@@ -118,12 +125,13 @@ export interface UseSoundReturn {
  * ```
  */
 export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
-  // Audio cache: soundId -> HTMLAudioElement[]
-  const audioPoolRef = useRef<Map<SoundId, HTMLAudioElement[]>>(new Map())
+  // Audio cache: cacheKey -> HTMLAudioElement[]
+  // Cache keys are soundId for regular sounds, or "soundId:variant" for variant sounds
+  const audioPoolRef = useRef<Map<string, HTMLAudioElement[]>>(new Map())
   // Track next audio element index for round-robin pooling
-  const poolIndexRef = useRef<Map<SoundId, number>>(new Map())
-  // Track loaded sounds
-  const loadedSoundsRef = useRef<Set<SoundId>>(new Set())
+  const poolIndexRef = useRef<Map<string, number>>(new Map())
+  // Track loaded sounds (by cache key)
+  const loadedSoundsRef = useRef<Set<string>>(new Set())
   // Track if audio is unlocked on mobile
   const [isReady, setIsReady] = useState(false)
   // Silent audio element for mobile unlock
@@ -192,19 +200,29 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
   }, [])
 
   // Get URL for a sound file (with cache-busting version param)
+  // For sounds with variants, pass the variant number to get the specific file
   const getSoundUrl = useCallback(
-    (soundId: SoundId): string => {
+    (soundId: SoundId, variant?: number): string => {
       const version = import.meta.env.VITE_SOUND_VERSION || '1'
+      if (variant !== undefined) {
+        // Variant sounds are stored in subdirectories: battle_attack/battle_attack_1.ogg
+        return `${baseUrl}/${soundId}/${soundId}_${variant}.ogg?v=${version}`
+      }
       return `${baseUrl}/${soundId}.ogg?v=${version}`
     },
     [baseUrl]
   )
 
-  // Create audio pool for a sound
+  // Get internal cache key for a sound (includes variant number for variant sounds)
+  const getCacheKey = (soundId: SoundId, variant?: number): string => {
+    return variant !== undefined ? `${soundId}:${variant}` : soundId
+  }
+
+  // Create audio pool for a sound (optionally for a specific variant)
   const createAudioPool = useCallback(
-    (soundId: SoundId): HTMLAudioElement[] => {
+    (soundId: SoundId, variant?: number): HTMLAudioElement[] => {
       const pool: HTMLAudioElement[] = []
-      const url = getSoundUrl(soundId)
+      const url = getSoundUrl(soundId, variant)
 
       for (let i = 0; i < POOL_SIZE; i++) {
         const audio = new Audio(url)
@@ -218,18 +236,20 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
     [getSoundUrl, volume, isMuted]
   )
 
-  // Preload a single sound
-  const preloadSound = useCallback(
-    async (soundId: SoundId): Promise<void> => {
+  // Preload a single sound variant
+  const preloadSoundVariant = useCallback(
+    async (soundId: SoundId, variant?: number): Promise<void> => {
+      const cacheKey = getCacheKey(soundId, variant)
+
       // Skip if already loaded
-      if (loadedSoundsRef.current.has(soundId)) {
+      if (loadedSoundsRef.current.has(cacheKey)) {
         return
       }
 
       // Create audio pool
-      const pool = createAudioPool(soundId)
-      audioPoolRef.current.set(soundId, pool)
-      poolIndexRef.current.set(soundId, 0)
+      const pool = createAudioPool(soundId, variant)
+      audioPoolRef.current.set(cacheKey, pool)
+      poolIndexRef.current.set(cacheKey, 0)
 
       // Wait for all to be ready
       await Promise.all(
@@ -246,9 +266,29 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
         )
       )
 
-      loadedSoundsRef.current.add(soundId)
+      loadedSoundsRef.current.add(cacheKey)
     },
     [createAudioPool]
+  )
+
+  // Preload a sound (including all variants if applicable)
+  const preloadSound = useCallback(
+    async (soundId: SoundId): Promise<void> => {
+      const variantCount = SOUND_VARIANTS[soundId]
+
+      if (variantCount) {
+        // Preload all variants in parallel
+        const variantPromises = []
+        for (let i = 1; i <= variantCount; i++) {
+          variantPromises.push(preloadSoundVariant(soundId, i))
+        }
+        await Promise.all(variantPromises)
+      } else {
+        // Preload single sound
+        await preloadSoundVariant(soundId)
+      }
+    },
+    [preloadSoundVariant]
   )
 
   // Preload multiple sounds
@@ -268,26 +308,39 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
     [preload]
   )
 
-  // Play a sound
+  // Play a sound (randomly selects variant for sounds with variants)
   const play = useCallback(
     (soundId: SoundId): void => {
       // Don't play if muted
       if (isMuted) return
 
+      // Check if this sound has variants
+      const variantCount = SOUND_VARIANTS[soundId]
+      let cacheKey: string
+      let variant: number | undefined
+
+      if (variantCount) {
+        // Randomly select a variant (1 to variantCount)
+        variant = Math.floor(Math.random() * variantCount) + 1
+        cacheKey = getCacheKey(soundId, variant)
+      } else {
+        cacheKey = soundId
+      }
+
       // Get or create audio pool
-      let pool = audioPoolRef.current.get(soundId)
+      let pool = audioPoolRef.current.get(cacheKey)
       if (!pool) {
-        pool = createAudioPool(soundId)
-        audioPoolRef.current.set(soundId, pool)
-        poolIndexRef.current.set(soundId, 0)
+        pool = createAudioPool(soundId, variant)
+        audioPoolRef.current.set(cacheKey, pool)
+        poolIndexRef.current.set(cacheKey, 0)
       }
 
       // Get next audio element (round-robin)
-      const index = poolIndexRef.current.get(soundId) ?? 0
+      const index = poolIndexRef.current.get(cacheKey) ?? 0
       const audio = pool[index]
 
       // Update pool index
-      poolIndexRef.current.set(soundId, (index + 1) % POOL_SIZE)
+      poolIndexRef.current.set(cacheKey, (index + 1) % POOL_SIZE)
 
       // Reset and play
       audio.currentTime = 0

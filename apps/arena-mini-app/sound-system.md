@@ -8,6 +8,17 @@ The arena mini-app uses a centralized sound system built on React Context. Sound
 
 All sounds are `.ogg` format stored at `{VITE_SOUND_BASE_URL}/{soundId}.ogg`.
 
+### Sound Variants
+
+Some sounds have multiple variants that are randomly selected at play time for variety. Variant sounds are stored in subdirectories:
+
+| Sound ID | Variants | Path Pattern |
+|----------|----------|--------------|
+| `battle_attack` | 10 | `battle_attack/battle_attack_{1-10}.ogg` |
+| `battle_damage` | 10 | `battle_damage/battle_damage_{1-10}.ogg` |
+
+When `play('battle_attack')` is called, a random variant (1-10) is selected and played. All variants are preloaded together when the `battle` category is preloaded.
+
 ## Sound Registry
 
 | Sound ID | Category | Description |
@@ -25,8 +36,8 @@ All sounds are `.ogg` format stored at `{VITE_SOUND_BASE_URL}/{soundId}.ogg`.
 | `success` | shop | Action succeeded |
 | `team_place` | team | Card placed/reordered in team |
 | `team_upgrade` | team | Card upgraded |
-| `battle_attack` | battle | Attacker initiates attack |
-| `battle_damage` | battle | Defender takes damage |
+| `battle_attack` | battle | Attacker initiates attack (10 variants) |
+| `battle_damage` | battle | Defender takes damage (10 variants) |
 | `battle_death` | battle | Card dies |
 | `battle_win` | battle | User won the battle |
 | `battle_lose` | battle | User lost the battle |

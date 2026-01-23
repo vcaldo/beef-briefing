@@ -46,7 +46,7 @@ export function TeamPhaseModal({
   onMatchChange,
 }: TeamPhaseModalProps) {
   // Sound context
-  const { play, playSequence } = useSoundContext()
+  const { play } = useSoundContext()
 
   // Image URLs for icons and panel background
   const { getUrlById } = useImages()
@@ -167,10 +167,10 @@ export function TeamPhaseModal({
       const newPositions = currentOrder.map((c: EnhancedTeamCard) => c.position)
       const data = await apiClient.setTeamOrder(activeMatch.id, newPositions)
       onShopDataChange(data)
-      play('team_place')
+      play('arena_team_place')
     } catch (err) {
       console.error('Failed to reorder team:', err)
-      play('error')
+      play('arena_error')
       // Revert to server state on error
       setLocalTeamOrder(teamCards)
     } finally {
@@ -187,10 +187,10 @@ export function TeamPhaseModal({
       try {
         const data = await apiClient.upgradeCard(activeMatch.id, teamSlot, upgradeType)
         onShopDataChange(data)
-        play('team_upgrade')
+        play('arena_team_upgrade')
       } catch (err) {
         console.error('Failed to upgrade card:', err)
-        play('error')
+        play('arena_error')
       } finally {
         setActionLoading(null)
       }
@@ -206,10 +206,10 @@ export function TeamPhaseModal({
     try {
       const data = await apiClient.submitTeam(activeMatch.id)
       onShopDataChange(data)
-      play('button_click')
+      play('arena_button_click')
     } catch (err) {
       console.error('Failed to submit team:', err)
-      play('error')
+      play('arena_error')
     } finally {
       setActionLoading(null)
     }

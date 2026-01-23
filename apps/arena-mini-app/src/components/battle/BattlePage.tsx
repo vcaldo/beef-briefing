@@ -104,7 +104,7 @@ export function BattlePage({
     isComplete,
     currentDamage,
     damageTargetKey,
-    activeEffect,
+    activeEffects,
     onEffectComplete,
     play,
     pause,
@@ -397,16 +397,16 @@ export function BattlePage({
           </div>
         </div>
 
-        {/* Battle Effect - renders animated effect at card positions */}
-        {activeEffect && (
+        {/* Battle Effects - renders animated effects at card positions (supports multiple simultaneous effects) */}
+        {activeEffects.map((effect) => (
           <BattleEffect
-            key={`${activeEffect.type}-${activeEffect.cardKey}`}
-            type={activeEffect.type}
-            position={activeEffect.position}
-            onComplete={onEffectComplete}
+            key={`${effect.type}-${effect.cardKey}`}
+            type={effect.type}
+            position={effect.position}
+            onComplete={() => onEffectComplete(effect.cardKey)}
             size={80}
           />
-        )}
+        ))}
       </div>
 
       {/* Playback Controls */}

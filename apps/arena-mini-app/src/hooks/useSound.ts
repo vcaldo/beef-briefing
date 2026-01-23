@@ -16,8 +16,6 @@ export type SoundId =
   | 'lobby_create'
   | 'lobby_join'
   | 'lobby_start'
-  | 'shop_reroll'
-  | 'shop_buy'
   | 'button_click'
   | 'team_place'
   | 'team_upgrade'
@@ -32,25 +30,19 @@ export type SoundId =
   | 'card_shuffle'
   | 'countdown_tick'
   | 'countdown_warning'
-  | 'tab_switch'
-  | 'modal_open'
-  | 'modal_close'
-  | 'card_hover'
   | 'success'
   | 'powerup'
   | 'critical_hp'
-  | 'round_start'
-  | 'team_ready'
 
 // Sound categories for preloading
 export type SoundCategory = 'lobby' | 'shop' | 'team' | 'battle'
 
 // Map categories to their sound IDs
 const CATEGORY_SOUNDS: Record<SoundCategory, SoundId[]> = {
-  lobby: ['lobby_create', 'lobby_join', 'lobby_start', 'countdown_tick', 'countdown_warning', 'tab_switch'],
-  shop: ['shop_reroll', 'shop_buy', 'button_click', 'card_draw', 'card_shuffle', 'coin_spend', 'error', 'card_hover', 'success'],
-  team: ['team_place', 'team_upgrade', 'button_click', 'modal_open', 'modal_close', 'team_ready', 'powerup', 'error'],
-  battle: ['battle_attack', 'battle_damage', 'battle_death', 'battle_win', 'battle_lose', 'round_start', 'critical_hp'],
+  lobby: ['lobby_create', 'lobby_join', 'lobby_start', 'countdown_tick', 'countdown_warning'],
+  shop: ['button_click', 'card_draw', 'card_shuffle', 'coin_spend', 'error', 'success'],
+  team: ['team_place', 'team_upgrade', 'button_click', 'powerup', 'error'],
+  battle: ['battle_attack', 'battle_damage', 'battle_death', 'battle_win', 'battle_lose', 'critical_hp'],
 }
 
 // localStorage keys

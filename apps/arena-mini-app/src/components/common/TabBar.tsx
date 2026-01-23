@@ -1,6 +1,5 @@
 import type { TabId } from '../../types'
 import { SoundSettings } from './SoundSettings'
-import { useSoundContext } from '../../contexts'
 import { GameButton } from '../ui/GameButton'
 
 interface Tab {
@@ -118,13 +117,7 @@ interface TabBarProps {
  * Uses CSS classes from global.css for styling.
  */
 export function TabBar({ activeTab, onTabChange }: TabBarProps) {
-  const { play } = useSoundContext()
-
   const handleTabClick = (tabId: TabId) => {
-    // Only play sound when switching to a different tab
-    if (tabId !== activeTab) {
-      play('tab_switch')
-    }
     onTabChange(tabId)
   }
 

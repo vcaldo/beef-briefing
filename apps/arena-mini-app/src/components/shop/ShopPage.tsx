@@ -193,7 +193,6 @@ export function ShopPage({
         })
         // After buying, data.can_reroll will be false (server enforces this)
         setShopData(data)
-        play('shop_buy')
         play('coin_spend')
         play('success')
       } catch (err) {
@@ -447,7 +446,11 @@ export function ShopPage({
           <GameButton
             variant="primary"
             size="lg"
-            onClick={() => setIsTeamPhase(true)}
+            onClick={() => {
+              play('button_click')
+              play('success')
+              setIsTeamPhase(true)
+            }}
             className="done-shopping-btn"
           >
             Done Shopping - Organize Team

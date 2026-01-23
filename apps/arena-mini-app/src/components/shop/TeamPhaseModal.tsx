@@ -208,7 +208,6 @@ export function TeamPhaseModal({
       const data = await apiClient.submitTeam(activeMatch.id)
       onShopDataChange(data)
       play('button_click')
-      play('team_ready')
     } catch (err) {
       console.error('Failed to submit team:', err)
       play('error')
@@ -216,14 +215,6 @@ export function TeamPhaseModal({
       setActionLoading(null)
     }
   }, [activeMatch, actionLoading, isSubmitted, onShopDataChange, play])
-
-  // Play modal_open sound on mount, modal_close on unmount
-  useEffect(() => {
-    play('modal_open')
-    return () => {
-      play('modal_close')
-    }
-  }, [play])
 
   return (
     <div className="team-phase-backdrop">

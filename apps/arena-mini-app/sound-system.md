@@ -107,6 +107,17 @@ Mobile browsers block autoplay until user interaction. The sound system:
 
 `unlockAudio()` is called in LobbyPage via `ensureAudioUnlocked()` on match create/join/leave/start actions.
 
+## Audio Context Wake-Up (Primer System)
+
+After extended periods of inactivity, browser audio contexts can go dormant, causing the first sound after idle to fail. To prevent this:
+
+1. A near-silent "primer" sound (`arena_primer.ogg`) is preloaded on mount
+2. Before **every** sound plays, the primer is played first to wake up the audio context
+3. The primer is ~50ms of barely-audible white noise (volume 0.01)
+4. This ensures audio playback is reliable even after long idle periods
+
+The primer is internal to the sound system and not exposed as a public `SoundId`.
+
 ## Sequential Sound Playback
 
 For actions that trigger multiple sounds, use `playSequence()` to play them in order with delays:

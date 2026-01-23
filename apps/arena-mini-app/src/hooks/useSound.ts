@@ -79,6 +79,13 @@ const POOL_SIZE = 4
 // Default volume (0-1) - fixed at 25%
 const DEFAULT_VOLUME = 0.25
 
+// Primer sound ID (internal, not part of regular sounds)
+// Plays before every sound to wake up dormant audio contexts
+const PRIMER_SOUND_ID = 'arena_primer'
+
+// Primer volume - nearly silent but audible enough to wake audio context
+const PRIMER_VOLUME = 0.01
+
 export interface UseSoundOptions {
   /** Base URL for sound files (e.g., "http://localhost:9000/beef-briefing/sounds/arena") */
   baseUrl: string
@@ -142,6 +149,8 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
   const silentAudioRef = useRef<HTMLAudioElement | null>(null)
   // Track active sequence for cancellation
   const sequenceAbortControllerRef = useRef<AbortController | null>(null)
+  // Primer audio element for waking up dormant audio contexts
+  const primerRef = useRef<HTMLAudioElement | null>(null)
 
   // Volume state with localStorage persistence
   const [volume, setVolumeState] = useState(() => {
@@ -189,6 +198,24 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
       }
     }
   }, [])
+
+  // Create and preload primer audio for waking up dormant audio contexts
+  // This plays before every sound to ensure the audio system is active
+  useEffect(() => {
+    const version = import.meta.env.VITE_SOUND_VERSION || '1'
+    const primerUrl = `${baseUrl}/${PRIMER_SOUND_ID}.ogg?v=${version}`
+    const primer = new Audio(primerUrl)
+    primer.preload = 'auto'
+    primer.volume = PRIMER_VOLUME
+    primerRef.current = primer
+
+    return () => {
+      if (primerRef.current) {
+        primerRef.current.pause()
+        primerRef.current = null
+      }
+    }
+  }, [baseUrl])
 
   // Cleanup all audio elements and cancel sequences on unmount
   useEffect(() => {
@@ -321,45 +348,60 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
     [preload]
   )
 
+  // Play primer to wake up dormant audio context
+  // Called before every sound to ensure audio system is active
+  const playPrimer = useCallback(async (): Promise<void> => {
+    if (!primerRef.current) return
+    try {
+      primerRef.current.currentTime = 0
+      await primerRef.current.play()
+    } catch {
+      // Primer failed, continue anyway - don't block the real sound
+    }
+  }, [])
+
   // Play a sound (randomly selects variant for sounds with variants)
   // Returns a Promise that resolves when the sound finishes playing
   const play = useCallback(
-    (soundId: SoundId): Promise<void> => {
-      return new Promise((resolve) => {
-        // Don't play if muted - resolve immediately
-        if (isMuted) {
-          resolve()
-          return
-        }
+    async (soundId: SoundId): Promise<void> => {
+      // Don't play if muted - resolve immediately
+      if (isMuted) {
+        return
+      }
 
-        // Check if this sound has variants
-        const variantCount = SOUND_VARIANTS[soundId]
-        let cacheKey: string
-        let variant: number | undefined
+      // Wake up dormant audio context with primer
+      await playPrimer()
 
-        if (variantCount) {
-          // Randomly select a variant (1 to variantCount)
-          variant = Math.floor(Math.random() * variantCount) + 1
-          cacheKey = getCacheKey(soundId, variant)
-        } else {
-          cacheKey = soundId
-        }
+      // Check if this sound has variants
+      const variantCount = SOUND_VARIANTS[soundId]
+      let cacheKey: string
+      let variant: number | undefined
 
-        // Get or create audio pool
-        let pool = audioPoolRef.current.get(cacheKey)
-        if (!pool) {
-          pool = createAudioPool(soundId, variant)
-          audioPoolRef.current.set(cacheKey, pool)
-          poolIndexRef.current.set(cacheKey, 0)
-        }
+      if (variantCount) {
+        // Randomly select a variant (1 to variantCount)
+        variant = Math.floor(Math.random() * variantCount) + 1
+        cacheKey = getCacheKey(soundId, variant)
+      } else {
+        cacheKey = soundId
+      }
 
-        // Get next audio element (round-robin)
-        const index = poolIndexRef.current.get(cacheKey) ?? 0
-        const audio = pool[index]
+      // Get or create audio pool
+      let pool = audioPoolRef.current.get(cacheKey)
+      if (!pool) {
+        pool = createAudioPool(soundId, variant)
+        audioPoolRef.current.set(cacheKey, pool)
+        poolIndexRef.current.set(cacheKey, 0)
+      }
 
-        // Update pool index
-        poolIndexRef.current.set(cacheKey, (index + 1) % POOL_SIZE)
+      // Get next audio element (round-robin)
+      const index = poolIndexRef.current.get(cacheKey) ?? 0
+      const audio = pool[index]
 
+      // Update pool index
+      poolIndexRef.current.set(cacheKey, (index + 1) % POOL_SIZE)
+
+      // Play sound and wait for completion
+      return new Promise<void>((resolve) => {
         // Create handlers for sound completion
         const onEnded = () => {
           audio.removeEventListener('ended', onEnded)
@@ -388,7 +430,7 @@ export function useSound({ baseUrl }: UseSoundOptions): UseSoundReturn {
         })
       })
     },
-    [isMuted, volume, createAudioPool]
+    [isMuted, volume, createAudioPool, playPrimer]
   )
 
   // Default gap between sounds in a sequence (ms)

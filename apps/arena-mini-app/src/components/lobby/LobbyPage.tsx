@@ -378,11 +378,14 @@ export function LobbyPage({
   const canStartEarly = isCreator && activeMatch?.participants && activeMatch.participants.length >= 2
 
   return (
-    <div className="lobby-page">
-      <header className="lobby-header">
-        <h1 className="lobby-title">Arena Lobby</h1>
-        <p className="lobby-subtitle">Welcome, {firstName}</p>
-      </header>
+    <div className="lobby-page rpg-lobby-page">
+      {/* RPG-styled header */}
+      <RPGPanel variant="outer" className="rpg-lobby-header">
+        <RPGPanel variant="inner" className="rpg-lobby-header-content">
+          <h1 className="rpg-lobby-title">Arena Lobby</h1>
+          <p className="rpg-lobby-subtitle">Welcome, {firstName}</p>
+        </RPGPanel>
+      </RPGPanel>
 
       {/* Error banner */}
       {error && (
@@ -483,34 +486,40 @@ export function LobbyPage({
 
       {/* Match list (when not in a match) */}
       {!activeMatch && (
-        <section className="lobby-matches">
-          <div className="lobby-section-header">
-            <h2 className="lobby-section-title">Available Matches</h2>
-            <GameButton
-              variant="primary"
-              size="sm"
-              onClick={handleCreateMatch}
-              disabled={actionLoading !== null}
-              className="create-match-btn"
-            >
-              {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : '+ New Match'}
-            </GameButton>
-          </div>
-
-          {matches.length === 0 ? (
-            <div className="lobby-empty-state">
-              <div className="empty-state-icon">⚔️</div>
-              <h3 className="empty-state-title">No Active Matches</h3>
-              <p className="empty-state-text">Create a new match to challenge your friends!</p>
+        <section className="lobby-matches rpg-lobby-matches">
+          <RPGPanel variant="outer" className="rpg-lobby-section-header">
+            <div className="rpg-section-header-row">
+              <h2 className="rpg-section-title">Available Matches</h2>
               <GameButton
                 variant="primary"
-                size="lg"
+                size="sm"
                 onClick={handleCreateMatch}
                 disabled={actionLoading !== null}
+                className="create-match-btn"
               >
-                {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : 'Create Match'}
+                {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : '+ New Match'}
               </GameButton>
             </div>
+          </RPGPanel>
+
+          {matches.length === 0 ? (
+            <RPGPanel variant="outer" className="rpg-empty-state-panel">
+              <RPGPanel variant="inner" className="rpg-empty-state-content">
+                <div className="rpg-empty-state">
+                  <span className="rpg-empty-icon">⚔️</span>
+                  <h3 className="rpg-empty-title">No Active Matches</h3>
+                  <p className="rpg-empty-hint">Create a new match to challenge your friends!</p>
+                  <GameButton
+                    variant="primary"
+                    size="lg"
+                    onClick={handleCreateMatch}
+                    disabled={actionLoading !== null}
+                  >
+                    {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : 'Create Match'}
+                  </GameButton>
+                </div>
+              </RPGPanel>
+            </RPGPanel>
           ) : (
             <div className="match-list">
               {matches

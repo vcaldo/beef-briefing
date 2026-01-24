@@ -4901,6 +4901,501 @@ button,
   justify-content: center;
 }
 
+/* ============================================
+   RPG Lobby Page Styles
+   ============================================ */
+
+.rpg-lobby-page {
+  background: transparent;
+}
+
+.rpg-lobby-header {
+  margin-bottom: 16px;
+}
+
+.rpg-lobby-header-content {
+  text-align: center;
+  padding: 16px 12px;
+}
+
+.rpg-lobby-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  color: #4a3a2a;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0 0 4px 0;
+}
+
+.rpg-lobby-subtitle {
+  font-size: 14px;
+  color: #6a5a4a;
+  margin: 0;
+}
+
+.rpg-lobby-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rpg-lobby-section-header {
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.rpg-section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rpg-section-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #4a3a2a;
+  margin: 0;
+}
+
+/* Empty state panel for no matches */
+.rpg-empty-state-panel {
+  margin-top: 8px;
+}
+
+.rpg-empty-state-content {
+  padding: 24px 16px;
+}
+
+.rpg-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.rpg-empty-icon {
+  font-size: 48px;
+}
+
+.rpg-empty-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #4a3a2a;
+  margin: 0;
+}
+
+.rpg-empty-hint {
+  font-size: 14px;
+  color: #6a5a4a;
+  margin: 0 0 8px 0;
+}
+
+/* ============================================
+   RPG Shop Page Styles
+   ============================================ */
+
+.rpg-shop-page {
+  background: transparent;
+  padding: 16px;
+  padding-bottom: calc(var(--tab-bar-height) + 16px);
+  min-height: 100vh;
+}
+
+.rpg-shop-outer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rpg-shop-header {
+  padding: 12px 16px;
+}
+
+.rpg-shop-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rpg-shop-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rpg-shop-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.rpg-shop-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: #4a3a2a;
+  margin: 0;
+}
+
+.rpg-shop-submitted-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #3a6a5a;
+  background: rgba(58, 106, 90, 0.15);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.rpg-shop-timer {
+  display: flex;
+  align-items: center;
+}
+
+/* Waiting panel - blue inner variant */
+.rpg-shop-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.rpg-shop-waiting-icon {
+  font-size: 32px;
+}
+
+.rpg-shop-waiting-text {
+  font-size: 14px;
+  color: #3a5a6a;
+  margin: 0;
+}
+
+/* Shop cards panel */
+.rpg-shop-cards-panel {
+  padding: 12px;
+}
+
+.rpg-shop-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(90, 74, 58, 0.2);
+}
+
+.rpg-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.rpg-shop-empty {
+  text-align: center;
+  padding: 16px;
+  color: #6a5a4a;
+  font-size: 14px;
+}
+
+.rpg-shop-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+}
+
+.rpg-shop-hint {
+  font-size: 12px;
+  color: #6a5a4a;
+  text-align: center;
+  margin: 0;
+}
+
+/* Mobile shop layout - 2 columns, no card frames */
+@media (max-width: 480px) {
+  .rpg-shop-page {
+    padding: 8px;
+    padding-bottom: calc(var(--tab-bar-height) + 8px);
+  }
+
+  .rpg-shop-outer {
+    gap: 8px;
+  }
+
+  .rpg-shop-header {
+    padding: 8px 12px;
+  }
+
+  .rpg-shop-title {
+    font-size: 16px;
+  }
+
+  .rpg-shop-cards-panel {
+    padding: 8px;
+  }
+
+  .rpg-shop-section-header {
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+  }
+
+  /* Force 2 columns on mobile */
+  .rpg-shop-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  /* Remove CardSlot frame on mobile shop */
+  .rpg-shop-grid .shop-card-slot {
+    background: none;
+    border: none;
+    box-shadow: none;
+    min-width: unset;
+    min-height: unset;
+    padding: 0;
+  }
+
+  /* Let the compact card fill available space */
+  .rpg-shop-grid .shop-card-slot .card-slot-content {
+    padding: 0;
+  }
+
+  .rpg-shop-grid .shop-card {
+    background: none;
+    border-radius: 0;
+  }
+
+  /* Smaller compact card scale on mobile */
+  .rpg-shop-grid .shop-compact-card {
+    transform: scale(0.42);
+    margin: calc(450px * (0.42 - 1) / 2) calc(300px * (0.42 - 1) / 2);
+  }
+
+  /* Tighter footer */
+  .rpg-shop-grid .shop-card-footer {
+    padding: 4px;
+  }
+
+  .rpg-shop-grid .shop-card-footer .game-button {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+}
+
+/* ============================================
+   RPG Team Phase Modal Styles
+   ============================================ */
+
+.rpg-team-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.rpg-team-modal-outer {
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rpg-team-modal-header {
+  padding: 12px 16px;
+}
+
+.rpg-team-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rpg-team-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rpg-team-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.rpg-team-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: #4a3a2a;
+  margin: 0;
+}
+
+.rpg-team-submitted-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #3a6a5a;
+  background: rgba(58, 106, 90, 0.15);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.rpg-team-timer {
+  display: flex;
+  align-items: center;
+}
+
+/* Team cards section - blue inner variant */
+.rpg-team-cards-section {
+  padding: 12px;
+}
+
+.rpg-team-cards-section .rpg-section-title {
+  color: #3a5a6a;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* ============================================
+   RPG Battle Page Styles
+   ============================================ */
+
+.rpg-battle-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  flex-wrap: wrap;
+}
+
+.rpg-battle-controls .control-btn {
+  min-width: 44px;
+  padding: 8px 12px;
+}
+
+.rpg-battle-controls .play-btn {
+  min-width: 56px;
+}
+
+/* Victory screen overlay */
+.rpg-victory-outer {
+  width: 90%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: victory-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes victory-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.rpg-victory-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  text-align: center;
+}
+
+.rpg-victory-content .victory-icon {
+  font-size: 48px;
+  animation: bounce 0.6s ease infinite alternate;
+}
+
+@keyframes bounce {
+  from { transform: translateY(0); }
+  to { transform: translateY(-8px); }
+}
+
+.rpg-victory-content .victory-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  color: #3a5a6a;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.rpg-victory-content .victory-subtitle {
+  font-size: 14px;
+  color: #4a6a7a;
+  margin: 0;
+}
+
+.rpg-victory-stats {
+  padding: 12px 16px;
+}
+
+.rpg-victory-stats .victory-stats {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+}
+
+.rpg-victory-stats .victory-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.rpg-victory-stats .stat-label {
+  font-size: 11px;
+  color: #6a5a4a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rpg-victory-stats .stat-value {
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #4a3a2a;
+}
+
+.rpg-victory-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  width: 100%;
+}
+
+.rpg-victory-actions .game-button {
+  width: 100%;
+}
+
 /* App container */
 .app {
   min-height: 100vh;

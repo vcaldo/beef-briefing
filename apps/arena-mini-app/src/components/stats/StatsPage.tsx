@@ -477,13 +477,11 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
         {/* Profile header */}
         <RPGPanel variant="inner" className="rpg-profile-header-panel">
           <div className="rpg-profile-header">
-            <div className="rpg-profile-avatar">
-              {profileData.photo_url ? (
-                <img src={profileData.photo_url} alt={profileData.first_name} />
-              ) : (
-                <span className="rpg-avatar-placeholder">👤</span>
-              )}
-            </div>
+            <Avatar
+              firstName={profileData.first_name}
+              photoUrl={profileData.photo_url}
+              size="large"
+            />
             <div className="rpg-profile-info">
               <h2 className="rpg-profile-name">{profileData.first_name}</h2>
               {profileData.username && <p className="rpg-profile-username">@{profileData.username}</p>}

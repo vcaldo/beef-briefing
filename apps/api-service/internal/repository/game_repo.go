@@ -222,8 +222,10 @@ type Participant struct {
 // ParticipantWithUser includes user info
 type ParticipantWithUser struct {
 	Participant
-	FirstName string `json:"first_name"`
-	Username  string `json:"username,omitempty"`
+	FirstName      string  `json:"first_name"`
+	Username       string  `json:"username,omitempty"`
+	PhotoObjectKey *string `json:"-"`                      // Internal: minio object key (not serialized)
+	PhotoURL       *string `json:"photo_url,omitempty"`    // Presigned URL for profile photo
 }
 
 // MatchRound represents a battle round
@@ -265,8 +267,10 @@ type LeaderboardEntry struct {
 	FirstMatchAt            *time.Time      `json:"first_match_at,omitempty"`
 	LastMatchAt             *time.Time      `json:"last_match_at,omitempty"`
 	// User info from join
-	FirstName string `json:"first_name,omitempty"`
-	Username  string `json:"username,omitempty"`
+	FirstName      string  `json:"first_name,omitempty"`
+	Username       string  `json:"username,omitempty"`
+	PhotoObjectKey *string `json:"-"`                   // Internal: minio object key (not serialized)
+	PhotoURL       *string `json:"photo_url,omitempty"` // Presigned URL for profile photo
 }
 
 // RankedTournament represents a daily ranked tournament

@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
+import { Avatar } from '@beef-briefing/shared-mini-app/components'
 import { LoadingSpinner } from '../common'
 import { RPGPanel, GameButton } from '../ui'
 
@@ -370,6 +371,11 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
                   <div className={`rpg-rank-badge ${getRankClass(entry.rank)}`}>
                     <span className="rpg-rank-number">{entry.rank}</span>
                   </div>
+                  <Avatar
+                    firstName={entry.first_name}
+                    photoUrl={entry.photo_url}
+                    size="small"
+                  />
                   <div className="rpg-leaderboard-user">
                     <div className="rpg-leaderboard-name">
                       {entry.first_name}
@@ -626,6 +632,11 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
                       {match.result === 'win' ? 'W' : match.result === 'loss' ? 'L' : 'D'}
                     </span>
                   </div>
+                  <Avatar
+                    firstName={match.opponent.first_name}
+                    photoUrl={match.opponent.photo_url}
+                    size="small"
+                  />
                   <div className="rpg-history-details">
                     <div className="rpg-history-opponent">vs {match.opponent.first_name}</div>
                     <div className="rpg-history-meta">

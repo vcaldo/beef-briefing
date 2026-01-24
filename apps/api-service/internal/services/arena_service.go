@@ -226,6 +226,9 @@ func (s *ArenaService) CreateMatch(ctx context.Context, chatID int64, creatorUse
 		return nil, fmt.Errorf("failed to get participants: %w", err)
 	}
 
+	// Populate photo URLs
+	s.populateParticipantPhotoURLs(ctx, participants)
+
 	// Record match creation metric
 	recordMatchEvent(s.nrApp, "created", match.ID, chatID, creatorUserID, string(repository.MatchTypeRegular))
 
@@ -253,6 +256,9 @@ func (s *ArenaService) GetMatch(ctx context.Context, matchID string) (*MatchResp
 		return nil, fmt.Errorf("failed to get participants: %w", err)
 	}
 
+	// Populate photo URLs
+	s.populateParticipantPhotoURLs(ctx, participants)
+
 	cardCount, _ := s.dealer.GetCardCount(ctx, match.ChatID)
 
 	return &MatchResponse{
@@ -277,6 +283,8 @@ func (s *ArenaService) GetActiveMatches(ctx context.Context, chatID int64) ([]*M
 		if err != nil {
 			continue // Skip on error
 		}
+		// Populate photo URLs
+		s.populateParticipantPhotoURLs(ctx, participants)
 		responses = append(responses, &MatchResponse{
 			Match:        match,
 			Participants: participants,
@@ -431,7 +439,15 @@ func (s *ArenaService) GetLeaderboard(ctx context.Context, chatID int64, matchTy
 	if matchType == "regular" {
 		mt = repository.MatchTypeRegular
 	}
-	return s.gameRepo.GetLeaderboard(ctx, chatID, mt, limit, offset)
+	entries, err := s.gameRepo.GetLeaderboard(ctx, chatID, mt, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	// Populate photo URLs
+	s.populateLeaderboardPhotoURLs(ctx, entries)
+
+	return entries, nil
 }
 
 // =============================================================================
@@ -795,4 +811,26 @@ func (s *ArenaService) GetPhotoPresignedURL(ctx context.Context, objectKey strin
 		return "", nil
 	}
 	return s.storageClient.GetPresignedURL(ctx, objectKey, 24*time.Hour)
+}
+
+// populateParticipantPhotoURLs generates presigned URLs for participant photos
+func (s *ArenaService) populateParticipantPhotoURLs(ctx context.Context, participants []*repository.ParticipantWithUser) {
+	for _, p := range participants {
+		if p.PhotoObjectKey != nil && *p.PhotoObjectKey != "" {
+			if url, err := s.storageClient.GetPresignedURL(ctx, *p.PhotoObjectKey, time.Hour); err == nil && url != "" {
+				p.PhotoURL = &url
+			}
+		}
+	}
+}
+
+// populateLeaderboardPhotoURLs generates presigned URLs for leaderboard entry photos
+func (s *ArenaService) populateLeaderboardPhotoURLs(ctx context.Context, entries []*repository.LeaderboardEntry) {
+	for _, e := range entries {
+		if e.PhotoObjectKey != nil && *e.PhotoObjectKey != "" {
+			if url, err := s.storageClient.GetPresignedURL(ctx, *e.PhotoObjectKey, time.Hour); err == nil && url != "" {
+				e.PhotoURL = &url
+			}
+		}
+	}
 }

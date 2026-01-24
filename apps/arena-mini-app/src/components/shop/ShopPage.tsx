@@ -15,7 +15,7 @@ import { preloadBattleAssets } from '../../utils/assetPreloader'
 import { useSoundContext } from '../../contexts'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer, ErrorBanner, CompactCard } from '../common'
-import { GameButton, CoinDisplay, CardSlot } from '../ui'
+import { GameButton, CoinDisplay, CardSlot, RPGPanel } from '../ui'
 import { usePolling, useErrorBanner } from '../../hooks'
 import TeamPhaseModal from './TeamPhaseModal'
 
@@ -295,184 +295,187 @@ export function ShopPage({
   }
 
   return (
-    <div className="shop-page">
-      {/* Header with coins and timer */}
-      <header className="shop-header">
-        <div className="shop-header-left">
-          <h1 className="shop-title">Build Your Team</h1>
-          {isSubmitted && (
-            <span className="shop-submitted-badge">Team Submitted</span>
-          )}
-        </div>
-        <div className="shop-header-right">
-          <CoinDisplay amount={coins} size="lg" animated />
-          {shopData?.deadline && (
-            <div className="shop-timer">
-              <CountdownTimer
-                deadline={shopData.deadline}
-                onExpire={() => {
-                  addPageAction('shop_phase_expired', { match_id: activeMatch.id })
-                }}
-                timerThresholds={gameConstants?.timer_thresholds}
-              />
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Error banner */}
-      {error && (
-        <ErrorBanner
-          message={error}
-          onDismiss={clearError}
-          className="shop-error-banner"
-        />
-      )}
-
-      {/* Waiting message when submitted */}
-      {isSubmitted && (
-        <div className="shop-waiting">
-          <div className="shop-waiting-icon">⏳</div>
-          <p className="shop-waiting-text">Waiting for opponent to submit their team...</p>
-        </div>
-      )}
-
-      {/* Shop cards grid - only show if not submitted */}
-      {!isSubmitted && (
-        <section className="shop-cards-section">
-          <div className="shop-section-header">
-            <h2 className="shop-section-title">Available Cards</h2>
-            {/* Reroll button */}
-            <GameButton
-              variant="neutral"
-              size="sm"
-              onClick={handleReroll}
-              disabled={!canReroll || coins < rerollCost || actionLoading !== null}
-              title={canReroll ? `Reroll (${rerollCost} coin)` : 'Cannot reroll after buying'}
-            >
-              {actionLoading === 'reroll' ? (
-                <LoadingSpinner size="sm" inline />
-              ) : (
-                <>🔄 Reroll ({rerollCost})</>
+    <div className="shop-page rpg-shop-page">
+      <RPGPanel variant="outer" className="rpg-shop-outer">
+        {/* Header with coins and timer */}
+        <RPGPanel variant="inner" className="rpg-shop-header">
+          <div className="rpg-shop-header-row">
+            <div className="rpg-shop-header-left">
+              <h1 className="rpg-shop-title">Build Your Team</h1>
+              {isSubmitted && (
+                <span className="rpg-shop-submitted-badge">Team Submitted</span>
               )}
-            </GameButton>
-          </div>
-
-          <div className="shop-grid">
-            {shopCards.map((card: EnhancedShopCard) => {
-              const isPurchased = card.is_purchased
-              const canAfford = card.can_afford
-              const teamFull = teamCards.length >= teamSize
-
-              // Determine CardSlot variant based on state
-              const slotVariant = isPurchased
-                ? 'default'
-                : canAfford && !teamFull
-                  ? 'hover'
-                  : 'default'
-
-              return (
-                <CardSlot
-                  key={card.index}
-                  variant={slotVariant}
-                  className={`shop-card-slot ${isPurchased ? 'shop-card-purchased' : ''} ${
-                    !canAfford && !isPurchased ? 'shop-card-disabled' : ''
-                  }`}
-                >
-                  <div className="shop-card">
-                    {/* Card image with compact card or fallback */}
-                    <div className="shop-card-compact">
-                      {card.compact_card_image_url ? (
-                        <CompactCard
-                          imageUrl={card.compact_card_image_url}
-                          positions={card.placeholder_positions}
-                          currentStats={{
-                            atk: card.atk,
-                            hp: card.hp,
-                            maxHp: card.hp,
-                          }}
-                          cardName={card.name}
-                          cardId={card.card_id}
-                          className="shop-compact-card"
-                        />
-                      ) : card.card_image_url ? (
-                        <div className="shop-card-image">
-                          <img
-                            src={card.card_image_url}
-                            alt={card.name}
-                            loading="lazy"
-                          />
-                          <div className="shop-card-stats">
-                            <span className="stat atk" title="Attack">⚔️ {card.atk}</span>
-                            <span className="stat hp" title="Health">❤️ {card.hp}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="shop-card-fallback">
-                          <div className="shop-card-name">{card.name}</div>
-                          {card.username && (
-                            <div className="shop-card-username">@{card.username}</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Buy button or status */}
-                    <div className="shop-card-footer">
-                      {isPurchased ? (
-                        <span className="shop-card-purchased-badge">Purchased</span>
-                      ) : (
-                        <GameButton
-                          variant="primary"
-                          size="sm"
-                          onClick={() => handleBuyCard(card.index)}
-                          disabled={!canAfford || teamFull || actionLoading !== null}
-                          className="shop-card-buy"
-                        >
-                          {actionLoading === 'buy' ? (
-                            <LoadingSpinner size="sm" inline />
-                          ) : (
-                            <>
-                              Buy <CoinDisplay amount={cardCost} size="sm" />
-                            </>
-                          )}
-                        </GameButton>
-                      )}
-                    </div>
-                  </div>
-                </CardSlot>
-              )
-            })}
-          </div>
-
-          {shopCards.filter((c) => !c.is_purchased).length === 0 && (
-            <div className="shop-empty">
-              <p>All cards purchased! Fill your team with {teamSize} cards.</p>
             </div>
-          )}
-        </section>
-      )}
+            <div className="rpg-shop-header-right">
+              <CoinDisplay amount={coins} size="lg" animated />
+              {shopData?.deadline && (
+                <div className="rpg-shop-timer">
+                  <CountdownTimer
+                    deadline={shopData.deadline}
+                    onExpire={() => {
+                      addPageAction('shop_phase_expired', { match_id: activeMatch.id })
+                    }}
+                    timerThresholds={gameConstants?.timer_thresholds}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </RPGPanel>
 
-      {/* Done Shopping button - appears when team is complete */}
-      {!isSubmitted && teamCards.length >= teamSize && (
-        <div className="done-shopping-section">
-          <GameButton
-            variant="primary"
-            size="lg"
-            onClick={() => {
-              playSequence(['arena_button_click', 'arena_success'])
-              setIsTeamPhase(true)
-            }}
-            className="done-shopping-btn"
-          >
-            Done Shopping - Organize Team
-          </GameButton>
-          <p className="done-shopping-hint">
-            Ready to organize your team? Click above to arrange positions and make final upgrades.
-          </p>
-        </div>
-      )}
+        {/* Error banner */}
+        {error && (
+          <ErrorBanner
+            message={error}
+            onDismiss={clearError}
+            className="shop-error-banner"
+          />
+        )}
 
+        {/* Waiting message when submitted */}
+        {isSubmitted && (
+          <RPGPanel variant="inner-blue" className="rpg-shop-waiting">
+            <div className="rpg-shop-waiting-icon">⏳</div>
+            <p className="rpg-shop-waiting-text">Waiting for opponent to submit their team...</p>
+          </RPGPanel>
+        )}
+
+        {/* Shop cards grid - only show if not submitted */}
+        {!isSubmitted && (
+          <RPGPanel variant="inner" className="rpg-shop-cards-panel">
+            <div className="rpg-shop-section-header">
+              <h2 className="rpg-section-title">Available Cards</h2>
+              {/* Reroll button */}
+              <GameButton
+                variant="neutral"
+                size="sm"
+                onClick={handleReroll}
+                disabled={!canReroll || coins < rerollCost || actionLoading !== null}
+                title={canReroll ? `Reroll (${rerollCost} coin)` : 'Cannot reroll after buying'}
+              >
+                {actionLoading === 'reroll' ? (
+                  <LoadingSpinner size="sm" inline />
+                ) : (
+                  <>🔄 Reroll ({rerollCost})</>
+                )}
+              </GameButton>
+            </div>
+
+            <div className="rpg-shop-grid">
+              {shopCards.map((card: EnhancedShopCard) => {
+                const isPurchased = card.is_purchased
+                const canAfford = card.can_afford
+                const teamFull = teamCards.length >= teamSize
+
+                // Determine CardSlot variant based on state
+                const slotVariant = isPurchased
+                  ? 'default'
+                  : canAfford && !teamFull
+                    ? 'hover'
+                    : 'default'
+
+                return (
+                  <CardSlot
+                    key={card.index}
+                    variant={slotVariant}
+                    className={`shop-card-slot ${isPurchased ? 'shop-card-purchased' : ''} ${
+                      !canAfford && !isPurchased ? 'shop-card-disabled' : ''
+                    }`}
+                  >
+                    <div className="shop-card">
+                      {/* Card image with compact card or fallback */}
+                      <div className="shop-card-compact">
+                        {card.compact_card_image_url ? (
+                          <CompactCard
+                            imageUrl={card.compact_card_image_url}
+                            positions={card.placeholder_positions}
+                            currentStats={{
+                              atk: card.atk,
+                              hp: card.hp,
+                              maxHp: card.hp,
+                            }}
+                            cardName={card.name}
+                            cardId={card.card_id}
+                            className="shop-compact-card"
+                          />
+                        ) : card.card_image_url ? (
+                          <div className="shop-card-image">
+                            <img
+                              src={card.card_image_url}
+                              alt={card.name}
+                              loading="lazy"
+                            />
+                            <div className="shop-card-stats">
+                              <span className="stat atk" title="Attack">⚔️ {card.atk}</span>
+                              <span className="stat hp" title="Health">❤️ {card.hp}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="shop-card-fallback">
+                            <div className="shop-card-name">{card.name}</div>
+                            {card.username && (
+                              <div className="shop-card-username">@{card.username}</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Buy button or status */}
+                      <div className="shop-card-footer">
+                        {isPurchased ? (
+                          <span className="shop-card-purchased-badge">Purchased</span>
+                        ) : (
+                          <GameButton
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleBuyCard(card.index)}
+                            disabled={!canAfford || teamFull || actionLoading !== null}
+                            className="shop-card-buy"
+                          >
+                            {actionLoading === 'buy' ? (
+                              <LoadingSpinner size="sm" inline />
+                            ) : (
+                              <>
+                                Buy <CoinDisplay amount={cardCost} size="sm" />
+                              </>
+                            )}
+                          </GameButton>
+                        )}
+                      </div>
+                    </div>
+                  </CardSlot>
+                )
+              })}
+            </div>
+
+            {shopCards.filter((c) => !c.is_purchased).length === 0 && (
+              <div className="rpg-shop-empty">
+                <p>All cards purchased! Fill your team with {teamSize} cards.</p>
+              </div>
+            )}
+          </RPGPanel>
+        )}
+
+        {/* Done Shopping button - appears when team is complete */}
+        {!isSubmitted && teamCards.length >= teamSize && (
+          <div className="rpg-shop-actions">
+            <GameButton
+              variant="primary"
+              size="lg"
+              onClick={() => {
+                playSequence(['arena_button_click', 'arena_success'])
+                setIsTeamPhase(true)
+              }}
+              className="done-shopping-btn"
+            >
+              Done Shopping - Organize Team
+            </GameButton>
+            <p className="rpg-shop-hint">
+              Ready to organize your team? Click above to arrange positions and make final upgrades.
+            </p>
+          </div>
+        )}
+      </RPGPanel>
     </div>
   )
 }

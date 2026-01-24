@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, ErrorDisplay } from '../common'
+import { RPGPanel, GameButton } from '../ui'
 import { CompactCard } from '../common/CompactCard'
 import { BattleLog } from './BattleLog'
 import { BattleEffect } from './BattleEffect'
@@ -410,32 +411,38 @@ export function BattlePage({
       </div>
 
       {/* Playback Controls */}
-      <div className="battle-controls">
-        <button
-          className="btn-ghost control-btn"
+      <div className="battle-controls rpg-battle-controls">
+        <GameButton
+          variant="neutral"
+          size="sm"
           onClick={resetPlayback}
           disabled={currentEventIndex < 0}
-          aria-label="Reset"
+          title="Reset"
+          className="control-btn"
         >
           ⏮️
-        </button>
+        </GameButton>
 
-        <button
-          className={`btn-primary control-btn play-btn ${isPlaying ? 'playing' : ''}`}
+        <GameButton
+          variant="primary"
+          size="sm"
           onClick={togglePlayback}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
+          title={isPlaying ? 'Pause' : 'Play'}
+          className={`control-btn play-btn ${isPlaying ? 'playing' : ''}`}
         >
           {isPlaying ? '⏸️' : '▶️'}
-        </button>
+        </GameButton>
 
-        <button
-          className="btn-ghost control-btn"
+        <GameButton
+          variant="neutral"
+          size="sm"
           onClick={skipToEnd}
           disabled={currentEventIndex >= battleData.events.length - 1}
-          aria-label="Skip to end"
+          title="Skip to end"
+          className="control-btn"
         >
           ⏭️
-        </button>
+        </GameButton>
 
         {/* Speed selector */}
         <div className="speed-selector">
@@ -467,41 +474,45 @@ export function BattlePage({
       {/* Victory Screen Overlay */}
       {showVictory && (
         <div className="victory-screen" onClick={() => setShowVictory(false)}>
-          <div className="victory-content">
-            <div className="victory-icon">
-              {isDraw ? '🤝' : isWinner ? '🏆' : '💀'}
-            </div>
-            <h2 className="victory-title">
-              {isDraw
-                ? 'Draw!'
-                : isWinner
-                  ? 'Victory!'
-                  : 'Defeat'}
-            </h2>
-            <p className="victory-subtitle">
-              {isDraw
-                ? 'Both players fought to a standstill'
-                : isWinner
-                  ? 'You won the battle!'
-                  : `${battleData.winner_id === battleData.player_a_id ? battleData.player_a_name : battleData.player_b_name} wins!`}
-            </p>
-
-            <div className="victory-stats">
-              <div className="victory-stat">
-                <span className="stat-label">Total Damage</span>
-                <span className="stat-value">
-                  {isPlayerA ? battleData.team_a_damage : battleData.team_b_damage}
-                </span>
+          <RPGPanel variant="outer" className="rpg-victory-outer">
+            <RPGPanel variant="inner-blue" className="rpg-victory-content">
+              <div className="victory-icon">
+                {isDraw ? '🤝' : isWinner ? '🏆' : '💀'}
               </div>
-              <div className="victory-stat">
-                <span className="stat-label">Rounds</span>
-                <span className="stat-value">{battleData.num_rounds}</span>
-              </div>
-            </div>
+              <h2 className="victory-title">
+                {isDraw
+                  ? 'Draw!'
+                  : isWinner
+                    ? 'Victory!'
+                    : 'Defeat'}
+              </h2>
+              <p className="victory-subtitle">
+                {isDraw
+                  ? 'Both players fought to a standstill'
+                  : isWinner
+                    ? 'You won the battle!'
+                    : `${battleData.winner_id === battleData.player_a_id ? battleData.player_a_name : battleData.player_b_name} wins!`}
+              </p>
+            </RPGPanel>
 
-            <div className="victory-actions">
-              <button
-                className="btn-primary"
+            <RPGPanel variant="inner" className="rpg-victory-stats">
+              <div className="victory-stats">
+                <div className="victory-stat">
+                  <span className="stat-label">Total Damage</span>
+                  <span className="stat-value">
+                    {isPlayerA ? battleData.team_a_damage : battleData.team_b_damage}
+                  </span>
+                </div>
+                <div className="victory-stat">
+                  <span className="stat-label">Rounds</span>
+                  <span className="stat-value">{battleData.num_rounds}</span>
+                </div>
+              </div>
+            </RPGPanel>
+
+            <div className="rpg-victory-actions">
+              <GameButton
+                variant="primary"
                 onClick={(e) => {
                   e.stopPropagation()
                   setShowVictory(false)
@@ -509,29 +520,29 @@ export function BattlePage({
                 }}
               >
                 Watch Again
-              </button>
+              </GameButton>
               {onNavigateToStats && (
-                <button
-                  className="btn-secondary"
+                <GameButton
+                  variant="secondary"
                   onClick={(e) => {
                     e.stopPropagation()
                     onNavigateToStats()
                   }}
                 >
                   View Stats
-                </button>
+                </GameButton>
               )}
-              <button
-                className="btn-ghost"
+              <GameButton
+                variant="neutral"
                 onClick={(e) => {
                   e.stopPropagation()
                   handleReturnToLobby()
                 }}
               >
                 Return to Lobby
-              </button>
+              </GameButton>
             </div>
-          </div>
+          </RPGPanel>
         </div>
       )}
     </div>

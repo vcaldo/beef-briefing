@@ -17,7 +17,7 @@
  * ```
  */
 
-import { ButtonHTMLAttributes, ReactNode, useState, useCallback } from 'react'
+import { ButtonHTMLAttributes, ReactNode, useState, useCallback, MouseEvent } from 'react'
 import {
   getVariantButtonImages,
   GameButtonVariant,
@@ -38,7 +38,7 @@ export interface GameButtonProps
   /** Whether the button is disabled */
   disabled?: boolean
   /** Click handler */
-  onClick?: () => void
+  onClick?: (e: MouseEvent<HTMLButtonElement>) => void
   /** Button content */
   children: ReactNode
   /** Additional CSS classes */
@@ -130,7 +130,7 @@ export function GameButton({
     <button
       type="button"
       disabled={disabled}
-      onClick={disabled ? undefined : onClick}
+      onClick={disabled ? undefined : (e) => onClick?.(e)}
       onMouseDown={handlePressStart}
       onMouseUp={handlePressEnd}
       onMouseLeave={handlePressEnd}

@@ -14,8 +14,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner } from '../common'
-import { useImages } from '../../hooks'
-import { CardSlot } from '../ui'
+import { RPGPanel, GameButton } from '../ui'
 
 import type {
   StatsSubTab,
@@ -36,11 +35,6 @@ interface StatsPageProps {
 }
 
 export function StatsPage({ chatId, userId }: StatsPageProps) {
-  // Image assets
-  const { getUrl } = useImages()
-  const bannerHangingUrl = getUrl('panels', 'banner_hanging')
-  const starYellowUrl = getUrl('icons', 'star_yellow')
-
   // Sub-tab state
   const [activeSubTab, setActiveSubTab] = useState<StatsSubTab>('leaderboard')
 
@@ -336,109 +330,107 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     }
 
     return (
-      <div className="stats-content">
+      <RPGPanel variant="outer" className="stats-outer-panel">
         {/* Hint message */}
-        <div className="tab-hint">
-          <span className="tab-hint-icon">ℹ️</span>
-          <span>Tap any player to view your head-to-head record</span>
+        <div className="rpg-tab-hint">
+          Tap any player to view your head-to-head record
         </div>
 
         {/* Type toggle */}
-        <div className="leaderboard-type-toggle">
-          <button
-            className={`toggle-btn ${leaderboardType === 'ranked' ? 'active' : ''}`}
+        <div className="rpg-type-toggle">
+          <GameButton
+            variant={leaderboardType === 'ranked' ? 'primary' : 'neutral'}
+            size="sm"
             onClick={() => handleLeaderboardTypeChange('ranked')}
           >
             🏆 Ranked
-          </button>
-          <button
-            className={`toggle-btn ${leaderboardType === 'casual' ? 'active' : ''}`}
+          </GameButton>
+          <GameButton
+            variant={leaderboardType === 'casual' ? 'primary' : 'neutral'}
+            size="sm"
             onClick={() => handleLeaderboardTypeChange('casual')}
           >
             ⚔️ Casual
-          </button>
+          </GameButton>
         </div>
 
         {/* Leaderboard list */}
         {leaderboardData && leaderboardData.entries.length > 0 ? (
-          <>
-            <div className="leaderboard-list">
+          <RPGPanel variant="inner" className="leaderboard-inner-panel">
+            <div className="rpg-leaderboard-list">
               {leaderboardData.entries.map((entry: LeaderboardEntry) => (
                 <div
                   key={entry.user_id}
-                  className={`leaderboard-item leaderboard-item-themed ${entry.user_id === userId ? 'current-user' : ''}`}
-                  style={{ backgroundImage: `url(${bannerHangingUrl})` }}
+                  className={`rpg-leaderboard-item ${entry.user_id === userId ? 'current-user' : ''}`}
                   onClick={() => handleSelectOpponent(entry.user_id)}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleSelectOpponent(entry.user_id))}
                 >
-                  <div className={`leaderboard-rank ${getRankClass(entry.rank)}`}>
-                    {entry.rank <= 3 ? (
-                      <img
-                        src={starYellowUrl}
-                        alt=""
-                        className="leaderboard-rank-star"
-                      />
-                    ) : null}
-                    <span className="leaderboard-rank-number">{entry.rank}</span>
+                  <div className={`rpg-rank-badge ${getRankClass(entry.rank)}`}>
+                    <span className="rpg-rank-number">{entry.rank}</span>
                   </div>
-                  <div className="leaderboard-user">
-                    <div className="leaderboard-name">
+                  <div className="rpg-leaderboard-user">
+                    <div className="rpg-leaderboard-name">
                       {entry.first_name}
-                      {entry.user_id === userId && <span className="you-badge">You</span>}
+                      {entry.user_id === userId && <span className="rpg-you-badge">You</span>}
                     </div>
-                    {entry.tier && <div className="leaderboard-tier">{entry.tier}</div>}
+                    {entry.tier && <div className="rpg-leaderboard-tier">{entry.tier}</div>}
                   </div>
-                  <div className="leaderboard-stats-mini">
+                  <div className="rpg-leaderboard-stats">
                     <span className="wins">{leaderboardType === 'ranked' ? entry.ranked_wins : entry.regular_wins}W</span>
                     <span className="losses">{leaderboardType === 'ranked' ? entry.ranked_losses : entry.regular_losses}L</span>
                   </div>
-                  <div className="leaderboard-score">{entry.score}</div>
+                  <div className="rpg-leaderboard-score">{entry.score}</div>
                 </div>
               ))}
             </div>
 
             {/* Pagination */}
             {leaderboardData.total > PAGE_SIZE && (
-              <div className="pagination">
-                <button
-                  className="pagination-btn"
+              <div className="rpg-pagination">
+                <GameButton
+                  variant="neutral"
+                  size="sm"
                   disabled={leaderboardPage === 0 || leaderboardLoading}
                   onClick={() => handleLeaderboardPageChange(leaderboardPage - 1)}
                 >
                   ← Prev
-                </button>
-                <span className="pagination-info">
+                </GameButton>
+                <span className="rpg-pagination-info">
                   Page {leaderboardPage + 1} of {Math.ceil(leaderboardData.total / PAGE_SIZE)}
                 </span>
-                <button
-                  className="pagination-btn"
+                <GameButton
+                  variant="neutral"
+                  size="sm"
                   disabled={(leaderboardPage + 1) * PAGE_SIZE >= leaderboardData.total || leaderboardLoading}
                   onClick={() => handleLeaderboardPageChange(leaderboardPage + 1)}
                 >
                   Next →
-                </button>
+                </GameButton>
               </div>
             )}
-          </>
+          </RPGPanel>
         ) : (
-          <div className="empty-state">
-            <span className="empty-icon">📊</span>
-            <p>No leaderboard data yet</p>
-            <p className="empty-hint">Play some matches to appear on the leaderboard!</p>
+          <div className="rpg-empty-state">
+            <span className="rpg-empty-icon">📊</span>
+            <p className="rpg-empty-title">No leaderboard data yet</p>
+            <p className="rpg-empty-hint">Play some matches to appear on the leaderboard!</p>
           </div>
         )}
 
         {/* Refresh button */}
-        <button
-          className="refresh-btn"
-          onClick={() => fetchLeaderboard()}
-          disabled={leaderboardLoading}
-        >
-          {leaderboardLoading ? <LoadingSpinner size="sm" inline /> : '🔄'} Refresh
-        </button>
-      </div>
+        <div className="rpg-actions">
+          <GameButton
+            variant="secondary"
+            size="sm"
+            onClick={() => fetchLeaderboard()}
+            disabled={leaderboardLoading}
+          >
+            {leaderboardLoading ? '...' : '🔄'} Refresh
+          </GameButton>
+        </div>
+      </RPGPanel>
     )
   }
 
@@ -450,13 +442,15 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
     if (!profileData) {
       return (
-        <div className="empty-state">
-          <span className="empty-icon">👤</span>
-          <p>No profile data</p>
-          <button className="btn-primary" onClick={fetchProfile}>
-            Load Profile
-          </button>
-        </div>
+        <RPGPanel variant="outer" className="stats-outer-panel">
+          <div className="rpg-empty-state">
+            <span className="rpg-empty-icon">👤</span>
+            <p className="rpg-empty-title">No profile data</p>
+            <GameButton variant="primary" size="sm" onClick={fetchProfile}>
+              Load Profile
+            </GameButton>
+          </div>
+        </RPGPanel>
       )
     }
 
@@ -465,142 +459,140 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     // Check if stats data is available
     if (!stats) {
       return (
-        <div className="empty-state">
-          <span className="empty-icon">📊</span>
-          <p>No statistics available</p>
-          <p className="empty-hint">Play some matches to build your stats!</p>
-          <button className="btn-primary" onClick={fetchProfile}>
-            Refresh
-          </button>
-        </div>
+        <RPGPanel variant="outer" className="stats-outer-panel">
+          <div className="rpg-empty-state">
+            <span className="rpg-empty-icon">📊</span>
+            <p className="rpg-empty-title">No statistics available</p>
+            <p className="rpg-empty-hint">Play some matches to build your stats!</p>
+            <GameButton variant="primary" size="sm" onClick={fetchProfile}>
+              Refresh
+            </GameButton>
+          </div>
+        </RPGPanel>
       )
     }
 
     return (
-      <div className="stats-content">
-        {/* Profile header with hexagon frame */}
-        <CardSlot variant="default" className="profile-header-slot">
-          <div className="profile-header profile-header-themed">
-            <div className="profile-avatar">
+      <RPGPanel variant="outer" className="profile-outer-panel">
+        {/* Profile header */}
+        <RPGPanel variant="inner" className="rpg-profile-header-panel">
+          <div className="rpg-profile-header">
+            <div className="rpg-profile-avatar">
               {profileData.photo_url ? (
                 <img src={profileData.photo_url} alt={profileData.first_name} />
               ) : (
-                <span className="avatar-placeholder">👤</span>
+                <span className="rpg-avatar-placeholder">👤</span>
               )}
             </div>
-            <div className="profile-info">
-              <h2 className="profile-name">{profileData.first_name}</h2>
-              {profileData.username && <p className="profile-username">@{profileData.username}</p>}
+            <div className="rpg-profile-info">
+              <h2 className="rpg-profile-name">{profileData.first_name}</h2>
+              {profileData.username && <p className="rpg-profile-username">@{profileData.username}</p>}
               {stats.tier && (
-                <span className={`profile-tier tier-${stats.tier.toLowerCase().replace(/\s+/g, '-')}`}>
+                <span className={`rpg-profile-tier tier-${stats.tier.toLowerCase().replace(/\s+/g, '-')}`}>
                   {stats.tier}
                 </span>
               )}
-              {stats.rank && <p className="profile-rank">Rank #{stats.rank}</p>}
+              {stats.rank && <p className="rpg-profile-rank">Rank #{stats.rank}</p>}
             </div>
           </div>
-        </CardSlot>
+        </RPGPanel>
 
-        {/* Overall stats with hexagon frame */}
-        <CardSlot variant="default" className="profile-section-slot">
-          <div className="profile-section profile-section-themed">
-            <h3 className="profile-section-title">Overall</h3>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <span className="stat-value">{stats.total_matches}</span>
-                <span className="stat-label">Matches</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-value">{stats.total_wins}</span>
-                <span className="stat-label">Wins</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-value">{stats.total_damage_dealt.toLocaleString()}</span>
-                <span className="stat-label">Damage</span>
-              </div>
+        {/* Overall stats - blue panel for emphasis */}
+        <RPGPanel variant="inner-blue" className="rpg-section-panel">
+          <h3 className="rpg-section-title">Overall</h3>
+          <div className="rpg-stats-grid">
+            <div className="rpg-stat-card">
+              <span className="rpg-stat-value">{stats.total_matches}</span>
+              <span className="rpg-stat-label">Matches</span>
+            </div>
+            <div className="rpg-stat-card">
+              <span className="rpg-stat-value">{stats.total_wins}</span>
+              <span className="rpg-stat-label">Wins</span>
+            </div>
+            <div className="rpg-stat-card">
+              <span className="rpg-stat-value">{stats.total_damage_dealt.toLocaleString()}</span>
+              <span className="rpg-stat-label">Damage</span>
             </div>
           </div>
-        </CardSlot>
+        </RPGPanel>
 
-        {/* Ranked stats with hexagon frame */}
-        <CardSlot variant="default" className="profile-section-slot">
-          <div className="profile-section profile-section-themed">
-            <h3 className="profile-section-title">🏆 Ranked</h3>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <span className="stat-value stat-wins">{stats.ranked_wins}</span>
-                <span className="stat-label">Wins</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-value stat-losses">{stats.ranked_losses}</span>
-                <span className="stat-label">Losses</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-value">{stats.ranked_draws}</span>
-                <span className="stat-label">Draws</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-value">{(stats.ranked_win_rate * 100).toFixed(1)}%</span>
-                <span className="stat-label">Win Rate</span>
-              </div>
+        {/* Ranked stats */}
+        <RPGPanel variant="inner" className="rpg-section-panel">
+          <h3 className="rpg-section-title">🏆 Ranked</h3>
+          <div className="rpg-stats-grid">
+            <div className="rpg-stat-card">
+              <span className="rpg-stat-value stat-wins">{stats.ranked_wins}</span>
+              <span className="rpg-stat-label">Wins</span>
             </div>
-            <div className="stats-row">
-              <div className="stat-mini">
-                <span className="stat-mini-value">🔥 {stats.ranked_current_streak}</span>
-                <span className="stat-mini-label">Current Streak</span>
-              </div>
-              <div className="stat-mini">
-                <span className="stat-mini-value">⭐ {stats.ranked_best_streak}</span>
-                <span className="stat-mini-label">Best Streak</span>
-              </div>
-              <div className="stat-mini">
-                <span className="stat-mini-value">🏅 {stats.ranked_tournaments_won}/{stats.ranked_tournaments_played}</span>
-                <span className="stat-mini-label">Tournaments</span>
-              </div>
+            <div className="rpg-stat-card">
+              <span className="rpg-stat-value stat-losses">{stats.ranked_losses}</span>
+              <span className="rpg-stat-label">Losses</span>
+            </div>
+            <div className="rpg-stat-card">
+              <span className="rpg-stat-value">{stats.ranked_draws}</span>
+              <span className="rpg-stat-label">Draws</span>
+            </div>
+            <div className="rpg-stat-card">
+              <span className="rpg-stat-value">{(stats.ranked_win_rate * 100).toFixed(1)}%</span>
+              <span className="rpg-stat-label">Win Rate</span>
             </div>
           </div>
-        </CardSlot>
+          <div className="rpg-stats-row">
+            <div className="rpg-stat-mini">
+              <span className="rpg-stat-mini-value">🔥 {stats.ranked_current_streak}</span>
+              <span className="rpg-stat-mini-label">Current Streak</span>
+            </div>
+            <div className="rpg-stat-mini">
+              <span className="rpg-stat-mini-value">⭐ {stats.ranked_best_streak}</span>
+              <span className="rpg-stat-mini-label">Best Streak</span>
+            </div>
+            <div className="rpg-stat-mini">
+              <span className="rpg-stat-mini-value">🏅 {stats.ranked_tournaments_won}/{stats.ranked_tournaments_played}</span>
+              <span className="rpg-stat-mini-label">Tournaments</span>
+            </div>
+          </div>
+        </RPGPanel>
 
-        {/* Casual stats with hexagon frame */}
-        <CardSlot variant="default" className="profile-section-slot">
-          <div className="profile-section profile-section-themed">
-            <h3 className="profile-section-title">⚔️ Casual</h3>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <span className="stat-value stat-wins">{stats.regular_wins}</span>
-                <span className="stat-label">Wins</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-value stat-losses">{stats.regular_losses}</span>
-                <span className="stat-label">Losses</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-value">{stats.regular_draws}</span>
-                <span className="stat-label">Draws</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-value">{(stats.regular_win_rate * 100).toFixed(1)}%</span>
-                <span className="stat-label">Win Rate</span>
-              </div>
+        {/* Casual stats */}
+        <RPGPanel variant="inner" className="rpg-section-panel">
+          <h3 className="rpg-section-title">⚔️ Casual</h3>
+          <div className="rpg-stats-grid">
+            <div className="rpg-stat-card">
+              <span className="rpg-stat-value stat-wins">{stats.regular_wins}</span>
+              <span className="rpg-stat-label">Wins</span>
             </div>
-            <div className="stats-row">
-              <div className="stat-mini">
-                <span className="stat-mini-value">🔥 {stats.regular_current_streak}</span>
-                <span className="stat-mini-label">Current Streak</span>
-              </div>
-              <div className="stat-mini">
-                <span className="stat-mini-value">⭐ {stats.regular_best_streak}</span>
-                <span className="stat-mini-label">Best Streak</span>
-              </div>
+            <div className="rpg-stat-card">
+              <span className="rpg-stat-value stat-losses">{stats.regular_losses}</span>
+              <span className="rpg-stat-label">Losses</span>
+            </div>
+            <div className="rpg-stat-card">
+              <span className="rpg-stat-value">{stats.regular_draws}</span>
+              <span className="rpg-stat-label">Draws</span>
+            </div>
+            <div className="rpg-stat-card">
+              <span className="rpg-stat-value">{(stats.regular_win_rate * 100).toFixed(1)}%</span>
+              <span className="rpg-stat-label">Win Rate</span>
             </div>
           </div>
-        </CardSlot>
+          <div className="rpg-stats-row">
+            <div className="rpg-stat-mini">
+              <span className="rpg-stat-mini-value">🔥 {stats.regular_current_streak}</span>
+              <span className="rpg-stat-mini-label">Current Streak</span>
+            </div>
+            <div className="rpg-stat-mini">
+              <span className="rpg-stat-mini-value">⭐ {stats.regular_best_streak}</span>
+              <span className="rpg-stat-mini-label">Best Streak</span>
+            </div>
+          </div>
+        </RPGPanel>
 
         {/* Refresh button */}
-        <button className="refresh-btn" onClick={fetchProfile} disabled={profileLoading}>
-          {profileLoading ? <LoadingSpinner size="sm" inline /> : '🔄'} Refresh
-        </button>
-      </div>
+        <div className="rpg-actions">
+          <GameButton variant="secondary" size="sm" onClick={fetchProfile} disabled={profileLoading}>
+            {profileLoading ? '...' : '🔄'} Refresh
+          </GameButton>
+        </div>
+      </RPGPanel>
     )
   }
 
@@ -611,37 +603,36 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     }
 
     return (
-      <div className="stats-content">
+      <RPGPanel variant="outer" className="stats-outer-panel">
         {/* Hint message */}
-        <div className="tab-hint">
-          <span className="tab-hint-icon">ℹ️</span>
-          <span>Tap any match to see detailed head-to-head stats</span>
+        <div className="rpg-tab-hint">
+          Tap any match to see detailed head-to-head stats
         </div>
 
         {historyData && historyData.matches.length > 0 ? (
-          <>
-            <div className="history-list">
+          <RPGPanel variant="inner" className="history-inner-panel">
+            <div className="rpg-history-list">
               {historyData.matches.map((match: MatchHistoryEntry) => (
                 <div
                   key={match.match_id}
-                  className={`history-item ${getResultClass(match.result)}`}
+                  className={`rpg-history-item ${getResultClass(match.result)}`}
                   onClick={() => handleSelectOpponent(match.opponent.user_id)}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleSelectOpponent(match.opponent.user_id))}
                 >
-                  <div className="history-result">
-                    <span className={`result-badge ${match.result}`}>
+                  <div className="rpg-history-result">
+                    <span className={`rpg-result-badge ${match.result}`}>
                       {match.result === 'win' ? 'W' : match.result === 'loss' ? 'L' : 'D'}
                     </span>
                   </div>
-                  <div className="history-details">
-                    <div className="history-opponent">vs {match.opponent.first_name}</div>
-                    <div className="history-meta">
-                      <span className="history-type">
+                  <div className="rpg-history-details">
+                    <div className="rpg-history-opponent">vs {match.opponent.first_name}</div>
+                    <div className="rpg-history-meta">
+                      <span className="rpg-history-type">
                         {match.match_type === 'ranked' ? '🏆' : '⚔️'}
                       </span>
-                      <span className="history-date">{formatDate(match.completed_at)}</span>
+                      <span className="rpg-history-date">{formatDate(match.completed_at)}</span>
                     </div>
                   </div>
                 </div>
@@ -650,40 +641,44 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
             {/* Pagination */}
             {historyData.total > PAGE_SIZE && (
-              <div className="pagination">
-                <button
-                  className="pagination-btn"
+              <div className="rpg-pagination">
+                <GameButton
+                  variant="neutral"
+                  size="sm"
                   disabled={historyPage === 0 || historyLoading}
                   onClick={() => handleHistoryPageChange(historyPage - 1)}
                 >
                   ← Prev
-                </button>
-                <span className="pagination-info">
+                </GameButton>
+                <span className="rpg-pagination-info">
                   Page {historyPage + 1} of {Math.ceil(historyData.total / PAGE_SIZE)}
                 </span>
-                <button
-                  className="pagination-btn"
+                <GameButton
+                  variant="neutral"
+                  size="sm"
                   disabled={(historyPage + 1) * PAGE_SIZE >= historyData.total || historyLoading}
                   onClick={() => handleHistoryPageChange(historyPage + 1)}
                 >
                   Next →
-                </button>
+                </GameButton>
               </div>
             )}
-          </>
+          </RPGPanel>
         ) : (
-          <div className="empty-state">
-            <span className="empty-icon">📜</span>
-            <p>No match history yet</p>
-            <p className="empty-hint">Play some matches to see your history!</p>
+          <div className="rpg-empty-state">
+            <span className="rpg-empty-icon">📜</span>
+            <p className="rpg-empty-title">No match history yet</p>
+            <p className="rpg-empty-hint">Play some matches to see your history!</p>
           </div>
         )}
 
         {/* Refresh button */}
-        <button className="refresh-btn" onClick={() => fetchHistory()} disabled={historyLoading}>
-          {historyLoading ? <LoadingSpinner size="sm" inline /> : '🔄'} Refresh
-        </button>
-      </div>
+        <div className="rpg-actions">
+          <GameButton variant="secondary" size="sm" onClick={() => fetchHistory()} disabled={historyLoading}>
+            {historyLoading ? '...' : '🔄'} Refresh
+          </GameButton>
+        </div>
+      </RPGPanel>
     )
   }
 
@@ -692,66 +687,77 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     if (!showH2HModal) return null
 
     return (
-      <div className="h2h-modal-backdrop" onClick={handleCloseH2HModal}>
-        <div className="h2h-modal-content" onClick={(e) => e.stopPropagation()}>
-          <button className="h2h-modal-close" onClick={handleCloseH2HModal} aria-label="Close">
-            ×
-          </button>
-
-          {/* Loading state */}
-          {h2hLoading && (
-            <div className="h2h-modal-loading">
-              <LoadingSpinner message="Loading head-to-head..." />
+      <div className="rpg-h2h-modal-backdrop" onClick={handleCloseH2HModal}>
+        <div className="rpg-h2h-modal-wrapper" onClick={(e) => e.stopPropagation()}>
+          <RPGPanel variant="outer" className="rpg-h2h-modal-outer">
+            {/* Close button */}
+            <div className="rpg-h2h-close-wrapper">
+              <GameButton
+                variant="danger"
+                size="sm"
+                shape="square"
+                onClick={handleCloseH2HModal}
+                aria-label="Close"
+              >
+                ×
+              </GameButton>
             </div>
-          )}
 
-          {/* H2H data display */}
-          {!h2hLoading && h2hData && (
-            <div className="h2h-result">
-              <div className="h2h-header">
-                <div className="h2h-player you">You</div>
-                <div className="h2h-vs">VS</div>
-                <div className="h2h-player opponent">
-                  {h2hData.record.opponent.first_name}
-                  {h2hData.record.opponent.username && (
-                    <span className="h2h-username">@{h2hData.record.opponent.username}</span>
+            {/* Loading state */}
+            {h2hLoading && (
+              <div className="rpg-h2h-loading">
+                <LoadingSpinner message="Loading head-to-head..." />
+              </div>
+            )}
+
+            {/* H2H data display */}
+            {!h2hLoading && h2hData && (
+              <RPGPanel variant="inner" className="rpg-h2h-content">
+                <div className="rpg-h2h-header">
+                  <div className="rpg-h2h-player you">You</div>
+                  <div className="rpg-h2h-vs">VS</div>
+                  <div className="rpg-h2h-player opponent">
+                    {h2hData.record.opponent.first_name}
+                    {h2hData.record.opponent.username && (
+                      <span className="rpg-h2h-username">@{h2hData.record.opponent.username}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rpg-h2h-record">
+                  <div className="rpg-h2h-stat wins">
+                    <span className="rpg-h2h-stat-value">{h2hData.record.wins}</span>
+                    <span className="rpg-h2h-stat-label">Wins</span>
+                  </div>
+                  <div className="rpg-h2h-stat draws">
+                    <span className="rpg-h2h-stat-value">{h2hData.record.draws}</span>
+                    <span className="rpg-h2h-stat-label">Draws</span>
+                  </div>
+                  <div className="rpg-h2h-stat losses">
+                    <span className="rpg-h2h-stat-value">{h2hData.record.losses}</span>
+                    <span className="rpg-h2h-stat-label">Losses</span>
+                  </div>
+                </div>
+
+                <div className="rpg-h2h-summary">
+                  <div className="rpg-h2h-summary-item">
+                    <span className="rpg-h2h-summary-label">Total Matches</span>
+                    <span className="rpg-h2h-summary-value">{h2hData.record.total_matches}</span>
+                  </div>
+                  <div className="rpg-h2h-summary-item">
+                    <span className="rpg-h2h-summary-label">Win Rate</span>
+                    <span className="rpg-h2h-summary-value">{(h2hData.record.win_rate * 100).toFixed(1)}%</span>
+                  </div>
+                  {h2hData.record.last_played && (
+                    <div className="rpg-h2h-summary-item">
+                      <span className="rpg-h2h-summary-label">Last Played</span>
+                      <span className="rpg-h2h-summary-value">{formatDate(h2hData.record.last_played)}</span>
+                    </div>
                   )}
                 </div>
-              </div>
-
-              <div className="h2h-record">
-                <div className="h2h-stat wins">
-                  <span className="h2h-stat-value">{h2hData.record.wins}</span>
-                  <span className="h2h-stat-label">Wins</span>
-                </div>
-                <div className="h2h-stat draws">
-                  <span className="h2h-stat-value">{h2hData.record.draws}</span>
-                  <span className="h2h-stat-label">Draws</span>
-                </div>
-                <div className="h2h-stat losses">
-                  <span className="h2h-stat-value">{h2hData.record.losses}</span>
-                  <span className="h2h-stat-label">Losses</span>
-                </div>
-              </div>
-
-              <div className="h2h-summary">
-                <div className="h2h-summary-item">
-                  <span className="summary-label">Total Matches</span>
-                  <span className="summary-value">{h2hData.record.total_matches}</span>
-                </div>
-                <div className="h2h-summary-item">
-                  <span className="summary-label">Win Rate</span>
-                  <span className="summary-value">{(h2hData.record.win_rate * 100).toFixed(1)}%</span>
-                </div>
-                {h2hData.record.last_played && (
-                  <div className="h2h-summary-item">
-                    <span className="summary-label">Last Played</span>
-                    <span className="summary-value">{formatDate(h2hData.record.last_played)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+              </RPGPanel>
+            )}
+          </RPGPanel>
         </div>
       </div>
     )
@@ -772,48 +778,54 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
   }
 
   return (
-    <div className="stats-page">
+    <div className="stats-page rpg-stats-page">
       {/* Sub-tabs */}
-      <nav className="stats-tabs" role="tablist">
-        <button
-          className={`stats-tab ${activeSubTab === 'leaderboard' ? 'active' : ''}`}
+      <nav className="stats-tabs-rpg" role="tablist">
+        <GameButton
+          variant={activeSubTab === 'leaderboard' ? 'primary' : 'neutral'}
+          size="sm"
           onClick={() => handleSubTabChange('leaderboard')}
-          role="tab"
           aria-selected={activeSubTab === 'leaderboard'}
         >
           📊 Leaderboard
-        </button>
-        <button
-          className={`stats-tab ${activeSubTab === 'profile' ? 'active' : ''}`}
+        </GameButton>
+        <GameButton
+          variant={activeSubTab === 'profile' ? 'primary' : 'neutral'}
+          size="sm"
           onClick={() => handleSubTabChange('profile')}
-          role="tab"
           aria-selected={activeSubTab === 'profile'}
         >
           👤 Profile
-        </button>
-        <button
-          className={`stats-tab ${activeSubTab === 'history' ? 'active' : ''}`}
+        </GameButton>
+        <GameButton
+          variant={activeSubTab === 'history' ? 'primary' : 'neutral'}
+          size="sm"
           onClick={() => handleSubTabChange('history')}
-          role="tab"
           aria-selected={activeSubTab === 'history'}
         >
           📜 History
-        </button>
+        </GameButton>
       </nav>
 
       {/* Error banner */}
       {error && (
-        <div className="stats-error-banner" role="alert">
-          <span className="stats-error-icon">⚠️</span>
-          <span className="stats-error-text">{error}</span>
-          <button className="stats-error-dismiss" onClick={() => setError(null)} aria-label="Dismiss error">
+        <div className="rpg-error-banner" role="alert">
+          <span className="rpg-error-icon">⚠️</span>
+          <span className="rpg-error-text">{error}</span>
+          <GameButton
+            variant="danger"
+            size="sm"
+            shape="square"
+            onClick={() => setError(null)}
+            aria-label="Dismiss error"
+          >
             ×
-          </button>
+          </GameButton>
         </div>
       )}
 
       {/* Content */}
-      <div className="stats-tab-content" role="tabpanel">
+      <div className="rpg-stats-tab-content" role="tabpanel">
         {renderContent()}
       </div>
 

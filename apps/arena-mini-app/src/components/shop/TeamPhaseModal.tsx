@@ -24,7 +24,7 @@ import { CountdownTimer, LoadingSpinner } from '../common'
 import { CompactCard } from '../common/CompactCard'
 import { apiClient } from '../../api/client'
 import { usePolling, useImages } from '../../hooks'
-import { GameButton, CoinDisplay } from '../ui'
+import { GameButton, CoinDisplay, RPGPanel } from '../ui'
 
 const POLL_INTERVAL = 3000 // 3 seconds
 
@@ -48,10 +48,9 @@ export function TeamPhaseModal({
   // Sound context
   const { play, playSequence } = useSoundContext()
 
-  // Image URLs for icons and panel background
+  // Image URLs for icons
   const { getUrlById } = useImages()
   const arrowUpUrl = getUrlById('arrow_up')
-  const bannerCurtainUrl = getUrlById('banner_classic_curtain')
 
   // Derived state
   const coins = shopData?.coins ?? 0
@@ -216,44 +215,37 @@ export function TeamPhaseModal({
   }, [activeMatch, actionLoading, isSubmitted, onShopDataChange, play, playSequence])
 
   return (
-    <div className="team-phase-backdrop">
-      <div
-        className="team-phase-modal"
-        style={{
-          backgroundImage: `url(${bannerCurtainUrl})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
-          backgroundRepeat: 'no-repeat',
-        }}
-      >
+    <div className="team-phase-backdrop rpg-team-backdrop">
+      <RPGPanel variant="outer" className="rpg-team-modal-outer">
         {/* Header with title, coins, and timer */}
-        <header className="team-phase-header">
-          <div className="team-phase-header-left">
-            <h1 className="team-phase-title">Organize Your Team</h1>
-            {isSubmitted && (
-              <span className="team-phase-submitted-badge">Team Submitted</span>
-            )}
+        <RPGPanel variant="inner" className="rpg-team-modal-header">
+          <div className="rpg-team-header-row">
+            <div className="rpg-team-header-left">
+              <h1 className="rpg-team-title">Organize Your Team</h1>
+              {isSubmitted && (
+                <span className="rpg-team-submitted-badge">Team Submitted</span>
+              )}
+            </div>
+            <div className="rpg-team-header-right">
+              <CoinDisplay amount={coins} size="lg" animated />
+              {shopData?.deadline && (
+                <div className="rpg-team-timer">
+                  <CountdownTimer
+                    deadline={shopData.deadline}
+                    onExpire={() => {
+                      // Timer expired - will be handled by polling
+                    }}
+                    timerThresholds={gameConstants?.timer_thresholds}
+                  />
+                </div>
+              )}
+            </div>
           </div>
-          <div className="team-phase-header-right">
-            <CoinDisplay amount={coins} size="lg" animated />
-            {shopData?.deadline && (
-              <div className="team-phase-timer">
-                <CountdownTimer
-                  deadline={shopData.deadline}
-                  onExpire={() => {
-                    // Timer expired - will be handled by polling
-                  }}
-                  timerThresholds={gameConstants?.timer_thresholds}
-                />
-              </div>
-            )}
-          </div>
-        </header>
+        </RPGPanel>
 
         {/* Main content - card row layout */}
-        <div className="team-phase-content">
-          <section className="team-phase-cards-section">
-            <h2 className="team-phase-section-title">Battle Formation</h2>
+        <RPGPanel variant="inner-blue" className="rpg-team-cards-section">
+          <h2 className="rpg-section-title">Battle Formation</h2>
 
             {/* Draggable team cards */}
             {localTeamOrder.length > 0 ? (
@@ -348,8 +340,7 @@ export function TeamPhaseModal({
                 ))}
               </div>
             )}
-          </section>
-        </div>
+        </RPGPanel>
 
         {/* Footer with Submit Team button or waiting state */}
         <footer className="team-phase-footer">
@@ -376,7 +367,7 @@ export function TeamPhaseModal({
             </div>
           )}
         </footer>
-      </div>
+      </RPGPanel>
     </div>
   )
 }

@@ -2,7 +2,8 @@
  * StatsPage - Main stats view for arena matches
  *
  * Features:
- * - 3 sub-tabs: Leaderboard, Profile, History
+ * - 2 sub-tabs: Leaderboard, History
+ * - Profile shown as modal overlay when clicking your own leaderboard entry
  * - H2H stats shown as modal overlay when clicking opponents
  * - Tab data caching to avoid refetching
  * - Manual refresh only (no automatic polling)
@@ -40,7 +41,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
   const [activeSubTab, setActiveSubTab] = useState<StatsSubTab>('leaderboard')
 
   // Leaderboard state
-  const [leaderboardType, setLeaderboardType] = useState<'ranked' | 'casual'>('ranked')
+  const [leaderboardType, setLeaderboardType] = useState<'ranked' | 'casual'>('casual')
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardResponse | null>(null)
   const [leaderboardPage, setLeaderboardPage] = useState(0)
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
@@ -58,6 +59,9 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
   const [h2hData, setH2HData] = useState<H2HResponse | null>(null)
   const [h2hLoading, setH2HLoading] = useState(false)
   const [showH2HModal, setShowH2HModal] = useState(false)
+
+  // Profile modal state
+  const [showProfileModal, setShowProfileModal] = useState(false)
 
   // Error state
   const [error, setError] = useState<string | null>(null)
@@ -229,18 +233,13 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
           fetchLeaderboard()
         }
         break
-      case 'profile':
-        if (!profileData) {
-          fetchProfile()
-        }
-        break
       case 'history':
         if (!historyData) {
           fetchHistory()
         }
         break
     }
-  }, [activeSubTab, leaderboardData, profileData, historyData, fetchLeaderboard, fetchProfile, fetchHistory])
+  }, [activeSubTab, leaderboardData, historyData, fetchLeaderboard, fetchHistory])
 
   // Handle tab change with tracking
   const handleSubTabChange = useCallback(
@@ -282,20 +281,32 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     [fetchHistory]
   )
 
-  // Handle H2H opponent selection from leaderboard or history
+  // Handle opponent selection from leaderboard or history
   const handleSelectOpponent = useCallback(
     (opponentId: number) => {
-      if (opponentId === userId) return // Can't view H2H with yourself
+      if (opponentId === userId) {
+        // Clicking own entry opens profile modal
+        setShowProfileModal(true)
+        if (!profileData) {
+          fetchProfile()
+        }
+        return
+      }
       setShowH2HModal(true)
       fetchH2H(opponentId)
     },
-    [userId, fetchH2H]
+    [userId, fetchH2H, profileData, fetchProfile]
   )
 
   // Handle closing H2H modal
   const handleCloseH2HModal = useCallback(() => {
     setShowH2HModal(false)
     setH2HData(null)
+  }, [])
+
+  // Handle closing Profile modal
+  const handleCloseProfileModal = useCallback(() => {
+    setShowProfileModal(false)
   }, [])
 
   // Render rank badge class
@@ -331,16 +342,9 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     }
 
     return (
-      <RPGPanel variant="outer" className="stats-outer-panel">
-        {/* Type toggle */}
+      <>
+        {/* Type toggle - outside the panel */}
         <div className="rpg-type-toggle">
-          <GameButton
-            variant={leaderboardType === 'ranked' ? 'primary' : 'neutral'}
-            size="sm"
-            onClick={() => handleLeaderboardTypeChange('ranked')}
-          >
-            🏆 Ranked
-          </GameButton>
           <GameButton
             variant={leaderboardType === 'casual' ? 'primary' : 'neutral'}
             size="sm"
@@ -348,78 +352,85 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
           >
             ⚔️ Casual
           </GameButton>
+          <GameButton
+            variant={leaderboardType === 'ranked' ? 'primary' : 'neutral'}
+            size="sm"
+            onClick={() => handleLeaderboardTypeChange('ranked')}
+          >
+            🏆 Ranked
+          </GameButton>
         </div>
 
-        {/* Leaderboard list */}
-        {leaderboardData && leaderboardData.entries.length > 0 ? (
-          <RPGPanel variant="inner" className="leaderboard-inner-panel">
-            <div className="rpg-leaderboard-list">
-              {leaderboardData.entries.map((entry: LeaderboardEntry) => (
-                <div
-                  key={entry.user_id}
-                  className={`rpg-leaderboard-item ${entry.user_id === userId ? 'current-user' : ''}`}
-                  onClick={() => handleSelectOpponent(entry.user_id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleSelectOpponent(entry.user_id))}
-                >
-                  <div className={`rpg-rank-badge ${getRankClass(entry.rank)}`}>
-                    <span className="rpg-rank-number">{entry.rank}</span>
-                  </div>
-                  <Avatar
-                    firstName={entry.first_name}
-                    photoUrl={entry.photo_url}
-                    size="small"
-                  />
-                  <div className="rpg-leaderboard-user">
-                    <div className="rpg-leaderboard-name">
-                      {entry.first_name}
-                      {entry.user_id === userId && <span className="rpg-you-badge">You</span>}
+        <RPGPanel variant="outer" className="stats-outer-panel">
+          {/* Leaderboard list */}
+          {leaderboardData && leaderboardData.entries.length > 0 ? (
+            <RPGPanel variant="inner" className="leaderboard-inner-panel">
+              <div className="rpg-leaderboard-list">
+                {leaderboardData.entries.map((entry: LeaderboardEntry) => (
+                  <div
+                    key={entry.user_id}
+                    className={`rpg-leaderboard-item ${entry.user_id === userId ? 'current-user' : ''} ${getRankClass(entry.rank)}`}
+                    onClick={() => handleSelectOpponent(entry.user_id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleSelectOpponent(entry.user_id))}
+                  >
+                    <Avatar
+                      firstName={entry.first_name}
+                      photoUrl={entry.photo_url}
+                      size="small"
+                    />
+                    <div className="rpg-leaderboard-user">
+                      <div className="rpg-leaderboard-name">
+                        <span className={`rpg-rank-text ${getRankClass(entry.rank)}`}>#{entry.rank}</span>
+                        {entry.first_name}
+                        {entry.user_id === userId && <span className="rpg-you-badge">You</span>}
+                      </div>
+                      {entry.tier && <div className="rpg-leaderboard-tier">{entry.tier}</div>}
                     </div>
-                    {entry.tier && <div className="rpg-leaderboard-tier">{entry.tier}</div>}
+                    <div className="rpg-leaderboard-stats">
+                      <span className="wins">{leaderboardType === 'ranked' ? entry.ranked_wins : entry.regular_wins}W</span>
+                      <span className="losses">{leaderboardType === 'ranked' ? entry.ranked_losses : entry.regular_losses}L</span>
+                    </div>
+                    <div className="rpg-leaderboard-score">{entry.score}</div>
                   </div>
-                  <div className="rpg-leaderboard-stats">
-                    <span className="wins">{leaderboardType === 'ranked' ? entry.ranked_wins : entry.regular_wins}W</span>
-                    <span className="losses">{leaderboardType === 'ranked' ? entry.ranked_losses : entry.regular_losses}L</span>
-                  </div>
-                  <div className="rpg-leaderboard-score">{entry.score}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {leaderboardData.total > PAGE_SIZE && (
-              <div className="rpg-pagination">
-                <GameButton
-                  variant="neutral"
-                  size="sm"
-                  disabled={leaderboardPage === 0 || leaderboardLoading}
-                  onClick={() => handleLeaderboardPageChange(leaderboardPage - 1)}
-                >
-                  ← Prev
-                </GameButton>
-                <span className="rpg-pagination-info">
-                  Page {leaderboardPage + 1} of {Math.ceil(leaderboardData.total / PAGE_SIZE)}
-                </span>
-                <GameButton
-                  variant="neutral"
-                  size="sm"
-                  disabled={(leaderboardPage + 1) * PAGE_SIZE >= leaderboardData.total || leaderboardLoading}
-                  onClick={() => handleLeaderboardPageChange(leaderboardPage + 1)}
-                >
-                  Next →
-                </GameButton>
+                ))}
               </div>
-            )}
-          </RPGPanel>
-        ) : (
-          <div className="rpg-empty-state">
-            <span className="rpg-empty-icon">📊</span>
-            <p className="rpg-empty-title">No leaderboard data yet</p>
-            <p className="rpg-empty-hint">Play some matches to appear on the leaderboard!</p>
-          </div>
-        )}
-      </RPGPanel>
+
+              {/* Pagination */}
+              {leaderboardData.total > PAGE_SIZE && (
+                <div className="rpg-pagination">
+                  <GameButton
+                    variant="neutral"
+                    size="sm"
+                    disabled={leaderboardPage === 0 || leaderboardLoading}
+                    onClick={() => handleLeaderboardPageChange(leaderboardPage - 1)}
+                  >
+                    ← Prev
+                  </GameButton>
+                  <span className="rpg-pagination-info">
+                    Page {leaderboardPage + 1} of {Math.ceil(leaderboardData.total / PAGE_SIZE)}
+                  </span>
+                  <GameButton
+                    variant="neutral"
+                    size="sm"
+                    disabled={(leaderboardPage + 1) * PAGE_SIZE >= leaderboardData.total || leaderboardLoading}
+                    onClick={() => handleLeaderboardPageChange(leaderboardPage + 1)}
+                  >
+                    Next →
+                  </GameButton>
+                </div>
+              )}
+            </RPGPanel>
+          ) : (
+            <div className="rpg-empty-state">
+              <span className="rpg-empty-icon">📊</span>
+              <p className="rpg-empty-title">No leaderboard data yet</p>
+              <p className="rpg-empty-hint">Play some matches to appear on the leaderboard!</p>
+            </div>
+          )}
+        </RPGPanel>
+      </>
     )
   }
 
@@ -575,6 +586,42 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
           </div>
         </RPGPanel>
       </RPGPanel>
+    )
+  }
+
+  // Render Profile modal overlay
+  const renderProfileModal = () => {
+    if (!showProfileModal) return null
+
+    return (
+      <div className="rpg-h2h-modal-backdrop" onClick={handleCloseProfileModal}>
+        <div className="rpg-h2h-modal-wrapper" onClick={(e) => e.stopPropagation()}>
+          <RPGPanel variant="outer" className="rpg-h2h-modal-outer">
+            {/* Close button */}
+            <div className="rpg-h2h-close-wrapper">
+              <GameButton
+                variant="danger"
+                size="sm"
+                shape="square"
+                onClick={handleCloseProfileModal}
+                aria-label="Close"
+              >
+                ×
+              </GameButton>
+            </div>
+
+            {/* Loading state */}
+            {profileLoading && !profileData && (
+              <div className="rpg-h2h-loading">
+                <LoadingSpinner message="Loading profile..." />
+              </div>
+            )}
+
+            {/* Profile content */}
+            {(!profileLoading || profileData) && renderProfile()}
+          </RPGPanel>
+        </div>
+      </div>
     )
   }
 
@@ -743,8 +790,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     switch (activeSubTab) {
       case 'leaderboard':
         return renderLeaderboard()
-      case 'profile':
-        return renderProfile()
       case 'history':
         return renderHistory()
       default:
@@ -763,14 +808,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
           aria-selected={activeSubTab === 'leaderboard'}
         >
           📊 Leaderboard
-        </GameButton>
-        <GameButton
-          variant={activeSubTab === 'profile' ? 'primary' : 'neutral'}
-          size="sm"
-          onClick={() => handleSubTabChange('profile')}
-          aria-selected={activeSubTab === 'profile'}
-        >
-          👤 Profile
         </GameButton>
         <GameButton
           variant={activeSubTab === 'history' ? 'primary' : 'neutral'}
@@ -806,6 +843,9 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
       {/* H2H Modal */}
       {renderH2HModal()}
+
+      {/* Profile Modal */}
+      {renderProfileModal()}
     </div>
   )
 }

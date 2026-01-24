@@ -39,6 +39,8 @@ function App() {
   // Battle playback state (lifted for TabBar access)
   const [isPlaying, setIsPlaying] = useState(false)
   const [speedIndex, setSpeedIndex] = useState(0) // 0=1x, 1=1.5x, 2=2x
+  const [isBattleComplete, setIsBattleComplete] = useState(false)
+  const [replayTrigger, setReplayTrigger] = useState(0)
 
   // Get launch params from Telegram
   let launchParams: ReturnType<typeof useLaunchParams> | null = null
@@ -198,6 +200,16 @@ function App() {
     setIsPlaying(playing)
   }, [])
 
+  // Sync battle complete state from BattlePage
+  const handleBattleCompleteChange = useCallback((complete: boolean) => {
+    setIsBattleComplete(complete)
+  }, [])
+
+  // Handle replay - increment trigger to signal BattlePage to reset
+  const handleReplay = useCallback(() => {
+    setReplayTrigger((prev) => prev + 1)
+  }, [])
+
   // Battle playback props for TabBar (only shown during battle tab)
   const battlePlayback: BattlePlaybackProps | undefined =
     activeTab === 'battle'
@@ -206,6 +218,8 @@ function App() {
           onPlayPause: handlePlayPause,
           speedIndex,
           onCycleSpeed: handleCycleSpeed,
+          isComplete: isBattleComplete,
+          onReplay: handleReplay,
         }
       : undefined
 
@@ -246,6 +260,8 @@ function App() {
             isPlaying={isPlaying}
             onPlayingChange={handlePlayingChange}
             speedIndex={speedIndex}
+            onCompleteChange={handleBattleCompleteChange}
+            replayTrigger={replayTrigger}
           />
         )
       case 'stats':

@@ -50,6 +50,10 @@ interface BattlePageProps {
   onPlayingChange: (playing: boolean) => void
   /** Speed index from parent (0=1x, 1=1.5x, 2=2x) */
   speedIndex: number
+  /** Callback to notify parent of battle completion state */
+  onCompleteChange?: (complete: boolean) => void
+  /** Counter that increments when replay is requested from TabBar */
+  replayTrigger?: number
 }
 
 export function BattlePage({
@@ -62,6 +66,8 @@ export function BattlePage({
   isPlaying: parentIsPlaying,
   onPlayingChange,
   speedIndex,
+  onCompleteChange,
+  replayTrigger,
 }: BattlePageProps) {
   // Battle data state
   const [battleData, setBattleData] = useState<BattleResult | null>(null)
@@ -70,6 +76,8 @@ export function BattlePage({
 
   // Victory screen state (separate from animation completion for UI control)
   const [showVictory, setShowVictory] = useState(false)
+  // Track if user has manually dismissed the victory modal (prevents auto-reopen)
+  const [victoryDismissed, setVictoryDismissed] = useState(false)
 
   // Sound context for battle audio
   const { play: playSound, preloadCategory } = useSoundContext()
@@ -211,7 +219,7 @@ export function BattlePage({
 
   // Show victory screen when animation completes and play win/lose/draw sound
   useEffect(() => {
-    if (isComplete && !showVictory) {
+    if (isComplete && !showVictory && !victoryDismissed) {
       setShowVictory(true)
       addPageAction('battle_playback_complete', { match_id: matchId })
 
@@ -226,14 +234,37 @@ export function BattlePage({
         }
       }
     }
-  }, [isComplete, showVictory, matchId, battleData, userId, playSound])
+  }, [isComplete, showVictory, victoryDismissed, matchId, battleData, userId, playSound])
 
-  // Reset playback wrapper (hides victory screen)
+  // Notify parent when battle completion state changes
+  useEffect(() => {
+    onCompleteChange?.(isComplete)
+  }, [isComplete, onCompleteChange])
+
+  // Dismiss victory modal (user manually closed it)
+  const dismissVictory = useCallback(() => {
+    setShowVictory(false)
+    setVictoryDismissed(true)
+  }, [])
+
+  // Reset playback wrapper (hides victory screen and allows it to reopen)
   const resetPlayback = useCallback(() => {
     reset()
     setShowVictory(false)
+    setVictoryDismissed(false)
     addPageAction('battle_reset', { match_id: matchId })
   }, [reset, matchId])
+
+  // Handle replay trigger from parent (TabBar replay button)
+  const prevReplayTriggerRef = useRef(replayTrigger)
+  useEffect(() => {
+    if (replayTrigger !== undefined && replayTrigger !== prevReplayTriggerRef.current) {
+      prevReplayTriggerRef.current = replayTrigger
+      if (replayTrigger > 0) {
+        resetPlayback()
+      }
+    }
+  }, [replayTrigger, resetPlayback])
 
   // Handle return to lobby
   const handleReturnToLobby = useCallback(() => {
@@ -424,8 +455,21 @@ export function BattlePage({
 
       {/* Victory Screen Overlay */}
       {showVictory && (
-        <div className="victory-screen" onClick={() => setShowVictory(false)}>
+        <div className="victory-screen" onClick={dismissVictory}>
           <RPGPanel variant="outer" className="rpg-victory-outer">
+            <button
+              className="victory-close-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                dismissVictory()
+              }}
+              aria-label="Close"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
             <RPGPanel variant="inner-blue" className="rpg-victory-content">
               <div className="victory-icon">
                 {isDraw ? '🤝' : isWinner ? '🏆' : '💀'}
@@ -449,9 +493,15 @@ export function BattlePage({
             <RPGPanel variant="inner" className="rpg-victory-stats">
               <div className="victory-stats">
                 <div className="victory-stat">
-                  <span className="stat-label">Total Damage</span>
+                  <span className="stat-label">Damage Dealt</span>
                   <span className="stat-value">
                     {isPlayerA ? battleData.team_a_damage : battleData.team_b_damage}
+                  </span>
+                </div>
+                <div className="victory-stat">
+                  <span className="stat-label">Damage Taken</span>
+                  <span className="stat-value">
+                    {isPlayerA ? battleData.team_b_damage : battleData.team_a_damage}
                   </span>
                 </div>
                 <div className="victory-stat">
@@ -464,27 +514,6 @@ export function BattlePage({
             <div className="rpg-victory-actions">
               <GameButton
                 variant="primary"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowVictory(false)
-                  resetPlayback()
-                }}
-              >
-                Watch Again
-              </GameButton>
-              {onNavigateToStats && (
-                <GameButton
-                  variant="secondary"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onNavigateToStats()
-                  }}
-                >
-                  View Stats
-                </GameButton>
-              )}
-              <GameButton
-                variant="neutral"
                 onClick={(e) => {
                   e.stopPropagation()
                   handleReturnToLobby()

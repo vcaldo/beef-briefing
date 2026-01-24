@@ -5272,12 +5272,41 @@ button,
 
 /* Victory screen overlay */
 .rpg-victory-outer {
+  position: relative;
   width: 90%;
   max-width: 400px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   animation: victory-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Close button for victory modal */
+.victory-close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: none;
+  border-radius: 50%;
+  color: var(--tg-theme-hint-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.victory-close-btn:hover {
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--tg-theme-text-color);
+}
+
+.victory-close-btn:active {
+  transform: scale(0.95);
 }
 
 @keyframes victory-pop {

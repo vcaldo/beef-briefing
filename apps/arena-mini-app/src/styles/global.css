@@ -385,6 +385,29 @@ a:focus:not(:focus-visible),
   transform: scale(1.1);
 }
 
+/* =============================================================================
+   Playback Controls (Tab Bar during battle)
+   ============================================================================= */
+.playback-controls {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+.playback-btn {
+  flex: 0 1 auto;
+}
+
+/* Speed icon shows text label (1x, 1.5x, 2x) */
+.playback-controls .speed-icon {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  min-width: 32px;
+  text-align: center;
+}
+
 /* Page container with bottom padding for tab bar */
 .page-container {
   flex: 1;
@@ -2396,72 +2419,6 @@ a:focus:not(:focus-visible),
   display: flex;
   gap: 8px;
   justify-content: center;
-}
-
-/* Playback Controls */
-.battle-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 16px;
-  background: var(--arena-bg-medium);
-  border-radius: 12px;
-  margin: 16px;
-}
-
-.control-btn {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  font-size: 20px;
-}
-
-.play-btn {
-  width: 56px;
-  height: 56px;
-  font-size: 24px;
-}
-
-.play-btn.playing {
-  background: var(--arena-blue);
-}
-
-.speed-selector {
-  display: flex;
-  gap: 4px;
-  margin-left: 12px;
-  padding-left: 12px;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.speed-btn {
-  padding: 6px 10px;
-  border: none;
-  background: transparent;
-  color: var(--tg-theme-hint-color);
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.speed-btn.active {
-  background: var(--arena-orange);
-  color: white;
-}
-
-.event-counter {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  color: var(--tg-theme-hint-color);
-  margin-left: 12px;
-  padding-left: 12px;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Event Log Enhancements */
@@ -5278,24 +5235,6 @@ button,
 /* ============================================
    RPG Battle Page Styles
    ============================================ */
-
-.rpg-battle-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px;
-  flex-wrap: wrap;
-}
-
-.rpg-battle-controls .control-btn {
-  min-width: 44px;
-  padding: 8px 12px;
-}
-
-.rpg-battle-controls .play-btn {
-  min-width: 56px;
-}
 
 /* Victory screen overlay */
 .rpg-victory-outer {

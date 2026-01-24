@@ -1,5 +1,6 @@
 import type { TabId } from '../../types'
 import { SoundSettings } from './SoundSettings'
+import { PlaybackControls } from './PlaybackControls'
 import { GameButton } from '../ui/GameButton'
 
 interface Tab {
@@ -104,19 +105,33 @@ const TABS: Tab[] = [
   { id: 'stats', label: 'Stats', icon: <StatsIcon /> },
 ]
 
+/** Battle playback state passed from App when in battle tab */
+export interface BattlePlaybackProps {
+  /** Whether playback is currently playing */
+  isPlaying: boolean
+  /** Callback when play/pause is toggled */
+  onPlayPause: () => void
+  /** Current speed index (0=1x, 1=1.5x, 2=2x) */
+  speedIndex: number
+  /** Callback to cycle to next speed */
+  onCycleSpeed: () => void
+}
+
 interface TabBarProps {
   /** Currently active tab */
   activeTab: TabId
   /** Callback when user clicks a tab */
   onTabChange: (tab: TabId) => void
+  /** Battle playback controls (optional - only shown during battle) */
+  battlePlayback?: BattlePlaybackProps
 }
 
 /**
  * Bottom navigation bar for arena mini-app.
- * Fixed position at bottom of screen with 2 tabs + sound settings.
+ * Fixed position at bottom of screen with 2 tabs + optional playback controls + sound settings.
  * Uses CSS classes from global.css for styling.
  */
-export function TabBar({ activeTab, onTabChange }: TabBarProps) {
+export function TabBar({ activeTab, onTabChange, battlePlayback }: TabBarProps) {
   const handleTabClick = (tabId: TabId) => {
     onTabChange(tabId)
   }
@@ -142,6 +157,14 @@ export function TabBar({ activeTab, onTabChange }: TabBarProps) {
           </GameButton>
         )
       })}
+      {battlePlayback && (
+        <PlaybackControls
+          isPlaying={battlePlayback.isPlaying}
+          onPlayPause={battlePlayback.onPlayPause}
+          speedIndex={battlePlayback.speedIndex}
+          onCycleSpeed={battlePlayback.onCycleSpeed}
+        />
+      )}
       <SoundSettings />
     </nav>
   )

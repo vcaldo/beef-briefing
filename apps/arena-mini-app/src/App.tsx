@@ -9,6 +9,7 @@ import { TabBar, SplashScreen, ErrorDisplay, LoadingSpinner } from './components
 import { SoundProvider } from './contexts'
 
 import type { TabId, AppState, GameConstants, Match } from './types'
+import type { BattlePlaybackProps } from './components/common'
 
 // Lazy load page components for code splitting
 // Each page will be loaded in a separate chunk when first accessed
@@ -34,6 +35,10 @@ function App() {
   // Game state
   const [activeMatch, setActiveMatch] = useState<Match | null>(null)
   const [gameConstants, setGameConstants] = useState<GameConstants | null>(null)
+
+  // Battle playback state (lifted for TabBar access)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [speedIndex, setSpeedIndex] = useState(0) // 0=1x, 1=1.5x, 2=2x
 
   // Get launch params from Telegram
   let launchParams: ReturnType<typeof useLaunchParams> | null = null
@@ -179,6 +184,31 @@ function App() {
     handleTabChange('battle')
   }, [handleTabChange])
 
+  // Battle playback callbacks for TabBar
+  const handlePlayPause = useCallback(() => {
+    setIsPlaying((prev) => !prev)
+  }, [])
+
+  const handleCycleSpeed = useCallback(() => {
+    setSpeedIndex((prev) => (prev + 1) % 3)
+  }, [])
+
+  // Sync isPlaying state from BattlePage
+  const handlePlayingChange = useCallback((playing: boolean) => {
+    setIsPlaying(playing)
+  }, [])
+
+  // Battle playback props for TabBar (only shown during battle tab)
+  const battlePlayback: BattlePlaybackProps | undefined =
+    activeTab === 'battle'
+      ? {
+          isPlaying,
+          onPlayPause: handlePlayPause,
+          speedIndex,
+          onCycleSpeed: handleCycleSpeed,
+        }
+      : undefined
+
   // Render page based on active tab
   const renderPage = () => {
     switch (activeTab) {
@@ -213,6 +243,9 @@ function App() {
             onMatchChange={handleMatchChange}
             onNavigateToStats={() => handleTabChange('stats')}
             onNavigateToLobby={navigateToLobby}
+            isPlaying={isPlaying}
+            onPlayingChange={handlePlayingChange}
+            speedIndex={speedIndex}
           />
         )
       case 'stats':
@@ -280,7 +313,7 @@ function App() {
             </Suspense>
           </ErrorBoundary>
         </main>
-        <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
+        <TabBar activeTab={activeTab} onTabChange={handleTabChange} battlePlayback={battlePlayback} />
       </div>
     </SoundProvider>
   )

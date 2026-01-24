@@ -332,11 +332,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
     return (
       <RPGPanel variant="outer" className="stats-outer-panel">
-        {/* Hint message */}
-        <div className="rpg-tab-hint">
-          Tap any player to view your head-to-head record
-        </div>
-
         {/* Type toggle */}
         <div className="rpg-type-toggle">
           <GameButton
@@ -424,18 +419,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
             <p className="rpg-empty-hint">Play some matches to appear on the leaderboard!</p>
           </div>
         )}
-
-        {/* Refresh button */}
-        <div className="rpg-actions">
-          <GameButton
-            variant="secondary"
-            size="sm"
-            onClick={() => fetchLeaderboard()}
-            disabled={leaderboardLoading}
-          >
-            {leaderboardLoading ? '...' : '🔄'} Refresh
-          </GameButton>
-        </div>
       </RPGPanel>
     )
   }
@@ -591,13 +574,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
             </div>
           </div>
         </RPGPanel>
-
-        {/* Refresh button */}
-        <div className="rpg-actions">
-          <GameButton variant="secondary" size="sm" onClick={fetchProfile} disabled={profileLoading}>
-            {profileLoading ? '...' : '🔄'} Refresh
-          </GameButton>
-        </div>
       </RPGPanel>
     )
   }
@@ -610,11 +586,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
     return (
       <RPGPanel variant="outer" className="stats-outer-panel">
-        {/* Hint message */}
-        <div className="rpg-tab-hint">
-          Tap any match to see detailed head-to-head stats
-        </div>
-
         {historyData && historyData.matches.length > 0 ? (
           <RPGPanel variant="inner" className="history-inner-panel">
             <div className="rpg-history-list">
@@ -682,13 +653,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
             <p className="rpg-empty-hint">Play some matches to see your history!</p>
           </div>
         )}
-
-        {/* Refresh button */}
-        <div className="rpg-actions">
-          <GameButton variant="secondary" size="sm" onClick={() => fetchHistory()} disabled={historyLoading}>
-            {historyLoading ? '...' : '🔄'} Refresh
-          </GameButton>
-        </div>
       </RPGPanel>
     )
   }

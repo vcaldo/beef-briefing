@@ -30,8 +30,8 @@ import type {
 } from '../../types'
 
 // Playback speed options (events per second)
+// Index: 0=1x, 1=1.5x, 2=2x (controlled by parent via speedIndex prop)
 const PLAYBACK_SPEEDS = [
-  { label: '0.5x', value: 2000 },
   { label: '1x', value: 1000 },
   { label: '1.5x', value: 667 },
   { label: '2x', value: 500 },
@@ -44,6 +44,12 @@ interface BattlePageProps {
   onNavigateToStats?: () => void
   onNavigateToLobby?: () => void
   onMatchChange?: (match: Match | null) => void
+  /** Playback state from parent (for TabBar sync) */
+  isPlaying: boolean
+  /** Callback to notify parent of playing state changes */
+  onPlayingChange: (playing: boolean) => void
+  /** Speed index from parent (0=1x, 1=1.5x, 2=2x) */
+  speedIndex: number
 }
 
 export function BattlePage({
@@ -53,14 +59,14 @@ export function BattlePage({
   onNavigateToStats,
   onNavigateToLobby,
   onMatchChange,
+  isPlaying: parentIsPlaying,
+  onPlayingChange,
+  speedIndex,
 }: BattlePageProps) {
   // Battle data state
   const [battleData, setBattleData] = useState<BattleResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Playback speed UI state (index into PLAYBACK_SPEEDS array)
-  const [playbackSpeedIndex, setPlaybackSpeedIndex] = useState(1) // Default to 1x
 
   // Victory screen state (separate from animation completion for UI control)
   const [showVictory, setShowVictory] = useState(false)
@@ -101,7 +107,7 @@ export function BattlePage({
     animationStates,
     currentEventIndex,
     currentPhase,
-    isPlaying,
+    isPlaying: hookIsPlaying,
     isComplete,
     currentDamage,
     damageTargetKey,
@@ -110,15 +116,28 @@ export function BattlePage({
     play,
     pause,
     reset,
-    skipToEnd: hookSkipToEnd,
   } = useBattleAnimation(battleData, {
     // Convert interval-based speed to multiplier (1000ms = 1x, 500ms = 2x)
-    playbackSpeed: 1000 / PLAYBACK_SPEEDS[playbackSpeedIndex].value,
+    playbackSpeed: 1000 / PLAYBACK_SPEEDS[speedIndex].value,
     playerAId: battleData?.player_a_id ?? 0,
     playerBId: battleData?.player_b_id ?? 0,
     onPlaySound: playSound,
     getCardPosition,
   })
+
+  // Sync parent isPlaying state with hook
+  useEffect(() => {
+    if (parentIsPlaying && !hookIsPlaying && !isComplete) {
+      play()
+    } else if (!parentIsPlaying && hookIsPlaying) {
+      pause()
+    }
+  }, [parentIsPlaying, hookIsPlaying, isComplete, play, pause])
+
+  // Notify parent when hook playing state changes
+  useEffect(() => {
+    onPlayingChange(hookIsPlaying)
+  }, [hookIsPlaying, onPlayingChange])
 
   // Get match ID
   const matchId = activeMatch?.id
@@ -179,15 +198,16 @@ export function BattlePage({
 
   // Auto-play battle after initial load
   useEffect(() => {
-    if (battleData && currentEventIndex === -1 && !isPlaying && !isComplete) {
+    if (battleData && currentEventIndex === -1 && !hookIsPlaying && !isComplete) {
       const autoPlayTimer = setTimeout(() => {
         play()
+        onPlayingChange(true)
         addPageAction('battle_autoplay_started', { match_id: matchId })
       }, 1500) // 1.5 second delay
 
       return () => clearTimeout(autoPlayTimer)
     }
-  }, [battleData, currentEventIndex, isPlaying, isComplete, matchId, play])
+  }, [battleData, currentEventIndex, hookIsPlaying, isComplete, matchId, play, onPlayingChange])
 
   // Show victory screen when animation completes and play win/lose/draw sound
   useEffect(() => {
@@ -207,22 +227,6 @@ export function BattlePage({
       }
     }
   }, [isComplete, showVictory, matchId, battleData, userId, playSound])
-
-  // Handle play/pause toggle
-  const togglePlayback = useCallback(() => {
-    if (isPlaying) {
-      pause()
-    } else {
-      play()
-    }
-  }, [isPlaying, play, pause])
-
-  // Skip to end wrapper (shows victory screen)
-  const skipToEnd = useCallback(() => {
-    hookSkipToEnd()
-    setShowVictory(true)
-    addPageAction('battle_skipped_to_end', { match_id: matchId })
-  }, [hookSkipToEnd, matchId])
 
   // Reset playback wrapper (hides victory screen)
   const resetPlayback = useCallback(() => {
@@ -372,7 +376,7 @@ export function BattlePage({
         style={{
           // Scale HP bar transition duration with playback speed
           // At 1x (value=1000), duration is 300ms; at 2x (value=500), duration is 150ms
-          '--hp-transition-duration': `${(PLAYBACK_SPEEDS[playbackSpeedIndex].value / 1000) * 300}ms`,
+          '--hp-transition-duration': `${(PLAYBACK_SPEEDS[speedIndex].value / 1000) * 300}ms`,
         } as React.CSSProperties}
       >
         {/* Team A (opponent or self) */}
@@ -408,59 +412,6 @@ export function BattlePage({
             size={80}
           />
         ))}
-      </div>
-
-      {/* Playback Controls */}
-      <div className="battle-controls rpg-battle-controls">
-        <GameButton
-          variant="neutral"
-          size="sm"
-          onClick={resetPlayback}
-          disabled={currentEventIndex < 0}
-          title="Reset"
-          className="control-btn"
-        >
-          ⏮️
-        </GameButton>
-
-        <GameButton
-          variant="primary"
-          size="sm"
-          onClick={togglePlayback}
-          title={isPlaying ? 'Pause' : 'Play'}
-          className={`control-btn play-btn ${isPlaying ? 'playing' : ''}`}
-        >
-          {isPlaying ? '⏸️' : '▶️'}
-        </GameButton>
-
-        <GameButton
-          variant="neutral"
-          size="sm"
-          onClick={skipToEnd}
-          disabled={currentEventIndex >= battleData.events.length - 1}
-          title="Skip to end"
-          className="control-btn"
-        >
-          ⏭️
-        </GameButton>
-
-        {/* Speed selector */}
-        <div className="speed-selector">
-          {PLAYBACK_SPEEDS.map((speed, index) => (
-            <button
-              key={speed.label}
-              className={`speed-btn ${index === playbackSpeedIndex ? 'active' : ''}`}
-              onClick={() => setPlaybackSpeedIndex(index)}
-            >
-              {speed.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Event counter */}
-        <div className="event-counter">
-          {currentEventIndex + 1} / {battleData.events.length}
-        </div>
       </div>
 
       {/* Event Log */}

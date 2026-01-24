@@ -1,4 +1,7 @@
 export { TabBar } from './TabBar'
+export type { BattlePlaybackProps } from './TabBar'
+export { PlaybackControls } from './PlaybackControls'
+export type { PlaybackControlsProps } from './PlaybackControls'
 export { CountdownTimer } from './CountdownTimer'
 export { Card } from './Card'
 export { CompactCard } from './CompactCard'

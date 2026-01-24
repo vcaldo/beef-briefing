@@ -478,6 +478,7 @@ export function LobbyPage({
               <>
                 <GameButton
                   variant="neutral"
+                  size="lg"
                   onClick={() => handleLeaveMatch(activeMatch.id)}
                   disabled={actionLoading !== null}
                 >
@@ -486,6 +487,7 @@ export function LobbyPage({
                 {canStartEarly && (
                   <GameButton
                     variant="primary"
+                    size="lg"
                     onClick={() => handleStartMatch(activeMatch.id)}
                     disabled={actionLoading !== null}
                   >

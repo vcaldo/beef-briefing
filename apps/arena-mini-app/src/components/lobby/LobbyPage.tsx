@@ -488,21 +488,6 @@ export function LobbyPage({
       {/* Match list (when not in a match) */}
       {!activeMatch && (
         <section className="lobby-matches rpg-lobby-matches">
-          <RPGPanel variant="outer" className="rpg-lobby-section-header">
-            <div className="rpg-section-header-row">
-              <h2 className="rpg-section-title">Available Matches</h2>
-              <GameButton
-                variant="primary"
-                size="sm"
-                onClick={handleCreateMatch}
-                disabled={actionLoading !== null}
-                className="create-match-btn"
-              >
-                {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : '+ New Match'}
-              </GameButton>
-            </div>
-          </RPGPanel>
-
           {matches.length === 0 ? (
             <RPGPanel variant="outer" className="rpg-empty-state-panel">
               <RPGPanel variant="inner" className="rpg-empty-state-content">

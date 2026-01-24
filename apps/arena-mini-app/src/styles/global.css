@@ -1969,8 +1969,7 @@ a:focus:not(:focus-visible),
 /* Team Phase Footer */
 .team-phase-footer {
   padding: 20px;
-  background: linear-gradient(to top, rgba(15, 15, 26, 0.95) 50%, transparent);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: none;
   margin-top: auto;
   position: relative;
   z-index: 1;

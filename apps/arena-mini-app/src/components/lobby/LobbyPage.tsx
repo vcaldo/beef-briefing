@@ -12,6 +12,7 @@ import { useState, useCallback, useRef } from 'react'
 
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
+import { Avatar } from '@beef-briefing/shared-mini-app/components'
 import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
 import { GameButton, RPGPanel } from '../ui'
 import { usePolling, useErrorBanner } from '../../hooks'
@@ -424,17 +425,17 @@ export function LobbyPage({
                   {activeMatch.participants?.map((p) => (
                     <div
                       key={p.user_id}
-                      className={`participant-chip ${p.user_id === userId ? 'is-you' : ''}`}
-                      title={p.username || p.first_name}
+                      className={`participant-avatar ${p.user_id === userId ? 'is-you' : ''} ${p.user_id === activeMatch.creator_user_id ? 'is-creator' : ''}`}
+                      title={p.username ? `${p.first_name} (@${p.username})` : p.first_name}
                     >
-                      <span className="participant-name">
-                        {p.first_name}
-                        {p.user_id === activeMatch.creator_user_id && (
-                          <span className="participant-creator-badge" title="Match creator">
-                            👑
-                          </span>
-                        )}
-                      </span>
+                      <Avatar
+                        firstName={p.first_name}
+                        photoUrl={p.photo_url}
+                        size="small"
+                      />
+                      {p.user_id === activeMatch.creator_user_id && (
+                        <span className="creator-crown" title="Match creator">👑</span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -558,17 +559,17 @@ export function LobbyPage({
                               {match.participants?.map((p) => (
                                 <div
                                   key={p.user_id}
-                                  className={`participant-chip ${p.user_id === userId ? 'is-you' : ''}`}
-                                  title={p.username || p.first_name}
+                                  className={`participant-avatar ${p.user_id === userId ? 'is-you' : ''} ${p.user_id === match.creator_user_id ? 'is-creator' : ''}`}
+                                  title={p.username ? `${p.first_name} (@${p.username})` : p.first_name}
                                 >
-                                  <span className="participant-name">
-                                    {p.first_name}
-                                    {p.user_id === match.creator_user_id && (
-                                      <span className="participant-creator-badge" title="Match creator">
-                                        👑
-                                      </span>
-                                    )}
-                                  </span>
+                                  <Avatar
+                                    firstName={p.first_name}
+                                    photoUrl={p.photo_url}
+                                    size="small"
+                                  />
+                                  {p.user_id === match.creator_user_id && (
+                                    <span className="creator-crown" title="Match creator">👑</span>
+                                  )}
                                 </div>
                               ))}
                             </div>

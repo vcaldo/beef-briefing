@@ -168,6 +168,8 @@ export interface Participant {
   first_name: string
   /** User's Telegram username (optional) */
   username?: string
+  /** Presigned URL for user's profile photo */
+  photo_url?: string
 }
 
 /**

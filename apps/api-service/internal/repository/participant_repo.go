@@ -83,7 +83,8 @@ func (r *ParticipantRepository) GetMatchParticipants(ctx context.Context, matchI
 		SELECT p.id, p.match_id, p.user_id, p.status, p.joined_at, p.coins_remaining,
 		       p.shop_cards, p.team, p.team_order, p.team_submitted_at,
 		       p.placement, p.wins, p.losses, p.total_damage_dealt,
-		       u.first_name, COALESCE(u.username, '')
+		       u.first_name, COALESCE(u.username, ''),
+		       (SELECT minio_object_key FROM user_profile_photos WHERE user_id = u.id ORDER BY width DESC LIMIT 1)
 		FROM game_match_participants p
 		JOIN users u ON p.user_id = u.id
 		WHERE p.match_id = $1
@@ -103,7 +104,7 @@ func (r *ParticipantRepository) GetMatchParticipants(ctx context.Context, matchI
 			&p.ID, &p.MatchID, &p.UserID, &p.Status, &p.JoinedAt,
 			&p.CoinsRemaining, &p.ShopCards, &p.Team, &p.TeamOrder,
 			&p.TeamSubmittedAt, &p.Placement, &p.Wins, &p.Losses, &p.TotalDamageDealt,
-			&p.FirstName, &p.Username,
+			&p.FirstName, &p.Username, &p.PhotoObjectKey,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan participant row: %w", err)

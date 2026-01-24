@@ -285,7 +285,8 @@ func (r *MatchRepository) GetLeaderboard(ctx context.Context, chatID int64, matc
 		       l.regular_wins, l.regular_losses, l.regular_draws, l.regular_matches_played,
 		       l.regular_current_streak, l.regular_best_streak,
 		       l.head_to_head, l.first_match_at, l.last_match_at,
-		       u.first_name, COALESCE(u.username, '')
+		       u.first_name, COALESCE(u.username, ''),
+		       (SELECT minio_object_key FROM user_profile_photos WHERE user_id = l.user_id ORDER BY width DESC LIMIT 1)
 		FROM game_leaderboard l
 		JOIN users u ON l.user_id = u.id
 		WHERE l.chat_id = $1
@@ -309,7 +310,7 @@ func (r *MatchRepository) GetLeaderboard(ctx context.Context, chatID int64, matc
 			&e.RegularWins, &e.RegularLosses, &e.RegularDraws, &e.RegularMatchesPlayed,
 			&e.RegularCurrentStreak, &e.RegularBestStreak,
 			&e.HeadToHead, &e.FirstMatchAt, &e.LastMatchAt,
-			&e.FirstName, &e.Username,
+			&e.FirstName, &e.Username, &e.PhotoObjectKey,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan leaderboard row: %w", err)

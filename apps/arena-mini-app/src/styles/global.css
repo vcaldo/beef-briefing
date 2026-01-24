@@ -4907,23 +4907,22 @@ button,
 
 .rpg-lobby-header-content {
   text-align: center;
-  padding: 16px 12px;
+  padding: 0;
 }
 
-.rpg-lobby-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 24px;
-  font-weight: 800;
-  color: #4a3a2a;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin: 0 0 4px 0;
+.rpg-lobby-logo {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 .rpg-lobby-subtitle {
+  font-family: 'Outfit', sans-serif;
   font-size: 14px;
+  font-weight: 600;
   color: #6a5a4a;
-  margin: 0;
+  text-align: center;
+  margin: 0 0 8px 0;
 }
 
 .rpg-lobby-matches {

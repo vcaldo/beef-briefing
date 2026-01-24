@@ -195,6 +195,11 @@ export function LobbyPage({
    */
   const handleMatchDetailsSuccess = useCallback(
     (match: Match) => {
+      // Handle loading state for initial fetch (e.g., navigating back to lobby with active match)
+      if (loading) {
+        setLoading(false)
+      }
+
       // Check for phase transition to shop
       if (match.status === 'shop_phase') {
         addPageAction('match_phase_transition', {
@@ -232,7 +237,7 @@ export function LobbyPage({
       // Update match state
       onMatchChange(match)
     },
-    [activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle, play]
+    [activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle, play, loading]
   )
 
   /**
@@ -417,6 +422,14 @@ export function LobbyPage({
                   />
                 </div>
               )}
+
+              {/* Title row: Casual 1v1 */}
+              <div className="rpg-match-card-title">
+                <span className="match-type-label">
+                  {activeMatch.match_type === 'ranked' ? '🏆 Ranked' : '⚔️ Casual'}
+                </span>
+                <span className="match-format-label">{activeMatch.format || '1v1'}</span>
+              </div>
 
               {/* Participants */}
               <div className="rpg-match-card-participants">

@@ -283,13 +283,13 @@ export function TeamPhaseModal({
                           size="sm"
                           onClick={() => handleUpgrade(card.position, 'atk')}
                           disabled={coins < upgradeCost || actionLoading !== null}
-                          title={`+3 ATK (${upgradeCost} coin)`}
+                          title={`+1 ATK (${upgradeCost} coin)`}
                           className="upgrade-btn upgrade-atk"
                         >
                           {actionLoading === `upgrade-${card.position}-atk` ? (
                             <LoadingSpinner size="sm" inline />
                           ) : (
-                            '+3'
+                            '+1'
                           )}
                         </GameButton>
                         <GameButton

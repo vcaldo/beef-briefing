@@ -15,7 +15,7 @@ const (
 	UpgradeCost      = 1
 	ShopSize         = 4
 	TeamSize         = 3
-	ATKUpgradeAmount = 3
+	ATKUpgradeAmount = 1
 	HPUpgradeAmount  = 3
 )
 

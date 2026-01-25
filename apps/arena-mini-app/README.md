@@ -9,7 +9,7 @@ The Arena Mini App is a competitive card battler where users build teams from we
 ## Features
 
 - **Match Lobby**: Create/join matches, view participants, auto-start countdowns
-- **Shop Phase**: Buy cards, upgrade stats (+3 ATK/HP), reroll shop, build your team
+- **Shop Phase**: Buy cards, upgrade stats (+1 ATK/+3 HP), reroll shop, build your team
 - **Battle Replay**: Animated playback with HP bars, attack indicators, speed controls
 - **Statistics**: Leaderboards (ranked/casual), player profiles, match history, head-to-head records
 - **Telegram Integration**: Seamless authentication via Mini App init data
@@ -161,7 +161,7 @@ The `/api/v1/mini-app/arena/constants` endpoint provides centralized game config
 | Starting coins | 10 | Coins at match start |
 | Card purchase | 3 | Buy a card from shop |
 | Reroll | 1 | Refresh shop (before first buy only) |
-| Upgrade | 1 | +3 ATK or +3 HP per upgrade |
+| Upgrade | 1 | +1 ATK or +3 HP per upgrade |
 | Team size | 3 | Cards required for battle |
 
 ## Development

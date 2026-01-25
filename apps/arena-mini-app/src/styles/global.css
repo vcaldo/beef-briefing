@@ -1971,43 +1971,140 @@ a:focus:not(:focus-visible),
 }
 
 /* =============================================================================
-   Event Log
+   Battle Log (Compact RPG-themed)
    ============================================================================= */
-.event-log {
-  background: var(--arena-bg-medium);
-  border-radius: 12px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 12px;
+.battle-log-outer {
+  margin: 8px 12px;
 }
 
-.event-log-item {
-  padding: 8px 12px;
-  border-radius: 8px;
-  margin-bottom: 4px;
+.battle-log-inner {
+  max-height: calc(33vh - 48px);
+  min-height: 80px;
+}
+
+.battle-log-title {
+  font-family: 'Outfit', sans-serif;
   font-size: 13px;
-  transition: background 0.2s ease;
+  font-weight: 600;
+  color: #4a3a2a;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(90, 74, 58, 0.2);
 }
 
-.event-log-item:last-child {
-  margin-bottom: 0;
+.battle-log-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: calc(33vh - 100px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 74, 58, 0.3) transparent;
 }
 
-.event-log-item.current {
-  background: rgba(249, 115, 22, 0.15);
-  border-left: 3px solid var(--arena-orange);
+.battle-log-content::-webkit-scrollbar {
+  width: 4px;
 }
 
-.event-log-item.attack {
-  color: var(--arena-orange-light);
+.battle-log-content::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.event-log-item.death {
-  color: var(--hp-low);
+.battle-log-content::-webkit-scrollbar-thumb {
+  background: rgba(90, 74, 58, 0.3);
+  border-radius: 2px;
 }
 
-.event-log-item.victory {
-  color: var(--hp-full);
+.battle-log-round {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(90, 74, 58, 0.08);
+  transition: background 0.2s ease, border-left 0.2s ease;
+}
+
+.battle-log-round.current {
+  background: rgba(249, 115, 22, 0.12);
+  border-left: 2px solid var(--arena-orange);
+  padding-left: 6px;
+}
+
+.battle-log-round.animating {
+  background: rgba(249, 115, 22, 0.18);
+}
+
+.battle-log-round.played {
+  opacity: 0.55;
+}
+
+.battle-log-round.slide-in {
+  animation: round-slide-in 0.3s ease-out;
+}
+
+@keyframes round-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.round-indicator {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b5a4a;
+  min-width: 22px;
+}
+
+.round-icons {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.event-icon {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+  opacity: 0.85;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.event-icon:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+/* Event type icon color tints */
+.event-icon-attack {
+  filter: sepia(25%) saturate(150%) hue-rotate(-5deg);
+}
+
+.event-icon-damage {
+  filter: hue-rotate(-10deg) saturate(140%);
+}
+
+.event-icon-death {
+  filter: grayscale(15%) brightness(0.9);
+}
+
+.event-icon-advance {
+  filter: sepia(20%) hue-rotate(180deg) saturate(120%);
+}
+
+.event-icon-victory {
+  filter: sepia(40%) saturate(180%) brightness(1.1);
+}
+
+.event-icon-summary {
+  filter: sepia(15%) saturate(100%);
 }
 
 /* =============================================================================
@@ -2326,99 +2423,7 @@ a:focus:not(:focus-visible),
   justify-content: center;
 }
 
-/* Event Log Enhancements */
-.event-log-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--tg-theme-text-color);
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.event-log-item {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.event-log-item.played {
-  opacity: 0.5;
-  transition: opacity 0.3s ease;
-}
-
-/* Slide-in animation for new log entries */
-.event-log-item.slide-in {
-  animation: log-entry-slide 0.4s ease-out;
-}
-
-@keyframes log-entry-slide {
-  0% {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Highlight background for currently animating event */
-.event-log-item.animating {
-  background: linear-gradient(
-    90deg,
-    rgba(249, 115, 22, 0.15) 0%,
-    rgba(249, 115, 22, 0.05) 100%
-  );
-  border-left: 3px solid var(--arena-orange);
-  padding-left: 9px; /* Adjust for border (12px - 3px) */
-  transition: background 0.3s ease, border-left 0.3s ease, padding-left 0.3s ease;
-}
-
-/* Progress dot that pulses during event animation */
-.event-progress-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--arena-orange);
-  animation: progress-pulse 1.5s ease-in-out infinite;
-  margin-left: 8px;
-}
-
-@keyframes progress-pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(1.3);
-  }
-}
-
-.event-round {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--tg-theme-hint-color);
-  min-width: 24px;
-}
-
-.event-message {
-  flex: 1;
-}
-
-.event-log-item.damage {
-  color: var(--arena-orange);
-}
-
-.event-log-item.advance {
-  color: var(--arena-cyan);
-}
-
-.event-log-item.summary {
-  color: var(--arena-purple);
-  font-style: italic;
-}
+/* Legacy event-log classes removed - replaced by battle-log-* classes above */
 
 /* =============================================================================
    Stats Page

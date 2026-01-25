@@ -33,6 +33,13 @@ export type IconImageId =
   | 'arrow_down'
   | 'arrow_left'
   | 'arrow_right'
+  // Battle log icons
+  | 'sword'
+  | 'heart_broken'
+  | 'skull'
+  | 'crown'
+  | 'book_open'
+  | 'arrow_right_board'
 
 // Effect image IDs (including explosion frames)
 export type EffectImageId =
@@ -96,7 +103,7 @@ export const IMAGE_CONFIGS: Record<ImageId, ImageConfig> = {
   barHorizontal_red_mid: { category: 'bars', filename: 'barHorizontal_red_mid', width: 1, height: 16 },
   barHorizontal_red_right: { category: 'bars', filename: 'barHorizontal_red_right', width: 8, height: 16 },
 
-  // Icons (64x64 pixels)
+  // Icons (various sizes)
   coin: { category: 'icons', filename: 'coin', width: 64, height: 64 },
   star_yellow: { category: 'icons', filename: 'star_yellow', width: 64, height: 64 },
   checkmark: { category: 'icons', filename: 'checkmark', width: 64, height: 64 },
@@ -105,6 +112,13 @@ export const IMAGE_CONFIGS: Record<ImageId, ImageConfig> = {
   arrow_down: { category: 'icons', filename: 'arrow_down', width: 64, height: 64 },
   arrow_left: { category: 'icons', filename: 'arrow_left', width: 64, height: 64 },
   arrow_right: { category: 'icons', filename: 'arrow_right', width: 64, height: 64 },
+  // Battle log icons (64x64 pixels)
+  sword: { category: 'icons', filename: 'sword', width: 64, height: 64 },
+  heart_broken: { category: 'icons', filename: 'suit_hearts_broken', width: 64, height: 64 },
+  skull: { category: 'icons', filename: 'skull', width: 64, height: 64 },
+  crown: { category: 'icons', filename: 'crown_a', width: 64, height: 64 },
+  book_open: { category: 'icons', filename: 'book_open', width: 64, height: 64 },
+  arrow_right_board: { category: 'icons', filename: 'arrow_right_board', width: 64, height: 64 },
 
   // Effects (flame and magic - 512x512 pixels)
   flame_01: { category: 'effects', filename: 'flame_01', width: 512, height: 512 },

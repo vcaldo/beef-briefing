@@ -1,85 +1,221 @@
 /**
  * Battle Log Component
  *
- * Displays a scrollable log of battle events with animation synchronization.
+ * Displays a compact, scrollable log of battle events grouped by round.
  * Features:
- * - Auto-scroll to latest event
- * - Slide-in animation for new entries
- * - Progress indicator for currently animating events
- * - Visual distinction between current, playing, and animated events
+ * - Events grouped by round with icons showing what happened
+ * - RPG-themed styling with brown/beige borders
+ * - Auto-scroll to latest round
+ * - Animation support for live battle playback
+ * - Reusable for battle history (static display)
  */
 
-import { useRef, useEffect } from 'react'
-import type { BattleEvent, EventAnimationPhase } from '../../types'
+import { useRef, useEffect, useMemo } from 'react'
+import type { BattleEvent, EventAnimationPhase, EventType } from '../../types'
+import type { IconImageId } from '../../types/images'
+import { useImages } from '../../hooks/useImages'
+import { RPGPanel } from '../ui/RPGPanel'
+
+/**
+ * Group of events for a single round
+ */
+interface RoundGroup {
+  round: number
+  events: BattleEvent[]
+}
+
+/**
+ * Groups battle events by their round number
+ */
+function groupEventsByRound(events: BattleEvent[]): RoundGroup[] {
+  const groups = new Map<number, BattleEvent[]>()
+
+  for (const event of events) {
+    const existing = groups.get(event.round)
+    if (existing) {
+      existing.push(event)
+    } else {
+      groups.set(event.round, [event])
+    }
+  }
+
+  // Convert to array and sort by round number
+  return Array.from(groups.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([round, events]) => ({ round, events }))
+}
+
+/**
+ * Maps event type to icon ID
+ */
+function getIconForEventType(type: EventType): IconImageId {
+  switch (type) {
+    case 'attack':
+      return 'sword'
+    case 'damage':
+      return 'heart_broken'
+    case 'death':
+      return 'skull'
+    case 'advance':
+      return 'arrow_right_board'
+    case 'victory':
+      return 'crown'
+    case 'summary':
+      return 'book_open'
+    default:
+      return 'book_open'
+  }
+}
 
 export interface BattleLogProps {
   /** List of all battle events */
   events: BattleEvent[]
-  /** Current event index being displayed (0-based) */
-  currentEventIndex: number
-  /** Current animation phase (idle, highlight, attack, damage, death, complete) */
-  currentPhase: EventAnimationPhase
-  /** Function to format event message */
-  getEventMessage: (event: BattleEvent) => string
+  /** Current event index being displayed (0-based). Optional for static display. */
+  currentEventIndex?: number
+  /** Current animation phase. Optional for static display (battle history). */
+  currentPhase?: EventAnimationPhase
+  /** Function to format event message (optional, for tooltip display) */
+  getEventMessage?: (event: BattleEvent) => string
+  /** Whether to show animation indicators (default: true) */
+  animated?: boolean
+  /** Custom className for additional styling */
+  className?: string
+}
+
+/**
+ * Props for the internal BattleLogRound component
+ */
+interface BattleLogRoundProps {
+  roundGroup: RoundGroup
+  isCurrentRound: boolean
+  isAnimating: boolean
+  isPlayed: boolean
+  getIconUrl: (type: EventType) => string
+}
+
+/**
+ * Single round row in the battle log
+ */
+function BattleLogRound({
+  roundGroup,
+  isCurrentRound,
+  isAnimating,
+  isPlayed,
+  getIconUrl,
+}: BattleLogRoundProps) {
+  const classes = [
+    'battle-log-round',
+    isCurrentRound ? 'current' : '',
+    isAnimating ? 'animating' : '',
+    isPlayed ? 'played' : '',
+    isCurrentRound && !isPlayed ? 'slide-in' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <div className={classes}>
+      <span className="round-indicator">R{roundGroup.round}</span>
+      <div className="round-icons">
+        {roundGroup.events.map((event, idx) => (
+          <img
+            key={idx}
+            src={getIconUrl(event.type)}
+            alt={event.type}
+            className={`event-icon event-icon-${event.type}`}
+            title={event.type}
+          />
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export const BattleLog = ({
   events,
-  currentEventIndex,
-  currentPhase,
-  getEventMessage,
+  currentEventIndex = -1,
+  currentPhase = 'idle',
+  animated = true,
+  className = '',
 }: BattleLogProps) => {
-  const eventLogRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const { getUrlById } = useImages()
 
   /**
    * Derived state: Is the current event still animating?
-   * Events are animating during highlight, attack, damage, and death phases.
-   * Once phase reaches 'complete' or 'idle', the event is no longer animating.
    */
   const isCurrentEventAnimating =
+    animated &&
     currentEventIndex >= 0 &&
     currentPhase !== 'idle' &&
     currentPhase !== 'complete'
 
   /**
-   * Auto-scroll to bottom when new events appear or current event changes.
-   * Smooth scrolling enhances the playback experience.
+   * Get visible events based on currentEventIndex
+   */
+  const visibleEvents = useMemo(() => {
+    if (!animated || currentEventIndex < 0) {
+      return events
+    }
+    return events.slice(0, currentEventIndex + 1)
+  }, [events, currentEventIndex, animated])
+
+  /**
+   * Group visible events by round
+   */
+  const roundGroups = useMemo(
+    () => groupEventsByRound(visibleEvents),
+    [visibleEvents]
+  )
+
+  /**
+   * Determine which round the current event belongs to
+   */
+  const currentRound = useMemo(() => {
+    if (currentEventIndex < 0 || currentEventIndex >= events.length) {
+      return -1
+    }
+    return events[currentEventIndex]?.round ?? -1
+  }, [events, currentEventIndex])
+
+  /**
+   * Auto-scroll to bottom when new rounds appear
    */
   useEffect(() => {
-    if (eventLogRef.current) {
-      eventLogRef.current.scrollTop = eventLogRef.current.scrollHeight
+    if (contentRef.current) {
+      contentRef.current.scrollTop = contentRef.current.scrollHeight
     }
-  }, [currentEventIndex])
+  }, [roundGroups.length])
+
+  /**
+   * Get icon URL for event type
+   */
+  const getIconUrl = (type: EventType): string => {
+    return getUrlById(getIconForEventType(type))
+  }
 
   return (
-    <div className="event-log" ref={eventLogRef}>
-      <div className="event-log-title">Battle Log</div>
-      {events.slice(0, currentEventIndex + 1).map((event, index) => {
-        // Determine event item classes
-        const isCurrent = index === currentEventIndex
-        const isPlayed = index < currentEventIndex
-        const isAnimating = isCurrent && isCurrentEventAnimating
-        const shouldSlideIn = isCurrent && !isPlayed
+    <RPGPanel variant="outer" className={`battle-log-outer ${className}`}>
+      <RPGPanel variant="inner" className="battle-log-inner">
+        <div className="battle-log-title">Battle Log</div>
+        <div className="battle-log-content" ref={contentRef}>
+          {roundGroups.map((roundGroup) => {
+            const isCurrentRound = roundGroup.round === currentRound
+            const isPlayed = roundGroup.round < currentRound
 
-        const classes = [
-          'event-log-item',
-          event.type,
-          isCurrent ? 'current' : '',
-          isPlayed ? 'played' : '',
-          isAnimating ? 'animating' : '',
-          shouldSlideIn ? 'slide-in' : '',
-        ]
-          .filter(Boolean)
-          .join(' ')
-
-        return (
-          <div key={index} className={classes}>
-            <span className="event-round">R{event.round}</span>
-            <span className="event-message">{getEventMessage(event)}</span>
-            {isAnimating && <div className="event-progress-dot" />}
-          </div>
-        )
-      })}
-    </div>
+            return (
+              <BattleLogRound
+                key={roundGroup.round}
+                roundGroup={roundGroup}
+                isCurrentRound={isCurrentRound}
+                isAnimating={isCurrentRound && isCurrentEventAnimating}
+                isPlayed={isPlayed}
+                getIconUrl={getIconUrl}
+              />
+            )
+          })}
+        </div>
+      </RPGPanel>
+    </RPGPanel>
   )
 }

@@ -8,12 +8,13 @@ import { initializeTelegramSDK } from '@beef-briefing/shared-mini-app/initializa
 
 import App from './App'
 import { ErrorBoundary } from '@beef-briefing/shared-mini-app/components'
+import { ENABLE_FULLSCREEN } from './config'
 import './styles/global.css'
 
 // Initialize app
 async function initApp() {
   // Initialize Telegram Mini App SDK - MUST await to prevent React error #310
-  await initializeTelegramSDK()
+  await initializeTelegramSDK({ enableFullscreen: ENABLE_FULLSCREEN })
 
   // Render app
   createRoot(document.getElementById('root')!).render(

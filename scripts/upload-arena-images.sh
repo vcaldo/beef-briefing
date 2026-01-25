@@ -28,6 +28,7 @@ IMAGE_CATEGORIES=(
     "icons"
     "effects"
     "effects/explosion"
+    "bg"
 )
 
 # Manifest file name for version tracking
@@ -45,8 +46,8 @@ generate_content_hash() {
         return
     fi
 
-    # Hash all .png files recursively, sort for determinism, then hash the result
-    find "$IMAGES_DIR" -name "*.png" -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1
+    # Hash all image files recursively, sort for determinism, then hash the result
+    find "$IMAGES_DIR" \( -name "*.png" -o -name "*.webp" \) -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1
 }
 
 # Get deployed manifest from object storage
@@ -253,17 +254,17 @@ upload_images() {
         local category_dir="$IMAGES_DIR/$category"
         if [[ -d "$category_dir" ]]; then
             local count
-            count=$(find "$category_dir" -maxdepth 1 -name "*.png" | wc -l)
+            count=$(find "$category_dir" -maxdepth 1 \( -name "*.png" -o -name "*.webp" \) | wc -l)
             total_files=$((total_files + count))
         fi
     done
 
     if [[ "$total_files" -eq 0 ]]; then
-        log_warn "No PNG files found in $IMAGES_DIR"
+        log_warn "No image files found in $IMAGES_DIR"
         exit 0
     fi
 
-    log_info "Found $total_files PNG files to upload across ${#IMAGE_CATEGORIES[@]} categories"
+    log_info "Found $total_files image files to upload across ${#IMAGE_CATEGORIES[@]} categories"
     log_info "Target: ${MC_ALIAS}/${bucket}/${base_target_path}/"
 
     echo ""
@@ -279,7 +280,7 @@ upload_images() {
 
         # Count files in this category
         local category_count
-        category_count=$(find "$category_dir" -maxdepth 1 -name "*.png" | wc -l)
+        category_count=$(find "$category_dir" -maxdepth 1 \( -name "*.png" -o -name "*.webp" \) | wc -l)
 
         if [[ "$category_count" -eq 0 ]]; then
             continue
@@ -287,20 +288,26 @@ upload_images() {
 
         echo -e "${BLUE}Category: $category ($category_count files)${NC}"
 
-        # Upload each PNG file in this category
-        for image_file in "$category_dir"/*.png; do
+        # Upload each image file in this category
+        for image_file in "$category_dir"/*.png "$category_dir"/*.webp; do
             [[ ! -f "$image_file" ]] && continue
 
             local filename
             filename=$(basename "$image_file")
 
-            # Target path: images/arena/{category}/{filename}.png
+            # Target path: images/arena/{category}/{filename}
             local target_path="$base_target_path/$category/$filename"
+
+            # Detect content type based on extension
+            local content_type="image/png"
+            if [[ "$filename" == *.webp ]]; then
+                content_type="image/webp"
+            fi
 
             echo -n "  Uploading $filename... "
 
             if mc cp "$image_file" "${MC_ALIAS}/${bucket}/${target_path}" \
-                --attr "Content-Type=image/png;Cache-Control=${CACHE_CONTROL};x-amz-acl=public-read" \
+                --attr "Content-Type=${content_type};Cache-Control=${CACHE_CONTROL};x-amz-acl=public-read" \
                 &>/dev/null; then
                 echo -e "${GREEN}done${NC}"
                 ((++uploaded))
@@ -459,7 +466,7 @@ case "$ACTION" in
         # Upload manifest with version info
         FINAL_VERSION=$(cat /tmp/arena_image_version 2>/dev/null || echo "1")
         FINAL_HASH=$(cat /tmp/arena_image_hash 2>/dev/null || echo "")
-        FILE_COUNT=$(find "$IMAGES_DIR" -name "*.png" | wc -l)
+        FILE_COUNT=$(find "$IMAGES_DIR" \( -name "*.png" -o -name "*.webp" \) | wc -l)
 
         upload_manifest "$FINAL_VERSION" "$FINAL_HASH" "$FILE_COUNT"
 
@@ -469,7 +476,7 @@ case "$ACTION" in
         echo ""
         log_success "Images uploaded successfully!"
         echo ""
-        log_info "Files are available at: images/arena/{category}/{filename}.png"
+        log_info "Files are available at: images/arena/{category}/{filename}"
         log_info "Current IMAGE_VERSION: ${FINAL_VERSION}"
         ;;
 esac

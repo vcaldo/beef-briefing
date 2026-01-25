@@ -217,9 +217,6 @@ export function TeamPhaseModal({
         {/* Header with coins and timer */}
         <RPGPanel variant="inner" className="rpg-team-modal-header">
           <div className="rpg-team-header-row">
-            {isSubmitted && (
-              <span className="rpg-team-submitted-badge">Team Submitted</span>
-            )}
             <CoinDisplay amount={coins} size="lg" animated />
             {shopData?.deadline && (
               <div className="rpg-team-timer">
@@ -326,6 +323,14 @@ export function TeamPhaseModal({
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Strategy hint - only show when not submitted and team has cards */}
+            {!isSubmitted && localTeamOrder.length > 0 && (
+              <div className="rpg-team-strategy-hint">
+                <span className="rpg-team-strategy-hint-icon">💡</span>
+                <span>Place your strongest cards in front — they attack first!</span>
               </div>
             )}
         </RPGPanel>

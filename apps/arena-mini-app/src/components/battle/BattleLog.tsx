@@ -68,13 +68,19 @@ function getIconForEventType(type: EventType): IconImageId {
 }
 
 /**
- * Determines which side (left/right) an event should align to.
- * Left = Team A (top player), Right = Team B (bottom player)
+ * Determines which side (left/right/center) an event should align to.
+ * Left = Team A (top player), Right = Team B (bottom player), Center = neutral
  */
 function getEventAlignment(
   event: BattleEvent,
   playerAId: number | undefined
-): 'left' | 'right' {
+): 'left' | 'right' | 'center' {
+  // Summary events are always centered
+  if (event.type === 'summary') return 'center'
+
+  // Advance events without owner IDs are matchup displays - center them
+  if (event.type === 'advance' && !event.attacker_team_owner_id) return 'center'
+
   if (!playerAId) return 'left'
 
   // Attack/advance events belong to the attacker's side
@@ -85,8 +91,8 @@ function getEventAlignment(
   if (event.defender_team_owner_id) {
     return event.defender_team_owner_id === playerAId ? 'left' : 'right'
   }
-  // Default to left
-  return 'left'
+
+  return 'center' // Unknown events default to center
 }
 
 export interface BattleLogProps {

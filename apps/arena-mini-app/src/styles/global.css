@@ -3367,6 +3367,23 @@ a:focus:not(:focus-visible),
   margin-bottom: 12px;
 }
 
+/* Profile outer panel - simplified borders and equal spacing */
+.profile-outer-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-outer-panel.rpg-panel-outer {
+  border-width: 6px;
+  padding: 6px;
+}
+
+.profile-outer-panel .rpg-panel-inner,
+.profile-outer-panel .rpg-section-panel {
+  margin-bottom: 0;
+}
+
 /* RPG Tab Hint */
 .rpg-tab-hint {
   padding: 10px 14px;

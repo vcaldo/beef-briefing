@@ -793,6 +793,13 @@ func (s *ArenaService) GetProfile(ctx context.Context, chatID, userID int64) (*A
 		return nil, nil
 	}
 
+	// Generate presigned URL for profile photo
+	if profile.PhotoObjectKey != nil && *profile.PhotoObjectKey != "" {
+		if url, err := s.storageClient.GetPresignedURL(ctx, *profile.PhotoObjectKey, time.Hour); err == nil && url != "" {
+			profile.PhotoURL = &url
+		}
+	}
+
 	// Get recent matches (limit to 10)
 	matches, _, err := s.gameRepo.GetMatchHistory(ctx, chatID, userID, 10, 0)
 	if err != nil {

@@ -397,11 +397,11 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
                         return streak > 0 ? <span className="streak">🔥{streak}</span> : null
                       })()}
                     </div>
-                    <div className="rpg-leaderboard-score">
-                      {leaderboardType === 'ranked'
-                        ? entry.score.toFixed(0)
-                        : `${(entry.score * 100).toFixed(0)}%`}
-                    </div>
+                    {leaderboardType === 'ranked' && (
+                      <div className="rpg-leaderboard-score">
+                        {entry.score.toFixed(0)}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -2047,16 +2047,34 @@ a:focus:not(:focus-visible),
   }
 }
 
-.round-indicator {
+/* Round header with player names on left/right edges */
+.round-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(90, 74, 58, 0.12);
+  margin-bottom: 4px;
+}
+
+.round-header .player-name {
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
   font-weight: 700;
   color: #6b5a4a;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding-bottom: 2px;
-  border-bottom: 1px solid rgba(90, 74, 58, 0.12);
-  margin-bottom: 2px;
+}
+
+.round-header .player-name.is-you {
+  color: var(--arena-orange);
+}
+
+.round-header .round-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(90, 74, 58, 0.5);
 }
 
 .round-events {
@@ -2069,6 +2087,18 @@ a:focus:not(:focus-visible),
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Event row alignment - LEFT (Team A / top player) */
+.event-row.align-left {
+  justify-content: flex-start;
+  flex-direction: row; /* icon first, then text */
+}
+
+/* Event row alignment - RIGHT (Team B / bottom player) */
+.event-row.align-right {
+  justify-content: flex-end;
+  flex-direction: row-reverse; /* text first, then icon */
 }
 
 .event-message {

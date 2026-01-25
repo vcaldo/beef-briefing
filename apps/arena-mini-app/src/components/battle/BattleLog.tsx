@@ -67,6 +67,28 @@ function getIconForEventType(type: EventType): IconImageId {
   }
 }
 
+/**
+ * Determines which side (left/right) an event should align to.
+ * Left = Team A (top player), Right = Team B (bottom player)
+ */
+function getEventAlignment(
+  event: BattleEvent,
+  playerAId: number | undefined
+): 'left' | 'right' {
+  if (!playerAId) return 'left'
+
+  // Attack/advance events belong to the attacker's side
+  if (event.attacker_team_owner_id) {
+    return event.attacker_team_owner_id === playerAId ? 'left' : 'right'
+  }
+  // Damage/death events belong to the defender's side
+  if (event.defender_team_owner_id) {
+    return event.defender_team_owner_id === playerAId ? 'left' : 'right'
+  }
+  // Default to left
+  return 'left'
+}
+
 export interface BattleLogProps {
   /** List of all battle events */
   events: BattleEvent[]
@@ -80,6 +102,16 @@ export interface BattleLogProps {
   animated?: boolean
   /** Custom className for additional styling */
   className?: string
+  /** Player A (top team) user ID */
+  playerAId?: number
+  /** Player B (bottom team) user ID */
+  playerBId?: number
+  /** Player A display name */
+  playerAName?: string
+  /** Player B display name */
+  playerBName?: string
+  /** Current user's ID (to show "You" instead of name) */
+  currentUserId?: number
 }
 
 /**
@@ -92,6 +124,14 @@ interface BattleLogRoundProps {
   isPlayed: boolean
   getIconUrl: (type: EventType) => string
   getEventMessage: (event: BattleEvent) => string
+  /** Player A (left side) user ID */
+  playerAId?: number
+  /** Player A display name (or "You" if current user) */
+  playerALabel: string
+  /** Player B display name (or "You" if current user) */
+  playerBLabel: string
+  /** Whether current user is Player A */
+  isCurrentUserPlayerA: boolean
 }
 
 /**
@@ -104,6 +144,10 @@ function BattleLogRound({
   isPlayed,
   getIconUrl,
   getEventMessage,
+  playerAId,
+  playerALabel,
+  playerBLabel,
+  isCurrentUserPlayerA,
 }: BattleLogRoundProps) {
   const classes = [
     'battle-log-round',
@@ -117,18 +161,32 @@ function BattleLogRound({
 
   return (
     <div className={classes}>
-      <span className="round-indicator">Round {roundGroup.round}</span>
+      <div className="round-header">
+        <span className={`player-name ${isCurrentUserPlayerA ? 'is-you' : ''}`}>
+          {playerALabel}
+        </span>
+        <span className="round-number">R{roundGroup.round}</span>
+        <span className={`player-name ${!isCurrentUserPlayerA ? 'is-you' : ''}`}>
+          {playerBLabel}
+        </span>
+      </div>
       <div className="round-events">
-        {roundGroup.events.map((event, idx) => (
-          <div key={idx} className={`event-row event-row-${event.type}`}>
-            <img
-              src={getIconUrl(event.type)}
-              alt={event.type}
-              className={`event-icon event-icon-${event.type}`}
-            />
-            <span className="event-message">{getEventMessage(event)}</span>
-          </div>
-        ))}
+        {roundGroup.events.map((event, idx) => {
+          const alignment = getEventAlignment(event, playerAId)
+          return (
+            <div
+              key={idx}
+              className={`event-row event-row-${event.type} align-${alignment}`}
+            >
+              <img
+                src={getIconUrl(event.type)}
+                alt={event.type}
+                className={`event-icon event-icon-${event.type}`}
+              />
+              <span className="event-message">{getEventMessage(event)}</span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -141,9 +199,21 @@ export const BattleLog = ({
   getEventMessage = (event) => event.message || event.type,
   animated = true,
   className = '',
+  playerAId,
+  playerBId: _playerBId,
+  playerAName = 'Player A',
+  playerBName = 'Player B',
+  currentUserId,
 }: BattleLogProps) => {
   const contentRef = useRef<HTMLDivElement>(null)
   const { getUrlById } = useImages()
+
+  /**
+   * Compute player labels - show "You" for current user
+   */
+  const isCurrentUserPlayerA = currentUserId !== undefined && currentUserId === playerAId
+  const playerALabel = isCurrentUserPlayerA ? 'You' : playerAName
+  const playerBLabel = !isCurrentUserPlayerA && currentUserId !== undefined ? 'You' : playerBName
 
   /**
    * Derived state: Is the current event still animating?
@@ -221,6 +291,10 @@ export const BattleLog = ({
                 isPlayed={isPlayed}
                 getIconUrl={getIconUrl}
                 getEventMessage={getEventMessage}
+                playerAId={playerAId}
+                playerALabel={playerALabel}
+                playerBLabel={playerBLabel}
+                isCurrentUserPlayerA={isCurrentUserPlayerA}
               />
             )
           })}

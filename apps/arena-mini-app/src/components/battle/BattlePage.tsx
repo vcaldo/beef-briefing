@@ -450,6 +450,11 @@ export function BattlePage({
         currentEventIndex={currentEventIndex}
         currentPhase={currentPhase}
         getEventMessage={getEventMessage}
+        playerAId={battleData.player_a_id}
+        playerBId={battleData.player_b_id}
+        playerAName={battleData.player_a_name}
+        playerBName={battleData.player_b_name}
+        currentUserId={userId}
       />
 
       {/* Victory Screen Overlay */}

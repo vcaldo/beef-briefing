@@ -117,7 +117,7 @@ function BattleLogRound({
 
   return (
     <div className={classes}>
-      <span className="round-indicator">R{roundGroup.round}</span>
+      <span className="round-indicator">Round {roundGroup.round}</span>
       <div className="round-events">
         {roundGroup.events.map((event, idx) => (
           <div key={idx} className={`event-row event-row-${event.type}`}>
@@ -189,13 +189,13 @@ export const BattleLog = ({
   }, [events, currentEventIndex])
 
   /**
-   * Auto-scroll to bottom when new rounds appear
+   * Auto-scroll to bottom when new events appear
    */
   useEffect(() => {
     if (contentRef.current) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight
     }
-  }, [roundGroups.length])
+  }, [visibleEvents.length])
 
   /**
    * Get icon URL for event type

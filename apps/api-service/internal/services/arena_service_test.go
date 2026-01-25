@@ -609,8 +609,8 @@ func (m *mockGameRepository) GetChatsWithTimezone(ctx context.Context) ([]*repos
 }
 
 // Leaderboard operations (stubs for interface compliance)
-func (m *mockGameRepository) GetLeaderboard(ctx context.Context, chatID int64, matchType repository.MatchType, limit, offset int) ([]*repository.LeaderboardEntry, error) {
-	return []*repository.LeaderboardEntry{}, nil
+func (m *mockGameRepository) GetLeaderboard(ctx context.Context, chatID int64, matchType repository.MatchType, limit, offset int) ([]*repository.LeaderboardEntry, int, error) {
+	return []*repository.LeaderboardEntry{}, 0, nil
 }
 
 func (m *mockGameRepository) UpdateLeaderboard(ctx context.Context, userID, chatID int64, matchType repository.MatchType, isWin bool, opponentID *int64, isTournamentWin bool, isDraw bool) error {

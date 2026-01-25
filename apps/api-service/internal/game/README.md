@@ -619,6 +619,33 @@ GET /api/v1/mini-app/arena/match/<match_id>/battle
 
 ### Leaderboards & Stats
 
+#### Ranking System
+
+The leaderboard uses different ranking algorithms depending on match type:
+
+**Ranked Matches** (Tournaments):
+- Simple ordering by `tournaments_won` (highest first)
+- Tiebreakers: `wins DESC`, `losses ASC`
+- `score` field = tournament wins count
+
+**Casual Matches** (Regular):
+- Uses **Wilson Score** for confidence-based ranking
+- Naturally handles sample size - a player with 3/3 wins (100%) won't outrank someone with 50/60 wins (83%) because the confidence interval is wider with fewer games
+- **Draws are excluded** from calculation (count as 0)
+- `score` field = Wilson Score (0.0 - 1.0 range)
+- Tiebreakers: `wins DESC`, `losses ASC`
+
+**Wilson Score Formula** (95% confidence interval lower bound):
+```
+n = wins + losses
+p = wins / n
+z = 1.96 (95% confidence)
+
+score = ((p + z²/2n) - z * sqrt((p(1-p) + z²/4n) / n)) / (1 + z²/n)
+```
+
+*Wilson Score SQL function: [migrations/sql/014_wilson_score.sql](../migrations/sql/014_wilson_score.sql)*
+
 #### Get Leaderboard
 ```http
 GET /api/v1/mini-app/arena/leaderboard?chat_id=<id>&type=ranked&limit=50&offset=0
@@ -633,26 +660,51 @@ GET /api/v1/mini-app/arena/leaderboard?chat_id=<id>&type=ranked&limit=50&offset=
 ```json
 {
   "type": "ranked",
+  "total": 45,
+  "page": 0,
+  "limit": 50,
+  "has_more": false,
   "entries": [
     {
       "user_id": 123456,
+      "chat_id": -1001234567890,
       "first_name": "Alice",
       "username": "alice",
-      "wins": 15,
-      "losses": 3,
-      "win_rate": 83.33,
-      "current_streak": 5,
-      "best_streak": 8,
-      "tournaments_played": 12,
-      "tournaments_won": 3,
-      "rank": 1
+      "photo_url": "https://...",
+      "rank": 1,
+      "score": 3.0,
+      "ranked_wins": 15,
+      "ranked_losses": 3,
+      "ranked_draws": 0,
+      "ranked_tournaments_played": 12,
+      "ranked_tournaments_won": 3,
+      "ranked_current_streak": 5,
+      "ranked_best_streak": 8,
+      "regular_wins": 42,
+      "regular_losses": 18,
+      "regular_draws": 2,
+      "regular_matches_played": 62,
+      "regular_current_streak": 3,
+      "regular_best_streak": 12,
+      "first_match_at": "2024-01-01T12:00:00Z",
+      "last_match_at": "2024-01-15T10:30:00Z"
     }
     // ... more entries
   ]
 }
 ```
 
-*Handler: [arena_handler.go:698-733](../handlers/arena_handler.go#L698-L733)*
+**Ranking Fields**:
+| Field | Description |
+|-------|-------------|
+| `rank` | 1-indexed position in leaderboard (calculated via `ROW_NUMBER()`) |
+| `score` | Ranking score: Wilson Score (0-1) for regular, tournaments_won for ranked |
+| `total` | Total number of entries in leaderboard |
+| `page` | Current page number (0-indexed, calculated as `offset / limit`) |
+| `has_more` | Whether there are more entries beyond current page |
+
+*Handler: [match_handler.go:251-290](../handlers/match_handler.go#L251-L290)*
+*Query: [match_repo.go:272-348](../repository/match_repo.go#L272-L348)*
 
 #### Get Match History
 ```http
@@ -975,6 +1027,55 @@ interface EnhancedTeamCard extends Card {
   atk_if_upgraded: number;               // ATK value if upgraded once more
   hp_if_upgraded: number;                // HP value if upgraded once more
   max_hp_if_upgraded: number;            // MaxHP value if upgraded once more
+}
+```
+
+### LeaderboardEntry
+```typescript
+interface LeaderboardEntry {
+  user_id: number;
+  chat_id: number;
+  first_name: string;
+  username?: string;
+  photo_url?: string;
+
+  // Ranking (calculated per query)
+  rank: number;                      // 1-indexed position
+  score: number;                     // Wilson Score (0-1) for regular, tournaments_won for ranked
+
+  // Ranked match stats
+  ranked_wins: number;
+  ranked_losses: number;
+  ranked_draws: number;
+  ranked_tournaments_played: number;
+  ranked_tournaments_won: number;
+  ranked_current_streak: number;
+  ranked_best_streak: number;
+
+  // Casual match stats
+  regular_wins: number;
+  regular_losses: number;
+  regular_draws: number;
+  regular_matches_played: number;
+  regular_current_streak: number;
+  regular_best_streak: number;
+
+  // Metadata
+  head_to_head?: Record<string, any>;  // H2H records vs other users
+  first_match_at?: string;             // ISO 8601
+  last_match_at?: string;              // ISO 8601
+}
+```
+
+### LeaderboardResponse
+```typescript
+interface LeaderboardResponse {
+  type: "ranked" | "regular";
+  entries: LeaderboardEntry[];
+  total: number;                       // Total entries for pagination
+  page: number;                        // Current page (offset / limit)
+  limit: number;                       // Page size
+  has_more: boolean;                   // Whether more entries exist
 }
 ```
 
@@ -1341,6 +1442,10 @@ Since this is a REST API, implement polling for live updates:
 - **Battle Types**: [battle/types.go](battle/types.go) - Cards, teams, events, results
 - **Shop Types**: [shop/types.go](shop/types.go) - Shop state, upgrades
 - **Repository Models**: [repository/game_repo.go:134-202](../repository/game_repo.go#L134-L202) - Match, Participant
+- **Leaderboard Entry**: [repository/game_repo.go:249-277](../repository/game_repo.go#L249-L277) - Stats, rank, score
+
+### Database Functions
+- **Wilson Score**: [migrations/sql/014_wilson_score.sql](../migrations/sql/014_wilson_score.sql) - Confidence-based ranking for casual matches
 
 ---
 

@@ -266,6 +266,9 @@ type LeaderboardEntry struct {
 	HeadToHead              json.RawMessage `json:"head_to_head"`
 	FirstMatchAt            *time.Time      `json:"first_match_at,omitempty"`
 	LastMatchAt             *time.Time      `json:"last_match_at,omitempty"`
+	// Ranking fields
+	Rank  int     `json:"rank"`  // 1-indexed position in leaderboard
+	Score float64 `json:"score"` // Wilson Score for regular, tournaments_won for ranked
 	// User info from join
 	FirstName      string  `json:"first_name,omitempty"`
 	Username       string  `json:"username,omitempty"`
@@ -417,7 +420,7 @@ func (r *GameRepository) GetMatchRounds(ctx context.Context, matchID string) ([]
 	return r.matchRepo.GetMatchRounds(ctx, matchID)
 }
 
-func (r *GameRepository) GetLeaderboard(ctx context.Context, chatID int64, matchType MatchType, limit, offset int) ([]*LeaderboardEntry, error) {
+func (r *GameRepository) GetLeaderboard(ctx context.Context, chatID int64, matchType MatchType, limit, offset int) ([]*LeaderboardEntry, int, error) {
 	return r.matchRepo.GetLeaderboard(ctx, chatID, matchType, limit, offset)
 }
 

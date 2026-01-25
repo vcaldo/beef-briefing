@@ -431,23 +431,23 @@ func (s *ArenaService) dealCardsToParticipants(ctx context.Context, matchID stri
 	return nil
 }
 
-// GetLeaderboard retrieves leaderboard for a chat
-func (s *ArenaService) GetLeaderboard(ctx context.Context, chatID int64, matchType string, limit, offset int) ([]*repository.LeaderboardEntry, error) {
+// GetLeaderboard retrieves leaderboard for a chat with total count
+func (s *ArenaService) GetLeaderboard(ctx context.Context, chatID int64, matchType string, limit, offset int) ([]*repository.LeaderboardEntry, int, error) {
 	defer nrutil.StartSegment(ctx, "service:arena:get-leaderboard")()
 
 	mt := repository.MatchTypeRanked
 	if matchType == "regular" {
 		mt = repository.MatchTypeRegular
 	}
-	entries, err := s.gameRepo.GetLeaderboard(ctx, chatID, mt, limit, offset)
+	entries, total, err := s.gameRepo.GetLeaderboard(ctx, chatID, mt, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// Populate photo URLs
 	s.populateLeaderboardPhotoURLs(ctx, entries)
 
-	return entries, nil
+	return entries, total, nil
 }
 
 // =============================================================================

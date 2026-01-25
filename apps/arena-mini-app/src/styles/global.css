@@ -52,6 +52,7 @@
 
   /* Spacing */
   --tab-bar-height: 80px;
+  --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 
   /* Spacing scale (4px base) */
@@ -5570,6 +5571,7 @@ button,
   display: flex;
   flex-direction: column;
   background-color: var(--arena-bg-dark) !important;
+  padding-top: var(--safe-area-top);
 }
 
 /* Page placeholder for unimplemented pages */

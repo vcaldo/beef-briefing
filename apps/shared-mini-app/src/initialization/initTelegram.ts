@@ -64,6 +64,15 @@ export async function initializeTelegramSDK(): Promise<void> {
       if (viewport.expand.isAvailable()) {
         viewport.expand()
       }
+
+      // Request full screen mode (hides Telegram header)
+      if (viewport.requestFullscreen.isAvailable()) {
+        try {
+          await viewport.requestFullscreen()
+        } catch (error) {
+          console.warn('Fullscreen request failed:', error)
+        }
+      }
     }
 
     if (backButton.mount.isAvailable()) {

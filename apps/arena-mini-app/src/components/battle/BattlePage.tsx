@@ -60,7 +60,7 @@ export function BattlePage({
   userId,
   activeMatch,
   gameConstants: _gameConstants,
-  onNavigateToStats,
+  onNavigateToStats: _onNavigateToStats,
   onNavigateToLobby,
   onMatchChange,
   isPlaying: parentIsPlaying,

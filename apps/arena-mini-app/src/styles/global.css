@@ -1891,25 +1891,10 @@ a:focus:not(:focus-visible),
   display: flex;
   gap: 4px;
   position: absolute;
-  bottom: -12px;
+  bottom: -8px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 2;
-}
-
-.team-phase-slot .upgrade-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 8px;
-  border-radius: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  min-width: 32px;
-  min-height: 28px;
 }
 
 .team-phase-slot .upgrade-btn:disabled {
@@ -1917,86 +1902,18 @@ a:focus:not(:focus-visible),
   cursor: not-allowed;
 }
 
-.team-phase-slot .upgrade-btn.upgrade-atk {
-  background: rgba(249, 115, 22, 0.2);
-  color: var(--arena-orange);
-  border: 1px solid rgba(249, 115, 22, 0.3);
+/* Square upgrade button styles */
+.team-phase-slot .upgrade-btn.game-button-square {
+  font-size: 11px;
+  font-weight: 600;
 }
 
-.team-phase-slot .upgrade-btn.upgrade-atk:hover:not(:disabled) {
-  background: rgba(249, 115, 22, 0.3);
-}
-
-.team-phase-slot .upgrade-btn.upgrade-hp {
-  background: rgba(34, 197, 94, 0.2);
-  color: var(--hp-full);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
-
-.team-phase-slot .upgrade-btn.upgrade-hp:hover:not(:disabled) {
-  background: rgba(34, 197, 94, 0.3);
-}
-
-/* Upgrade button content with icon */
-.upgrade-btn-content {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.upgrade-icon {
-  width: 12px;
-  height: 12px;
-  filter: brightness(0) invert(1);
-  opacity: 0.9;
-}
-
-/* Override GameButton styles for upgrade buttons in team phase */
-.team-phase-slot .upgrade-btn.game-button {
-  min-width: auto;
-  min-height: 28px;
-  padding: 4px 8px;
-  font-size: 10px;
-  height: auto;
-}
-
-.team-phase-slot .upgrade-btn.game-button .game-button-content {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-/* Team Phase Footer */
-.team-phase-footer {
-  padding: 20px;
-  background: none;
-  margin-top: auto;
-  position: relative;
-  z-index: 1;
-}
-
-.team-phase-footer .submit-btn {
-  width: 100%;
-}
-
-.team-phase-footer .submit-status {
+.team-phase-slot .upgrade-btn.game-button-square .game-button-content {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  background: rgba(34, 197, 94, 0.15);
-  padding: 12px 16px;
-  border-radius: 12px;
-}
-
-.team-phase-footer .submit-status-icon {
-  font-size: 18px;
-  color: var(--hp-full);
-}
-
-.team-phase-footer .submit-status-text {
-  font-size: 14px;
-  color: var(--hp-full);
+  gap: 1px;
+  font-size: 11px;
 }
 
 /* =============================================================================
@@ -5183,21 +5100,15 @@ button,
 }
 
 /* ============================================
-   RPG Team Phase Modal Styles
+   RPG Team Phase Page Styles
    ============================================ */
 
-.rpg-team-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  z-index: 100;
+.rpg-team-page {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  min-height: 100%;
   padding: 16px;
+  box-sizing: border-box;
 }
 
 .rpg-team-modal-outer {
@@ -5264,6 +5175,40 @@ button,
   color: #3a5a6a;
   margin-bottom: 12px;
   text-align: center;
+}
+
+/* Team phase waiting panel - blue inner variant */
+.rpg-team-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.rpg-team-waiting-icon {
+  font-size: 32px;
+}
+
+.rpg-team-waiting-text {
+  font-size: 14px;
+  color: #3a5a6a;
+  margin: 0;
+}
+
+/* Team phase actions - outside panel */
+.rpg-team-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+}
+
+.rpg-team-actions .submit-btn {
+  width: 100%;
+  max-width: 300px;
 }
 
 /* ============================================

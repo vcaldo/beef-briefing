@@ -29,8 +29,8 @@ export class BaseApiClient {
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Authentication failed' }))
-      throw new Error(error.detail || 'Authentication failed')
+      const errorData = await response.json().catch(() => ({ error: 'Authentication failed' }))
+      throw new Error(errorData.error || errorData.detail || 'Authentication failed')
     }
 
     const data: AuthResponse = await response.json()
@@ -64,8 +64,8 @@ export class BaseApiClient {
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Request failed' }))
-      throw new Error(error.detail || `Request failed: ${response.statusText}`)
+      const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
+      throw new Error(errorData.error || errorData.detail || `Request failed: ${response.statusText}`)
     }
 
     return response.json()

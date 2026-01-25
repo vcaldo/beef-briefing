@@ -656,6 +656,8 @@ export interface LeaderboardEntry {
   rank: number
   /** Telegram user ID */
   user_id: number
+  /** Telegram chat ID */
+  chat_id: number
   /** Display name */
   first_name: string
   /** Telegram username (optional) */
@@ -688,10 +690,14 @@ export interface LeaderboardEntry {
   regular_current_streak: number
   /** Best casual win streak ever */
   regular_best_streak: number
-  /** Overall ranking score */
+  /** Overall ranking score (Wilson Score 0-1 for regular, tournaments_won for ranked) */
   score: number
   /** Tier name (Lendário, Bichão, etc.) */
   tier?: string
+  /** First match timestamp */
+  first_match_at?: string
+  /** Last match timestamp */
+  last_match_at?: string
 }
 
 /**
@@ -708,8 +714,10 @@ export interface LeaderboardResponse {
   page: number
   /** Entries per page */
   limit: number
-  /** Leaderboard type (ranked or casual) */
-  type: 'ranked' | 'casual'
+  /** Whether there are more entries beyond current page */
+  has_more: boolean
+  /** Leaderboard type (ranked or regular/casual) */
+  type: 'ranked' | 'regular'
 }
 
 /**

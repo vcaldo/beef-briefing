@@ -893,6 +893,24 @@ arena-images-clean-prod: ## Delete all arena images from production storage (Lin
 	@$(SCRIPTS_DIR)/upload-arena-images.sh --prod --clean
 
 # =============================================================================
+# ARENA DATABASE CLEANUP (arena-clean-db-*)
+# =============================================================================
+arena-clean-db-dev: ## Clean all arena game data from dev database (matches, leaderboard, tournaments)
+	@echo "Cleaning arena game data from development database..."
+	@$(DC) exec -T $(POSTGRES_SERVICE) psql -U $${DB_USER:-postgres} -d $${DB_NAME:-beef_briefing} -c "\
+		TRUNCATE game_tournament_participants, game_ranked_tournaments, game_leaderboard, game_match_rounds, game_match_participants, game_matches CASCADE; \
+		DELETE FROM schema_migrations WHERE version = '014_wilson_score.sql';"
+	@echo "Arena game data cleaned. Run 'make up' or 'make deploy' to re-apply migration 014."
+
+arena-clean-db-prod: ## Clean all arena game data from prod database (requires pg-tunnel)
+	@echo "Cleaning arena game data from production database..."
+	@echo "Note: Requires 'make pg-tunnel' running in another terminal"
+	@PGPASSWORD=$$(grep DB_PASSWORD $(PROD_ENV_FILE) | cut -d= -f2) psql -h localhost -p 5433 -U postgres -d beef_briefing -c "\
+		TRUNCATE game_tournament_participants, game_ranked_tournaments, game_leaderboard, game_match_rounds, game_match_participants, game_matches CASCADE; \
+		DELETE FROM schema_migrations WHERE version = '014_wilson_score.sql';"
+	@echo "Arena game data cleaned. Run 'make deploy' to re-apply migration 014."
+
+# =============================================================================
 # ARENA ASSET VERSIONS (arena-assets-*)
 # =============================================================================
 arena-assets-version: ## Check arena asset versions in development storage

@@ -301,7 +301,6 @@ export function ShopPage({
         <RPGPanel variant="inner" className="rpg-shop-header">
           <div className="rpg-shop-header-row">
             <div className="rpg-shop-header-left">
-              <h1 className="rpg-shop-title">Build Your Team</h1>
               {isSubmitted && (
                 <span className="rpg-shop-submitted-badge">Team Submitted</span>
               )}
@@ -343,24 +342,6 @@ export function ShopPage({
         {/* Shop cards grid - only show if not submitted */}
         {!isSubmitted && (
           <RPGPanel variant="inner" className="rpg-shop-cards-panel">
-            <div className="rpg-shop-section-header">
-              <h2 className="rpg-section-title">Available Cards</h2>
-              {/* Reroll button */}
-              <GameButton
-                variant="primary"
-                size="sm"
-                onClick={handleReroll}
-                disabled={!canReroll || coins < rerollCost || actionLoading !== null}
-                title={canReroll ? `Reroll (${rerollCost} coin)` : 'Cannot reroll after buying'}
-              >
-                {actionLoading === 'reroll' ? (
-                  <LoadingSpinner size="sm" inline />
-                ) : (
-                  <>🔄 Reroll ({rerollCost})</>
-                )}
-              </GameButton>
-            </div>
-
             <div className="rpg-shop-grid">
               {shopCards.map((card: EnhancedShopCard) => {
                 const isPurchased = card.is_purchased
@@ -458,20 +439,38 @@ export function ShopPage({
 
       </RPGPanel>
 
-      {/* Done Shopping button - appears when team is complete (outside shop box) */}
-      {!isSubmitted && teamCards.length >= teamSize && (
+      {/* Bottom action buttons */}
+      {!isSubmitted && (canReroll || teamCards.length >= teamSize) && (
         <div className="rpg-shop-actions">
-          <GameButton
-            variant="primary"
-            size="lg"
-            onClick={() => {
-              playSequence(['arena_button_click', 'arena_success'])
-              setIsTeamPhase(true)
-            }}
-            className="done-shopping-btn"
-          >
-            Done Shopping
-          </GameButton>
+          {canReroll && (
+            <GameButton
+              variant="primary"
+              size="lg"
+              onClick={handleReroll}
+              disabled={coins < rerollCost || actionLoading !== null}
+              title={`Reroll (${rerollCost} coin)`}
+              className="reroll-btn"
+            >
+              {actionLoading === 'reroll' ? (
+                <LoadingSpinner size="sm" inline />
+              ) : (
+                `Reroll (${rerollCost})`
+              )}
+            </GameButton>
+          )}
+          {teamCards.length >= teamSize && (
+            <GameButton
+              variant="primary"
+              size="lg"
+              onClick={() => {
+                playSequence(['arena_button_click', 'arena_success'])
+                setIsTeamPhase(true)
+              }}
+              className="done-shopping-btn"
+            >
+              Done Shopping
+            </GameButton>
+          )}
         </div>
       )}
     </div>

@@ -12,3 +12,6 @@ export type { UseSoundOptions, UseSoundReturn, SoundId, SoundCategory } from './
 
 export { useImages } from './useImages';
 export type { UseImagesReturn } from './useImages';
+
+export { usePageBackground } from './usePageBackground';
+export type { UsePageBackgroundOptions, UsePageBackgroundReturn } from './usePageBackground';

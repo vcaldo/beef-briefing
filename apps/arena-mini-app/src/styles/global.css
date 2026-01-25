@@ -88,6 +88,9 @@
   --arena-orange-20: rgba(249, 115, 22, 0.2);
   --arena-orange-30: rgba(249, 115, 22, 0.3);
   --arena-orange-40: rgba(249, 115, 22, 0.4);
+
+  /* Page background URLs (set dynamically via JS for cache-busting) */
+  --bg-arena-url: none;
 }
 
 /* =============================================================================
@@ -121,6 +124,46 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* =============================================================================
+   Page Background System
+
+   Reusable background classes for different pages. Backgrounds are loaded
+   from object storage and applied via CSS custom properties set by JS.
+
+   Usage:
+   1. Call usePageBackground({ backgroundId: 'arena' }) in your component
+   2. Add classes: className="page-bg page-bg--arena"
+   ============================================================================= */
+
+/* Base background container - adds a pseudo-element for the background image */
+.page-bg {
+  position: relative;
+}
+
+.page-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* Arena background (for battle page) */
+.page-bg--arena::before {
+  background-image: var(--bg-arena-url);
+  /* Darken the image to maintain UI contrast */
+  filter: brightness(0.4);
+}
+
+/* Ensure content remains above the background */
+.page-bg > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* =============================================================================
@@ -1913,11 +1956,18 @@ a:focus:not(:focus-visible),
   flex-direction: column;
   gap: var(--battle-gap, 24px);
   padding: 16px;
+  /* Background is set via .page-bg--arena when background image is loaded */
+  /* Fallback gradient when no background image is available */
   background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
   flex: 1;
   min-height: 0; /* Allow shrinking */
   min-height: 400px;
   position: relative;
+}
+
+/* When using page-bg--arena, make background transparent so the image shows */
+.battle-arena.page-bg--arena {
+  background: transparent;
 }
 
 .battle-team {

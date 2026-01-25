@@ -19,7 +19,7 @@ import { CompactCard } from '../common/CompactCard'
 import { BattleLog } from './BattleLog'
 import { BattleEffect } from './BattleEffect'
 import type { EffectPosition } from './BattleEffect'
-import { useBattleAnimation, getCardKey } from '../../hooks'
+import { useBattleAnimation, getCardKey, usePageBackground } from '../../hooks'
 import { useSoundContext } from '../../contexts'
 import type {
   BattleResult,
@@ -81,6 +81,9 @@ export function BattlePage({
   // Sound context for battle audio
   const { play: playSound, preloadCategory } = useSoundContext()
   const soundsPreloadedRef = useRef(false)
+
+  // Apply arena background image
+  usePageBackground({ backgroundId: 'arena' })
 
   // Refs for card positions (used to place battle effects)
   const battleArenaRef = useRef<HTMLDivElement>(null)
@@ -402,7 +405,7 @@ export function BattlePage({
       {/* Battle Arena */}
       <div
         ref={battleArenaRef}
-        className="battle-arena battle-effect-container"
+        className="battle-arena battle-effect-container page-bg page-bg--arena"
         style={{
           // Scale HP bar transition duration with playback speed
           // At 1x (value=1000), duration is 300ms; at 2x (value=500), duration is 150ms

@@ -22,7 +22,7 @@
  * ```
  */
 
-import { ImageCategory, ImageId, IMAGE_CONFIGS } from '../types/images'
+import { ImageCategory, ImageId, IMAGE_CONFIGS, BackgroundImageId } from '../types/images'
 
 /**
  * Get the base URL for images from environment variable.
@@ -43,8 +43,9 @@ function getImageVersion(): string {
 /**
  * Build a complete URL for an image asset.
  *
- * @param category - Image category (buttons, panels, bars, icons, effects)
+ * @param category - Image category (buttons, panels, bars, icons, effects, bg)
  * @param filename - Image filename without extension
+ * @param extension - File extension (default: 'png')
  * @returns Full URL with cache-busting version parameter
  *
  * @example
@@ -53,11 +54,18 @@ function getImageVersion(): string {
  *
  * getImageUrl('effects', 'explosion/explosion00')
  * // => "http://localhost:9000/telegram-media/images/arena/effects/explosion/explosion00.png?v=1"
+ *
+ * getImageUrl('bg', 'arena', 'webp')
+ * // => "http://localhost:9000/telegram-media/images/arena/bg/arena.webp?v=1"
  */
-export function getImageUrl(category: ImageCategory, filename: string): string {
+export function getImageUrl(
+  category: ImageCategory,
+  filename: string,
+  extension: 'png' | 'webp' = 'png'
+): string {
   const baseUrl = getBaseUrl()
   const version = getImageVersion()
-  return `${baseUrl}/${category}/${filename}.png?v=${version}`
+  return `${baseUrl}/${category}/${filename}.${extension}?v=${version}`
 }
 
 /**
@@ -69,6 +77,9 @@ export function getImageUrl(category: ImageCategory, filename: string): string {
  * @example
  * getImageUrlById('coin')
  * // => "http://localhost:9000/telegram-media/images/arena/icons/coin.png?v=1"
+ *
+ * getImageUrlById('arena')
+ * // => "http://localhost:9000/telegram-media/images/arena/bg/arena.webp?v=1"
  */
 export function getImageUrlById(imageId: ImageId): string {
   const config = IMAGE_CONFIGS[imageId]
@@ -76,7 +87,21 @@ export function getImageUrlById(imageId: ImageId): string {
     console.error(`[images] Unknown imageId: ${imageId}`)
     return ''
   }
-  return getImageUrl(config.category, config.filename)
+  return getImageUrl(config.category, config.filename, config.extension ?? 'png')
+}
+
+/**
+ * Get URL for a background image by its ID.
+ *
+ * @param backgroundId - Background image ID
+ * @returns Full URL with cache-busting version parameter
+ *
+ * @example
+ * getBackgroundUrl('arena')
+ * // => "http://localhost:9000/telegram-media/images/arena/bg/arena.webp?v=1"
+ */
+export function getBackgroundUrl(backgroundId: BackgroundImageId): string {
+  return getImageUrlById(backgroundId)
 }
 
 /**

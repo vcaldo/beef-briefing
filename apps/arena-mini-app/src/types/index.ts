@@ -568,6 +568,74 @@ export interface BattleEvent {
 }
 
 /**
+ * A single event within a combat.
+ * Same as BattleEvent but without the `round` field since events are grouped by combat.
+ *
+ * @see {@link Combat} Parent combat containing events
+ * @see {@link BattleEvent} Original event type with round field
+ */
+export interface CombatEvent {
+  /** Type of event (attack, death, victory, etc.) */
+  type: EventType
+  /** Human-readable event description */
+  message?: string
+  /** Card ID of the attacker (attack events) */
+  attacker_card_id?: number
+  /** Card ID of the defender (attack events) */
+  defender_card_id?: number
+  /** User ID who owns the attacking card */
+  attacker_team_owner_id?: number
+  /** User ID who owns the defending card */
+  defender_team_owner_id?: number
+  /** Damage dealt in this event */
+  damage?: number
+  /** Defender's HP before damage */
+  hp_before?: number
+  /** Defender's HP after damage */
+  hp_after?: number
+  /** Whether this is a summary event */
+  is_summary?: boolean
+  /** Card that dealt the killing blow (death events) */
+  killer_card_id?: number | null
+  /** Total damage dealt by this card (summary) */
+  total_damage_dealt?: number
+  /** Total damage taken by this card (summary) */
+  total_damage_taken?: number
+  /** Rounds this duel lasted (summary) */
+  rounds_in_duel?: number
+  /** Consecutive kills by this card */
+  kill_streak?: number
+  /** All card states after this event resolves */
+  card_states?: CardSnapshot[]
+}
+
+/**
+ * Combat outcome indicating how a combat ended.
+ */
+export type CombatOutcome = 'card_a_died' | 'card_b_died' | 'both_died' | 'victory'
+
+/**
+ * A combat represents a duel between two cards until one or both die.
+ * A battle consists of multiple combats as winning cards advance to fight next opponents.
+ *
+ * @example
+ * // Render combat header showing dueling cards
+ * const combat = combats[0];
+ * console.log(`Combat ${combat.combat_number}: ${combat.outcome}`);
+ *
+ * @see {@link CombatEvent} Events within a combat
+ * @see {@link BattleResult} Contains the combats array
+ */
+export interface Combat {
+  /** 1-indexed position of this combat in the battle */
+  combat_number: number
+  /** Ordered sequence of events in this combat */
+  events: CombatEvent[]
+  /** How the combat ended */
+  outcome: CombatOutcome
+}
+
+/**
  * A team's state during or after battle.
  *
  * Contains owner information and all cards in the team.
@@ -609,7 +677,11 @@ export interface BattleResult {
   winner_id?: number | null
   /** Whether battle ended in a draw */
   is_draw: boolean
-  /** Ordered list of battle events for replay */
+  /** Combats grouped by card duels (new primary structure) */
+  combats: Combat[]
+  /** Total number of combats */
+  num_combats: number
+  /** Ordered list of battle events for replay (legacy, used by animation hook) */
   events: BattleEvent[]
   /** Total number of combat rounds */
   num_rounds: number

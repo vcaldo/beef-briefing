@@ -1,49 +1,26 @@
 /**
  * Battle Log Component
  *
- * Displays a compact, scrollable log of battle events grouped by round.
+ * Displays a compact, scrollable log of battle events grouped by combat.
  * Features:
- * - Events grouped by round with icons showing what happened
+ * - Events grouped by combat (card duels) with centered matchup headers
  * - RPG-themed styling with brown/beige borders
- * - Auto-scroll to latest round
+ * - Auto-scroll to latest combat
  * - Animation support for live battle playback
  * - Reusable for battle history (static display)
  */
 
 import { useRef, useEffect, useMemo } from 'react'
-import type { BattleEvent, EventAnimationPhase, EventType } from '../../types'
+import type {
+  Combat,
+  CombatEvent,
+  BattleEvent,
+  EventAnimationPhase,
+  EventType,
+} from '../../types'
 import type { IconImageId } from '../../types/images'
 import { useImages } from '../../hooks/useImages'
 import { RPGPanel } from '../ui/RPGPanel'
-
-/**
- * Group of events for a single round
- */
-interface RoundGroup {
-  round: number
-  events: BattleEvent[]
-}
-
-/**
- * Groups battle events by their round number
- */
-function groupEventsByRound(events: BattleEvent[]): RoundGroup[] {
-  const groups = new Map<number, BattleEvent[]>()
-
-  for (const event of events) {
-    const existing = groups.get(event.round)
-    if (existing) {
-      existing.push(event)
-    } else {
-      groups.set(event.round, [event])
-    }
-  }
-
-  // Convert to array and sort by round number
-  return Array.from(groups.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([round, events]) => ({ round, events }))
-}
 
 /**
  * Maps event type to icon ID
@@ -71,8 +48,8 @@ function getIconForEventType(type: EventType): IconImageId {
  * Determines which side (left/right/center) an event should align to.
  * Left = Team A (top player), Right = Team B (bottom player), Center = neutral
  */
-function getEventAlignment(
-  event: BattleEvent,
+function getCombatEventAlignment(
+  event: CombatEvent,
   playerAId: number | undefined
 ): 'left' | 'right' | 'center' {
   // Summary events are always centered
@@ -80,6 +57,9 @@ function getEventAlignment(
 
   // Advance events without owner IDs are matchup displays - center them
   if (event.type === 'advance' && !event.attacker_team_owner_id) return 'center'
+
+  // Victory events are centered
+  if (event.type === 'victory') return 'center'
 
   if (!playerAId) return 'left'
 
@@ -95,15 +75,50 @@ function getEventAlignment(
   return 'center' // Unknown events default to center
 }
 
+/**
+ * Extracts the matchup display text from a combat's events.
+ * Returns "Card A vs Card B" based on the first attack event.
+ */
+function getCombatMatchup(
+  combat: Combat,
+  playerAId: number | undefined,
+  playerAName: string,
+  playerBName: string
+): { leftName: string; rightName: string } | null {
+  // Find the first attack event to determine who's fighting
+  const firstAttack = combat.events.find((e) => e.type === 'attack')
+  if (!firstAttack) return null
+
+  // Determine card names from the message if available
+  // Format is usually "CardA attacks CardB for X damage"
+  const message = firstAttack.message || ''
+  const attackMatch = message.match(/^(.+?) attacks (.+?) for/)
+
+  if (attackMatch) {
+    const [, attackerName, defenderName] = attackMatch
+    // Determine which side is which based on attacker_team_owner_id
+    if (firstAttack.attacker_team_owner_id === playerAId) {
+      return { leftName: attackerName, rightName: defenderName }
+    } else {
+      return { leftName: defenderName, rightName: attackerName }
+    }
+  }
+
+  // Fallback to player names
+  return { leftName: playerAName, rightName: playerBName }
+}
+
 export interface BattleLogProps {
-  /** List of all battle events */
+  /** List of combats (primary data source) */
+  combats: Combat[]
+  /** List of all battle events (for animation tracking) */
   events: BattleEvent[]
   /** Current event index being displayed (0-based). Optional for static display. */
   currentEventIndex?: number
   /** Current animation phase. Optional for static display (battle history). */
   currentPhase?: EventAnimationPhase
   /** Function to format event message (optional, for tooltip display) */
-  getEventMessage?: (event: BattleEvent) => string
+  getEventMessage?: (event: CombatEvent) => string
   /** Whether to show animation indicators (default: true) */
   animated?: boolean
   /** Custom className for additional styling */
@@ -121,15 +136,16 @@ export interface BattleLogProps {
 }
 
 /**
- * Props for the internal BattleLogRound component
+ * Props for the internal BattleLogCombat component
  */
-interface BattleLogRoundProps {
-  roundGroup: RoundGroup
-  isCurrentRound: boolean
+interface BattleLogCombatProps {
+  combat: Combat
+  visibleEventCount: number
+  isCurrentCombat: boolean
   isAnimating: boolean
   isPlayed: boolean
   getIconUrl: (type: EventType) => string
-  getEventMessage: (event: BattleEvent) => string
+  getEventMessage: (event: CombatEvent) => string
   /** Player A (left side) user ID */
   playerAId?: number
   /** Player A display name (or "You" if current user) */
@@ -141,11 +157,12 @@ interface BattleLogRoundProps {
 }
 
 /**
- * Single round frame in the battle log with all events listed vertically
+ * Single combat frame in the battle log with all events listed vertically
  */
-function BattleLogRound({
-  roundGroup,
-  isCurrentRound,
+function BattleLogCombat({
+  combat,
+  visibleEventCount,
+  isCurrentCombat,
   isAnimating,
   isPlayed,
   getIconUrl,
@@ -154,31 +171,43 @@ function BattleLogRound({
   playerALabel,
   playerBLabel,
   isCurrentUserPlayerA,
-}: BattleLogRoundProps) {
+}: BattleLogCombatProps) {
   const classes = [
-    'battle-log-round',
-    isCurrentRound ? 'current' : '',
+    'battle-log-combat',
+    isCurrentCombat ? 'current' : '',
     isAnimating ? 'animating' : '',
     isPlayed ? 'played' : '',
-    isCurrentRound && !isPlayed ? 'slide-in' : '',
+    isCurrentCombat && !isPlayed ? 'slide-in' : '',
   ]
     .filter(Boolean)
     .join(' ')
 
+  // Get matchup info from combat events
+  const matchup = getCombatMatchup(combat, playerAId, playerALabel, playerBLabel)
+
+  // Determine visible events within this combat
+  const visibleEvents = combat.events.slice(0, visibleEventCount)
+
   return (
     <div className={classes}>
-      <div className="round-header">
-        <span className={`player-name ${isCurrentUserPlayerA ? 'is-you' : ''}`}>
-          {playerALabel}
-        </span>
-        <span className="round-number">R{roundGroup.round}</span>
-        <span className={`player-name ${!isCurrentUserPlayerA ? 'is-you' : ''}`}>
-          {playerBLabel}
-        </span>
+      <div className="combat-header">
+        {matchup ? (
+          <div className="combat-matchup">
+            <span className={`card-name ${isCurrentUserPlayerA ? 'is-you' : ''}`}>
+              {matchup.leftName}
+            </span>
+            <span className="vs">vs</span>
+            <span className={`card-name ${!isCurrentUserPlayerA ? 'is-you' : ''}`}>
+              {matchup.rightName}
+            </span>
+          </div>
+        ) : (
+          <span className="combat-number">Combat #{combat.combat_number}</span>
+        )}
       </div>
-      <div className="round-events">
-        {roundGroup.events.map((event, idx) => {
-          const alignment = getEventAlignment(event, playerAId)
+      <div className="combat-events">
+        {visibleEvents.map((event, idx) => {
+          const alignment = getCombatEventAlignment(event, playerAId)
           return (
             <div
               key={idx}
@@ -199,7 +228,8 @@ function BattleLogRound({
 }
 
 export const BattleLog = ({
-  events,
+  combats,
+  events: _events,
   currentEventIndex = -1,
   currentPhase = 'idle',
   getEventMessage = (event) => event.message || event.type,
@@ -217,9 +247,11 @@ export const BattleLog = ({
   /**
    * Compute player labels - show "You" for current user
    */
-  const isCurrentUserPlayerA = currentUserId !== undefined && currentUserId === playerAId
+  const isCurrentUserPlayerA =
+    currentUserId !== undefined && currentUserId === playerAId
   const playerALabel = isCurrentUserPlayerA ? 'You' : playerAName
-  const playerBLabel = !isCurrentUserPlayerA && currentUserId !== undefined ? 'You' : playerBName
+  const playerBLabel =
+    !isCurrentUserPlayerA && currentUserId !== undefined ? 'You' : playerBName
 
   /**
    * Derived state: Is the current event still animating?
@@ -231,38 +263,82 @@ export const BattleLog = ({
     currentPhase !== 'complete'
 
   /**
-   * Get visible events based on currentEventIndex
-   * - When not animated: show all events (static display for battle history)
-   * - When animated and index < 0: show nothing (waiting for animation to start)
-   * - When animated and index >= 0: show events up to current index
+   * Map currentEventIndex to combat index and event offset within combat.
+   * This allows us to determine which combat is current and how many events
+   * within that combat should be visible.
    */
-  const visibleEvents = useMemo(() => {
-    if (!animated) {
-      return events
+  const { currentCombatIndex, eventOffsets } = useMemo(() => {
+    const offsets: number[] = []
+    let cumulativeCount = 0
+
+    for (const combat of combats) {
+      offsets.push(cumulativeCount)
+      cumulativeCount += combat.events.length
     }
+
+    // Find which combat contains the current event
+    let combatIdx = -1
+    if (currentEventIndex >= 0) {
+      for (let i = 0; i < combats.length; i++) {
+        const combatStart = offsets[i]
+        const combatEnd = combatStart + combats[i].events.length
+        if (currentEventIndex < combatEnd) {
+          combatIdx = i
+          break
+        }
+      }
+      // If past all events, default to last combat
+      if (combatIdx === -1 && combats.length > 0) {
+        combatIdx = combats.length - 1
+      }
+    }
+
+    return { currentCombatIndex: combatIdx, eventOffsets: offsets }
+  }, [combats, currentEventIndex])
+
+  /**
+   * Determine visible combats and event counts within each
+   */
+  const visibleCombats = useMemo(() => {
+    if (!animated) {
+      // Static display: show all combats with all events
+      return combats.map((combat) => ({
+        combat,
+        visibleEventCount: combat.events.length,
+      }))
+    }
+
     if (currentEventIndex < 0) {
       return []
     }
-    return events.slice(0, currentEventIndex + 1)
-  }, [events, currentEventIndex, animated])
 
-  /**
-   * Group visible events by round
-   */
-  const roundGroups = useMemo(
-    () => groupEventsByRound(visibleEvents),
-    [visibleEvents]
-  )
+    // Show combats up to and including the current one
+    const result: { combat: Combat; visibleEventCount: number }[] = []
 
-  /**
-   * Determine which round the current event belongs to
-   */
-  const currentRound = useMemo(() => {
-    if (currentEventIndex < 0 || currentEventIndex >= events.length) {
-      return -1
+    for (let i = 0; i < combats.length; i++) {
+      const combatStart = eventOffsets[i]
+      const combatEnd = combatStart + combats[i].events.length
+
+      if (currentEventIndex >= combatStart) {
+        // This combat has at least some visible events
+        const visibleCount = Math.min(
+          combats[i].events.length,
+          currentEventIndex - combatStart + 1
+        )
+        result.push({
+          combat: combats[i],
+          visibleEventCount: visibleCount,
+        })
+      }
+
+      if (currentEventIndex < combatEnd) {
+        // Current event is in this combat, stop here
+        break
+      }
     }
-    return events[currentEventIndex]?.round ?? -1
-  }, [events, currentEventIndex])
+
+    return result
+  }, [combats, eventOffsets, currentEventIndex, animated])
 
   /**
    * Auto-scroll to bottom when new events appear
@@ -271,7 +347,7 @@ export const BattleLog = ({
     if (contentRef.current) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight
     }
-  }, [visibleEvents.length])
+  }, [visibleCombats.length, currentEventIndex])
 
   /**
    * Get icon URL for event type
@@ -284,26 +360,32 @@ export const BattleLog = ({
     <RPGPanel variant="outer" className={`battle-log-outer ${className}`}>
       <RPGPanel variant="inner" className="battle-log-inner">
         <div className="battle-log-content" ref={contentRef}>
-          {roundGroups.map((roundGroup) => {
-            const isCurrentRound = roundGroup.round === currentRound
-            const isPlayed = roundGroup.round < currentRound
+          {visibleCombats.map(
+            (
+              item: { combat: Combat; visibleEventCount: number },
+              idx: number
+            ) => {
+              const isCurrentCombat = idx === currentCombatIndex
+              const isPlayed = idx < currentCombatIndex
 
-            return (
-              <BattleLogRound
-                key={roundGroup.round}
-                roundGroup={roundGroup}
-                isCurrentRound={isCurrentRound}
-                isAnimating={isCurrentRound && isCurrentEventAnimating}
-                isPlayed={isPlayed}
-                getIconUrl={getIconUrl}
-                getEventMessage={getEventMessage}
-                playerAId={playerAId}
-                playerALabel={playerALabel}
-                playerBLabel={playerBLabel}
-                isCurrentUserPlayerA={isCurrentUserPlayerA}
-              />
-            )
-          })}
+              return (
+                <BattleLogCombat
+                  key={item.combat.combat_number}
+                  combat={item.combat}
+                  visibleEventCount={item.visibleEventCount}
+                  isCurrentCombat={isCurrentCombat}
+                  isAnimating={isCurrentCombat && isCurrentEventAnimating}
+                  isPlayed={isPlayed}
+                  getIconUrl={getIconUrl}
+                  getEventMessage={getEventMessage}
+                  playerAId={playerAId}
+                  playerALabel={playerALabel}
+                  playerBLabel={playerBLabel}
+                  isCurrentUserPlayerA={isCurrentUserPlayerA}
+                />
+              )
+            }
+          )}
         </div>
       </RPGPanel>
     </RPGPanel>

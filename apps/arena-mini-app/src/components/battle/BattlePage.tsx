@@ -23,7 +23,7 @@ import { useBattleAnimation, getCardKey } from '../../hooks'
 import { useSoundContext } from '../../contexts'
 import type {
   BattleResult,
-  BattleEvent,
+  CombatEvent,
   Match,
   GameConstants,
   PlaceholderPositions,
@@ -365,7 +365,7 @@ export function BattlePage({
   }
 
   // Get event message text
-  const getEventMessage = (event: BattleEvent): string => {
+  const getEventMessage = (event: CombatEvent): string => {
     if (event.message) return event.message
 
     switch (event.type) {
@@ -380,7 +380,7 @@ export function BattlePage({
       case 'victory':
         return `Victory!`
       case 'summary':
-        return `Round ${event.round} summary`
+        return `Combat summary`
       default:
         return `Event: ${event.type}`
     }
@@ -446,6 +446,7 @@ export function BattlePage({
 
       {/* Event Log */}
       <BattleLog
+        combats={battleData.combats}
         events={battleData.events}
         currentEventIndex={currentEventIndex}
         currentPhase={currentPhase}

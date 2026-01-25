@@ -2008,7 +2008,7 @@ a:focus:not(:focus-visible),
   border-radius: 2px;
 }
 
-.battle-log-round {
+.battle-log-combat {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -2019,24 +2019,24 @@ a:focus:not(:focus-visible),
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-.battle-log-round.current {
+.battle-log-combat.current {
   background: rgba(249, 115, 22, 0.1);
   border-color: var(--arena-orange);
 }
 
-.battle-log-round.animating {
+.battle-log-combat.animating {
   background: rgba(249, 115, 22, 0.15);
 }
 
-.battle-log-round.played {
+.battle-log-combat.played {
   opacity: 0.6;
 }
 
-.battle-log-round.slide-in {
-  animation: round-slide-in 0.3s ease-out;
+.battle-log-combat.slide-in {
+  animation: combat-slide-in 0.3s ease-out;
 }
 
-@keyframes round-slide-in {
+@keyframes combat-slide-in {
   from {
     opacity: 0;
     transform: translateX(-10px);
@@ -2047,45 +2047,50 @@ a:focus:not(:focus-visible),
   }
 }
 
-/* Round header with player names on left/right edges */
-.round-header {
+/* Combat header with centered matchup display */
+.combat-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   padding-bottom: 4px;
   border-bottom: 1px solid rgba(90, 74, 58, 0.12);
   margin-bottom: 4px;
 }
 
-.round-header .player-name {
+.combat-matchup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
   color: #6b5a4a;
+}
+
+.combat-matchup .card-name {
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-.round-header .player-name:first-child {
-  text-align: left;
-}
-
-.round-header .player-name:last-child {
-  text-align: right;
-}
-
-.round-header .player-name.is-you {
+.combat-matchup .card-name.is-you {
   color: var(--arena-orange);
 }
 
-.round-header .round-number {
+.combat-matchup .vs {
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(90, 74, 58, 0.5);
+  text-transform: lowercase;
+}
+
+.combat-number {
   font-family: 'JetBrains Mono', monospace;
   font-size: 9px;
   font-weight: 500;
   color: rgba(90, 74, 58, 0.5);
 }
 
-.round-events {
+.combat-events {
   display: flex;
   flex-direction: column;
   gap: 2px;

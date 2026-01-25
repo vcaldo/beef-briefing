@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { useLaunchParams } from '@telegram-apps/sdk-react'
 
 import { apiClient } from './api/client'
-import { preloadCriticalAssets } from './utils/assetPreloader'
+import { preloadAllDuringSplash } from './utils/assetPreloader'
 import { setCustomAttribute, addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { ErrorBoundary } from '@beef-briefing/shared-mini-app/components'
 import { TabBar, SplashScreen, ErrorDisplay, LoadingSpinner } from './components/common'
@@ -59,6 +59,12 @@ function App() {
     } catch {
       setCustomAttribute('timezone', 'unknown')
     }
+  }, [])
+
+  // Start preloading immediately on mount - runs in parallel with auth
+  // This uses the full 2-second splash window to load components and assets
+  useEffect(() => {
+    preloadAllDuringSplash()
   }, [])
 
   // Handle splash screen minimum time elapsed
@@ -123,9 +129,9 @@ function App() {
 
         setAppState('authenticated')
 
-        // Prefetch game constants and preload critical assets while splash screen is still showing
+        // Prefetch game constants (requires auth token)
+        // Note: Asset preloading happens earlier via preloadAllDuringSplash on mount
         prefetchGameConstants()
-        preloadCriticalAssets()
       } catch (err) {
         console.error('Authentication failed:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')

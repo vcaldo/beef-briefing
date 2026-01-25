@@ -4,10 +4,11 @@
  * Preloads critical UI assets during the splash screen to eliminate
  * visual delays when the main app renders.
  *
- * Called from App.tsx after authentication succeeds.
+ * Called from App.tsx immediately on mount (before authentication).
  */
 
 import { preloadCategories } from './images'
+import { preloadPageComponents } from './componentPreloader'
 import type { ImageCategory } from '../types/images'
 
 /**
@@ -60,4 +61,30 @@ export function preloadBattleAssets(): void {
     // Non-fatal: images will load on-demand if preload fails
     console.warn('[assetPreloader] Failed to preload battle assets:', err)
   })
+}
+
+/**
+ * Preload all critical assets during splash screen.
+ * Called immediately on app mount (before authentication).
+ *
+ * This runs in parallel with authentication to maximize use of the
+ * 2-second splash screen window.
+ *
+ * @example
+ * // In App.tsx, on mount
+ * useEffect(() => {
+ *   preloadAllDuringSplash()
+ * }, [])
+ */
+export function preloadAllDuringSplash(): void {
+  // 1. Preload page component chunks
+  preloadPageComponents()
+
+  // 2. Preload critical images (buttons, panels, icons)
+  preloadCriticalAssets()
+
+  // 3. Preload battle assets with slight delay (lower priority)
+  setTimeout(() => {
+    preloadBattleAssets()
+  }, 500)
 }

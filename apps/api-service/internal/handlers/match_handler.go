@@ -271,6 +271,7 @@ func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Reque
 	addTransactionAttribute(ctx, "chat_id", chatID)
 	addTransactionAttribute(ctx, "match_type", matchType)
 	addTransactionAttribute(ctx, "limit", limit)
+	addTransactionAttribute(ctx, "offset", offset)
 
 	entries, total, err := h.service.GetLeaderboard(ctx, chatID, matchType, limit, offset)
 	if err != nil {

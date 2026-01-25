@@ -13,32 +13,39 @@ Technical documentation for the Beef Briefing system architecture and services.
                               │  (SSL/Routing)  │
                               └────────┬────────┘
                                        │
-           ┌───────────────────────────┼───────────────────────────┐
-           │                           │                           │
-           ▼                           ▼                           ▼
-┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
-│  Leaderboard Mini   │    │    API Service      │    │   Deck Mini App     │
-│       App           │    │     (Go:8080)       │    │                     │
-│   (React/Nginx)     │    │                     │    │   (React/Nginx)     │
-└─────────────────────┘    └──────────┬──────────┘    └─────────────────────┘
-                                      │
-        ┌─────────────────────────────┼─────────────────────────────┐
-        │                             │                             │
-        ▼                             ▼                             ▼
-┌───────────────┐          ┌─────────────────────┐          ┌───────────────┐
-│ Telegram Bot  │          │    PostgreSQL       │          │ Card Renderer │
-│     (Go)      │─────────▶│     (Database)      │◀─────────│  (Py:8051)    │
-└───────────────┘          └─────────────────────┘          └───────────────┘
-        │                             ▲                             │
-        │                             │                             │
-        ▼                             │                             ▼
-┌───────────────┐          ┌─────────────────────┐          ┌───────────────┐
-│   Telegram    │          │    ML Processor     │          │ MinIO/S3      │
-│     API       │          │   (Python/GPU)      │          │  (Storage)    │
-└───────────────┘          └─────────────────────┘          └───────────────┘
+    ┌──────────────┬───────────────────┼───────────────────┬──────────────┐
+    │              │                   │                   │              │
+    ▼              ▼                   ▼                   ▼              ▼
+┌────────┐  ┌────────────┐  ┌─────────────────┐  ┌────────────┐  ┌────────┐
+│ Arena  │  │ Leaderboard│  │  API Service    │  │    Deck    │  │  ML    │
+│Mini App│  │  Mini App  │  │   (Go:8080)     │  │  Mini App  │  │Dashboard
+└────────┘  └────────────┘  └────────┬────────┘  └────────────┘  └────────┘
+                                     │
+        ┌────────────────────────────┼────────────────────────────┐
+        │                            │                            │
+        ▼                            ▼                            ▼
+┌───────────────┐         ┌─────────────────────┐         ┌───────────────┐
+│ Telegram Bot  │         │    PostgreSQL       │         │ Card Renderer │
+│     (Go)      │────────▶│     (Database)      │◀────────│  (Py:8051)    │
+└───────────────┘         └─────────────────────┘         └───────────────┘
+        │                            ▲                            │
+        │                            │                            │
+        ▼                            │                            ▼
+┌───────────────┐         ┌─────────────────────┐         ┌───────────────┐
+│   Telegram    │         │    ML Processor     │         │ MinIO/S3      │
+│     API       │         │   (Python/OpenAI)   │         │  (Storage)    │
+└───────────────┘         └─────────────────────┘         └───────────────┘
+                                     │
+                                     ▼
+                          ┌─────────────────────┐
+                          │       Qdrant        │
+                          │    (Embeddings)     │
+                          └─────────────────────┘
 ```
 
 ## Services
+
+### Backend Services
 
 | Service | Language | Port | Description |
 |---------|----------|------|-------------|
@@ -46,9 +53,16 @@ Technical documentation for the Beef Briefing system architecture and services.
 | [telegram-bot](telegram-bot/README.md) | Go | - | Real-time Telegram message listener |
 | [card-renderer](card-renderer/README.md) | Python | 8051 | Gamified stats card image generator |
 | [ml-processor](ml-processor/README.md) | Python | - | ML analytics pipeline (sentiment, humor, toxicity) |
+| [ml-dashboard](ml-dashboard/README.md) | Python/React | 5173 | ML analytics dashboard with FastAPI backend |
 | [import-cli](import-cli/README.md) | Go | - | Telegram Desktop export importer |
-| [deck-mini-app](deck-mini-app/README.md) | React | 80 | Card gallery Telegram Mini App |
-| [leaderboard-mini-app](leaderboard-mini-app/README.md) | React | 80 | Stats leaderboard Telegram Mini App |
+
+### Telegram Mini Apps
+
+| Service | Language | Port | Description |
+|---------|----------|------|-------------|
+| [arena-mini-app](arena-mini-app/README.md) | React | 5175 | Turn-based card battle arena |
+| [deck-mini-app](deck-mini-app/README.md) | React | 5174 | Card gallery for browsing weekly cards |
+| [leaderboard-mini-app](leaderboard-mini-app/README.md) | React | 5173 | Stats leaderboard and user profiles |
 
 ## Data Flow
 
@@ -101,9 +115,24 @@ Telegram Mini App → api-service (JWT auth) → PostgreSQL
 2. API validates signature and issues JWT tokens
 3. Authenticated requests fetch stats and card images
 
+### Arena Game Flow
+
+```
+arena-mini-app → api-service (JWT auth) → PostgreSQL (matches, participants)
+                      │
+                      └──→ Shop: Deal cards from weekly pool
+                      └──→ Battle: Calculate damage, determine winner
+                      └──→ Leaderboard: Track tournament rankings
+```
+
+1. Players join matches via `/matches` endpoint
+2. Shop phase: Buy cards, upgrade stats (ATK/HP)
+3. Battle phase: Automated turn-based combat
+4. Results: ELO-based rankings and tournament points
+
 ## Database Schema
 
-22 tables modeling the complete Telegram data structure:
+30+ tables modeling the complete Telegram data structure:
 
 - **Core**: `chats`, `users`, `updates`
 - **Messages**: `messages`, `message_entities`, `message_edits`
@@ -111,6 +140,7 @@ Telegram Mini App → api-service (JWT auth) → PostgreSQL
 - **Media**: `media_files`, `photos`, `stickers`, `games`, `game_photos`
 - **Other**: `polls`, `poll_options`, `contacts`, `locations`, `venues`, `dice`
 - **ML Results**: `ml_sentiment`, `ml_toxicity`, `ml_humor`, `ml_ner`, `ml_user_cards`, `ml_user_card_images`
+- **Arena Game**: `matches`, `match_participants`, `match_rounds`, `ranked_tournaments`, `tournament_participants`
 
 ## Development
 

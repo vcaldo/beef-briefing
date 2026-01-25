@@ -491,22 +491,22 @@ export function BattlePage({
             </RPGPanel>
 
             <RPGPanel variant="inner" className="rpg-victory-stats">
-              <div className="victory-stats">
-                <div className="victory-stat">
-                  <span className="stat-label">Damage Dealt</span>
-                  <span className="stat-value">
+              <div className="rpg-stats-grid">
+                <div className="rpg-stat-card">
+                  <span className="rpg-stat-value">
                     {isPlayerA ? battleData.team_a_damage : battleData.team_b_damage}
                   </span>
+                  <span className="rpg-stat-label">Damage Dealt</span>
                 </div>
-                <div className="victory-stat">
-                  <span className="stat-label">Damage Taken</span>
-                  <span className="stat-value">
+                <div className="rpg-stat-card">
+                  <span className="rpg-stat-value">
                     {isPlayerA ? battleData.team_b_damage : battleData.team_a_damage}
                   </span>
+                  <span className="rpg-stat-label">Damage Taken</span>
                 </div>
-                <div className="victory-stat">
-                  <span className="stat-label">Rounds</span>
-                  <span className="stat-value">{battleData.num_rounds}</span>
+                <div className="rpg-stat-card">
+                  <span className="rpg-stat-value">{battleData.num_rounds}</span>
+                  <span className="rpg-stat-label">Rounds</span>
                 </div>
               </div>
             </RPGPanel>

@@ -1975,14 +1975,16 @@ a:focus:not(:focus-visible),
 
 .battle-vs {
   position: absolute;
-  top: 50%;
+  top: 75%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-family: 'Outfit', sans-serif;
-  font-size: 32px;
-  font-weight: 800;
-  color: var(--arena-orange);
-  text-shadow: 0 0 20px rgba(249, 115, 22, 0.5);
+  z-index: 10;
+}
+
+.battle-vs-icon {
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 0 12px rgba(249, 115, 22, 0.6));
 }
 
 /* Battle card highlighting */
@@ -2036,6 +2038,7 @@ a:focus:not(:focus-visible),
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-height: 150px;
   max-height: 150px;
   overflow-y: auto;
   scrollbar-width: thin;

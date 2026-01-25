@@ -40,6 +40,8 @@ export type IconImageId =
   | 'crown'
   | 'book_open'
   | 'arrow_right_board'
+  // Battle UI icons
+  | 'vs'
 
 // Effect image IDs (including explosion frames)
 export type EffectImageId =
@@ -124,6 +126,8 @@ export const IMAGE_CONFIGS: Record<ImageId, ImageConfig> = {
   crown: { category: 'icons', filename: 'crown_a', width: 64, height: 64 },
   book_open: { category: 'icons', filename: 'book_open', width: 64, height: 64 },
   arrow_right_board: { category: 'icons', filename: 'arrow_right_board', width: 64, height: 64 },
+  // Battle UI icons
+  vs: { category: 'icons', filename: 'vs', width: 64, height: 64 },
 
   // Effects (flame and magic - 512x512 pixels)
   flame_01: { category: 'effects', filename: 'flame_01', width: 512, height: 512 },

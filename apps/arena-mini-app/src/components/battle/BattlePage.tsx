@@ -411,9 +411,6 @@ export function BattlePage({
           </div>
         </div>
 
-        {/* VS Indicator */}
-        <div className="battle-vs">VS</div>
-
         {/* Team A (right side) */}
         <div className="battle-team team-a">
           <div className="team-label">{battleData.player_a_name}</div>

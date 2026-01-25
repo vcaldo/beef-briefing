@@ -391,17 +391,6 @@ export function BattlePage({
 
   return (
     <div className="battle-page">
-      {/* Header */}
-      <div className="battle-header">
-        <h1 className="battle-title">Battle Arena</h1>
-        <div className="battle-info">
-          <span className="battle-round">Round {battleData.num_rounds}</span>
-          <span className="battle-score">
-            {battleData.team_a_damage} - {battleData.team_b_damage}
-          </span>
-        </div>
-      </div>
-
       {/* Battle Arena */}
       <div
         ref={battleArenaRef}

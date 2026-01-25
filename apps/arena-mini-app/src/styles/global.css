@@ -2311,41 +2311,6 @@ a:focus:not(:focus-visible),
   overflow: hidden;
 }
 
-.battle-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  background: var(--arena-bg-medium);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.battle-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--arena-orange);
-  margin: 0;
-}
-
-.battle-info {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-
-.battle-round {
-  font-size: 13px;
-  color: var(--tg-theme-hint-color);
-}
-
-.battle-score {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--tg-theme-text-color);
-}
-
 /* Battle Cards */
 .battle-card {
   display: flex;

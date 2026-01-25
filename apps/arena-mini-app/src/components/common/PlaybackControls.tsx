@@ -49,14 +49,14 @@ const ReplayIcon = () => (
 )
 
 /** Speed labels for each index */
-const SPEED_LABELS = ['1x', '1.5x', '2x']
+const SPEED_LABELS = ['1x', '2x']
 
 export interface PlaybackControlsProps {
   /** Whether playback is currently playing */
   isPlaying: boolean
   /** Callback when play/pause is toggled */
   onPlayPause: () => void
-  /** Current speed index (0=1x, 1=1.5x, 2=2x) */
+  /** Current speed index (0=1x, 1=2x) */
   speedIndex: number
   /** Callback to cycle to next speed */
   onCycleSpeed: () => void

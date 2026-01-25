@@ -17,7 +17,6 @@ import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
 import { GameButton, RPGPanel } from '../ui'
 import { usePolling, useErrorBanner } from '../../hooks'
 import { useSoundContext } from '../../contexts'
-import arenaLogo from '../../../assets/images/logo/logo.webp'
 
 import type { Match, GameConstants } from '../../types'
 
@@ -389,7 +388,7 @@ export function LobbyPage({
       {/* RPG-styled header */}
       <RPGPanel variant="outer" className="rpg-lobby-header">
         <RPGPanel variant="inner" className="rpg-lobby-header-content">
-          <img src={arenaLogo} alt="Arena" className="rpg-lobby-logo" />
+          <h1 className="rpg-lobby-title">Beef Arena</h1>
         </RPGPanel>
       </RPGPanel>
 

@@ -551,7 +551,7 @@ Turn-based card battle arena where users build teams from weekly stats cards and
 | Starting coins | 10 | Coins at match start |
 | Card purchase | 3 | Buy a card from shop |
 | Reroll | 1 | Refresh shop (before first buy only) |
-| Upgrade | 1 | +3 ATK or +3 HP per upgrade |
+| Upgrade | 1 | +1 ATK or +3 HP per upgrade |
 | Team size | 3 | Cards required for battle |
 
 **Polling Intervals**:

@@ -128,7 +128,7 @@ The game supports two modes:
 |--------|------|------------|-------------|
 | **Buy Card** | 3 coins | Team not full (< 3) | Purchase card from shop slot |
 | **Reroll Shop** | 1 coin | No cards purchased yet | Replace unpurchased cards with new ones (only before first purchase) |
-| **Upgrade ATK** | 1 coin | Card in team | +3 ATK per upgrade |
+| **Upgrade ATK** | 1 coin | Card in team | +1 ATK per upgrade |
 | **Upgrade HP** | 1 coin | Card in team | +3 HP per upgrade |
 
 **Important**:
@@ -1063,7 +1063,7 @@ interface CardSnapshot {
 - **Team Size**: 3 cards (required)
 
 ### Upgrades
-- **ATK Upgrade**: +3 ATK per upgrade
+- **ATK Upgrade**: +1 ATK per upgrade
 - **HP Upgrade**: +3 HP and +3 MaxHP per upgrade
 
 ### Timings

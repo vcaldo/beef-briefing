@@ -401,12 +401,12 @@ export function BattlePage({
           '--hp-transition-duration': `${(PLAYBACK_SPEEDS[speedIndex].value / 1000) * 300}ms`,
         } as React.CSSProperties}
       >
-        {/* Team A (opponent or self) */}
-        <div className="battle-team team-a">
-          <div className="team-label">{battleData.player_a_name}</div>
+        {/* Team B (left side) */}
+        <div className="battle-team team-b">
+          <div className="team-label">{battleData.player_b_name}</div>
           <div className="team-cards">
-            {(battleData.team_a_final?.cards ?? []).map((card) =>
-              renderBattleCard(card.card_id, battleData.player_a_id, card)
+            {(battleData.team_b_final?.cards ?? []).map((card) =>
+              renderBattleCard(card.card_id, battleData.player_b_id, card)
             )}
           </div>
         </div>
@@ -414,12 +414,12 @@ export function BattlePage({
         {/* VS Indicator */}
         <div className="battle-vs">VS</div>
 
-        {/* Team B (opponent or self) */}
-        <div className="battle-team team-b">
-          <div className="team-label">{battleData.player_b_name}</div>
+        {/* Team A (right side) */}
+        <div className="battle-team team-a">
+          <div className="team-label">{battleData.player_a_name}</div>
           <div className="team-cards">
-            {(battleData.team_b_final?.cards ?? []).map((card) =>
-              renderBattleCard(card.card_id, battleData.player_b_id, card)
+            {(battleData.team_a_final?.cards ?? []).map((card) =>
+              renderBattleCard(card.card_id, battleData.player_a_id, card)
             )}
           </div>
         </div>

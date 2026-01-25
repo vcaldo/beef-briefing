@@ -1954,7 +1954,9 @@ a:focus:not(:focus-visible),
    ============================================================================= */
 .battle-arena {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
   gap: var(--battle-gap, 24px);
   padding: 16px;
   /* Background is set via .page-bg--arena when background image is loaded */
@@ -1962,7 +1964,7 @@ a:focus:not(:focus-visible),
   background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
   flex: 1;
   min-height: 0; /* Allow shrinking */
-  min-height: 400px;
+  min-height: 200px;
   position: relative;
 }
 
@@ -2459,11 +2461,12 @@ a:focus:not(:focus-visible),
 /* Battle Compact Card - Scale from 300x450 with margin compensation
    transform: scale() doesn't affect layout, so we use negative margins
    to collapse the layout box to match the visual size.
-   Formula: margin = size * (scale - 1) / 2 */
+   Formula: margin = size * (scale - 1) / 2
+   Note: Scale 0.21 is 30% smaller than original 0.3 */
 .battle-compact-card {
   width: 300px;
   height: 450px;
-  --base-scale: 0.3;
+  --base-scale: 0.21;
   --anim-scale: 1;
   transform: scale(calc(var(--base-scale) * var(--anim-scale)));
   transform-origin: center;
@@ -2482,12 +2485,19 @@ a:focus:not(:focus-visible),
   /* HP bar inherits positions from placeholder_positions and scales with the card */
 }
 
-/* Battle Teams */
+/* Battle Teams - Horizontal layout with Team B left, Team A right */
 .battle-team {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 8px;
+}
+
+.battle-team.team-a {
+  align-items: flex-end;
+}
+
+.battle-team.team-b {
+  align-items: flex-start;
 }
 
 .team-label {
@@ -2501,8 +2511,15 @@ a:focus:not(:focus-visible),
 
 .team-cards {
   display: flex;
-  gap: 8px;
-  justify-content: center;
+  gap: 4px;
+}
+
+.team-a .team-cards {
+  justify-content: flex-end;
+}
+
+.team-b .team-cards {
+  justify-content: flex-start;
 }
 
 /* Legacy event-log classes removed - replaced by battle-log-* classes above */
@@ -4382,17 +4399,21 @@ a:focus:not(:focus-visible),
   }
 
   .battle-compact-card {
-    --base-scale: 0.25;
-    /* Margins auto-adjust via calc() */
+    --base-scale: 0.175;
+    /* Margins auto-adjust via calc() - 30% smaller than original 0.25 */
   }
 }
 
 /* Mobile-specific battle adjustments for tablets and larger phones */
 @media (max-width: 480px) {
   .battle-arena {
-    --battle-gap: 12px;
-    padding: 12px;
+    --battle-gap: 8px;
+    padding: 8px;
     min-height: auto;
+  }
+
+  .team-cards {
+    gap: 2px;
   }
 }
 

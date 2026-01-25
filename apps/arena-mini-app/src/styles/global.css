@@ -1976,19 +1976,19 @@ a:focus:not(:focus-visible),
    Battle Log (Compact RPG-themed)
    ============================================================================= */
 .battle-log-outer {
-  margin: 0 12px 8px;
+  margin: 0 8px 6px;
   margin-top: auto; /* Push to bottom */
   flex-shrink: 0; /* Don't shrink */
 }
 
 .battle-log-inner {
-  padding: 8px 2px;
+  padding: 4px 2px;
 }
 
 .battle-log-content {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   max-height: 150px;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -2012,7 +2012,7 @@ a:focus:not(:focus-visible),
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 6px 10px;
+  padding: 4px 6px;
   border-radius: 6px;
   background: rgba(90, 74, 58, 0.08);
   border: 1px solid rgba(90, 74, 58, 0.15);
@@ -2081,6 +2081,11 @@ a:focus:not(:focus-visible),
   font-weight: 500;
   color: rgba(90, 74, 58, 0.5);
   text-transform: lowercase;
+}
+
+.combat-matchup .combat-separator {
+  color: rgba(90, 74, 58, 0.5);
+  margin: 0 2px;
 }
 
 .combat-number {
@@ -5068,7 +5073,7 @@ button,
 
 /* Shop cards panel */
 .rpg-shop-cards-panel {
-  padding: 12px;
+  padding: 6px;
 }
 
 .rpg-shop-section-header {
@@ -5084,7 +5089,7 @@ button,
 .rpg-shop-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 8px;
 }
 
 .rpg-shop-empty {
@@ -5135,7 +5140,7 @@ button,
   }
 
   .rpg-shop-cards-panel {
-    padding: 8px;
+    padding: 4px;
   }
 
   .rpg-shop-section-header {
@@ -5146,7 +5151,7 @@ button,
   /* Force 2 columns on mobile */
   .rpg-shop-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: 6px;
   }
 
   /* Remove CardSlot frame on mobile shop */

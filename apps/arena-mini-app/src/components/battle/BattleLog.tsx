@@ -191,18 +191,34 @@ function BattleLogCombat({
   return (
     <div className={classes}>
       <div className="combat-header">
-        {matchup ? (
+        {combat.outcome === 'victory' ? (
+          // Victory summary - no combat number, just player names
           <div className="combat-matchup">
             <span className={`card-name ${isCurrentUserPlayerA ? 'is-you' : ''}`}>
-              {matchup.leftName}
+              {playerALabel}
             </span>
             <span className="vs">vs</span>
             <span className={`card-name ${!isCurrentUserPlayerA ? 'is-you' : ''}`}>
-              {matchup.rightName}
+              {playerBLabel}
             </span>
           </div>
         ) : (
-          <span className="combat-number">Combat #{combat.combat_number}</span>
+          // Regular combat - show "Combat N - CardA vs CardB"
+          <div className="combat-matchup">
+            <span className="combat-number">Combat {combat.combat_number}</span>
+            {matchup && (
+              <>
+                <span className="combat-separator">-</span>
+                <span className={`card-name ${isCurrentUserPlayerA ? 'is-you' : ''}`}>
+                  {matchup.leftName}
+                </span>
+                <span className="vs">vs</span>
+                <span className={`card-name ${!isCurrentUserPlayerA ? 'is-you' : ''}`}>
+                  {matchup.rightName}
+                </span>
+              </>
+            )}
+          </div>
         )}
       </div>
       <div className="combat-events">

@@ -91,10 +91,11 @@ interface BattleLogRoundProps {
   isAnimating: boolean
   isPlayed: boolean
   getIconUrl: (type: EventType) => string
+  getEventMessage: (event: BattleEvent) => string
 }
 
 /**
- * Single round row in the battle log
+ * Single round frame in the battle log with all events listed vertically
  */
 function BattleLogRound({
   roundGroup,
@@ -102,6 +103,7 @@ function BattleLogRound({
   isAnimating,
   isPlayed,
   getIconUrl,
+  getEventMessage,
 }: BattleLogRoundProps) {
   const classes = [
     'battle-log-round',
@@ -116,15 +118,16 @@ function BattleLogRound({
   return (
     <div className={classes}>
       <span className="round-indicator">R{roundGroup.round}</span>
-      <div className="round-icons">
+      <div className="round-events">
         {roundGroup.events.map((event, idx) => (
-          <img
-            key={idx}
-            src={getIconUrl(event.type)}
-            alt={event.type}
-            className={`event-icon event-icon-${event.type}`}
-            title={event.type}
-          />
+          <div key={idx} className={`event-row event-row-${event.type}`}>
+            <img
+              src={getIconUrl(event.type)}
+              alt={event.type}
+              className={`event-icon event-icon-${event.type}`}
+            />
+            <span className="event-message">{getEventMessage(event)}</span>
+          </div>
         ))}
       </div>
     </div>
@@ -135,6 +138,7 @@ export const BattleLog = ({
   events,
   currentEventIndex = -1,
   currentPhase = 'idle',
+  getEventMessage = (event) => event.message || event.type,
   animated = true,
   className = '',
 }: BattleLogProps) => {
@@ -197,7 +201,6 @@ export const BattleLog = ({
   return (
     <RPGPanel variant="outer" className={`battle-log-outer ${className}`}>
       <RPGPanel variant="inner" className="battle-log-inner">
-        <div className="battle-log-title">Battle Log</div>
         <div className="battle-log-content" ref={contentRef}>
           {roundGroups.map((roundGroup) => {
             const isCurrentRound = roundGroup.round === currentRound
@@ -211,6 +214,7 @@ export const BattleLog = ({
                 isAnimating={isCurrentRound && isCurrentEventAnimating}
                 isPlayed={isPlayed}
                 getIconUrl={getIconUrl}
+                getEventMessage={getEventMessage}
               />
             )
           })}

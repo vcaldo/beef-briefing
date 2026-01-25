@@ -43,6 +43,12 @@ COMMIT_HASH ?= $(shell git rev-parse --short HEAD)
 .DEFAULT_GOAL := help
 
 # =============================================================================
+# SCRIPT PERMISSIONS
+# =============================================================================
+ensure-scripts-executable:
+	@chmod +x $(SCRIPTS_DIR)/*
+
+# =============================================================================
 # HELP
 # =============================================================================
 help: ## Show this help message
@@ -62,19 +68,25 @@ help: ## Show this help message
 # =============================================================================
 # POPULAR ALIASES
 # =============================================================================
-up: dev-up ## Alias for dev-up
-build: docker-build ## Alias for docker-build
-deploy: prod-deploy ## Alias for prod-deploy
+up: | ensure-scripts-executable ## Alias for dev-up
+	@$(MAKE) dev-up
+
+build: | ensure-scripts-executable ## Alias for docker-build
+	@$(MAKE) docker-build
+
+deploy: | ensure-scripts-executable ## Alias for prod-deploy
+	@$(MAKE) prod-deploy
+
 down: dev-down ## Alias for dev-down
 
 # =============================================================================
 # DEVELOPMENT (dev-*)
 # =============================================================================
-dev-up: ## Start all dev services
+dev-up: | ensure-scripts-executable ## Start all dev services
 	@$(DC) up -d
 	@$(SCRIPTS_DIR)/show-summary.sh dev
 
-dev-up-build: ## Rebuild images and start all dev services
+dev-up-build: | ensure-scripts-executable ## Rebuild images and start all dev services
 	@$(DC) up -d --build
 	@$(SCRIPTS_DIR)/show-summary.sh dev
 
@@ -99,28 +111,28 @@ dev-prune: ## Remove all dev containers, images, volumes, and networks
 # =============================================================================
 # PRODUCTION (prod-*)
 # =============================================================================
-prod-deploy: tf-sync-object-storage ## Deploy to production server
+prod-deploy: | ensure-scripts-executable tf-sync-object-storage ## Deploy to production server
 	@$(SCRIPTS_DIR)/deploy.sh
 
-prod-deploy-skip-build: tf-sync-object-storage ## Deploy using existing images (skip build)
+prod-deploy-skip-build: | ensure-scripts-executable tf-sync-object-storage ## Deploy using existing images (skip build)
 	@$(SCRIPTS_DIR)/deploy.sh --skip-build
 
-prod-deploy-skip-cleanup: tf-sync-object-storage ## Deploy without cleaning up old images
+prod-deploy-skip-cleanup: | ensure-scripts-executable tf-sync-object-storage ## Deploy without cleaning up old images
 	@$(SCRIPTS_DIR)/deploy.sh --skip-cleanup
 
-prod-deploy-regenerate-certs: ## Deploy with fresh Let's Encrypt certificates
+prod-deploy-regenerate-certs: | ensure-scripts-executable ## Deploy with fresh Let's Encrypt certificates
 	@echo "Removing Let's Encrypt certificates on remote server..."
 	@ssh $$($(MAKE) -s tf-ssh-user-host) 'rm -f ~/beef-briefing/infrastructure/letsencrypt/acme.json'
 	@echo "Certificates removed, deploying with fresh certificates..."
 	@$(MAKE) prod-deploy
 
-prod-rollback: ## Rollback to previous deployment
+prod-rollback: | ensure-scripts-executable ## Rollback to previous deployment
 	@$(SCRIPTS_DIR)/rollback.sh
 
-prod-rollback-force: ## Rollback to previous deployment (skip confirmation)
+prod-rollback-force: | ensure-scripts-executable ## Rollback to previous deployment (skip confirmation)
 	@$(SCRIPTS_DIR)/rollback.sh --force
 
-prod-backup-db: ## Backup production database to local_backups/db/
+prod-backup-db: | ensure-scripts-executable ## Backup production database to local_backups/db/
 	@$(SCRIPTS_DIR)/backup-prod-db.sh
 
 prod-clean-certs: ## Remove Let's Encrypt certificates on remote server
@@ -271,7 +283,7 @@ pg-prod: ## Connect to production PostgreSQL using psql (requires pg-tunnel runn
 # =============================================================================
 # DOCKER BUILD (docker-build-*)
 # =============================================================================
-docker-build: ## Rebuild all Docker images
+docker-build: | ensure-scripts-executable ## Rebuild all Docker images
 	@START_TIME=$$(date +%s); \
 	$(DC) build; \
 	END_TIME=$$(date +%s); \
@@ -342,7 +354,7 @@ go-build-import-cli: ## Build import-cli binary locally
 	cd $(IMPORT_CLI_DIR) && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/import-cli ./cmd
 	@echo "Binary created at $(IMPORT_CLI_DIR)/bin/import-cli"
 
-go-build-import-cli-prod: ## Build import-cli for production server and deploy
+go-build-import-cli-prod: | ensure-scripts-executable ## Build import-cli for production server and deploy
 	@$(SCRIPTS_DIR)/go-build-import-cli-prod.sh
 
 go-clean: ## Remove Go build artifacts
@@ -403,28 +415,24 @@ go-vet: ## Run go vet on api-service
 # =============================================================================
 # SECRETS (secrets-*)
 # =============================================================================
-secrets-traefik-password: ## Generate Traefik dashboard password
-	@chmod +x $(SCRIPTS_DIR)/generate-traefik-password.sh
+secrets-traefik-password: | ensure-scripts-executable ## Generate Traefik dashboard password
 	@$(SCRIPTS_DIR)/generate-traefik-password.sh
 
-secrets-service-api: ## Generate API key for an app (APP=telegram-bot required)
+secrets-service-api: | ensure-scripts-executable ## Generate API key for an app (APP=telegram-bot required)
 	@if [ -z "$(APP)" ]; then \
 		echo "Error: APP variable is required. Usage: make secrets-service-api APP=telegram-bot"; \
 		exit 1; \
 	fi
-	@chmod +x $(SCRIPTS_DIR)/generate-api-service-key.sh
 	@$(SCRIPTS_DIR)/generate-api-service-key.sh "$(APP)" "$(SECRETS_DIR)"
 
-secrets-card-renderer: ## Generate card-renderer API key for an app (APP=ml-processor required)
+secrets-card-renderer: | ensure-scripts-executable ## Generate card-renderer API key for an app (APP=ml-processor required)
 	@if [ -z "$(APP)" ]; then \
 		echo "Error: APP variable is required. Usage: make secrets-card-renderer APP=ml-processor"; \
 		exit 1; \
 	fi
-	@chmod +x $(SCRIPTS_DIR)/generate-card-renderer-key.sh
 	@$(SCRIPTS_DIR)/generate-card-renderer-key.sh "$(APP)" "$(SECRETS_DIR)"
 
-secrets-jwt: ## Generate JWT secret key for Mini App authentication
-	@chmod +x $(SCRIPTS_DIR)/generate-jwt-secret.sh
+secrets-jwt: | ensure-scripts-executable ## Generate JWT secret key for Mini App authentication
 	@$(SCRIPTS_DIR)/generate-jwt-secret.sh
 
 # =============================================================================
@@ -438,7 +446,7 @@ tf-init: ## Initialize Terraform working directory
 tf-plan: ## Show Terraform execution plan
 	cd $(TERRAFORM_DIR) && terraform plan
 
-tf-apply: ## Apply Terraform configuration (updates SSH config after)
+tf-apply: | ensure-scripts-executable ## Apply Terraform configuration (updates SSH config after)
 	cd $(TERRAFORM_DIR) && terraform apply
 	@$(SCRIPTS_DIR)/update-ssh-config.sh
 
@@ -524,13 +532,13 @@ tf-object-storage-bucket: ## Show Object Storage bucket name
 tf-connect: ## SSH to the Linode instance
 	@ssh admin@$$(cd $(TERRAFORM_DIR) && terraform output -raw instance_ip)
 
-tf-setup: ## Setup Terraform configuration from .env file
+tf-setup: | ensure-scripts-executable ## Setup Terraform configuration from .env file
 	@$(SCRIPTS_DIR)/tf-setup.sh
 
-tf-sync-object-storage: ## Sync Object Storage credentials to .env.prod
+tf-sync-object-storage: | ensure-scripts-executable ## Sync Object Storage credentials to .env.prod
 	@$(SCRIPTS_DIR)/tf-sync-object-storage.sh
 
-tf-update-ssh-config: ## Update SSH config with server details
+tf-update-ssh-config: | ensure-scripts-executable ## Update SSH config with server details
 	@$(SCRIPTS_DIR)/update-ssh-config.sh
 
 tf-docs: ## Show Terraform documentation
@@ -547,31 +555,31 @@ tf-deploy-check: tf-validate tf-fmt-check tf-plan ## Full pre-deployment check
 # Use -prod suffix for production: make ml-run-prod (requires: make pg-tunnel)
 
 # Development (local postgres) - DEFAULT
-ml-run: ## Run ml-processor batch processing (dev)
+ml-run: | ensure-scripts-executable ## Run ml-processor batch processing (dev)
 	./scripts/ml-processor.sh process $(ML_ARGS)
 
-ml-run-status: ## Show ml-processor status (dev)
+ml-run-status: | ensure-scripts-executable ## Show ml-processor status (dev)
 	./scripts/ml-processor.sh status $(ML_ARGS)
 
-ml-run-once: ## Run single batch (dev)
+ml-run-once: | ensure-scripts-executable ## Run single batch (dev)
 	./scripts/ml-processor.sh process --limit 1 $(ML_ARGS)
 
-ml-run-continuous: ## Run continuous processing (dev)
+ml-run-continuous: | ensure-scripts-executable ## Run continuous processing (dev)
 	./scripts/ml-processor.sh continuous $(ML_ARGS)
 
-ml-run-cards: ## Generate weekly user cards (dev)
+ml-run-cards: | ensure-scripts-executable ## Generate weekly user cards (dev)
 	./scripts/ml-processor.sh cards $(ML_ARGS)
 
-ml-run-render: ## Render card images (dev)
+ml-run-render: | ensure-scripts-executable ## Render card images (dev)
 	./scripts/ml-processor.sh render $(ML_ARGS)
 
-ml-run-render-regular: ## Render regular card images only (dev)
+ml-run-render-regular: | ensure-scripts-executable ## Render regular card images only (dev)
 	./scripts/ml-processor.sh render --card-type regular $(ML_ARGS)
 
-ml-run-render-compact: ## Render compact card images only (dev)
+ml-run-render-compact: | ensure-scripts-executable ## Render compact card images only (dev)
 	./scripts/ml-processor.sh render --card-type compact $(ML_ARGS)
 
-ml-run-render-all: ## Render both regular and compact card images (dev)
+ml-run-render-all: | ensure-scripts-executable ## Render both regular and compact card images (dev)
 	@echo "Rendering regular cards..."
 	./scripts/ml-processor.sh render --card-type regular $(ML_ARGS)
 	@echo "Rendering compact cards..."
@@ -579,31 +587,31 @@ ml-run-render-all: ## Render both regular and compact card images (dev)
 	@echo "Done! Both regular and compact cards rendered."
 
 # Production (requires: make pg-tunnel in another terminal)
-ml-run-prod: ## Run ml-processor batch processing (prod)
+ml-run-prod: | ensure-scripts-executable ## Run ml-processor batch processing (prod)
 	./scripts/ml-processor.sh --prod process $(ML_ARGS)
 
-ml-run-status-prod: ## Show ml-processor status (prod)
+ml-run-status-prod: | ensure-scripts-executable ## Show ml-processor status (prod)
 	./scripts/ml-processor.sh --prod status $(ML_ARGS)
 
-ml-run-once-prod: ## Run single batch (prod)
+ml-run-once-prod: | ensure-scripts-executable ## Run single batch (prod)
 	./scripts/ml-processor.sh --prod process --limit 1 $(ML_ARGS)
 
-ml-run-continuous-prod: ## Run continuous processing (prod)
+ml-run-continuous-prod: | ensure-scripts-executable ## Run continuous processing (prod)
 	./scripts/ml-processor.sh --prod continuous $(ML_ARGS)
 
-ml-run-cards-prod: ## Generate weekly user cards (prod)
+ml-run-cards-prod: | ensure-scripts-executable ## Generate weekly user cards (prod)
 	./scripts/ml-processor.sh --prod cards $(ML_ARGS)
 
-ml-run-render-prod: ## Render card images (prod)
+ml-run-render-prod: | ensure-scripts-executable ## Render card images (prod)
 	./scripts/ml-processor.sh --prod render $(ML_ARGS)
 
-ml-run-render-regular-prod: ## Render regular card images only (prod)
+ml-run-render-regular-prod: | ensure-scripts-executable ## Render regular card images only (prod)
 	./scripts/ml-processor.sh --prod render --card-type regular $(ML_ARGS)
 
-ml-run-render-compact-prod: ## Render compact card images only (prod)
+ml-run-render-compact-prod: | ensure-scripts-executable ## Render compact card images only (prod)
 	./scripts/ml-processor.sh --prod render --card-type compact $(ML_ARGS)
 
-ml-run-render-all-prod: ## Render both regular and compact card images (prod)
+ml-run-render-all-prod: | ensure-scripts-executable ## Render both regular and compact card images (prod)
 	@echo "Rendering regular cards..."
 	./scripts/ml-processor.sh --prod render --card-type regular $(ML_ARGS)
 	@echo "Rendering compact cards..."
@@ -611,7 +619,7 @@ ml-run-render-all-prod: ## Render both regular and compact card images (prod)
 	@echo "Done! Both regular and compact cards rendered."
 
 # Impersonation mode (generate cards from source chat, store to target chat)
-ml-cards-impersonate: ## Generate cards with impersonation (dev) - SOURCE_CHAT_ID TARGET_CHAT_ID ML_ARGS required
+ml-cards-impersonate: | ensure-scripts-executable ## Generate cards with impersonation (dev) - SOURCE_CHAT_ID TARGET_CHAT_ID ML_ARGS required
 	@if [ -z "$(SOURCE_CHAT_ID)" ] || [ -z "$(TARGET_CHAT_ID)" ]; then \
 		echo "Error: SOURCE_CHAT_ID and TARGET_CHAT_ID are required"; \
 		echo "Usage: make ml-cards-impersonate SOURCE_CHAT_ID=-1001234 TARGET_CHAT_ID=-1005678 ML_ARGS='--timezone UTC'"; \
@@ -619,7 +627,7 @@ ml-cards-impersonate: ## Generate cards with impersonation (dev) - SOURCE_CHAT_I
 	fi
 	./scripts/ml-processor.sh cards --chat-id $(TARGET_CHAT_ID) --source-chat-id $(SOURCE_CHAT_ID) $(ML_ARGS)
 
-ml-cards-impersonate-prod: ## Generate cards with impersonation (prod) - SOURCE_CHAT_ID TARGET_CHAT_ID ML_ARGS required
+ml-cards-impersonate-prod: | ensure-scripts-executable ## Generate cards with impersonation (prod) - SOURCE_CHAT_ID TARGET_CHAT_ID ML_ARGS required
 	@if [ -z "$(SOURCE_CHAT_ID)" ] || [ -z "$(TARGET_CHAT_ID)" ]; then \
 		echo "Error: SOURCE_CHAT_ID and TARGET_CHAT_ID are required"; \
 		echo "Usage: make ml-cards-impersonate-prod SOURCE_CHAT_ID=-1001234 TARGET_CHAT_ID=-1005678 ML_ARGS='--timezone UTC'"; \
@@ -628,7 +636,7 @@ ml-cards-impersonate-prod: ## Generate cards with impersonation (prod) - SOURCE_
 	./scripts/ml-processor.sh --prod cards --chat-id $(TARGET_CHAT_ID) --source-chat-id $(SOURCE_CHAT_ID) $(ML_ARGS)
 
 # Utility
-ml-shell: ## Open shell in ml-processor container
+ml-shell: | ensure-scripts-executable ## Open shell in ml-processor container
 	./scripts/ml-processor.sh shell
 
 ml-clean-dev: ## Clean all ML data (dev - PostgreSQL + Qdrant)
@@ -650,10 +658,10 @@ ml-clean-prod: ## Clean all ML data (prod - PostgreSQL + Qdrant)
 	@echo "ML data cleaned (prod)"
 
 # Card cleanup targets
-ml-clean-cards-dev: ## Clean cards for a chat (dev). Usage: make ml-clean-cards-dev ML_ARGS="--chat-id -1003280306634 [--week 2024-12-16]"
+ml-clean-cards-dev: | ensure-scripts-executable ## Clean cards for a chat (dev). Usage: make ml-clean-cards-dev ML_ARGS="--chat-id -1003280306634 [--week 2024-12-16]"
 	./scripts/ml-processor.sh clean-cards $(ML_ARGS)
 
-ml-clean-cards-prod: ## Clean cards for a chat (prod). Usage: make ml-clean-cards-prod ML_ARGS="--chat-id -1003280306634 [--week 2024-12-16] [--force]"
+ml-clean-cards-prod: | ensure-scripts-executable ## Clean cards for a chat (prod). Usage: make ml-clean-cards-prod ML_ARGS="--chat-id -1003280306634 [--week 2024-12-16] [--force]"
 	./scripts/ml-processor.sh --prod clean-cards $(ML_ARGS)
 
 # =============================================================================
@@ -847,28 +855,28 @@ ranked-status-chat-prod: ## Show ranked tournament status for specific chat (pro
 # =============================================================================
 # ARENA SOUNDS (arena-sounds-*)
 # =============================================================================
-arena-sounds-upload: ## Upload arena sounds to development storage (MinIO)
+arena-sounds-upload: | ensure-scripts-executable ## Upload arena sounds to development storage (MinIO)
 	@$(SCRIPTS_DIR)/upload-arena-sounds.sh --dev
 
-arena-sounds-upload-prod: ## Upload arena sounds to production storage (Linode)
+arena-sounds-upload-prod: | ensure-scripts-executable ## Upload arena sounds to production storage (Linode)
 	@$(SCRIPTS_DIR)/upload-arena-sounds.sh --prod
 
-arena-sounds-list: ## List arena sounds in development storage
+arena-sounds-list: | ensure-scripts-executable ## List arena sounds in development storage
 	@$(SCRIPTS_DIR)/upload-arena-sounds.sh --dev --list
 
-arena-sounds-list-prod: ## List arena sounds in production storage
+arena-sounds-list-prod: | ensure-scripts-executable ## List arena sounds in production storage
 	@$(SCRIPTS_DIR)/upload-arena-sounds.sh --prod --list
 
-arena-sounds-clean: ## Delete all arena sounds from development storage (MinIO)
+arena-sounds-clean: | ensure-scripts-executable ## Delete all arena sounds from development storage (MinIO)
 	@$(SCRIPTS_DIR)/upload-arena-sounds.sh --dev --clean
 
-arena-sounds-clean-prod: ## Delete all arena sounds from production storage (Linode)
+arena-sounds-clean-prod: | ensure-scripts-executable ## Delete all arena sounds from production storage (Linode)
 	@$(SCRIPTS_DIR)/upload-arena-sounds.sh --prod --clean
 
-arena-sounds-normalize: ## Normalize arena sounds loudness (EBU R128) - backs up originals
+arena-sounds-normalize: | ensure-scripts-executable ## Normalize arena sounds loudness (EBU R128) - backs up originals
 	@$(SCRIPTS_DIR)/normalize-audio.sh
 
-arena-sounds-normalize-dry: ## Preview audio normalization without making changes
+arena-sounds-normalize-dry: | ensure-scripts-executable ## Preview audio normalization without making changes
 	@$(SCRIPTS_DIR)/normalize-audio.sh --dry-run
 
 # =============================================================================

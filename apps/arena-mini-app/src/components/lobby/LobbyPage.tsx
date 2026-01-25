@@ -17,7 +17,7 @@ import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
 import { GameButton, RPGPanel } from '../ui'
 import { usePolling, useErrorBanner } from '../../hooks'
 import { useSoundContext } from '../../contexts'
-import arenaLogo from '../../../assets/images/logo/logo.webp'
+import arenaLogo from '../../../assets/images/logo/logo-wide.webp'
 
 import type { Match, GameConstants } from '../../types'
 

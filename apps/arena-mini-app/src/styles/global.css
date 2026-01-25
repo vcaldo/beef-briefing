@@ -1914,6 +1914,8 @@ a:focus:not(:focus-visible),
   gap: var(--battle-gap, 24px);
   padding: 16px;
   background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
+  flex: 1;
+  min-height: 0; /* Allow shrinking */
   min-height: 400px;
   position: relative;
 }
@@ -1974,19 +1976,20 @@ a:focus:not(:focus-visible),
    Battle Log (Compact RPG-themed)
    ============================================================================= */
 .battle-log-outer {
-  margin: 8px 12px;
+  margin: 0 12px 8px;
+  margin-top: auto; /* Push to bottom */
+  flex-shrink: 0; /* Don't shrink */
 }
 
 .battle-log-inner {
-  max-height: calc(33vh - 48px);
-  min-height: 80px;
+  padding: 8px 6px;
 }
 
 .battle-log-content {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: calc(33vh - 60px);
+  max-height: 100px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(90, 74, 58, 0.3) transparent;
@@ -2190,9 +2193,10 @@ a:focus:not(:focus-visible),
 .battle-page {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  padding-bottom: calc(var(--tab-bar-height) + 16px);
+  height: 100vh;
+  padding-bottom: var(--tab-bar-height);
   background: var(--arena-bg-dark);
+  overflow: hidden;
 }
 
 .battle-header {

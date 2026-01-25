@@ -156,10 +156,16 @@ export const BattleLog = ({
 
   /**
    * Get visible events based on currentEventIndex
+   * - When not animated: show all events (static display for battle history)
+   * - When animated and index < 0: show nothing (waiting for animation to start)
+   * - When animated and index >= 0: show events up to current index
    */
   const visibleEvents = useMemo(() => {
-    if (!animated || currentEventIndex < 0) {
+    if (!animated) {
       return events
+    }
+    if (currentEventIndex < 0) {
+      return []
     }
     return events.slice(0, currentEventIndex + 1)
   }, [events, currentEventIndex, animated])

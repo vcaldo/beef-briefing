@@ -271,8 +271,9 @@ func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Reque
 	addTransactionAttribute(ctx, "chat_id", chatID)
 	addTransactionAttribute(ctx, "match_type", matchType)
 	addTransactionAttribute(ctx, "limit", limit)
+	addTransactionAttribute(ctx, "offset", offset)
 
-	entries, err := h.service.GetLeaderboard(ctx, chatID, matchType, limit, offset)
+	entries, total, err := h.service.GetLeaderboard(ctx, chatID, matchType, limit, offset)
 	if err != nil {
 		logAndNoticeError(ctx, "failed to get leaderboard", err)
 		httputil.RespondError(w, "failed to get leaderboard", http.StatusInternalServerError)
@@ -280,8 +281,12 @@ func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Reque
 	}
 
 	httputil.RespondJSON(w, map[string]interface{}{
-		"entries": entries,
-		"type":    matchType,
+		"entries":  entries,
+		"type":     matchType,
+		"total":    total,
+		"page":     offset / limit,
+		"limit":    limit,
+		"has_more": offset+len(entries) < total,
 	}, http.StatusOK)
 }
 

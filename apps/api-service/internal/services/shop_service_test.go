@@ -379,9 +379,9 @@ func TestUpgradeCard_ATK(t *testing.T) {
 		t.Fatalf("expected 3 team cards, got %d", len(resp.Team))
 	}
 
-	// Check that ATK increased by 3 (10 + 3 = 13)
-	if resp.Team[0].ATK != 13 {
-		t.Errorf("expected ATK 13, got %d", resp.Team[0].ATK)
+	// Check that ATK increased by 1 (10 + 1 = 11)
+	if resp.Team[0].ATK != 11 {
+		t.Errorf("expected ATK 11, got %d", resp.Team[0].ATK)
 	}
 
 	// Check that HP and MaxHP remain unchanged

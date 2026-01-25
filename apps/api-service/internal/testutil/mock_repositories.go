@@ -1100,8 +1100,8 @@ func (m *MockGameRepository) GetChatsWithTimezone(ctx context.Context) ([]*repos
 // =============================================================================
 
 // GetLeaderboard is a stub for interface compliance.
-func (m *MockGameRepository) GetLeaderboard(ctx context.Context, chatID int64, matchType repository.MatchType, limit, offset int) ([]*repository.LeaderboardEntry, error) {
-	return []*repository.LeaderboardEntry{}, nil
+func (m *MockGameRepository) GetLeaderboard(ctx context.Context, chatID int64, matchType repository.MatchType, limit, offset int) ([]*repository.LeaderboardEntry, int, error) {
+	return []*repository.LeaderboardEntry{}, 0, nil
 }
 
 // UpdateLeaderboard is a stub for interface compliance.

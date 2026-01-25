@@ -269,34 +269,60 @@ func (r *MatchRepository) GetMatchRounds(ctx context.Context, matchID string) ([
 	return rounds, rows.Err()
 }
 
-// GetLeaderboard retrieves leaderboard entries for a chat
-func (r *MatchRepository) GetLeaderboard(ctx context.Context, chatID int64, matchType MatchType, limit, offset int) ([]*LeaderboardEntry, error) {
+// GetLeaderboard retrieves leaderboard entries for a chat with ranking
+func (r *MatchRepository) GetLeaderboard(ctx context.Context, chatID int64, matchType MatchType, limit, offset int) ([]*LeaderboardEntry, int, error) {
 	defer nrutil.StartSegment(ctx, "db:get-leaderboard")()
 
-	orderBy := "ranked_wins DESC, ranked_losses ASC"
-	if matchType == MatchTypeRegular {
-		orderBy = "regular_wins DESC, regular_losses ASC"
+	// Get total count
+	countQuery := `SELECT COUNT(*) FROM game_leaderboard WHERE chat_id = $1`
+	var total int
+	if err := r.db.QueryRowContext(ctx, countQuery, chatID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count leaderboard: %w", err)
+	}
+
+	// Determine ordering and score expression based on match type
+	var orderBy, scoreExpr string
+	if matchType == MatchTypeRanked {
+		// Ranked: Order by tournaments won, then wins, then fewest losses
+		orderBy = "ranked_tournaments_won DESC, ranked_wins DESC, ranked_losses ASC"
+		scoreExpr = "ranked_tournaments_won::FLOAT"
+	} else {
+		// Regular: Order by Wilson Score
+		orderBy = "wilson_score_lower_bound(regular_wins, regular_losses) DESC, regular_wins DESC, regular_losses ASC"
+		scoreExpr = "wilson_score_lower_bound(regular_wins, regular_losses)"
 	}
 
 	query := fmt.Sprintf(`
-		SELECT l.user_id, l.chat_id,
-		       l.ranked_wins, l.ranked_losses, l.ranked_draws, l.ranked_tournaments_played, l.ranked_tournaments_won,
-		       l.ranked_current_streak, l.ranked_best_streak,
-		       l.regular_wins, l.regular_losses, l.regular_draws, l.regular_matches_played,
-		       l.regular_current_streak, l.regular_best_streak,
-		       l.head_to_head, l.first_match_at, l.last_match_at,
-		       u.first_name, COALESCE(u.username, ''),
-		       (SELECT minio_object_key FROM user_profile_photos WHERE user_id = l.user_id ORDER BY width DESC LIMIT 1)
-		FROM game_leaderboard l
-		JOIN users u ON l.user_id = u.id
-		WHERE l.chat_id = $1
-		ORDER BY %s
+		WITH ranked_entries AS (
+			SELECT l.user_id, l.chat_id,
+			       l.ranked_wins, l.ranked_losses, l.ranked_draws, l.ranked_tournaments_played, l.ranked_tournaments_won,
+			       l.ranked_current_streak, l.ranked_best_streak,
+			       l.regular_wins, l.regular_losses, l.regular_draws, l.regular_matches_played,
+			       l.regular_current_streak, l.regular_best_streak,
+			       l.head_to_head, l.first_match_at, l.last_match_at,
+			       u.first_name, COALESCE(u.username, '') as username,
+			       (SELECT minio_object_key FROM user_profile_photos WHERE user_id = l.user_id ORDER BY width DESC LIMIT 1) as photo_key,
+			       %s as score,
+			       ROW_NUMBER() OVER (ORDER BY %s) as rank
+			FROM game_leaderboard l
+			JOIN users u ON l.user_id = u.id
+			WHERE l.chat_id = $1
+		)
+		SELECT user_id, chat_id,
+		       ranked_wins, ranked_losses, ranked_draws, ranked_tournaments_played, ranked_tournaments_won,
+		       ranked_current_streak, ranked_best_streak,
+		       regular_wins, regular_losses, regular_draws, regular_matches_played,
+		       regular_current_streak, regular_best_streak,
+		       head_to_head, first_match_at, last_match_at,
+		       first_name, username, photo_key, rank, score
+		FROM ranked_entries
+		ORDER BY rank
 		LIMIT $2 OFFSET $3
-	`, orderBy)
+	`, scoreExpr, orderBy)
 
 	rows, err := r.db.QueryContext(ctx, query, chatID, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query leaderboard: %w", err)
+		return nil, 0, fmt.Errorf("failed to query leaderboard: %w", err)
 	}
 	defer rows.Close()
 
@@ -310,15 +336,15 @@ func (r *MatchRepository) GetLeaderboard(ctx context.Context, chatID int64, matc
 			&e.RegularWins, &e.RegularLosses, &e.RegularDraws, &e.RegularMatchesPlayed,
 			&e.RegularCurrentStreak, &e.RegularBestStreak,
 			&e.HeadToHead, &e.FirstMatchAt, &e.LastMatchAt,
-			&e.FirstName, &e.Username, &e.PhotoObjectKey,
+			&e.FirstName, &e.Username, &e.PhotoObjectKey, &e.Rank, &e.Score,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan leaderboard row: %w", err)
+			return nil, 0, fmt.Errorf("failed to scan leaderboard row: %w", err)
 		}
 		entries = append(entries, e)
 	}
 
-	return entries, rows.Err()
+	return entries, total, rows.Err()
 }
 
 // UpdateLeaderboard updates a user's leaderboard stats (calls DB function)

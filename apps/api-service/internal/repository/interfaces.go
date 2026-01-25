@@ -166,7 +166,7 @@ type GameRepositoryInterface interface {
 	GetChatsWithTimezone(ctx context.Context) ([]*ChatTimezone, error)
 
 	// Leaderboard and stats operations
-	GetLeaderboard(ctx context.Context, chatID int64, matchType MatchType, limit, offset int) ([]*LeaderboardEntry, error)
+	GetLeaderboard(ctx context.Context, chatID int64, matchType MatchType, limit, offset int) ([]*LeaderboardEntry, int, error)
 	UpdateLeaderboard(ctx context.Context, userID, chatID int64, matchType MatchType, isWin bool, opponentID *int64, isTournamentWin bool, isDraw bool) error
 	GetMatchHistory(ctx context.Context, chatID, userID int64, limit, offset int) ([]*MatchHistoryEntry, int, error)
 	GetH2HRecord(ctx context.Context, chatID, userID, opponentID int64) (*H2HRecord, error)

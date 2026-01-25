@@ -1671,6 +1671,321 @@ func TestGetLeaderboard_UsesDefaultType(t *testing.T) {
 	}
 }
 
+func TestGetLeaderboard_Returns400OnMissingChatID(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	// Create token WITHOUT chat_id - this will trigger the 400 error
+	// since there's no fallback available when URL also lacks chat_id
+	token, _ := jwtAuth.CreateToken(12345, nil, nil, "Test User")
+
+	// Request without chat_id parameter and JWT also has no chat_id
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/leaderboard", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetLeaderboard(rr, req)
+
+	// When JWT has no chat_id and URL has no chat_id, should return 400 (chat_id is required)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestGetLeaderboard_TypeRegular(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	// Check if wilson_score_lower_bound function exists (migration 014)
+	var exists bool
+	err := tdb.DB.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1 FROM pg_proc WHERE proname = 'wilson_score_lower_bound'
+		)
+	`).Scan(&exists)
+	if err != nil || !exists {
+		t.Skip("Skipping: wilson_score_lower_bound function not found (migration 014 not applied)")
+	}
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/leaderboard?chat_id=-1001234567890&type=regular", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetLeaderboard(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if resp["type"] != "regular" {
+		t.Errorf("expected type 'regular', got '%s'", resp["type"])
+	}
+}
+
+func TestGetLeaderboard_CustomPagination(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/leaderboard?chat_id=-1001234567890&limit=10&offset=20", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetLeaderboard(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify limit in response
+	if int(resp["limit"].(float64)) != 10 {
+		t.Errorf("expected limit 10, got %v", resp["limit"])
+	}
+
+	// Verify page calculation: offset / limit = 20 / 10 = 2
+	if int(resp["page"].(float64)) != 2 {
+		t.Errorf("expected page 2, got %v", resp["page"])
+	}
+}
+
+func TestGetLeaderboard_ResponseStructure(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/leaderboard?chat_id=-1001234567890", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetLeaderboard(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify all required fields exist
+	requiredFields := []string{"entries", "type", "total", "page", "limit", "has_more"}
+	for _, field := range requiredFields {
+		if _, ok := resp[field]; !ok {
+			t.Errorf("response missing required field: %s", field)
+		}
+	}
+
+	// Verify entries is an array
+	if _, ok := resp["entries"].([]interface{}); !ok {
+		t.Error("entries should be an array")
+	}
+
+	// Verify has_more is a boolean
+	if _, ok := resp["has_more"].(bool); !ok {
+		t.Error("has_more should be a boolean")
+	}
+
+	// Verify total is a number
+	if _, ok := resp["total"].(float64); !ok {
+		t.Error("total should be a number")
+	}
+}
+
+func TestGetLeaderboard_AccessDenied(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	// Token for a different chat
+	differentChatID := int64(-1009999999999)
+	token, _ := jwtAuth.CreateToken(12345, &differentChatID, nil, "Test User")
+
+	// Request for a different chat than the token's chat_id
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/leaderboard?chat_id=-1001234567890", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetLeaderboard(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusForbidden, rr.Code, rr.Body.String())
+	}
+}
+
+func TestGetLeaderboard_EmptyLeaderboard(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	// Use a chat that definitely has no leaderboard data
+	chatID := int64(-1008888888888)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/leaderboard?chat_id=-1008888888888", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetLeaderboard(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	entries := resp["entries"].([]interface{})
+	if len(entries) != 0 {
+		t.Errorf("expected empty entries, got %d entries", len(entries))
+	}
+
+	if int(resp["total"].(float64)) != 0 {
+		t.Errorf("expected total 0, got %v", resp["total"])
+	}
+
+	if resp["has_more"].(bool) != false {
+		t.Error("expected has_more to be false for empty leaderboard")
+	}
+}
+
+func TestGetLeaderboard_LimitClamping(t *testing.T) {
+	tdb := testutil.SetupTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
+
+	cfg := &config.Config{}
+	handler := NewArenaHandler(arenaService, cfg)
+
+	secretKey := "test-jwt-secret-key-for-testing"
+	jwtAuth := middleware.NewJWTAuth(secretKey)
+	chatID := int64(-1001234567890)
+	token, _ := jwtAuth.CreateToken(12345, &chatID, nil, "Test User")
+
+	// Request with limit > 100 (should be clamped to 100)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/leaderboard?chat_id=-1001234567890&limit=500", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	claims, _ := jwtAuth.ValidateToken(token)
+	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.HandleGetLeaderboard(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Limit should be clamped to max (100)
+	if int(resp["limit"].(float64)) != 100 {
+		t.Errorf("expected limit to be clamped to 100, got %v", resp["limit"])
+	}
+}
+
 // =============================================================================
 // Get Constants Tests
 // =============================================================================

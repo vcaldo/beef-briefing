@@ -513,7 +513,7 @@ export function BattlePage({
 
             <div className="rpg-victory-actions">
               <GameButton
-                variant="primary"
+                variant="secondary"
                 onClick={(e) => {
                   e.stopPropagation()
                   handleReturnToLobby()

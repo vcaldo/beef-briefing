@@ -214,29 +214,24 @@ export function TeamPhaseModal({
   return (
     <div className="team-phase-page rpg-team-page">
       <RPGPanel variant="outer" className="rpg-team-modal-outer">
-        {/* Header with title, coins, and timer */}
+        {/* Header with coins and timer */}
         <RPGPanel variant="inner" className="rpg-team-modal-header">
           <div className="rpg-team-header-row">
-            <div className="rpg-team-header-left">
-              <h1 className="rpg-team-title">Battle Formation</h1>
-              {isSubmitted && (
-                <span className="rpg-team-submitted-badge">Team Submitted</span>
-              )}
-            </div>
-            <div className="rpg-team-header-right">
-              <CoinDisplay amount={coins} size="lg" animated />
-              {shopData?.deadline && (
-                <div className="rpg-team-timer">
-                  <CountdownTimer
-                    deadline={shopData.deadline}
-                    onExpire={() => {
-                      // Timer expired - will be handled by polling
-                    }}
-                    timerThresholds={gameConstants?.timer_thresholds}
-                  />
-                </div>
-              )}
-            </div>
+            {isSubmitted && (
+              <span className="rpg-team-submitted-badge">Team Submitted</span>
+            )}
+            <CoinDisplay amount={coins} size="lg" animated />
+            {shopData?.deadline && (
+              <div className="rpg-team-timer">
+                <CountdownTimer
+                  deadline={shopData.deadline}
+                  onExpire={() => {
+                    // Timer expired - will be handled by polling
+                  }}
+                  timerThresholds={gameConstants?.timer_thresholds}
+                />
+              </div>
+            )}
           </div>
         </RPGPanel>
 
@@ -286,7 +281,7 @@ export function TeamPhaseModal({
                     {!isSubmitted && (
                       <div className="team-phase-card-upgrades">
                         <GameButton
-                          variant="danger"
+                          variant="primary"
                           shape="square"
                           size="sm"
                           onClick={() => handleUpgrade(card.position, 'atk')}
@@ -297,7 +292,7 @@ export function TeamPhaseModal({
                           {actionLoading === `upgrade-${card.position}-atk` ? (
                             <LoadingSpinner size="sm" inline />
                           ) : (
-                            '+3 ⚔️'
+                            '+3'
                           )}
                         </GameButton>
                         <GameButton
@@ -312,7 +307,7 @@ export function TeamPhaseModal({
                           {actionLoading === `upgrade-${card.position}-hp` ? (
                             <LoadingSpinner size="sm" inline />
                           ) : (
-                            '+3 🥩'
+                            '+3'
                           )}
                         </GameButton>
                       </div>

@@ -1954,10 +1954,10 @@ a:focus:not(:focus-visible),
    ============================================================================= */
 .battle-arena {
   display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--battle-gap, 24px);
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  gap: var(--battle-gap, 16px);
   padding: 16px;
   /* Background is set via .page-bg--arena when background image is loaded */
   /* Fallback gradient when no background image is available */
@@ -1971,12 +1971,6 @@ a:focus:not(:focus-visible),
 /* When using page-bg--arena, make background transparent so the image shows */
 .battle-arena.page-bg--arena {
   background: transparent;
-}
-
-.battle-team {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
 }
 
 .battle-vs {

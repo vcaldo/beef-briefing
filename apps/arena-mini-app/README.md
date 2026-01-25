@@ -164,6 +164,91 @@ The `/api/v1/mini-app/arena/constants` endpoint provides centralized game config
 | Upgrade | 1 | +1 ATK or +3 HP per upgrade |
 | Team size | 3 | Cards required for battle |
 
+## Battle Response Format
+
+The `/api/v1/mini-app/arena/match/{id}/battle` endpoint returns battle results with two event formats:
+
+### Response Structure
+
+```json
+{
+  "match_id": "uuid",
+  "winner_id": 123456,
+  "is_draw": false,
+  "combats": [...],
+  "events": [...],
+  "num_combats": 3,
+  "num_rounds": 7,
+  "team_a_damage": 85,
+  "team_b_damage": 108,
+  "damage_dealt": 85,
+  "damage_taken": 108,
+  "team_a_final": {...},
+  "team_b_final": {...},
+  "player_a_id": 123,
+  "player_b_id": 456,
+  "player_a_name": "Alice",
+  "player_b_name": "Bob"
+}
+```
+
+### Combat Grouping
+
+Events are grouped into **combats** - sequences where two cards face each other until one or both die:
+
+```json
+{
+  "combats": [
+    {
+      "combat_number": 1,
+      "events": [
+        {"type": "attack", "attacker_card_id": 1, "defender_card_id": 2, "damage": 15, ...},
+        {"type": "attack", "attacker_card_id": 2, "defender_card_id": 1, "damage": 12, ...},
+        {"type": "death", "defender_card_id": 2, ...},
+        {"type": "summary", "killer_card_id": 1, "kill_streak": 1, ...},
+        {"type": "advance", ...}
+      ],
+      "outcome": "card_b_died"
+    },
+    {
+      "combat_number": 2,
+      "events": [...],
+      "outcome": "card_a_died"
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `combats` | array | Events grouped by card-vs-card duels |
+| `events` | array | Flat list of all events (backwards compatible) |
+| `num_combats` | int | Total number of combats in the battle |
+| `num_rounds` | int | Total number of attack rounds |
+| `damage_dealt` | int | Total damage dealt by requesting user's team |
+| `damage_taken` | int | Total damage taken by requesting user's team |
+
+### Combat Outcomes
+
+| Outcome | Description |
+|---------|-------------|
+| `card_a_died` | Player A's card was defeated |
+| `card_b_died` | Player B's card was defeated |
+| `both_died` | Both cards died in the same round |
+| `victory` | Final combat ending the battle |
+
+### Event Types
+
+| Type | Description |
+|------|-------------|
+| `attack` | Card attacks opponent (includes damage, HP before/after) |
+| `death` | Card is defeated |
+| `summary` | Duel stats (damage dealt/taken, rounds, kill streak) |
+| `advance` | Next card comes forward after a death |
+| `victory` | Battle ends with a winner |
+
+**Note**: Events within `combats` do not include the `round` field since they are already grouped by combat. The flat `events` array includes `round` for backwards compatibility.
+
 ## Development
 
 ```bash

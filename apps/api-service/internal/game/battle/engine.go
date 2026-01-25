@@ -139,7 +139,7 @@ func Simulate(teamA, teamB *Team) *Result {
 			victoryEventB := BattleEvent{
 				Type:       EventVictory,
 				Round:      round,
-				Message:    fmt.Sprintf("🏆 %s wins!", getTeamName(b)),
+				Message:    fmt.Sprintf("%s wins!", getTeamName(b)),
 				CardStates: captureCardStates(a, b, 0, 0),
 			}
 			events = append(events, victoryEventB)
@@ -159,7 +159,7 @@ func Simulate(teamA, teamB *Team) *Result {
 			victoryEventA := BattleEvent{
 				Type:       EventVictory,
 				Round:      round,
-				Message:    fmt.Sprintf("🏆 %s wins!", getTeamName(a)),
+				Message:    fmt.Sprintf("%s wins!", getTeamName(a)),
 				CardStates: captureCardStates(a, b, 0, 0),
 			}
 			events = append(events, victoryEventA)
@@ -191,7 +191,7 @@ func Simulate(teamA, teamB *Team) *Result {
 			Damage:              damageToB,
 			HPBefore:            frontB.HP,
 			HPAfter:             frontB.HP - damageToB,
-			Message:             fmt.Sprintf("🗡️ %s attacks %s (%d ATK) → %s %d HP", frontA.Name, frontB.Name, damageToB, generateHealthBar(frontB.HP-damageToB, frontB.MaxHP), frontB.HP-damageToB),
+			Message:             fmt.Sprintf("%s attacks %s (%d ATK) → %s %d HP", frontA.Name, frontB.Name, damageToB, generateHealthBar(frontB.HP-damageToB, frontB.MaxHP), frontB.HP-damageToB),
 		})
 
 		// Record attack from B to A
@@ -205,7 +205,7 @@ func Simulate(teamA, teamB *Team) *Result {
 			Damage:              damageToA,
 			HPBefore:            frontA.HP,
 			HPAfter:             frontA.HP - damageToA,
-			Message:             fmt.Sprintf("🗡️ %s attacks %s (%d ATK) → %s %d HP", frontB.Name, frontA.Name, damageToA, generateHealthBar(frontA.HP-damageToA, frontA.MaxHP), frontA.HP-damageToA),
+			Message:             fmt.Sprintf("%s attacks %s (%d ATK) → %s %d HP", frontB.Name, frontA.Name, damageToA, generateHealthBar(frontA.HP-damageToA, frontA.MaxHP), frontA.HP-damageToA),
 		})
 
 		// Apply damage and update duel stats
@@ -239,7 +239,7 @@ func Simulate(teamA, teamB *Team) *Result {
 			Round:               round,
 			DefenderCardID:      frontA.CardID,
 			DefenderTeamOwnerID: a.OwnerID,
-			Message:             fmt.Sprintf("💀 %s defeats %s", frontB.Name, frontA.Name),
+			Message:             fmt.Sprintf("%s defeats %s", frontB.Name, frontA.Name),
 			CardStates:          captureCardStates(a, b, frontB.CardID, frontA.CardID),
 		}
 		events = append(events, deathEventA)
@@ -257,7 +257,7 @@ func Simulate(teamA, teamB *Team) *Result {
 
 			streakMsg := ""
 			if streak >= 2 {
-				streakMsg = fmt.Sprintf(" 🔥 x%d", streak)
+				streakMsg = fmt.Sprintf(" x%d streak", streak)
 			}
 
 			summaryEventB := BattleEvent{
@@ -269,11 +269,11 @@ func Simulate(teamA, teamB *Team) *Result {
 				TotalDamageTaken: currentDuelB.damageTaken,
 				RoundsInDuel:     currentDuelB.roundsCount,
 				KillStreak:       streak,
-				Message: fmt.Sprintf("⚔️ %s defeats %s | %d rounds | %d dealt / %d taken | %d❤️%s",
-					frontB.Name, frontA.Name, currentDuelB.roundsCount,
+				Message: fmt.Sprintf("%d rounds | %d dealt / %d taken | %d HP left%s",
+					currentDuelB.roundsCount,
 					currentDuelB.damageDealt, currentDuelB.damageTaken,
 					frontB.HP, streakMsg),
-				CardStates:       captureCardStates(a, b, frontB.CardID, frontA.CardID),
+				CardStates: captureCardStates(a, b, frontB.CardID, frontA.CardID),
 			}
 			events = append(events, summaryEventB)
 		}
@@ -285,7 +285,7 @@ func Simulate(teamA, teamB *Team) *Result {
 			Round:               round,
 			DefenderCardID:      frontB.CardID,
 			DefenderTeamOwnerID: b.OwnerID,
-			Message:             fmt.Sprintf("💀 %s defeats %s", frontA.Name, frontB.Name),
+			Message:             fmt.Sprintf("%s defeats %s", frontA.Name, frontB.Name),
 			CardStates:          captureCardStates(a, b, frontA.CardID, frontB.CardID),
 		}
 		events = append(events, deathEventB)
@@ -303,7 +303,7 @@ func Simulate(teamA, teamB *Team) *Result {
 
 			streakMsg := ""
 			if streak >= 2 {
-				streakMsg = fmt.Sprintf(" 🔥 x%d", streak)
+				streakMsg = fmt.Sprintf(" x%d streak", streak)
 			}
 
 			summaryEventA := BattleEvent{
@@ -315,11 +315,11 @@ func Simulate(teamA, teamB *Team) *Result {
 				TotalDamageTaken: currentDuelA.damageTaken,
 				RoundsInDuel:     currentDuelA.roundsCount,
 				KillStreak:       streak,
-				Message: fmt.Sprintf("⚔️ %s defeats %s | %d rounds | %d dealt / %d taken | %d❤️%s",
-					frontA.Name, frontB.Name, currentDuelA.roundsCount,
+				Message: fmt.Sprintf("%d rounds | %d dealt / %d taken | %d HP left%s",
+					currentDuelA.roundsCount,
 					currentDuelA.damageDealt, currentDuelA.damageTaken,
 					frontA.HP, streakMsg),
-				CardStates:       captureCardStates(a, b, frontA.CardID, frontB.CardID),
+				CardStates: captureCardStates(a, b, frontA.CardID, frontB.CardID),
 			}
 			events = append(events, summaryEventA)
 		}
@@ -327,10 +327,27 @@ func Simulate(teamA, teamB *Team) *Result {
 
 	// Advance if cards died
 	if aDied || bDied {
+		nextA := a.GetFront()
+		nextB := b.GetFront()
+
+		var advanceMsg string
+		switch {
+		case nextA != nil && nextB != nil:
+			advanceMsg = fmt.Sprintf("%s (%d HP) vs %s (%d ATK/%d HP)",
+				nextA.Name, nextA.HP,
+				nextB.Name, nextB.ATK, nextB.HP)
+		case nextA != nil:
+			advanceMsg = fmt.Sprintf("%s advances (%d HP)", nextA.Name, nextA.HP)
+		case nextB != nil:
+			advanceMsg = fmt.Sprintf("%s advances (%d HP)", nextB.Name, nextB.HP)
+		default:
+			advanceMsg = "No cards remaining"
+		}
+
 		advanceEvent := BattleEvent{
 			Type:       EventAdvance,
 			Round:      round,
-			Message:    "➡️ Next cards advance",
+			Message:    advanceMsg,
 			CardStates: captureCardStates(a, b, 0, 0),
 		}
 		events = append(events, advanceEvent)
@@ -342,7 +359,7 @@ func Simulate(teamA, teamB *Team) *Result {
 		damageVictoryA := BattleEvent{
 			Type:       EventVictory,
 			Round:      round,
-			Message:    fmt.Sprintf("🏆 %s wins!", getTeamName(a)),
+			Message:    fmt.Sprintf("%s wins!", getTeamName(a)),
 			CardStates: captureCardStates(a, b, 0, 0),
 		}
 		events = append(events, damageVictoryA)
@@ -361,7 +378,7 @@ func Simulate(teamA, teamB *Team) *Result {
 		damageVictoryB := BattleEvent{
 			Type:       EventVictory,
 			Round:      round,
-			Message:    fmt.Sprintf("🏆 %s wins!", getTeamName(b)),
+			Message:    fmt.Sprintf("%s wins!", getTeamName(b)),
 			CardStates: captureCardStates(a, b, 0, 0),
 		}
 		events = append(events, damageVictoryB)
@@ -382,7 +399,7 @@ func Simulate(teamA, teamB *Team) *Result {
 	drawEvent := BattleEvent{
 		Type:       EventVictory,
 		Round:      round,
-		Message:    "🤝 Draw!",
+		Message:    "Draw!",
 		CardStates: captureCardStates(a, b, 0, 0),
 	}
 	events = append(events, drawEvent)

@@ -397,11 +397,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
                         return streak > 0 ? <span className="streak">🔥{streak}</span> : null
                       })()}
                     </div>
-                    <div className="rpg-leaderboard-score">
-                      {leaderboardType === 'ranked'
-                        ? entry.score.toFixed(0)
-                        : `${(entry.score * 100).toFixed(0)}%`}
-                    </div>
                   </div>
                 ))}
               </div>
@@ -504,9 +499,9 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
           </div>
         </RPGPanel>
 
-        {/* Overall stats - blue panel for emphasis */}
-        <RPGPanel variant="inner-blue" className="rpg-section-panel">
-          <h3 className="rpg-section-title">Overall</h3>
+        {/* Overall stats */}
+        <RPGPanel variant="inner" className="rpg-section-panel">
+          <h3 className="rpg-section-title">📊 Overall</h3>
           <div className="rpg-stats-grid">
             <div className="rpg-stat-card">
               <span className="rpg-stat-value">{stats.total_matches}</span>

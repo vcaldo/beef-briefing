@@ -53,6 +53,7 @@ interface ProfileApiProfile {
   user_id: number
   first_name: string
   username?: string
+  photo_url?: string
   ranked_wins: number
   ranked_losses: number
   ranked_draws: number
@@ -356,7 +357,7 @@ class ArenaApiClient extends BaseApiClient {
       user_id: p.user_id,
       first_name: p.first_name,
       username: p.username || undefined,
-      photo_url: undefined, // Backend doesn't return photo_url yet
+      photo_url: p.photo_url || undefined,
       stats: {
         ranked_wins: p.ranked_wins,
         ranked_losses: p.ranked_losses,

@@ -366,6 +366,8 @@ type UserProfile struct {
 	RegularRank             int        `json:"regular_rank"`
 	FirstMatchAt            *time.Time `json:"first_match_at,omitempty"`
 	LastMatchAt             *time.Time `json:"last_match_at,omitempty"`
+	PhotoObjectKey          *string    `json:"-"`                        // Internal: minio object key (not serialized)
+	PhotoURL                *string    `json:"photo_url,omitempty"`      // Presigned URL for profile photo
 }
 
 // ============================================================================

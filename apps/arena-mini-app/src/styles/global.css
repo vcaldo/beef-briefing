@@ -1914,6 +1914,8 @@ a:focus:not(:focus-visible),
   gap: var(--battle-gap, 24px);
   padding: 16px;
   background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
+  flex: 1;
+  min-height: 0; /* Allow shrinking */
   min-height: 400px;
   position: relative;
 }
@@ -1971,43 +1973,203 @@ a:focus:not(:focus-visible),
 }
 
 /* =============================================================================
-   Event Log
+   Battle Log (Compact RPG-themed)
    ============================================================================= */
-.event-log {
-  background: var(--arena-bg-medium);
-  border-radius: 12px;
-  max-height: 200px;
+.battle-log-outer {
+  margin: 0 8px 6px;
+  margin-top: auto; /* Push to bottom */
+  flex-shrink: 0; /* Don't shrink */
+}
+
+.battle-log-inner {
+  padding: 4px 2px;
+}
+
+.battle-log-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 150px;
   overflow-y: auto;
-  padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 74, 58, 0.3) transparent;
 }
 
-.event-log-item {
-  padding: 8px 12px;
-  border-radius: 8px;
-  margin-bottom: 4px;
-  font-size: 13px;
-  transition: background 0.2s ease;
+.battle-log-content::-webkit-scrollbar {
+  width: 4px;
 }
 
-.event-log-item:last-child {
-  margin-bottom: 0;
+.battle-log-content::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.event-log-item.current {
+.battle-log-content::-webkit-scrollbar-thumb {
+  background: rgba(90, 74, 58, 0.3);
+  border-radius: 2px;
+}
+
+.battle-log-combat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(90, 74, 58, 0.08);
+  border: 1px solid rgba(90, 74, 58, 0.15);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.battle-log-combat.current {
+  background: rgba(249, 115, 22, 0.1);
+  border-color: var(--arena-orange);
+}
+
+.battle-log-combat.animating {
   background: rgba(249, 115, 22, 0.15);
-  border-left: 3px solid var(--arena-orange);
 }
 
-.event-log-item.attack {
-  color: var(--arena-orange-light);
+.battle-log-combat.played {
+  opacity: 0.6;
 }
 
-.event-log-item.death {
-  color: var(--hp-low);
+.battle-log-combat.slide-in {
+  animation: combat-slide-in 0.3s ease-out;
 }
 
-.event-log-item.victory {
-  color: var(--hp-full);
+@keyframes combat-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Combat header with centered matchup display */
+.combat-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(90, 74, 58, 0.12);
+  margin-bottom: 4px;
+}
+
+.combat-matchup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #6b5a4a;
+}
+
+.combat-matchup .card-name {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.combat-matchup .card-name.is-you {
+  color: var(--arena-orange);
+}
+
+.combat-matchup .vs {
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(90, 74, 58, 0.5);
+  text-transform: lowercase;
+}
+
+.combat-matchup .combat-separator {
+  color: rgba(90, 74, 58, 0.5);
+  margin: 0 2px;
+}
+
+.combat-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(90, 74, 58, 0.5);
+}
+
+.combat-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.event-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Event row alignment - LEFT (Team A / top player) */
+.event-row.align-left {
+  justify-content: flex-start;
+  flex-direction: row; /* icon first, then text */
+}
+
+/* Event row alignment - RIGHT (Team B / bottom player) */
+.event-row.align-right {
+  justify-content: flex-start; /* With row-reverse, flex-start aligns to the RIGHT */
+  flex-direction: row-reverse; /* text first, then icon */
+}
+
+.event-row.align-right .event-message {
+  text-align: right;
+}
+
+/* Event row alignment - CENTER (neutral events like summary, matchups) */
+.event-row.align-center {
+  justify-content: center;
+}
+
+.event-row.align-center .event-message {
+  text-align: center;
+}
+
+.event-message {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  color: #4a3a2a;
+  line-height: 1.3;
+}
+
+.event-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+  opacity: 0.9;
+}
+
+/* Event type icon color tints */
+.event-icon-attack {
+  filter: sepia(25%) saturate(150%) hue-rotate(-5deg);
+}
+
+.event-icon-damage {
+  filter: hue-rotate(-10deg) saturate(140%);
+}
+
+.event-icon-death {
+  filter: grayscale(15%) brightness(0.9);
+}
+
+.event-icon-advance {
+  filter: sepia(20%) hue-rotate(180deg) saturate(120%);
+}
+
+.event-icon-victory {
+  filter: sepia(40%) saturate(180%) brightness(1.1);
+}
+
+.event-icon-summary {
+  filter: sepia(15%) saturate(100%);
 }
 
 /* =============================================================================
@@ -2092,9 +2254,10 @@ a:focus:not(:focus-visible),
 .battle-page {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  padding-bottom: calc(var(--tab-bar-height) + 16px);
+  height: 100vh;
+  padding-bottom: var(--tab-bar-height);
   background: var(--arena-bg-dark);
+  overflow: hidden;
 }
 
 .battle-header {
@@ -2326,99 +2489,7 @@ a:focus:not(:focus-visible),
   justify-content: center;
 }
 
-/* Event Log Enhancements */
-.event-log-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--tg-theme-text-color);
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.event-log-item {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.event-log-item.played {
-  opacity: 0.5;
-  transition: opacity 0.3s ease;
-}
-
-/* Slide-in animation for new log entries */
-.event-log-item.slide-in {
-  animation: log-entry-slide 0.4s ease-out;
-}
-
-@keyframes log-entry-slide {
-  0% {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Highlight background for currently animating event */
-.event-log-item.animating {
-  background: linear-gradient(
-    90deg,
-    rgba(249, 115, 22, 0.15) 0%,
-    rgba(249, 115, 22, 0.05) 100%
-  );
-  border-left: 3px solid var(--arena-orange);
-  padding-left: 9px; /* Adjust for border (12px - 3px) */
-  transition: background 0.3s ease, border-left 0.3s ease, padding-left 0.3s ease;
-}
-
-/* Progress dot that pulses during event animation */
-.event-progress-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--arena-orange);
-  animation: progress-pulse 1.5s ease-in-out infinite;
-  margin-left: 8px;
-}
-
-@keyframes progress-pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(1.3);
-  }
-}
-
-.event-round {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--tg-theme-hint-color);
-  min-width: 24px;
-}
-
-.event-message {
-  flex: 1;
-}
-
-.event-log-item.damage {
-  color: var(--arena-orange);
-}
-
-.event-log-item.advance {
-  color: var(--arena-cyan);
-}
-
-.event-log-item.summary {
-  color: var(--arena-purple);
-  font-style: italic;
-}
+/* Legacy event-log classes removed - replaced by battle-log-* classes above */
 
 /* =============================================================================
    Stats Page
@@ -3360,6 +3431,23 @@ a:focus:not(:focus-visible),
 .stats-outer-panel,
 .profile-outer-panel {
   margin-bottom: 12px;
+}
+
+/* Profile outer panel - simplified borders and equal spacing */
+.profile-outer-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-outer-panel.rpg-panel-outer {
+  border-width: 6px;
+  padding: 6px;
+}
+
+.profile-outer-panel .rpg-panel-inner,
+.profile-outer-panel .rpg-section-panel {
+  margin-bottom: 0;
 }
 
 /* RPG Tab Hint */
@@ -4985,7 +5073,7 @@ button,
 
 /* Shop cards panel */
 .rpg-shop-cards-panel {
-  padding: 12px;
+  padding: 6px;
 }
 
 .rpg-shop-section-header {
@@ -5001,7 +5089,7 @@ button,
 .rpg-shop-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 8px;
 }
 
 .rpg-shop-empty {
@@ -5052,7 +5140,7 @@ button,
   }
 
   .rpg-shop-cards-panel {
-    padding: 8px;
+    padding: 4px;
   }
 
   .rpg-shop-section-header {
@@ -5063,7 +5151,7 @@ button,
   /* Force 2 columns on mobile */
   .rpg-shop-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: 6px;
   }
 
   /* Remove CardSlot frame on mobile shop */

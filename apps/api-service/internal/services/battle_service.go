@@ -272,11 +272,16 @@ func (s *BattleService) runBattle(ctx context.Context, matchID string, pA, pB *r
 	// Complete match for 1v1
 	s.gameRepo.CompleteMatch(ctx, matchID, result.WinnerID)
 
+	// Group events into combats
+	combats := battle.GroupEventsIntoCombats(result.Events, pA.UserID, pB.UserID)
+
 	return &BattleResponse{
 		MatchID:     matchID,
 		WinnerID:    result.WinnerID,
 		IsDraw:      result.IsDraw,
+		Combats:     combats,
 		Events:      result.Events,
+		NumCombats:  len(combats),
 		NumRounds:   result.NumRounds,
 		TeamADamage: result.TeamADamage,
 		TeamBDamage: result.TeamBDamage,
@@ -354,11 +359,13 @@ func (s *BattleService) runArena(ctx context.Context, matchID string, participan
 
 	// Arena format returns summary response (no detailed battle events for replay)
 	return &BattleResponse{
-		MatchID:   matchID,
-		WinnerID:  winnerID,
-		IsDraw:    false,
-		Events:    []battle.BattleEvent{},
-		NumRounds: roundNumber,
+		MatchID:    matchID,
+		WinnerID:   winnerID,
+		IsDraw:     false,
+		Combats:    []battle.Combat{},
+		Events:     []battle.BattleEvent{},
+		NumCombats: 0,
+		NumRounds:  roundNumber,
 	}, nil
 }
 
@@ -392,7 +399,9 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 	if len(rounds) == 0 {
 		return &BattleResponse{
 			MatchID:     matchID,
+			Combats:     []battle.Combat{},
 			Events:      []battle.BattleEvent{},
+			NumCombats:  0,
 			DamageDealt: 0,
 			DamageTaken: 0,
 		}, nil
@@ -415,6 +424,9 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 	if err := jsonutil.Unmarshal(round.BattleLog, &events); err != nil {
 		return nil, fmt.Errorf("failed to parse battle log: %w", err)
 	}
+
+	// Group events into combats
+	combats := battle.GroupEventsIntoCombats(events, round.PlayerAID, round.PlayerBID)
 
 	// Get participant names
 	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
@@ -467,7 +479,9 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 		MatchID:     matchID,
 		WinnerID:    round.WinnerID,
 		IsDraw:      round.IsDraw,
+		Combats:     combats,
 		Events:      events,
+		NumCombats:  len(combats),
 		NumRounds:   round.TotalRounds,
 		TeamADamage: round.PlayerADmg,
 		TeamBDamage: round.PlayerBDmg,

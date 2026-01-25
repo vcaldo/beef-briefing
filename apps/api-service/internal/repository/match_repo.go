@@ -562,7 +562,8 @@ func (r *MatchRepository) GetUserProfile(ctx context.Context, chatID, userID int
 			l.regular_wins, l.regular_losses, l.regular_draws, l.regular_matches_played,
 			l.regular_current_streak, l.regular_best_streak,
 			COALESCE(rgl.rank, 0),
-			l.first_match_at, l.last_match_at
+			l.first_match_at, l.last_match_at,
+			(SELECT minio_object_key FROM user_profile_photos WHERE user_id = l.user_id ORDER BY width DESC LIMIT 1) as photo_key
 		FROM game_leaderboard l
 		JOIN users u ON u.id = l.user_id
 		LEFT JOIN ranked_lb rl ON rl.user_id = l.user_id
@@ -582,6 +583,7 @@ func (r *MatchRepository) GetUserProfile(ctx context.Context, chatID, userID int
 		&profile.RegularCurrentStreak, &profile.RegularBestStreak,
 		&profile.RegularRank,
 		&profile.FirstMatchAt, &profile.LastMatchAt,
+		&profile.PhotoObjectKey,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil

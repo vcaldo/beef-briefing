@@ -165,7 +165,9 @@ type BattleResponse struct {
 	MatchID     string               `json:"match_id"`
 	WinnerID    *int64               `json:"winner_id,omitempty"`
 	IsDraw      bool                 `json:"is_draw"`
+	Combats     []battle.Combat      `json:"combats"`
 	Events      []battle.BattleEvent `json:"events"`
+	NumCombats  int                  `json:"num_combats"`
 	NumRounds   int                  `json:"num_rounds"`
 	TeamADamage int                  `json:"team_a_damage"`
 	TeamBDamage int                  `json:"team_b_damage"`
@@ -791,6 +793,13 @@ func (s *ArenaService) GetProfile(ctx context.Context, chatID, userID int64) (*A
 	}
 	if profile == nil {
 		return nil, nil
+	}
+
+	// Generate presigned URL for profile photo
+	if profile.PhotoObjectKey != nil && *profile.PhotoObjectKey != "" {
+		if url, err := s.storageClient.GetPresignedURL(ctx, *profile.PhotoObjectKey, time.Hour); err == nil && url != "" {
+			profile.PhotoURL = &url
+		}
 	}
 
 	// Get recent matches (limit to 10)

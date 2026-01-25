@@ -2105,7 +2105,7 @@ a:focus:not(:focus-visible),
 
 /* Event row alignment - RIGHT (Team B / bottom player) */
 .event-row.align-right {
-  justify-content: flex-end;
+  justify-content: flex-start; /* With row-reverse, flex-start aligns to the RIGHT */
   flex-direction: row-reverse; /* text first, then icon */
 }
 

@@ -89,44 +89,6 @@ function getEventAlignment(
   return 'left'
 }
 
-/**
- * Gets the front card stats for a player at the start of a round.
- * Returns { atk, hp } for the front-most alive card.
- */
-function getFrontCardStats(
-  allEvents: BattleEvent[],
-  roundNumber: number,
-  playerId: number
-): { atk: number; hp: number } | null {
-  // Find the card states to use:
-  // - For round 1: use the first event's card_states (approximate)
-  // - For round N: use the last event of round N-1
-  let cardStates: BattleEvent['card_states'] | undefined
-
-  if (roundNumber === 1) {
-    // Use first event's card_states as approximation
-    const firstEvent = allEvents[0]
-    cardStates = firstEvent?.card_states
-  } else {
-    // Find last event of previous round
-    const prevRoundEvents = allEvents.filter((e) => e.round === roundNumber - 1)
-    const lastPrevEvent = prevRoundEvents[prevRoundEvents.length - 1]
-    cardStates = lastPrevEvent?.card_states
-  }
-
-  if (!cardStates) return null
-
-  // Find the front-most alive card for this player
-  const playerCards = cardStates
-    .filter((c) => c.user_id === playerId && c.is_alive)
-    .sort((a, b) => a.position - b.position)
-
-  const frontCard = playerCards[0]
-  if (!frontCard) return null
-
-  return { atk: frontCard.atk, hp: frontCard.hp }
-}
-
 export interface BattleLogProps {
   /** List of all battle events */
   events: BattleEvent[]
@@ -164,16 +126,12 @@ interface BattleLogRoundProps {
   getEventMessage: (event: BattleEvent) => string
   /** Player A (left side) user ID */
   playerAId?: number
-  /** Player B (right side) user ID */
-  playerBId?: number
   /** Player A display name (or "You" if current user) */
   playerALabel: string
   /** Player B display name (or "You" if current user) */
   playerBLabel: string
   /** Whether current user is Player A */
   isCurrentUserPlayerA: boolean
-  /** All events (for looking up card stats) */
-  allEvents: BattleEvent[]
 }
 
 /**
@@ -187,11 +145,9 @@ function BattleLogRound({
   getIconUrl,
   getEventMessage,
   playerAId,
-  playerBId,
   playerALabel,
   playerBLabel,
   isCurrentUserPlayerA,
-  allEvents,
 }: BattleLogRoundProps) {
   const classes = [
     'battle-log-round',
@@ -203,32 +159,15 @@ function BattleLogRound({
     .filter(Boolean)
     .join(' ')
 
-  // Get front card stats for each player at the start of this round
-  const playerAStats = playerAId
-    ? getFrontCardStats(allEvents, roundGroup.round, playerAId)
-    : null
-  const playerBStats = playerBId
-    ? getFrontCardStats(allEvents, roundGroup.round, playerBId)
-    : null
-
-  // Format player label with stats: "Name (ATK/HP)"
-  const formatPlayerWithStats = (
-    label: string,
-    stats: { atk: number; hp: number } | null
-  ) => {
-    if (!stats) return label
-    return `${label} (${stats.atk}/${stats.hp})`
-  }
-
   return (
     <div className={classes}>
       <div className="round-header">
         <span className={`player-name ${isCurrentUserPlayerA ? 'is-you' : ''}`}>
-          {formatPlayerWithStats(playerALabel, playerAStats)}
+          {playerALabel}
         </span>
         <span className="round-number">R{roundGroup.round}</span>
         <span className={`player-name ${!isCurrentUserPlayerA ? 'is-you' : ''}`}>
-          {formatPlayerWithStats(playerBLabel, playerBStats)}
+          {playerBLabel}
         </span>
       </div>
       <div className="round-events">
@@ -261,7 +200,7 @@ export const BattleLog = ({
   animated = true,
   className = '',
   playerAId,
-  playerBId,
+  playerBId: _playerBId,
   playerAName = 'Player A',
   playerBName = 'Player B',
   currentUserId,
@@ -353,11 +292,9 @@ export const BattleLog = ({
                 getIconUrl={getIconUrl}
                 getEventMessage={getEventMessage}
                 playerAId={playerAId}
-                playerBId={playerBId}
                 playerALabel={playerALabel}
                 playerBLabel={playerBLabel}
                 isCurrentUserPlayerA={isCurrentUserPlayerA}
-                allEvents={events}
               />
             )
           })}

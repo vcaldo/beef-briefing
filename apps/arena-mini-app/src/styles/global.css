@@ -2066,6 +2066,14 @@ a:focus:not(:focus-visible),
   letter-spacing: 0.5px;
 }
 
+.round-header .player-name:first-child {
+  text-align: left;
+}
+
+.round-header .player-name:last-child {
+  text-align: right;
+}
+
 .round-header .player-name.is-you {
   color: var(--arena-orange);
 }

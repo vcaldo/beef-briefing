@@ -281,7 +281,7 @@ export function TeamPhaseModal({
                     {!isSubmitted && (
                       <div className="team-phase-card-upgrades">
                         <GameButton
-                          variant="primary"
+                          variant="secondary"
                           shape="square"
                           size="sm"
                           onClick={() => handleUpgrade(card.position, 'atk')}
@@ -296,7 +296,7 @@ export function TeamPhaseModal({
                           )}
                         </GameButton>
                         <GameButton
-                          variant="primary"
+                          variant="secondary"
                           shape="square"
                           size="sm"
                           onClick={() => handleUpgrade(card.position, 'hp')}

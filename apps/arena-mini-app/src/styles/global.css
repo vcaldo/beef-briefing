@@ -1891,10 +1891,15 @@ a:focus:not(:focus-visible),
   display: flex;
   gap: 6px;
   position: absolute;
-  bottom: -32px;
+  bottom: -46px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 2;
+}
+
+/* Add breathing room below cards for upgrade buttons */
+.rpg-team-cards-section {
+  padding-bottom: 48px;
 }
 
 .team-phase-slot .upgrade-btn:disabled {

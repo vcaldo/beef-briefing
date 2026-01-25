@@ -38,8 +38,9 @@ function App() {
 
   // Battle playback state (lifted for TabBar access)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [speedIndex, setSpeedIndex] = useState(0) // 0=1x, 1=1.5x, 2=2x
+  const [speedIndex, setSpeedIndex] = useState(0) // 0=1x, 1=2x
   const [isBattleComplete, setIsBattleComplete] = useState(false)
+  const [hasBattleEverCompleted, setHasBattleEverCompleted] = useState(false)
   const [replayTrigger, setReplayTrigger] = useState(0)
 
   // Get launch params from Telegram
@@ -146,6 +147,15 @@ function App() {
   // Handle tab change with tracking
   const handleTabChange = useCallback(
     (tab: TabId) => {
+      // Reset battle state when leaving battle tab
+      // Also clear activeMatch so LobbyPage doesn't redirect back to battle
+      if (activeTab === 'battle' && tab !== 'battle') {
+        setHasBattleEverCompleted(false)
+        setIsBattleComplete(false)
+        setIsPlaying(false)
+        setActiveMatch(null)
+      }
+
       addPageAction('tab_change', {
         tab,
         previous_tab: activeTab,
@@ -192,7 +202,7 @@ function App() {
   }, [])
 
   const handleCycleSpeed = useCallback(() => {
-    setSpeedIndex((prev) => (prev + 1) % 3)
+    setSpeedIndex((prev) => (prev + 1) % 2)
   }, [])
 
   // Sync isPlaying state from BattlePage
@@ -203,6 +213,9 @@ function App() {
   // Sync battle complete state from BattlePage
   const handleBattleCompleteChange = useCallback((complete: boolean) => {
     setIsBattleComplete(complete)
+    if (complete) {
+      setHasBattleEverCompleted(true)
+    }
   }, [])
 
   // Handle replay - increment trigger to signal BattlePage to reset
@@ -220,6 +233,7 @@ function App() {
           onCycleSpeed: handleCycleSpeed,
           isComplete: isBattleComplete,
           onReplay: handleReplay,
+          canNavigateAway: hasBattleEverCompleted,
         }
       : undefined
 

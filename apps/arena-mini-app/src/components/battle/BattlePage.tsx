@@ -30,11 +30,10 @@ import type {
 } from '../../types'
 
 // Playback speed options (events per second)
-// Index: 0=1x, 1=1.5x, 2=2x (controlled by parent via speedIndex prop)
+// Index: 0=1x, 1=2x (controlled by parent via speedIndex prop)
 const PLAYBACK_SPEEDS = [
   { label: '1x', value: 1000 },
-  { label: '1.5x', value: 667 },
-  { label: '2x', value: 500 },
+  { label: '2x', value: 667 },  // Uses old 1.5x interval for balanced speed
 ]
 
 interface BattlePageProps {
@@ -470,7 +469,9 @@ export function BattlePage({
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
-            <RPGPanel variant="inner-blue" className="rpg-victory-content">
+
+            {/* Box 1: Emoji announcement */}
+            <RPGPanel variant="inner" className="rpg-victory-announcement">
               <div className="victory-icon">
                 {isDraw ? '🤝' : isWinner ? '🏆' : '💀'}
               </div>
@@ -490,6 +491,7 @@ export function BattlePage({
               </p>
             </RPGPanel>
 
+            {/* Box 2: Stats */}
             <RPGPanel variant="inner" className="rpg-victory-stats">
               <div className="rpg-stats-grid">
                 <div className="rpg-stat-card">
@@ -510,19 +512,20 @@ export function BattlePage({
                 </div>
               </div>
             </RPGPanel>
-
-            <div className="rpg-victory-actions">
-              <GameButton
-                variant="secondary"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleReturnToLobby()
-                }}
-              >
-                Return to Lobby
-              </GameButton>
-            </div>
           </RPGPanel>
+
+          {/* Button OUTSIDE the outer box */}
+          <div className="rpg-victory-actions-outside">
+            <GameButton
+              variant="primary"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleReturnToLobby()
+              }}
+            >
+              Return to Lobby
+            </GameButton>
+          </div>
         </div>
       )}
     </div>

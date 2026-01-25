@@ -111,7 +111,7 @@ export interface BattlePlaybackProps {
   isPlaying: boolean
   /** Callback when play/pause is toggled */
   onPlayPause: () => void
-  /** Current speed index (0=1x, 1=1.5x, 2=2x) */
+  /** Current speed index (0=1x, 1=2x) */
   speedIndex: number
   /** Callback to cycle to next speed */
   onCycleSpeed: () => void
@@ -119,6 +119,8 @@ export interface BattlePlaybackProps {
   isComplete?: boolean
   /** Callback to replay battle from start */
   onReplay?: () => void
+  /** Whether user can navigate away (true after battle has played through once) */
+  canNavigateAway?: boolean
 }
 
 interface TabBarProps {
@@ -140,10 +142,15 @@ export function TabBar({ activeTab, onTabChange, battlePlayback }: TabBarProps) 
     onTabChange(tabId)
   }
 
+  // Disable Lobby tab during battle until battle has played through once
+  // Use explicit check for `!== true` to safely handle undefined values
+  const isLobbyDisabled = Boolean(battlePlayback && battlePlayback.canNavigateAway !== true)
+
   return (
     <nav className="tab-bar" role="navigation" aria-label="Main navigation">
       {TABS.map((tab) => {
         const isActive = activeTab === tab.id
+        const isDisabled = tab.id === 'lobby' && isLobbyDisabled
 
         return (
           <GameButton
@@ -153,6 +160,7 @@ export function TabBar({ activeTab, onTabChange, battlePlayback }: TabBarProps) 
             size="lg"
             className={`tab-item-game ${isActive ? 'active' : ''}`}
             onClick={() => handleTabClick(tab.id)}
+            disabled={isDisabled}
             aria-current={isActive ? 'page' : undefined}
             aria-label={tab.label}
           >

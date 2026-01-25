@@ -330,7 +330,7 @@ export function TeamPhaseModal({
             {!isSubmitted && localTeamOrder.length > 0 && (
               <div className="rpg-team-strategy-hint">
                 <span className="rpg-team-strategy-hint-icon">💡</span>
-                <span>Place your strongest cards in front — they attack first!</span>
+                <span>Got coins left? Power up! Stack your strongest cards in front so they hit first.</span>
               </div>
             )}
         </RPGPanel>

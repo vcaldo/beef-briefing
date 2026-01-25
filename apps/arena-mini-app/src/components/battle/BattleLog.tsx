@@ -261,7 +261,7 @@ export const BattleLog = ({
   animated = true,
   className = '',
   playerAId,
-  playerBId: _playerBId,
+  playerBId,
   playerAName = 'Player A',
   playerBName = 'Player B',
   currentUserId,

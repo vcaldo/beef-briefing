@@ -2109,6 +2109,10 @@ a:focus:not(:focus-visible),
   flex-direction: row-reverse; /* text first, then icon */
 }
 
+.event-row.align-right .event-message {
+  text-align: right;
+}
+
 .event-message {
   font-family: 'Outfit', sans-serif;
   font-size: 12px;

@@ -52,6 +52,7 @@
 
   /* Spacing */
   --tab-bar-height: 80px;
+  --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 
   /* Spacing scale (4px base) */
@@ -88,6 +89,9 @@
   --arena-orange-20: rgba(249, 115, 22, 0.2);
   --arena-orange-30: rgba(249, 115, 22, 0.3);
   --arena-orange-40: rgba(249, 115, 22, 0.4);
+
+  /* Page background URLs (set dynamically via JS for cache-busting) */
+  --bg-arena-url: none;
 }
 
 /* =============================================================================
@@ -121,6 +125,46 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* =============================================================================
+   Page Background System
+
+   Reusable background classes for different pages. Backgrounds are loaded
+   from object storage and applied via CSS custom properties set by JS.
+
+   Usage:
+   1. Call usePageBackground({ backgroundId: 'arena' }) in your component
+   2. Add classes: className="page-bg page-bg--arena"
+   ============================================================================= */
+
+/* Base background container - adds a pseudo-element for the background image */
+.page-bg {
+  position: relative;
+}
+
+.page-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* Arena background (for battle page) */
+.page-bg--arena::before {
+  background-image: var(--bg-arena-url);
+  /* Darken the image to maintain UI contrast */
+  filter: brightness(0.4);
+}
+
+/* Ensure content remains above the background */
+.page-bg > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* =============================================================================
@@ -190,44 +234,42 @@ a:focus:not(:focus-visible),
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
+  background-color: #0f0f1a;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   z-index: 1000;
-  gap: 16px;
+  gap: 20px;
 }
 
 .splash-logo {
-  font-size: 80px;
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-.splash-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 32px;
-  font-weight: 800;
-  color: var(--arena-orange);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  text-shadow: 0 0 20px rgba(249, 115, 22, 0.5);
+  width: 280px;
+  max-width: 75%;
+  height: auto;
+  animation: pulse-glow 2.5s ease-in-out infinite;
 }
 
 .splash-subtitle {
-  font-size: 14px;
-  color: var(--tg-theme-hint-color);
-  margin-top: -8px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  margin-top: 8px;
 }
 
 .splash-spinner {
-  margin-top: 24px;
+  margin-top: 32px;
 }
 
 @keyframes pulse-glow {
   0%, 100% {
     transform: scale(1);
-    filter: drop-shadow(0 0 10px rgba(249, 115, 22, 0.3));
+    filter: drop-shadow(0 0 15px rgba(218, 165, 32, 0.4));
   }
   50% {
-    transform: scale(1.1);
-    filter: drop-shadow(0 0 25px rgba(249, 115, 22, 0.6));
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 30px rgba(218, 165, 32, 0.7));
   }
 }
 
@@ -1911,31 +1953,36 @@ a:focus:not(:focus-visible),
 .battle-arena {
   display: flex;
   flex-direction: column;
-  gap: var(--battle-gap, 24px);
+  justify-content: flex-end;
+  align-items: stretch;
+  gap: var(--battle-gap, 16px);
   padding: 16px;
+  /* Background is set via .page-bg--arena when background image is loaded */
+  /* Fallback gradient when no background image is available */
   background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
   flex: 1;
   min-height: 0; /* Allow shrinking */
-  min-height: 400px;
+  min-height: 200px;
   position: relative;
 }
 
-.battle-team {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
+/* When using page-bg--arena, make background transparent so the image shows */
+.battle-arena.page-bg--arena {
+  background: transparent;
 }
 
 .battle-vs {
   position: absolute;
-  top: 50%;
+  top: 75%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-family: 'Outfit', sans-serif;
-  font-size: 32px;
-  font-weight: 800;
-  color: var(--arena-orange);
-  text-shadow: 0 0 20px rgba(249, 115, 22, 0.5);
+  z-index: 10;
+}
+
+.battle-vs-icon {
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 0 12px rgba(249, 115, 22, 0.6));
 }
 
 /* Battle card highlighting */
@@ -1989,6 +2036,7 @@ a:focus:not(:focus-visible),
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-height: 150px;
   max-height: 150px;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -2260,41 +2308,6 @@ a:focus:not(:focus-visible),
   overflow: hidden;
 }
 
-.battle-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  background: var(--arena-bg-medium);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.battle-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--arena-orange);
-  margin: 0;
-}
-
-.battle-info {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-
-.battle-round {
-  font-size: 13px;
-  color: var(--tg-theme-hint-color);
-}
-
-.battle-score {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--tg-theme-text-color);
-}
-
 /* Battle Cards */
 .battle-card {
   display: flex;
@@ -2443,11 +2456,12 @@ a:focus:not(:focus-visible),
 /* Battle Compact Card - Scale from 300x450 with margin compensation
    transform: scale() doesn't affect layout, so we use negative margins
    to collapse the layout box to match the visual size.
-   Formula: margin = size * (scale - 1) / 2 */
+   Formula: margin = size * (scale - 1) / 2
+   Note: Scale 0.21 is 30% smaller than original 0.3 */
 .battle-compact-card {
   width: 300px;
   height: 450px;
-  --base-scale: 0.3;
+  --base-scale: 0.21;
   --anim-scale: 1;
   transform: scale(calc(var(--base-scale) * var(--anim-scale)));
   transform-origin: center;
@@ -2466,12 +2480,19 @@ a:focus:not(:focus-visible),
   /* HP bar inherits positions from placeholder_positions and scales with the card */
 }
 
-/* Battle Teams */
+/* Battle Teams - Horizontal layout with Team B left, Team A right */
 .battle-team {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 8px;
+}
+
+.battle-team.team-a {
+  align-items: flex-end;
+}
+
+.battle-team.team-b {
+  align-items: flex-start;
 }
 
 .team-label {
@@ -2485,8 +2506,15 @@ a:focus:not(:focus-visible),
 
 .team-cards {
   display: flex;
-  gap: 8px;
-  justify-content: center;
+  gap: 4px;
+}
+
+.team-a .team-cards {
+  justify-content: flex-end;
+}
+
+.team-b .team-cards {
+  justify-content: flex-start;
 }
 
 /* Legacy event-log classes removed - replaced by battle-log-* classes above */
@@ -4366,17 +4394,21 @@ a:focus:not(:focus-visible),
   }
 
   .battle-compact-card {
-    --base-scale: 0.25;
-    /* Margins auto-adjust via calc() */
+    --base-scale: 0.175;
+    /* Margins auto-adjust via calc() - 30% smaller than original 0.25 */
   }
 }
 
 /* Mobile-specific battle adjustments for tablets and larger phones */
 @media (max-width: 480px) {
   .battle-arena {
-    --battle-gap: 12px;
-    padding: 12px;
+    --battle-gap: 8px;
+    padding: 8px;
     min-height: auto;
+  }
+
+  .team-cards {
+    gap: 2px;
   }
 }
 
@@ -5520,6 +5552,7 @@ button,
   display: flex;
   flex-direction: column;
   background-color: var(--arena-bg-dark) !important;
+  padding-top: var(--safe-area-top);
 }
 
 /* Page placeholder for unimplemented pages */

@@ -6,7 +6,7 @@
  */
 
 // Image categories matching asset directory structure
-export type ImageCategory = 'buttons' | 'panels' | 'bars' | 'icons' | 'effects'
+export type ImageCategory = 'buttons' | 'panels' | 'bars' | 'icons' | 'effects' | 'bg'
 
 // Button image IDs
 export type ButtonImageId = 'primary' | 'secondary' | 'neutral' | 'danger'
@@ -40,6 +40,8 @@ export type IconImageId =
   | 'crown'
   | 'book_open'
   | 'arrow_right_board'
+  // Battle UI icons
+  | 'vs'
 
 // Effect image IDs (including explosion frames)
 export type EffectImageId =
@@ -59,8 +61,11 @@ export type EffectImageId =
   | 'explosion/explosion07'
   | 'explosion/explosion08'
 
+// Background image IDs (page backgrounds)
+export type BackgroundImageId = 'arena'
+
 // Union of all image IDs
-export type ImageId = ButtonImageId | PanelImageId | BarImageId | IconImageId | EffectImageId
+export type ImageId = ButtonImageId | PanelImageId | BarImageId | IconImageId | EffectImageId | BackgroundImageId
 
 // Image configuration interface
 export interface ImageConfig {
@@ -72,6 +77,8 @@ export interface ImageConfig {
   width?: number
   /** Optional height in pixels (for preloading hints) */
   height?: number
+  /** File extension (default: 'png') */
+  extension?: 'png' | 'webp'
 }
 
 // Map image IDs to their configurations
@@ -119,6 +126,8 @@ export const IMAGE_CONFIGS: Record<ImageId, ImageConfig> = {
   crown: { category: 'icons', filename: 'crown_a', width: 64, height: 64 },
   book_open: { category: 'icons', filename: 'book_open', width: 64, height: 64 },
   arrow_right_board: { category: 'icons', filename: 'arrow_right_board', width: 64, height: 64 },
+  // Battle UI icons
+  vs: { category: 'icons', filename: 'vs', width: 64, height: 64 },
 
   // Effects (flame and magic - 512x512 pixels)
   flame_01: { category: 'effects', filename: 'flame_01', width: 512, height: 512 },
@@ -138,4 +147,7 @@ export const IMAGE_CONFIGS: Record<ImageId, ImageConfig> = {
   'explosion/explosion06': { category: 'effects', filename: 'explosion/explosion06', width: 512, height: 512 },
   'explosion/explosion07': { category: 'effects', filename: 'explosion/explosion07', width: 512, height: 512 },
   'explosion/explosion08': { category: 'effects', filename: 'explosion/explosion08', width: 512, height: 512 },
+
+  // Backgrounds (page backgrounds)
+  arena: { category: 'bg', filename: 'arena', extension: 'webp' },
 }

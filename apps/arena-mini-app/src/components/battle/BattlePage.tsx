@@ -19,7 +19,7 @@ import { CompactCard } from '../common/CompactCard'
 import { BattleLog } from './BattleLog'
 import { BattleEffect } from './BattleEffect'
 import type { EffectPosition } from './BattleEffect'
-import { useBattleAnimation, getCardKey } from '../../hooks'
+import { useBattleAnimation, getCardKey, usePageBackground } from '../../hooks'
 import { useSoundContext } from '../../contexts'
 import type {
   BattleResult,
@@ -81,6 +81,9 @@ export function BattlePage({
   // Sound context for battle audio
   const { play: playSound, preloadCategory } = useSoundContext()
   const soundsPreloadedRef = useRef(false)
+
+  // Apply arena background image
+  usePageBackground({ backgroundId: 'arena' })
 
   // Refs for card positions (used to place battle effects)
   const battleArenaRef = useRef<HTMLDivElement>(null)
@@ -388,46 +391,32 @@ export function BattlePage({
 
   return (
     <div className="battle-page">
-      {/* Header */}
-      <div className="battle-header">
-        <h1 className="battle-title">Battle Arena</h1>
-        <div className="battle-info">
-          <span className="battle-round">Round {battleData.num_rounds}</span>
-          <span className="battle-score">
-            {battleData.team_a_damage} - {battleData.team_b_damage}
-          </span>
-        </div>
-      </div>
-
       {/* Battle Arena */}
       <div
         ref={battleArenaRef}
-        className="battle-arena battle-effect-container"
+        className="battle-arena battle-effect-container page-bg page-bg--arena"
         style={{
           // Scale HP bar transition duration with playback speed
           // At 1x (value=1000), duration is 300ms; at 2x (value=500), duration is 150ms
           '--hp-transition-duration': `${(PLAYBACK_SPEEDS[speedIndex].value / 1000) * 300}ms`,
         } as React.CSSProperties}
       >
-        {/* Team A (opponent or self) */}
-        <div className="battle-team team-a">
-          <div className="team-label">{battleData.player_a_name}</div>
-          <div className="team-cards">
-            {(battleData.team_a_final?.cards ?? []).map((card) =>
-              renderBattleCard(card.card_id, battleData.player_a_id, card)
-            )}
-          </div>
-        </div>
-
-        {/* VS Indicator */}
-        <div className="battle-vs">VS</div>
-
-        {/* Team B (opponent or self) */}
+        {/* Team B (left side) */}
         <div className="battle-team team-b">
           <div className="team-label">{battleData.player_b_name}</div>
           <div className="team-cards">
             {(battleData.team_b_final?.cards ?? []).map((card) =>
               renderBattleCard(card.card_id, battleData.player_b_id, card)
+            )}
+          </div>
+        </div>
+
+        {/* Team A (right side) */}
+        <div className="battle-team team-a">
+          <div className="team-label">{battleData.player_a_name}</div>
+          <div className="team-cards">
+            {(battleData.team_a_final?.cards ?? []).map((card) =>
+              renderBattleCard(card.card_id, battleData.player_a_id, card)
             )}
           </div>
         </div>

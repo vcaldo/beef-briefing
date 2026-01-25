@@ -17,6 +17,14 @@ import {
 let sdkInitialized = false
 
 /**
+ * Options for Telegram SDK initialization.
+ */
+export interface TelegramSDKOptions {
+  /** Enable full screen mode (hides Telegram header). Default: false */
+  enableFullscreen?: boolean
+}
+
+/**
  * Check if the Telegram SDK has been fully initialized.
  * Use this to guard code that depends on SDK features.
  */
@@ -34,10 +42,14 @@ export function isSDKInitialized(): boolean {
  * - Theme parameters
  * - Viewport expansion
  * - Back button
+ * - Full screen mode (if enabled)
  *
+ * @param options - Configuration options
  * @returns Promise that resolves when SDK is fully initialized
  */
-export async function initializeTelegramSDK(): Promise<void> {
+export async function initializeTelegramSDK(
+  options: TelegramSDKOptions = {}
+): Promise<void> {
   try {
     // Initialize SDK
     init()
@@ -63,6 +75,15 @@ export async function initializeTelegramSDK(): Promise<void> {
       // Expand to full height
       if (viewport.expand.isAvailable()) {
         viewport.expand()
+      }
+
+      // Request full screen mode (hides Telegram header) if enabled
+      if (options.enableFullscreen && viewport.requestFullscreen.isAvailable()) {
+        try {
+          await viewport.requestFullscreen()
+        } catch (error) {
+          console.warn('Fullscreen request failed:', error)
+        }
       }
     }
 

@@ -169,6 +169,72 @@ type BattleEvent struct {
 	CardStates []CardSnapshot `json:"card_states,omitempty"`
 }
 
+// CombatEvent represents a single action within a combat.
+// Unlike BattleEvent, it does not include the Round field since
+// events are grouped by combat rather than by round.
+type CombatEvent struct {
+	Type    EventType `json:"type"`
+	Message string    `json:"message,omitempty"`
+
+	// Card-specific identifiers
+	AttackerCardID      int64 `json:"attacker_card_id,omitempty"`
+	DefenderCardID      int64 `json:"defender_card_id,omitempty"`
+	AttackerTeamOwnerID int64 `json:"attacker_team_owner_id,omitempty"`
+	DefenderTeamOwnerID int64 `json:"defender_team_owner_id,omitempty"`
+
+	// Combat stats
+	Damage   int `json:"damage,omitempty"`
+	HPBefore int `json:"hp_before,omitempty"`
+	HPAfter  int `json:"hp_after,omitempty"`
+
+	// Summary event fields
+	IsSummary        bool   `json:"is_summary,omitempty"`
+	KillerCardID     *int64 `json:"killer_card_id,omitempty"`
+	TotalDamageDealt int    `json:"total_damage_dealt,omitempty"`
+	TotalDamageTaken int    `json:"total_damage_taken,omitempty"`
+	RoundsInDuel     int    `json:"rounds_in_duel,omitempty"`
+	KillStreak       int    `json:"kill_streak,omitempty"`
+
+	// Card states snapshot
+	CardStates []CardSnapshot `json:"card_states,omitempty"`
+}
+
+// Combat represents a sequence of events where two cards face each other
+// until one or both die. A battle consists of multiple combats.
+type Combat struct {
+	// CombatNumber is the 1-indexed position of this combat in the battle
+	CombatNumber int `json:"combat_number"`
+
+	// Events contains the ordered sequence of actions in this combat
+	Events []CombatEvent `json:"events"`
+
+	// Outcome describes how the combat ended
+	// Possible values: "card_a_died", "card_b_died", "both_died", "victory"
+	Outcome string `json:"outcome"`
+}
+
+// ToCombatEvent converts a BattleEvent to a CombatEvent by removing the Round field.
+func (e *BattleEvent) ToCombatEvent() CombatEvent {
+	return CombatEvent{
+		Type:                e.Type,
+		Message:             e.Message,
+		AttackerCardID:      e.AttackerCardID,
+		DefenderCardID:      e.DefenderCardID,
+		AttackerTeamOwnerID: e.AttackerTeamOwnerID,
+		DefenderTeamOwnerID: e.DefenderTeamOwnerID,
+		Damage:              e.Damage,
+		HPBefore:            e.HPBefore,
+		HPAfter:             e.HPAfter,
+		IsSummary:           e.IsSummary,
+		KillerCardID:        e.KillerCardID,
+		TotalDamageDealt:    e.TotalDamageDealt,
+		TotalDamageTaken:    e.TotalDamageTaken,
+		RoundsInDuel:        e.RoundsInDuel,
+		KillStreak:          e.KillStreak,
+		CardStates:          e.CardStates,
+	}
+}
+
 // Result represents the outcome of a battle
 type Result struct {
 	WinnerID  *int64        `json:"winner_id"` // nil for draw

@@ -882,22 +882,22 @@ arena-sounds-normalize-dry: | ensure-scripts-executable ## Preview audio normali
 # =============================================================================
 # ARENA IMAGES (arena-images-*)
 # =============================================================================
-arena-images-upload: ## Upload arena images to development storage (MinIO)
+arena-images-upload: | ensure-scripts-executable ## Upload arena images to development storage (MinIO)
 	@$(SCRIPTS_DIR)/upload-arena-images.sh --dev
 
-arena-images-upload-prod: ## Upload arena images to production storage (Linode)
+arena-images-upload-prod: | ensure-scripts-executable ## Upload arena images to production storage (Linode)
 	@$(SCRIPTS_DIR)/upload-arena-images.sh --prod
 
-arena-images-list: ## List arena images in development storage
+arena-images-list: | ensure-scripts-executable ## List arena images in development storage
 	@$(SCRIPTS_DIR)/upload-arena-images.sh --dev --list
 
-arena-images-list-prod: ## List arena images in production storage
+arena-images-list-prod: | ensure-scripts-executable ## List arena images in production storage
 	@$(SCRIPTS_DIR)/upload-arena-images.sh --prod --list
 
-arena-images-clean: ## Delete all arena images from development storage (MinIO)
+arena-images-clean: | ensure-scripts-executable ## Delete all arena images from development storage (MinIO)
 	@$(SCRIPTS_DIR)/upload-arena-images.sh --dev --clean
 
-arena-images-clean-prod: ## Delete all arena images from production storage (Linode)
+arena-images-clean-prod: | ensure-scripts-executable ## Delete all arena images from production storage (Linode)
 	@$(SCRIPTS_DIR)/upload-arena-images.sh --prod --clean
 
 # =============================================================================
@@ -921,10 +921,10 @@ arena-clean-db-prod: ## Clean all arena game data from prod database (requires p
 # =============================================================================
 # ARENA ASSET VERSIONS (arena-assets-*)
 # =============================================================================
-arena-assets-version: ## Check arena asset versions in development storage
+arena-assets-version: | ensure-scripts-executable ## Check arena asset versions in development storage
 	@$(SCRIPTS_DIR)/check-asset-versions.sh --dev
 
-arena-assets-version-prod: ## Check arena asset versions in production storage
+arena-assets-version-prod: | ensure-scripts-executable ## Check arena asset versions in production storage
 	@$(SCRIPTS_DIR)/check-asset-versions.sh --prod
 
 # =============================================================================
@@ -946,7 +946,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 # =============================================================================
 # PHONY TARGETS
 # =============================================================================
-.PHONY: help \
+.PHONY: help ensure-scripts-executable \
 	up build deploy \
 	dev-up dev-up-build dev-up-logs dev-down dev-restart dev-ps dev-clean dev-prune \
 	prod-deploy prod-deploy-skip-build prod-deploy-skip-cleanup prod-deploy-regenerate-certs \

@@ -1897,11 +1897,6 @@ a:focus:not(:focus-visible),
   z-index: 2;
 }
 
-/* Add breathing room below cards for upgrade buttons */
-.rpg-team-cards-section {
-  padding-bottom: 128px;
-}
-
 .team-phase-slot .upgrade-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -5176,7 +5171,10 @@ button,
 
 /* Team cards section - blue inner variant */
 .rpg-team-cards-section {
-  padding: 12px;
+  padding-top: 12px;
+  padding-right: 12px;
+  padding-left: 12px;
+  padding-bottom: 64px; /* Breathing room for upgrade buttons */
 }
 
 .rpg-team-cards-section .rpg-section-title {

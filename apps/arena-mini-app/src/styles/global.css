@@ -1989,7 +1989,7 @@ a:focus:not(:focus-visible),
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 100px;
+  max-height: 130px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(90, 74, 58, 0.3) transparent;

@@ -4,15 +4,16 @@ Telegram Mini App for browsing weekly user stats card galleries.
 
 ## Overview
 
-The Deck Mini App provides a gallery interface for viewing generated stats cards within Telegram. Users can browse cards organized by week, view individual cards in full size, and share them with friends.
+The Deck Mini App provides a gallery interface for viewing generated stats cards within Telegram. Users can browse cards organized by week, view individual cards in full size with reveal animations, and share them with friends.
 
 ## Features
 
-- **Card Gallery**: Browse cards organized by week
+- **Card Gallery**: Browse cards organized by week with masonry layout
+- **Card Reveal**: Tap-to-reveal animation when viewing new cards
+- **Week Navigation**: Switch between different weeks with dropdown selector
 - **Full-Size Viewing**: Tap cards to view in detail
-- **Week Navigation**: Switch between different weeks
 - **Telegram Integration**: Seamless authentication via Mini App init data
-- **Responsive Design**: Works on mobile and desktop Telegram clients
+- **Responsive Design**: Adapts to Telegram theme (light/dark mode)
 
 ## Quick Start
 
@@ -38,7 +39,9 @@ npm run build
 
 - **Framework**: React 18 with TypeScript
 - **Build Tool**: Vite
+- **Styling**: CSS with Telegram theme variables
 - **Telegram SDK**: @telegram-apps/sdk-react
+- **Fonts**: System font stack (Apple, Segoe UI, Roboto)
 
 ## API Integration
 
@@ -88,13 +91,32 @@ npx tsc --noEmit
 ```
 apps/deck-mini-app/
 ├── src/
-│   ├── api/client.ts     # API client with JWT auth
-│   ├── App.tsx           # Main application
-│   └── main.tsx          # Entry point
+│   ├── api/client.ts           # API client with JWT auth
+│   ├── types/index.ts          # TypeScript interfaces
+│   ├── styles/global.css       # CSS with Telegram theme variables
+│   ├── components/
+│   │   ├── CardGallery.tsx     # Main gallery grid
+│   │   ├── CardImage.tsx       # Individual card display
+│   │   ├── CardReveal.tsx      # Reveal animation overlay
+│   │   ├── WeekSelector.tsx    # Week dropdown
+│   │   └── InfoModal.tsx       # Info/help modal
+│   ├── App.tsx                 # Main app component
+│   └── main.tsx                # Entry point (SDK init)
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
-└── Dockerfile
+├── Dockerfile
+└── index.html
+```
+
+## Screen Flow
+
+```
+Week Selection → Card Gallery → Card Detail
+      │              │              │
+      │              │              └── Full-size card view with actions
+      │              └── Tap card to reveal/view, masonry grid
+      └── Dropdown to switch weeks
 ```
 
 ## Deployment
@@ -105,16 +127,29 @@ The Mini App is deployed as a static site behind Traefik:
 
 The Docker build process compiles the React app and serves it via nginx.
 
+### Build Info
+
+- **Bundle size**: ~68KB gzipped (target: <300KB)
+- **Single bundle**: No code splitting (small app)
+
 ## Troubleshooting
-
-### Cards not loading
-
-1. Verify API Service is running
-2. Check browser console for errors
-3. Ensure JWT token is valid (refresh by reopening Mini App)
 
 ### Authentication fails
 
 - Check `VITE_API_URL` points to correct API
 - Verify the Mini App is launched from Telegram (not standalone browser)
 - Check API Service logs for init_data validation errors
+- Ensure chat_id is present (must open from group chat context)
+
+### Cards not loading
+
+1. Verify API Service is running
+2. Check browser console for errors
+3. Ensure JWT token is valid (refresh by reopening Mini App)
+4. Verify the chat has generated cards for the selected week
+
+### Week selector empty
+
+1. Check `/api/v1/mini-app/gallery/weeks` returns data
+2. Ensure cards have been generated for this chat
+3. Verify chat_id in request matches the current chat

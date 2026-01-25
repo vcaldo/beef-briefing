@@ -347,7 +347,7 @@ export function ShopPage({
               <h2 className="rpg-section-title">Available Cards</h2>
               {/* Reroll button */}
               <GameButton
-                variant="neutral"
+                variant="primary"
                 size="sm"
                 onClick={handleReroll}
                 disabled={!canReroll || coins < rerollCost || actionLoading !== null}
@@ -456,26 +456,24 @@ export function ShopPage({
           </RPGPanel>
         )}
 
-        {/* Done Shopping button - appears when team is complete */}
-        {!isSubmitted && teamCards.length >= teamSize && (
-          <div className="rpg-shop-actions">
-            <GameButton
-              variant="primary"
-              size="lg"
-              onClick={() => {
-                playSequence(['arena_button_click', 'arena_success'])
-                setIsTeamPhase(true)
-              }}
-              className="done-shopping-btn"
-            >
-              Done Shopping - Organize Team
-            </GameButton>
-            <p className="rpg-shop-hint">
-              Ready to organize your team? Click above to arrange positions and make final upgrades.
-            </p>
-          </div>
-        )}
       </RPGPanel>
+
+      {/* Done Shopping button - appears when team is complete (outside shop box) */}
+      {!isSubmitted && teamCards.length >= teamSize && (
+        <div className="rpg-shop-actions">
+          <GameButton
+            variant="primary"
+            size="lg"
+            onClick={() => {
+              playSequence(['arena_button_click', 'arena_success'])
+              setIsTeamPhase(true)
+            }}
+            className="done-shopping-btn"
+          >
+            Done Shopping
+          </GameButton>
+        </div>
+      )}
     </div>
   )
 }

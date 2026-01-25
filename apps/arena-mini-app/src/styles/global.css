@@ -1889,27 +1889,12 @@ a:focus:not(:focus-visible),
 /* Team Phase Card Upgrades */
 .team-phase-card-upgrades {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   position: absolute;
-  bottom: -12px;
+  bottom: -46px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 2;
-}
-
-.team-phase-slot .upgrade-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 8px;
-  border-radius: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  min-width: 32px;
-  min-height: 28px;
 }
 
 .team-phase-slot .upgrade-btn:disabled {
@@ -1917,87 +1902,21 @@ a:focus:not(:focus-visible),
   cursor: not-allowed;
 }
 
-.team-phase-slot .upgrade-btn.upgrade-atk {
-  background: rgba(249, 115, 22, 0.2);
-  color: var(--arena-orange);
-  border: 1px solid rgba(249, 115, 22, 0.3);
+/* Square upgrade button styles */
+.team-phase-slot .upgrade-btn.game-button-square {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.team-phase-slot .upgrade-btn.upgrade-atk:hover:not(:disabled) {
-  background: rgba(249, 115, 22, 0.3);
-}
-
-.team-phase-slot .upgrade-btn.upgrade-hp {
-  background: rgba(34, 197, 94, 0.2);
-  color: var(--hp-full);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
-
-.team-phase-slot .upgrade-btn.upgrade-hp:hover:not(:disabled) {
-  background: rgba(34, 197, 94, 0.3);
-}
-
-/* Upgrade button content with icon */
-.upgrade-btn-content {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.upgrade-icon {
-  width: 12px;
-  height: 12px;
-  filter: brightness(0) invert(1);
-  opacity: 0.9;
-}
-
-/* Override GameButton styles for upgrade buttons in team phase */
-.team-phase-slot .upgrade-btn.game-button {
-  min-width: auto;
-  min-height: 28px;
-  padding: 4px 8px;
-  font-size: 10px;
-  height: auto;
-}
-
-.team-phase-slot .upgrade-btn.game-button .game-button-content {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-/* Team Phase Footer */
-.team-phase-footer {
-  padding: 20px;
-  background: linear-gradient(to top, rgba(15, 15, 26, 0.95) 50%, transparent);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: auto;
-  position: relative;
-  z-index: 1;
-}
-
-.team-phase-footer .submit-btn {
-  width: 100%;
-}
-
-.team-phase-footer .submit-status {
+.team-phase-slot .upgrade-btn.game-button-square .game-button-content {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  background: rgba(34, 197, 94, 0.15);
-  padding: 12px 16px;
-  border-radius: 12px;
-}
-
-.team-phase-footer .submit-status-icon {
-  font-size: 18px;
-  color: var(--hp-full);
-}
-
-.team-phase-footer .submit-status-text {
-  font-size: 14px;
-  color: var(--hp-full);
+  gap: 1px;
+  font-size: 11px;
 }
 
 /* =============================================================================
@@ -3563,6 +3482,42 @@ a:focus:not(:focus-visible),
   font-weight: 800;
 }
 
+/* RPG Leaderboard Title */
+.rpg-leaderboard-title {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #4a3a2a;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* RPG Rank Text (before name) */
+.rpg-rank-text {
+  font-weight: 700;
+  font-size: 13px;
+  margin-right: 6px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.rpg-rank-text.gold {
+  color: #b8860b;
+  text-shadow: 0 0 4px rgba(255, 215, 0, 0.5);
+}
+
+.rpg-rank-text.silver {
+  color: #808080;
+}
+
+.rpg-rank-text.bronze {
+  color: #cd7f32;
+}
+
+.rpg-rank-text.default {
+  color: #6a5a4a;
+}
+
 /* RPG Leaderboard User Info */
 .rpg-leaderboard-user {
   flex: 1;
@@ -4872,23 +4827,22 @@ button,
 
 .rpg-lobby-header-content {
   text-align: center;
-  padding: 16px 12px;
+  padding: 0;
 }
 
-.rpg-lobby-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 24px;
-  font-weight: 800;
-  color: #4a3a2a;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin: 0 0 4px 0;
+.rpg-lobby-logo {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 .rpg-lobby-subtitle {
+  font-family: 'Outfit', sans-serif;
   font-size: 14px;
+  font-weight: 600;
   color: #6a5a4a;
-  margin: 0;
+  text-align: center;
+  margin: 0 0 8px 0;
 }
 
 .rpg-lobby-matches {
@@ -5051,7 +5005,7 @@ button,
 
 .rpg-shop-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
@@ -5149,21 +5103,16 @@ button,
 }
 
 /* ============================================
-   RPG Team Phase Modal Styles
+   RPG Team Phase Page Styles
    ============================================ */
 
-.rpg-team-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  z-index: 100;
+.rpg-team-page {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  min-height: 100%;
   padding: 16px;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .rpg-team-modal-outer {
@@ -5223,7 +5172,10 @@ button,
 
 /* Team cards section - blue inner variant */
 .rpg-team-cards-section {
-  padding: 12px;
+  padding-top: 12px;
+  padding-right: 12px;
+  padding-left: 12px;
+  padding-bottom: 16px;
 }
 
 .rpg-team-cards-section .rpg-section-title {
@@ -5232,18 +5184,100 @@ button,
   text-align: center;
 }
 
+/* Team strategy hint - advise about card placement */
+.rpg-team-strategy-hint {
+  margin-top: 60px; /* Clear upgrade buttons (46px offset + 38px height + buffer) */
+  padding: 12px 16px;
+  background: rgba(90, 74, 58, 0.15);
+  border: 1px solid rgba(90, 74, 58, 0.25);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 13px;
+  color: #6a5a4a;
+  line-height: 1.4;
+}
+
+.rpg-team-strategy-hint-icon {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+/* Team phase waiting panel - blue inner variant */
+.rpg-team-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.rpg-team-waiting-icon {
+  font-size: 32px;
+}
+
+.rpg-team-waiting-text {
+  font-size: 14px;
+  color: #3a5a6a;
+  margin: 0;
+}
+
+/* Team phase actions - outside panel */
+.rpg-team-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+}
+
+.rpg-team-actions .submit-btn {
+  width: 100%;
+  max-width: 300px;
+}
+
 /* ============================================
    RPG Battle Page Styles
    ============================================ */
 
 /* Victory screen overlay */
 .rpg-victory-outer {
+  position: relative;
   width: 90%;
   max-width: 400px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   animation: victory-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Close button for victory modal */
+.victory-close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: none;
+  border-radius: 50%;
+  color: var(--tg-theme-hint-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.victory-close-btn:hover {
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--tg-theme-text-color);
+}
+
+.victory-close-btn:active {
+  transform: scale(0.95);
 }
 
 @keyframes victory-pop {
@@ -5296,31 +5330,40 @@ button,
   padding: 12px 16px;
 }
 
-.rpg-victory-stats .victory-stats {
-  display: flex;
-  justify-content: center;
-  gap: 32px;
+.rpg-victory-stats .rpg-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
 }
 
-.rpg-victory-stats .victory-stat {
+.rpg-victory-stats .rpg-stat-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  padding: 12px 8px;
+  background: rgba(90, 74, 58, 0.08);
+  border: 1px solid rgba(90, 74, 58, 0.15);
+  border-radius: 8px;
+  text-align: center;
+  min-height: 70px;
+  justify-content: center;
 }
 
-.rpg-victory-stats .stat-label {
-  font-size: 11px;
+.rpg-victory-stats .rpg-stat-value {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #4a3a2a;
+  line-height: 1.2;
+}
+
+.rpg-victory-stats .rpg-stat-label {
+  font-size: 10px;
   color: #6a5a4a;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-}
-
-.rpg-victory-stats .stat-value {
-  font-family: 'Outfit', sans-serif;
-  font-size: 24px;
-  font-weight: 700;
-  color: #4a3a2a;
+  margin-top: 4px;
+  line-height: 1.3;
 }
 
 .rpg-victory-actions {
@@ -6475,12 +6518,12 @@ button,
 
 /* Leaderboard avatars */
 .rpg-leaderboard-item .avatar {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  font-size: 11px;
-  margin-right: 8px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  font-size: 12px;
   border: 2px solid rgba(90, 74, 58, 0.3);
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
@@ -6489,17 +6532,17 @@ button,
 }
 
 /* Rank-specific avatar borders for top 3 */
-.rpg-leaderboard-item:has(.rpg-rank-badge.gold) .avatar {
+.rpg-leaderboard-item.gold .avatar {
   border-color: #ffd700;
   box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
 }
 
-.rpg-leaderboard-item:has(.rpg-rank-badge.silver) .avatar {
+.rpg-leaderboard-item.silver .avatar {
   border-color: #c0c0c0;
   box-shadow: 0 0 6px rgba(192, 192, 192, 0.4);
 }
 
-.rpg-leaderboard-item:has(.rpg-rank-badge.bronze) .avatar {
+.rpg-leaderboard-item.bronze .avatar {
   border-color: #cd7f32;
   box-shadow: 0 0 6px rgba(205, 127, 50, 0.4);
 }

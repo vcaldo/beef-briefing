@@ -115,6 +115,10 @@ export interface BattlePlaybackProps {
   speedIndex: number
   /** Callback to cycle to next speed */
   onCycleSpeed: () => void
+  /** Whether battle playback has completed */
+  isComplete?: boolean
+  /** Callback to replay battle from start */
+  onReplay?: () => void
 }
 
 interface TabBarProps {
@@ -163,6 +167,8 @@ export function TabBar({ activeTab, onTabChange, battlePlayback }: TabBarProps) 
           onPlayPause={battlePlayback.onPlayPause}
           speedIndex={battlePlayback.speedIndex}
           onCycleSpeed={battlePlayback.onCycleSpeed}
+          isComplete={battlePlayback.isComplete}
+          onReplay={battlePlayback.onReplay}
         />
       )}
       <SoundSettings />

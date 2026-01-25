@@ -23,7 +23,7 @@ import type {
 import { CountdownTimer, LoadingSpinner } from '../common'
 import { CompactCard } from '../common/CompactCard'
 import { apiClient } from '../../api/client'
-import { usePolling, useImages } from '../../hooks'
+import { usePolling } from '../../hooks'
 import { GameButton, CoinDisplay, RPGPanel } from '../ui'
 
 const POLL_INTERVAL = 3000 // 3 seconds
@@ -48,9 +48,6 @@ export function TeamPhaseModal({
   // Sound context
   const { play, playSequence } = useSoundContext()
 
-  // Image URLs for icons
-  const { getUrlById } = useImages()
-  const arrowUpUrl = getUrlById('arrow_up')
 
   // Derived state
   const coins = shopData?.coins ?? 0
@@ -215,37 +212,29 @@ export function TeamPhaseModal({
   }, [activeMatch, actionLoading, isSubmitted, onShopDataChange, play, playSequence])
 
   return (
-    <div className="team-phase-backdrop rpg-team-backdrop">
+    <div className="team-phase-page rpg-team-page">
       <RPGPanel variant="outer" className="rpg-team-modal-outer">
-        {/* Header with title, coins, and timer */}
+        {/* Header with coins and timer */}
         <RPGPanel variant="inner" className="rpg-team-modal-header">
           <div className="rpg-team-header-row">
-            <div className="rpg-team-header-left">
-              <h1 className="rpg-team-title">Organize Your Team</h1>
-              {isSubmitted && (
-                <span className="rpg-team-submitted-badge">Team Submitted</span>
-              )}
-            </div>
-            <div className="rpg-team-header-right">
-              <CoinDisplay amount={coins} size="lg" animated />
-              {shopData?.deadline && (
-                <div className="rpg-team-timer">
-                  <CountdownTimer
-                    deadline={shopData.deadline}
-                    onExpire={() => {
-                      // Timer expired - will be handled by polling
-                    }}
-                    timerThresholds={gameConstants?.timer_thresholds}
-                  />
-                </div>
-              )}
-            </div>
+            <CoinDisplay amount={coins} size="lg" animated />
+            {shopData?.deadline && (
+              <div className="rpg-team-timer">
+                <CountdownTimer
+                  deadline={shopData.deadline}
+                  onExpire={() => {
+                    // Timer expired - will be handled by polling
+                  }}
+                  timerThresholds={gameConstants?.timer_thresholds}
+                />
+              </div>
+            )}
           </div>
         </RPGPanel>
 
         {/* Main content - card row layout */}
-        <RPGPanel variant="inner-blue" className="rpg-team-cards-section">
-          <h2 className="rpg-section-title">Battle Formation</h2>
+        <RPGPanel variant="inner" className="rpg-team-cards-section">
+          <h2 className="rpg-section-title">Drag and drop to set battle order</h2>
 
             {/* Draggable team cards */}
             {localTeamOrder.length > 0 ? (
@@ -289,7 +278,8 @@ export function TeamPhaseModal({
                     {!isSubmitted && (
                       <div className="team-phase-card-upgrades">
                         <GameButton
-                          variant="danger"
+                          variant="primary"
+                          shape="square"
                           size="sm"
                           onClick={() => handleUpgrade(card.position, 'atk')}
                           disabled={coins < upgradeCost || actionLoading !== null}
@@ -299,14 +289,12 @@ export function TeamPhaseModal({
                           {actionLoading === `upgrade-${card.position}-atk` ? (
                             <LoadingSpinner size="sm" inline />
                           ) : (
-                            <span className="upgrade-btn-content">
-                              <img src={arrowUpUrl} alt="" className="upgrade-icon" />
-                              <span>ATK</span>
-                            </span>
+                            '+3'
                           )}
                         </GameButton>
                         <GameButton
                           variant="primary"
+                          shape="square"
                           size="sm"
                           onClick={() => handleUpgrade(card.position, 'hp')}
                           disabled={coins < upgradeCost || actionLoading !== null}
@@ -316,10 +304,7 @@ export function TeamPhaseModal({
                           {actionLoading === `upgrade-${card.position}-hp` ? (
                             <LoadingSpinner size="sm" inline />
                           ) : (
-                            <span className="upgrade-btn-content">
-                              <img src={arrowUpUrl} alt="" className="upgrade-icon" />
-                              <span>HP</span>
-                            </span>
+                            '+3'
                           )}
                         </GameButton>
                       </div>
@@ -340,34 +325,45 @@ export function TeamPhaseModal({
                 ))}
               </div>
             )}
+
+            {/* Strategy hint - only show when not submitted and team has cards */}
+            {!isSubmitted && localTeamOrder.length > 0 && (
+              <div className="rpg-team-strategy-hint">
+                <span className="rpg-team-strategy-hint-icon">💡</span>
+                <span>Place your strongest cards in front — they attack first!</span>
+              </div>
+            )}
         </RPGPanel>
 
-        {/* Footer with Submit Team button or waiting state */}
-        <footer className="team-phase-footer">
-          {!isSubmitted ? (
-            <GameButton
-              variant="primary"
-              size="lg"
-              onClick={handleSubmitTeam}
-              disabled={!canSubmit || actionLoading !== null}
-              className="submit-btn"
-            >
-              {actionLoading === 'submit' ? (
-                <LoadingSpinner size="sm" inline />
-              ) : isTeamComplete ? (
-                'Submit Team'
-              ) : (
-                `Need ${teamSize - teamCards.length} more card${teamSize - teamCards.length > 1 ? 's' : ''}`
-              )}
-            </GameButton>
-          ) : (
-            <div className="submit-status">
-              <span className="submit-status-icon">✓</span>
-              <span className="submit-status-text">Waiting for opponent...</span>
-            </div>
-          )}
-        </footer>
+        {/* Waiting message - only show if submitted */}
+        {isSubmitted && (
+          <RPGPanel variant="inner-blue" className="rpg-team-waiting">
+            <div className="rpg-team-waiting-icon">⏳</div>
+            <p className="rpg-team-waiting-text">Waiting for opponent...</p>
+          </RPGPanel>
+        )}
       </RPGPanel>
+
+      {/* Submit button OUTSIDE the box - matches Shop/Lobby pattern */}
+      {!isSubmitted && (
+        <div className="rpg-team-actions">
+          <GameButton
+            variant="primary"
+            size="lg"
+            onClick={handleSubmitTeam}
+            disabled={!canSubmit || actionLoading !== null}
+            className="submit-btn"
+          >
+            {actionLoading === 'submit' ? (
+              <LoadingSpinner size="sm" inline />
+            ) : isTeamComplete ? (
+              'Submit Team'
+            ) : (
+              `Need ${teamSize - teamCards.length} more card${teamSize - teamCards.length > 1 ? 's' : ''}`
+            )}
+          </GameButton>
+        </div>
+      )}
     </div>
   )
 }

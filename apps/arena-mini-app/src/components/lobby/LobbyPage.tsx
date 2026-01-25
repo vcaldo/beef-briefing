@@ -17,6 +17,7 @@ import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
 import { GameButton, RPGPanel } from '../ui'
 import { usePolling, useErrorBanner } from '../../hooks'
 import { useSoundContext } from '../../contexts'
+import arenaLogo from '../../../assets/images/logo/logo.webp'
 
 import type { Match, GameConstants } from '../../types'
 
@@ -194,6 +195,11 @@ export function LobbyPage({
    */
   const handleMatchDetailsSuccess = useCallback(
     (match: Match) => {
+      // Handle loading state for initial fetch (e.g., navigating back to lobby with active match)
+      if (loading) {
+        setLoading(false)
+      }
+
       // Check for phase transition to shop
       if (match.status === 'shop_phase') {
         addPageAction('match_phase_transition', {
@@ -231,7 +237,7 @@ export function LobbyPage({
       // Update match state
       onMatchChange(match)
     },
-    [activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle, play]
+    [activeMatch, onMatchChange, onNavigateToShop, onNavigateToBattle, play, loading]
   )
 
   /**
@@ -383,8 +389,7 @@ export function LobbyPage({
       {/* RPG-styled header */}
       <RPGPanel variant="outer" className="rpg-lobby-header">
         <RPGPanel variant="inner" className="rpg-lobby-header-content">
-          <h1 className="rpg-lobby-title">Arena Lobby</h1>
-          <p className="rpg-lobby-subtitle">Welcome, {firstName}</p>
+          <img src={arenaLogo} alt="Arena" className="rpg-lobby-logo" />
         </RPGPanel>
       </RPGPanel>
 
@@ -417,6 +422,14 @@ export function LobbyPage({
                   />
                 </div>
               )}
+
+              {/* Title row: Casual 1v1 */}
+              <div className="rpg-match-card-title">
+                <span className="match-type-label">
+                  {activeMatch.match_type === 'ranked' ? '🏆 Ranked' : '⚔️ Casual'}
+                </span>
+                <span className="match-format-label">{activeMatch.format || '1v1'}</span>
+              </div>
 
               {/* Participants */}
               <div className="rpg-match-card-participants">
@@ -465,6 +478,7 @@ export function LobbyPage({
               <>
                 <GameButton
                   variant="neutral"
+                  size="lg"
                   onClick={() => handleLeaveMatch(activeMatch.id)}
                   disabled={actionLoading !== null}
                 >
@@ -473,6 +487,7 @@ export function LobbyPage({
                 {canStartEarly && (
                   <GameButton
                     variant="primary"
+                    size="lg"
                     onClick={() => handleStartMatch(activeMatch.id)}
                     disabled={actionLoading !== null}
                   >
@@ -488,25 +503,11 @@ export function LobbyPage({
       {/* Match list (when not in a match) */}
       {!activeMatch && (
         <section className="lobby-matches rpg-lobby-matches">
-          <RPGPanel variant="outer" className="rpg-lobby-section-header">
-            <div className="rpg-section-header-row">
-              <h2 className="rpg-section-title">Available Matches</h2>
-              <GameButton
-                variant="primary"
-                size="sm"
-                onClick={handleCreateMatch}
-                disabled={actionLoading !== null}
-                className="create-match-btn"
-              >
-                {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : '+ New Match'}
-              </GameButton>
-            </div>
-          </RPGPanel>
-
           {matches.length === 0 ? (
             <RPGPanel variant="outer" className="rpg-empty-state-panel">
               <RPGPanel variant="inner" className="rpg-empty-state-content">
                 <div className="rpg-empty-state">
+                  <p className="rpg-lobby-subtitle">Welcome, {firstName}</p>
                   <span className="rpg-empty-icon">⚔️</span>
                   <h3 className="rpg-empty-title">No Active Matches</h3>
                   <p className="rpg-empty-hint">Create a new match to challenge your friends!</p>

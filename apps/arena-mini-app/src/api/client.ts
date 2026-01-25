@@ -278,7 +278,7 @@ class ArenaApiClient extends BaseApiClient {
    */
   async getLeaderboard(
     chatId?: number,
-    type: 'ranked' | 'casual' = 'ranked',
+    type: 'ranked' | 'regular' = 'regular',
     limit: number = 50,
     offset: number = 0
   ): Promise<LeaderboardResponse> {

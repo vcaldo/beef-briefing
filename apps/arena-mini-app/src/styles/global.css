@@ -3554,6 +3554,11 @@ a:focus:not(:focus-visible),
   font-weight: 600;
 }
 
+.rpg-leaderboard-stats .streak {
+  color: #c2410c;
+  font-weight: 600;
+}
+
 /* RPG Leaderboard Score */
 .rpg-leaderboard-score {
   font-family: 'JetBrains Mono', monospace;

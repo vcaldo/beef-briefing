@@ -41,7 +41,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
   const [activeSubTab, setActiveSubTab] = useState<StatsSubTab>('leaderboard')
 
   // Leaderboard state
-  const [leaderboardType, setLeaderboardType] = useState<'ranked' | 'casual'>('casual')
+  const [leaderboardType, setLeaderboardType] = useState<'ranked' | 'regular'>('regular')
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardResponse | null>(null)
   const [leaderboardPage, setLeaderboardPage] = useState(0)
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
@@ -87,7 +87,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
   // Fetch leaderboard data
   const fetchLeaderboard = useCallback(
-    async (type: 'ranked' | 'casual' = leaderboardType, page: number = leaderboardPage) => {
+    async (type: 'ranked' | 'regular' = leaderboardType, page: number = leaderboardPage) => {
       if (!isMountedRef.current) return
 
       setLeaderboardLoading(true)
@@ -96,6 +96,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
         if (!isMountedRef.current) return
 
         setLeaderboardData(data)
+        setError(null) // Clear any previous error
         addPageAction('leaderboard_loaded', {
           type,
           page,
@@ -255,7 +256,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
   // Handle leaderboard type change
   const handleLeaderboardTypeChange = useCallback(
-    (type: 'ranked' | 'casual') => {
+    (type: 'ranked' | 'regular') => {
       setLeaderboardType(type)
       setLeaderboardPage(0)
       fetchLeaderboard(type, 0)
@@ -346,9 +347,9 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
         {/* Type toggle - outside the panel */}
         <div className="rpg-type-toggle">
           <GameButton
-            variant={leaderboardType === 'casual' ? 'primary' : 'neutral'}
+            variant={leaderboardType === 'regular' ? 'primary' : 'neutral'}
             size="sm"
-            onClick={() => handleLeaderboardTypeChange('casual')}
+            onClick={() => handleLeaderboardTypeChange('regular')}
           >
             ⚔️ Casual
           </GameButton>
@@ -391,8 +392,16 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
                     <div className="rpg-leaderboard-stats">
                       <span className="wins">{leaderboardType === 'ranked' ? entry.ranked_wins : entry.regular_wins}W</span>
                       <span className="losses">{leaderboardType === 'ranked' ? entry.ranked_losses : entry.regular_losses}L</span>
+                      {(() => {
+                        const streak = leaderboardType === 'ranked' ? entry.ranked_current_streak : entry.regular_current_streak
+                        return streak > 0 ? <span className="streak">🔥{streak}</span> : null
+                      })()}
                     </div>
-                    <div className="rpg-leaderboard-score">{entry.score}</div>
+                    <div className="rpg-leaderboard-score">
+                      {leaderboardType === 'ranked'
+                        ? entry.score.toFixed(0)
+                        : `${(entry.score * 100).toFixed(0)}%`}
+                    </div>
                   </div>
                 ))}
               </div>

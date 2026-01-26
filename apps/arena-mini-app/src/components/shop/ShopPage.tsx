@@ -16,7 +16,7 @@ import { useSoundContext } from '../../contexts'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer, ErrorBanner, CompactCard } from '../common'
 import { GameButton, CoinDisplay, CardSlot, RPGPanel } from '../ui'
-import { usePolling, useErrorBanner } from '../../hooks'
+import { usePolling, useErrorBanner, usePageBackground } from '../../hooks'
 import TeamPhaseModal from './TeamPhaseModal'
 
 import type {
@@ -75,6 +75,9 @@ export function ShopPage({
   const soundsPreloadedRef = useRef(false)
   // Track if initial shop cards have been loaded (for card_draw sound)
   const initialCardsLoadedRef = useRef(false)
+
+  // Apply splash background image
+  usePageBackground({ backgroundId: 'splash' })
 
   // Preload shop and team sounds on mount
   useEffect(() => {
@@ -282,7 +285,7 @@ export function ShopPage({
   // No active match - should not be on this page
   if (!activeMatch) {
     return (
-      <div className="shop-page">
+      <div className="shop-page page-bg page-bg--splash">
         <div className="shop-error">
           <p>No active match. Return to the lobby to join or create a match.</p>
         </div>
@@ -293,7 +296,7 @@ export function ShopPage({
   // Loading state
   if (loading) {
     return (
-      <div className="shop-page">
+      <div className="shop-page page-bg page-bg--splash">
         <LoadingSpinner message="Loading shop..." />
       </div>
     )
@@ -314,7 +317,7 @@ export function ShopPage({
   }
 
   return (
-    <div className="shop-page rpg-shop-page">
+    <div className="shop-page rpg-shop-page page-bg page-bg--splash">
       <RPGPanel variant="outer" className="rpg-shop-outer">
         {/* Header with button, timer, and coins */}
         <RPGPanel variant="inner" className="rpg-shop-header">

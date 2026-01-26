@@ -4972,6 +4972,8 @@ button,
   display: flex;
   flex-direction: column;
   gap: 16px;
+  flex: 1;
+  justify-content: center;
 }
 
 .rpg-lobby-section-header {
@@ -4996,7 +4998,7 @@ button,
 
 /* Empty state panel for no matches */
 .rpg-empty-state-panel {
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .rpg-empty-state-content {

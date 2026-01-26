@@ -389,13 +389,6 @@ export function LobbyPage({
 
   return (
     <div className="lobby-page rpg-lobby-page page-bg page-bg--splash">
-      {/* RPG-styled header */}
-      <RPGPanel variant="outer" className="rpg-lobby-header">
-        <RPGPanel variant="inner" className="rpg-lobby-header-content">
-          <h1 className="rpg-lobby-title">Beef Arena</h1>
-        </RPGPanel>
-      </RPGPanel>
-
       {/* Error banner */}
       {error && (
         <ErrorBanner

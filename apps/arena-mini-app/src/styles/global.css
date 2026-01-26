@@ -2485,7 +2485,7 @@ a:focus:not(:focus-visible),
   /* HP bar inherits positions from placeholder_positions and scales with the card */
 }
 
-/* Battle Teams - Horizontal layout with Team B left, Team A right */
+/* Battle Teams - Horizontal layout with Team A left, Team B right */
 .battle-team {
   display: flex;
   flex-direction: column;
@@ -2493,12 +2493,12 @@ a:focus:not(:focus-visible),
 }
 
 .battle-team.team-a {
-  align-items: flex-end;
+  align-items: flex-start;
   transform: translateY(-10px); /* Same level as team-b */
 }
 
 .battle-team.team-b {
-  align-items: flex-start;
+  align-items: flex-end;
   transform: translateY(-10px);  /* Move down for staggered "two teams" effect */
 }
 
@@ -2517,11 +2517,11 @@ a:focus:not(:focus-visible),
 }
 
 .team-a .team-cards {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .team-b .team-cards {
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
 
 /* =============================================================================
@@ -2539,7 +2539,7 @@ a:focus:not(:focus-visible),
   position: relative;
 }
 
-/* Fighter slots in arena (left=Player B, right=Player A) */
+/* Fighter slots in arena (left=Player A, right=Player B) */
 .arena-fighter-slot {
   display: flex;
   align-items: center;
@@ -2549,11 +2549,11 @@ a:focus:not(:focus-visible),
 }
 
 .arena-fighter-left {
-  /* Player B's card - normal orientation */
+  /* Player A's card - normal orientation */
 }
 
 .arena-fighter-right {
-  /* Player A's card - normal orientation (no flip) */
+  /* Player B's card - normal orientation (no flip) */
 }
 
 /* VS indicator between fighters */

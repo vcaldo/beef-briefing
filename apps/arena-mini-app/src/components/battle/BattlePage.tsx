@@ -489,19 +489,7 @@ export function BattlePage({
 
         {/* Team Stacks Row */}
         <div className="battle-teams-row">
-          {/* Team B (left side) */}
-          <div className="battle-team team-b">
-            <div className="team-label">
-              {userId === battleData.player_b_id ? 'You' : battleData.player_b_name}
-            </div>
-            <div className="team-cards">
-              {(battleData.team_b_final?.cards ?? []).map((card) =>
-                renderBattleCard(card.card_id, battleData.player_b_id, card)
-              )}
-            </div>
-          </div>
-
-          {/* Team A (right side) */}
+          {/* Team A (left side) */}
           <div className="battle-team team-a">
             <div className="team-label">
               {userId === battleData.player_a_id ? 'You' : battleData.player_a_name}
@@ -509,6 +497,18 @@ export function BattlePage({
             <div className="team-cards">
               {(battleData.team_a_final?.cards ?? []).map((card) =>
                 renderBattleCard(card.card_id, battleData.player_a_id, card)
+              )}
+            </div>
+          </div>
+
+          {/* Team B (right side) */}
+          <div className="battle-team team-b">
+            <div className="team-label">
+              {userId === battleData.player_b_id ? 'You' : battleData.player_b_name}
+            </div>
+            <div className="team-cards">
+              {(battleData.team_b_final?.cards ?? []).map((card) =>
+                renderBattleCard(card.card_id, battleData.player_b_id, card)
               )}
             </div>
           </div>

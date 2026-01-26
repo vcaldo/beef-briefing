@@ -44,12 +44,12 @@ export interface ArenaFighter {
 }
 
 /**
- * Arena fighters state - tracks left (Player B) and right (Player A) fighters.
+ * Arena fighters state - tracks left (Player A) and right (Player B) fighters.
  */
 export interface ArenaFightersState {
-  /** Player B's fighter (left side of arena) */
+  /** Player A's fighter (left side of arena) */
   left: ArenaFighter | null
-  /** Player A's fighter (right side of arena) */
+  /** Player B's fighter (right side of arena) */
   right: ArenaFighter | null
 }
 
@@ -87,7 +87,7 @@ export interface UseBattleAnimationReturn {
   damageTargetKey: string | null
   /** Currently active battle effects (attack, damage, death, spark) - supports multiple simultaneous effects */
   activeEffects: ActiveBattleEffect[]
-  /** Cards currently fighting in the central arena (left=Player B, right=Player A) */
+  /** Cards currently fighting in the central arena (left=Player A, right=Player B) */
   arenaFighters: ArenaFightersState
   /** Callback to call when an effect animation completes (pass cardKey to identify which effect) */
   onEffectComplete: (cardKey: string) => void
@@ -663,14 +663,14 @@ export function useBattleAnimation(
         teamOwnerId: nextEvent.defender_team_owner_id,
       }
 
-      // Player A (playerAId) cards go RIGHT, Player B (playerBId) cards go LEFT
+      // Player A (playerAId) cards go LEFT, Player B (playerBId) cards go RIGHT
       const attackerIsPlayerA = nextEvent.attacker_team_owner_id === playerAId
 
       setArenaFighters({
-        // Left side is always Player B's card
-        left: attackerIsPlayerA ? defenderFighter : attackerFighter,
-        // Right side is always Player A's card
-        right: attackerIsPlayerA ? attackerFighter : defenderFighter,
+        // Left side is always Player A's card
+        left: attackerIsPlayerA ? attackerFighter : defenderFighter,
+        // Right side is always Player B's card
+        right: attackerIsPlayerA ? defenderFighter : attackerFighter,
       })
     }
 

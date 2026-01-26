@@ -92,6 +92,7 @@
 
   /* Page background URLs (set dynamically via JS for cache-busting) */
   --bg-arena-url: none;
+  --bg-splash-url: none;
 }
 
 /* =============================================================================
@@ -157,6 +158,13 @@ body {
 /* Arena background (for battle page) */
 .page-bg--arena::before {
   background-image: var(--bg-arena-url);
+  /* Darken the image to maintain UI contrast */
+  filter: brightness(0.4);
+}
+
+/* Splash background (for lobby and shop pages) */
+.page-bg--splash::before {
+  background-image: var(--bg-splash-url);
   /* Darken the image to maintain UI contrast */
   filter: brightness(0.4);
 }

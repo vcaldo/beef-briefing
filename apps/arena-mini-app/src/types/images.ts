@@ -62,7 +62,7 @@ export type EffectImageId =
   | 'explosion/explosion08'
 
 // Background image IDs (page backgrounds)
-export type BackgroundImageId = 'arena'
+export type BackgroundImageId = 'arena' | 'splash'
 
 // Union of all image IDs
 export type ImageId = ButtonImageId | PanelImageId | BarImageId | IconImageId | EffectImageId | BackgroundImageId
@@ -150,4 +150,5 @@ export const IMAGE_CONFIGS: Record<ImageId, ImageConfig> = {
 
   // Backgrounds (page backgrounds)
   arena: { category: 'bg', filename: 'arena', extension: 'webp' },
+  splash: { category: 'bg', filename: 'splash', extension: 'webp' },
 }

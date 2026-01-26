@@ -1371,7 +1371,7 @@ export type TabId = 'lobby' | 'shop' | 'battle' | 'stats'
  * @example
  * const [subTab, setSubTab] = useState<StatsSubTab>('leaderboard');
  */
-export type StatsSubTab = 'leaderboard' | 'history'
+export type StatsSubTab = 'leaderboard' | 'profile' | 'history'
 
 /**
  * Application lifecycle state.

@@ -8,13 +8,16 @@ The Leaderboard Mini App displays activity statistics and user rankings for Tele
 
 ## Features
 
-- **Overview Stats**: Total messages, reactions, active users
-- **Activity Timeline**: Daily message/reaction trends with charts
-- **User Rankings**: Leaderboards by various metrics
+- **Overview Stats**: Total messages, reactions, active users with trend indicators
+- **Activity Timeline**: Daily message/reaction trends with interactive charts
+- **User Rankings**: Leaderboards by various metrics with pagination
 - **Media Statistics**: Breakdown by type (photos, videos, GIFs, voice, docs, stickers) with pie chart, timeline, and top senders
+- **Interactions**: Reply and reaction network analysis between users
 - **Period Filtering**: View stats for 7d, 30d, 90d, or all time
-- **Multiple Metrics**: Rank by messages, reactions sent/received, active days
+- **User Profiles**: Individual user statistics and activity heatmaps
+- **Admin Panel**: Group management for administrators
 - **Telegram Integration**: Seamless authentication via Mini App init data
+- **Responsive Design**: Adapts to Telegram theme (light/dark mode)
 
 ## Quick Start
 
@@ -40,8 +43,10 @@ npm run build
 
 - **Framework**: React 18 with TypeScript
 - **Build Tool**: Vite
-- **Charts**: Recharts
+- **Styling**: CSS with Telegram theme variables
+- **Charts**: Recharts (area, pie, bar charts)
 - **Telegram SDK**: @telegram-apps/sdk-react
+- **Fonts**: System font stack (Apple, Segoe UI, Roboto)
 
 ## API Integration
 
@@ -109,14 +114,54 @@ npx tsc --noEmit
 ```
 apps/leaderboard-mini-app/
 ├── src/
-│   ├── api/client.ts     # API client with JWT auth
-│   ├── types/index.ts    # TypeScript interfaces
-│   ├── App.tsx           # Main application
-│   └── main.tsx          # Entry point
+│   ├── api/client.ts              # API client with JWT auth
+│   ├── types/index.ts             # TypeScript interfaces
+│   ├── styles/global.css          # CSS with Telegram theme variables
+│   ├── components/
+│   │   ├── common/
+│   │   │   ├── TabBar.tsx         # Bottom navigation
+│   │   │   ├── TrendIndicator.tsx # Up/down trend arrows
+│   │   │   └── HeatmapGrid.tsx    # Activity heatmap
+│   │   ├── home/
+│   │   │   └── HomePage.tsx       # Overview dashboard
+│   │   ├── leaderboard/
+│   │   │   └── LeaderboardPage.tsx
+│   │   ├── media/
+│   │   │   └── MediaPage.tsx      # Media statistics
+│   │   ├── interactions/
+│   │   │   └── InteractionsPage.tsx
+│   │   ├── card/
+│   │   │   └── CardPage.tsx       # User card view
+│   │   ├── profile/
+│   │   │   └── ProfilePage.tsx    # User profile
+│   │   ├── admin/
+│   │   │   └── AdminPage.tsx      # Admin controls
+│   │   ├── OverviewStats.tsx      # Stats summary cards
+│   │   ├── ActivityChart.tsx      # Timeline chart
+│   │   ├── LeaderboardTable.tsx   # Rankings table
+│   │   └── PeriodSelector.tsx     # Time period filter
+│   ├── App.tsx                    # Main app with tab routing
+│   └── main.tsx                   # Entry point (SDK init)
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
-└── Dockerfile
+├── Dockerfile
+└── index.html
+```
+
+## Screen Flow
+
+```
+Home → Leaderboard → Media → Interactions → Profile
+  │        │           │          │           │
+  │        │           │          │           └── User stats, heatmap, cards
+  │        │           │          └── Reply/reaction networks
+  │        │           └── Media breakdown, top senders
+  │        └── Rankings by metric, pagination
+  └── Overview stats, activity chart, quick rankings
+
+Tab navigation allows direct access to any section.
+Period selector (7d/30d/90d/all) persists across tabs.
 ```
 
 ## Deployment
@@ -127,21 +172,35 @@ The Mini App is deployed as a static site behind Traefik:
 
 The Docker build process compiles the React app and serves it via nginx.
 
+### Build Info
+
+- **Bundle size**: ~182KB gzipped (target: <300KB)
+- **Single bundle**: Includes Recharts (~100KB contribution)
+
 ## Troubleshooting
-
-### Stats not loading
-
-1. Verify API Service is running
-2. Check browser console for errors
-3. Ensure the chat has message data
-
-### Charts not rendering
-
-- Check Recharts is installed: `npm ls recharts`
-- Verify activity data is being returned from API
 
 ### Authentication fails
 
 - Check `VITE_API_URL` points to correct API
 - Verify the Mini App is launched from Telegram (not standalone browser)
 - Check API Service logs for init_data validation errors
+- Ensure chat_id is present (must open from group chat context)
+
+### Stats not loading
+
+1. Verify API Service is running
+2. Check browser console for errors
+3. Ensure the chat has message data
+4. Verify chat_id in request matches the current chat
+
+### Charts not rendering
+
+- Check Recharts is installed: `npm ls recharts`
+- Verify activity data is being returned from API
+- Check for JavaScript errors in browser console
+
+### Period selector not working
+
+1. Verify the period parameter is being passed to API
+2. Check that data exists for the selected period
+3. Try switching to "all" period to verify data exists

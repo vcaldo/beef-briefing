@@ -34,7 +34,8 @@ cp .env.dev.example .env.dev
 #    - DB_PASSWORD
 
 # 3. Generate secrets (from repo root)
-make secrets-analytics-api-key
+make secrets-service-api APP=telegram-bot
+make secrets-card-renderer APP=ml-processor
 
 # 4. Start services
 make up-build
@@ -104,22 +105,33 @@ All development variables plus:
 
 ### Development (`docker-compose.dev.yml`)
 
-| Service | Port | Description |
-|---------|------|-------------|
-| postgres | 5432 | PostgreSQL 17 with PostGIS 3.4 |
-| minio | 9000/9001 | S3-compatible object storage |
-| api-service | 8080 | REST API for Telegram data ingestion |
-| telegram-bot | - | Telegram bot client |
+| Service | Port | Language | Description |
+|---------|------|----------|-------------|
+| postgres | 5432 | - | PostgreSQL 17 with PostGIS 3.4 |
+| minio | 9000/9001 | - | S3-compatible object storage |
+| qdrant | 6333/6334 | - | Vector database for ML embeddings |
+| api-service | 8080 | Go | REST API for Telegram data ingestion |
+| telegram-bot | - | Go | Telegram bot client |
+| card-renderer | 8051 | Python | Card image renderer (Playwright) |
+| ml-processor | - | Python | ML pipeline for message analysis |
+| ml-dashboard-backend | 8052 | Python | ML Dashboard API |
+| ml-dashboard-frontend | 3000 | React | ML Dashboard UI |
+| deck-mini-app-dev | 5173 | React | Telegram Mini App for deck viewing |
+| leaderboard-mini-app-dev | 5174 | React | Telegram Mini App for leaderboard |
+| arena-mini-app-dev | 5175 | React | Telegram Mini App for card battles |
 
 ### Production (`docker-compose.prod.yml`)
 
-| Service | Port | Description |
-|---------|------|-------------|
-| traefik | 80/443 | Reverse proxy with Let's Encrypt SSL |
-| postgres | 5432 (internal) | PostgreSQL with PostGIS |
-| api-service | 8080 (internal) | REST API |
-| telegram-bot | - | Telegram bot client |
-| newrelic-infra | - | Infrastructure monitoring (optional) |
+| Service | Port | Language | Description |
+|---------|------|----------|-------------|
+| traefik | 80/443 | - | Reverse proxy with Let's Encrypt SSL |
+| postgres | 5432 (internal) | - | PostgreSQL with PostGIS |
+| api-service | 8080 (internal) | Go | REST API |
+| telegram-bot | - | Go | Telegram bot client |
+| card-renderer | 8051 (internal) | Python | Card image renderer |
+| deck-mini-app | - | React | Telegram Mini App (deck viewing) |
+| leaderboard-mini-app | - | React | Telegram Mini App (leaderboard) |
+| arena-mini-app | - | React | Telegram Mini App (card battles) |
 
 ## Secrets Management
 
@@ -131,8 +143,13 @@ See [secrets/README.md](secrets/README.md) for detailed secrets documentation.
 # Generate Traefik dashboard password (production)
 make secrets-traefik-password
 
-# Generate analytics API key
-make secrets-analytics-api-key
+# Generate API keys for services
+make secrets-service-api APP=telegram-bot
+make secrets-service-api APP=ml-processor
+make secrets-card-renderer APP=ml-processor
+
+# Generate JWT secret for Mini Apps
+make secrets-jwt
 ```
 
 ## Terraform (Linode)
@@ -182,11 +199,123 @@ make deploy-regenerate-certs
 ```
 Internet (443/80) --> Traefik (SSL termination)
                            |
-                           +--> Traefik Dashboard (/dashboard)
+                           +--> api.{domain} --> API Service (8080)
+                           |       +--> /api/v1/mini-app/* (public, JWT auth)
+                           |       +--> /api/v1/* (IP restricted)
+                           +--> cards-api.{domain} --> Card Renderer (8051)
+                           +--> deck.{domain} --> Deck Mini App
+                           +--> leaderboard.{domain} --> Leaderboard Mini App
+                           +--> arena.{domain} --> Arena Mini App
+                           +--> {domain}/dashboard --> Traefik Dashboard
 
 Internal Docker Network (beef-prod-network):
   +-- API Service (8080) <--> Telegram Bot
+  +-- Card Renderer (8051)
   +-- PostgreSQL (5432) - NOT exposed externally
+```
+
+## Commands Reference
+
+### Docker Lifecycle
+
+| Command | Description |
+|---------|-------------|
+| `make up` | Start all dev services |
+| `make up-build` | Rebuild images and start |
+| `make down` | Stop all services |
+| `make logs` | Tail logs from all services |
+| `make logs-api` | Tail API service logs |
+| `make clean` | Stop and remove volumes |
+
+### Production Deployment
+
+| Command | Description |
+|---------|-------------|
+| `make deploy` | Full production deployment |
+| `make deploy-skip-build` | Deploy with existing images |
+| `make rollback` | Rollback to previous version |
+| `make prod-logs-traefik` | View Traefik logs |
+| `make prod-update-ip` | Update IP allowlist |
+
+### Database
+
+| Command | Description |
+|---------|-------------|
+| `make pg-dev` | Connect to dev PostgreSQL |
+| `make pg-tunnel` | Open SSH tunnel to prod database |
+| `make pg-prod` | Connect to prod PostgreSQL (requires tunnel) |
+| `make prod-backup-db` | Backup production database |
+
+### Cache Management
+
+| Command | Description |
+|---------|-------------|
+| `make layer-cache-health` | Check OCI cache health |
+| `make layer-cache-stats` | Show cache statistics |
+| `make layer-cache-clean-remote` | Clean remote cache |
+
+## Troubleshooting
+
+### Services not starting
+
+**Symptoms**: Containers exit immediately or fail to start
+
+**Solution**:
+```bash
+# Check logs for the failing service
+make logs-api  # or logs-bot, etc.
+
+# Verify secrets are generated
+ls -la infrastructure/secrets/apps/
+
+# Regenerate secrets if missing
+make secrets-service-api APP=telegram-bot
+```
+
+### Database connection refused
+
+**Symptoms**: API service cannot connect to PostgreSQL
+
+**Solution**:
+```bash
+# Check if postgres is running
+docker ps | grep postgres
+
+# Check postgres logs
+make logs-postgres
+
+# Restart postgres
+docker restart beef-postgres-dev
+```
+
+### SSL certificate issues (production)
+
+**Symptoms**: HTTPS not working, certificate errors
+
+**Solution**:
+```bash
+# View Traefik logs
+make prod-logs-traefik
+
+# Check certificate files
+ssh admin@<server> 'ls -la ~/beef-briefing/infrastructure/letsencrypt/'
+
+# Force regenerate certificates
+make deploy-regenerate-certs
+```
+
+### MinIO/Object Storage connection failed
+
+**Symptoms**: Media uploads fail, card images not rendering
+
+**Solution**:
+```bash
+# Development: Check MinIO is running
+docker ps | grep minio
+
+# Production: Verify credentials in .env.prod
+# Run Terraform sync to update credentials
+make tf-sync-object-storage
 ```
 
 ## Related Documentation
@@ -194,4 +323,6 @@ Internal Docker Network (beef-prod-network):
 - [Terraform Infrastructure](terraform/README.md) - Linode provisioning details
 - [Secrets Management](secrets/README.md) - Secret generation and storage
 - [API Service](../apps/api-service/README.md) - REST API documentation
+- [Card Renderer](../apps/card-renderer/README.md) - Card image renderer
 - [Telegram Bot](../apps/telegram-bot/README.md) - Bot configuration
+- [ML Processor](../apps/ml-processor/README.md) - ML pipeline for analytics

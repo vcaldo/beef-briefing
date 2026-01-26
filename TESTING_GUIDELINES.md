@@ -1,6 +1,6 @@
 # Testing Guidelines for beef-briefing
 
-This document provides comprehensive guidelines for writing and maintaining tests in the beef-briefing project. It complements the testing patterns documentation in [CLAUDE.md](CLAUDE.md#testing-patterns).
+This document provides comprehensive guidelines for writing and maintaining tests in the beef-briefing project. It is the authoritative testing documentation and is referenced from [CLAUDE.md](CLAUDE.md#testing-patterns).
 
 ## Table of Contents
 
@@ -767,16 +767,14 @@ When submitting tests in a PR, ensure:
 
 ## Additional Resources
 
-- [CLAUDE.md - Testing Patterns](CLAUDE.md#testing-the-system)
 - [Go Testing Best Practices](https://golang.org/doc/effective_go#testing)
 - [Table-Driven Tests](https://github.com/golang/go/wiki/TableDrivenTests)
-- [testutil Package Documentation](CLAUDE.md#test-utilities-testutil-package)
+- [testutil Package](apps/api-service/internal/testutil/) - Fixtures, mocks, and database helpers
 
 ## Questions or Issues?
 
 If you have questions about testing patterns or encounter issues:
 
 1. Check existing tests in `apps/api-service/internal/*/` for examples
-2. Review the `testutil` package documentation
-3. Look at the "Testing Patterns" section in CLAUDE.md
-4. Check the progress notes in `plans/more-tests/progress.txt`
+2. Review the `testutil` package source code
+3. Check the progress notes in `plans/more-tests/progress.txt`

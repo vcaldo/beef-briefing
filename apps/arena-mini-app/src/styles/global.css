@@ -5147,8 +5147,9 @@ button,
 
 .rpg-shop-reroll-hint {
   font-size: 12px;
-  color: #6a5a4a;
-  line-height: 1.4;
+  font-weight: 600;
+  font-style: italic;
+  color: #5a6a3a;
 }
 
 .rpg-shop-section-header {
@@ -5390,8 +5391,10 @@ button,
 }
 
 .rpg-team-waiting-text {
-  font-size: 14px;
-  color: #3a5a6a;
+  font-size: 12px;
+  font-weight: 600;
+  font-style: italic;
+  color: #5a6a3a;
   margin: 0;
 }
 

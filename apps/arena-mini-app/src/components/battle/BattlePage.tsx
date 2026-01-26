@@ -505,21 +505,17 @@ export function BattlePage({
                   <span className="rpg-stat-label">Rounds</span>
                 </div>
               </div>
+              <GameButton
+                variant="primary"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleReturnToLobby()
+                }}
+              >
+                Return to Lobby
+              </GameButton>
             </RPGPanel>
           </RPGPanel>
-
-          {/* Button OUTSIDE the outer box */}
-          <div className="rpg-victory-actions-outside">
-            <GameButton
-              variant="primary"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleReturnToLobby()
-              }}
-            >
-              Return to Lobby
-            </GameButton>
-          </div>
         </div>
       )}
     </div>

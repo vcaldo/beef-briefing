@@ -229,7 +229,7 @@ export function TeamPhaseModal({
                   {actionLoading === 'submit' ? (
                     <LoadingSpinner size="sm" inline />
                   ) : isTeamComplete ? (
-                    'Submit Team'
+                    'Done'
                   ) : (
                     `Need ${teamSize - teamCards.length} more`
                   )}
@@ -354,15 +354,12 @@ export function TeamPhaseModal({
                 <span>Got coins left? Power up! Stack your strongest cards in front so they hit first.</span>
               </div>
             )}
-        </RPGPanel>
 
-        {/* Waiting message - only show if submitted */}
-        {isSubmitted && (
-          <RPGPanel variant="inner-blue" className="rpg-team-waiting">
-            <div className="rpg-team-waiting-icon">⏳</div>
-            <p className="rpg-team-waiting-text">Waiting for opponent...</p>
-          </RPGPanel>
-        )}
+            {/* Waiting message - only show if submitted */}
+            {isSubmitted && (
+              <p className="rpg-team-waiting-text">Waiting for opponent...</p>
+            )}
+        </RPGPanel>
       </RPGPanel>
     </div>
   )

@@ -476,8 +476,10 @@ export function BattlePage({
             {arenaFighters.left && renderArenaCard(arenaFighters.left)}
           </div>
 
-          {/* VS indicator */}
-          <div className="arena-vs-indicator">VS</div>
+          {/* VS indicator - only visible when both fighters present */}
+          {arenaFighters.left && arenaFighters.right && (
+            <div className="arena-vs-indicator">VS</div>
+          )}
 
           {/* Right fighter slot (Player A's card) */}
           <div className="arena-fighter-slot arena-fighter-right">

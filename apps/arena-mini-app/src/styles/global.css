@@ -2526,14 +2526,14 @@ a:focus:not(:focus-visible),
    Central Battle Arena (Fighting Zone)
    ============================================================================= */
 
-/* Central arena where active combat happens */
+/* Central arena where active combat happens - aligned to top */
 .battle-center-arena {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 16px;
-  padding: 12px 16px;
-  min-height: 180px;
+  padding: 0 16px;
+  min-height: auto;
   position: relative;
 }
 
@@ -2542,8 +2542,8 @@ a:focus:not(:focus-visible),
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 145px;   /* 300 * 0.483 ≈ 145px visual width */
-  min-height: 217px;  /* 450 * 0.483 ≈ 217px visual height */
+  min-width: 90px;    /* 300 * 0.300 = 90px visual width */
+  min-height: 135px;  /* 450 * 0.300 = 135px visual height */
 }
 
 .arena-fighter-left {
@@ -2574,12 +2574,12 @@ a:focus:not(:focus-visible),
   position: relative;
 }
 
-/* Arena Compact Card - 2x scale (0.2415 * 2 = 0.483)
-   Double the size of battle-compact-card for prominence in fighting zone */
+/* Arena Compact Card - 1.24x scale (0.2415 * 1.24 ≈ 0.300)
+   Larger than stack cards for prominence in fighting zone */
 .arena-compact-card {
   width: 300px;
   height: 450px;
-  --base-scale: 0.483;
+  --base-scale: 0.300;
   --anim-scale: 1;
   transform: scale(calc(var(--base-scale) * var(--anim-scale)));
   transform-origin: center;

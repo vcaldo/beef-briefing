@@ -214,12 +214,30 @@ export function TeamPhaseModal({
   return (
     <div className="team-phase-page rpg-team-page">
       <RPGPanel variant="outer" className="rpg-team-modal-outer">
-        {/* Header with coins and timer */}
+        {/* Header with button, timer, and coins */}
         <RPGPanel variant="inner" className="rpg-team-modal-header">
           <div className="rpg-team-header-row">
-            <CoinDisplay amount={coins} size="lg" animated />
-            {shopData?.deadline && (
-              <div className="rpg-team-timer">
+            <div className="rpg-team-header-left">
+              {!isSubmitted && (
+                <GameButton
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSubmitTeam}
+                  disabled={!canSubmit || actionLoading !== null}
+                  className="submit-btn"
+                >
+                  {actionLoading === 'submit' ? (
+                    <LoadingSpinner size="sm" inline />
+                  ) : isTeamComplete ? (
+                    'Submit Team'
+                  ) : (
+                    `Need ${teamSize - teamCards.length} more`
+                  )}
+                </GameButton>
+              )}
+            </div>
+            <div className="rpg-team-header-center">
+              {shopData?.deadline && (
                 <CountdownTimer
                   deadline={shopData.deadline}
                   onExpire={() => {
@@ -227,8 +245,11 @@ export function TeamPhaseModal({
                   }}
                   timerThresholds={gameConstants?.timer_thresholds}
                 />
-              </div>
-            )}
+              )}
+            </div>
+            <div className="rpg-team-header-right">
+              <CoinDisplay amount={coins} size="lg" animated />
+            </div>
           </div>
         </RPGPanel>
 
@@ -343,27 +364,6 @@ export function TeamPhaseModal({
           </RPGPanel>
         )}
       </RPGPanel>
-
-      {/* Submit button OUTSIDE the box - matches Shop/Lobby pattern */}
-      {!isSubmitted && (
-        <div className="rpg-team-actions">
-          <GameButton
-            variant="primary"
-            size="lg"
-            onClick={handleSubmitTeam}
-            disabled={!canSubmit || actionLoading !== null}
-            className="submit-btn"
-          >
-            {actionLoading === 'submit' ? (
-              <LoadingSpinner size="sm" inline />
-            ) : isTeamComplete ? (
-              'Submit Team'
-            ) : (
-              `Need ${teamSize - teamCards.length} more card${teamSize - teamCards.length > 1 ? 's' : ''}`
-            )}
-          </GameButton>
-        </div>
-      )}
     </div>
   )
 }

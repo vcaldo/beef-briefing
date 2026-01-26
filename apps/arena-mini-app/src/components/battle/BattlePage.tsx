@@ -332,8 +332,6 @@ export function BattlePage({
     const damageToShow =
       isDamageTarget && currentDamage !== null ? currentDamage : undefined
 
-    const isCurrentUser = teamOwnerId === userId
-
     // Ref callback to register card element for effect positioning
     const setCardRef = (el: HTMLDivElement | null) => {
       if (el) {
@@ -345,9 +343,6 @@ export function BattlePage({
 
     return (
       <div key={cardId} className="battle-card-wrapper" ref={setCardRef}>
-        <div className={`battle-card-owner-badge ${isCurrentUser ? 'you' : ''}`}>
-          {isCurrentUser ? 'You' : ''}
-        </div>
         <CompactCard
           imageUrl={originalCard.card_image_url || ''}
           positions={originalCard.placeholder_positions}
@@ -403,7 +398,9 @@ export function BattlePage({
       >
         {/* Team B (left side) */}
         <div className="battle-team team-b">
-          <div className="team-label">{battleData.player_b_name}</div>
+          <div className="team-label">
+            {userId === battleData.player_b_id ? 'YOU' : battleData.player_b_name}
+          </div>
           <div className="team-cards">
             {(battleData.team_b_final?.cards ?? []).map((card) =>
               renderBattleCard(card.card_id, battleData.player_b_id, card)
@@ -413,7 +410,9 @@ export function BattlePage({
 
         {/* Team A (right side) */}
         <div className="battle-team team-a">
-          <div className="team-label">{battleData.player_a_name}</div>
+          <div className="team-label">
+            {userId === battleData.player_a_id ? 'YOU' : battleData.player_a_name}
+          </div>
           <div className="team-cards">
             {(battleData.team_a_final?.cards ?? []).map((card) =>
               renderBattleCard(card.card_id, battleData.player_a_id, card)

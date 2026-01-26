@@ -297,27 +297,40 @@ export function ShopPage({
   return (
     <div className="shop-page rpg-shop-page">
       <RPGPanel variant="outer" className="rpg-shop-outer">
-        {/* Header with coins and timer */}
+        {/* Header with button, timer, and coins */}
         <RPGPanel variant="inner" className="rpg-shop-header">
           <div className="rpg-shop-header-row">
             <div className="rpg-shop-header-left">
+              {teamCards.length >= teamSize && !isSubmitted && (
+                <GameButton
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    playSequence(['arena_button_click', 'arena_success'])
+                    setIsTeamPhase(true)
+                  }}
+                  className="done-btn"
+                >
+                  Done
+                </GameButton>
+              )}
               {isSubmitted && (
                 <span className="rpg-shop-submitted-badge">Team Submitted</span>
               )}
             </div>
+            <div className="rpg-shop-header-center">
+              {shopData?.deadline && (
+                <CountdownTimer
+                  deadline={shopData.deadline}
+                  onExpire={() => {
+                    addPageAction('shop_phase_expired', { match_id: activeMatch.id })
+                  }}
+                  timerThresholds={gameConstants?.timer_thresholds}
+                />
+              )}
+            </div>
             <div className="rpg-shop-header-right">
               <CoinDisplay amount={coins} size="lg" animated />
-              {shopData?.deadline && (
-                <div className="rpg-shop-timer">
-                  <CountdownTimer
-                    deadline={shopData.deadline}
-                    onExpire={() => {
-                      addPageAction('shop_phase_expired', { match_id: activeMatch.id })
-                    }}
-                    timerThresholds={gameConstants?.timer_thresholds}
-                  />
-                </div>
-              )}
             </div>
           </div>
         </RPGPanel>
@@ -342,6 +355,25 @@ export function ShopPage({
         {/* Shop cards grid - only show if not submitted */}
         {!isSubmitted && (
           <RPGPanel variant="inner" className="rpg-shop-cards-panel">
+            {/* Reroll button at top-right of cards panel */}
+            {canReroll && (
+              <div className="rpg-shop-reroll-row">
+                <GameButton
+                  variant="primary"
+                  size="sm"
+                  onClick={handleReroll}
+                  disabled={coins < rerollCost || actionLoading !== null}
+                  title={`Reroll (${rerollCost} coin)`}
+                  className="reroll-btn"
+                >
+                  {actionLoading === 'reroll' ? (
+                    <LoadingSpinner size="sm" inline />
+                  ) : (
+                    `Reroll (${rerollCost})`
+                  )}
+                </GameButton>
+              </div>
+            )}
             <div className="rpg-shop-grid">
               {shopCards.map((card: EnhancedShopCard) => {
                 const isPurchased = card.is_purchased
@@ -438,41 +470,6 @@ export function ShopPage({
         )}
 
       </RPGPanel>
-
-      {/* Bottom action buttons */}
-      {!isSubmitted && (canReroll || teamCards.length >= teamSize) && (
-        <div className="rpg-shop-actions">
-          {canReroll && (
-            <GameButton
-              variant="primary"
-              size="lg"
-              onClick={handleReroll}
-              disabled={coins < rerollCost || actionLoading !== null}
-              title={`Reroll (${rerollCost} coin)`}
-              className="reroll-btn"
-            >
-              {actionLoading === 'reroll' ? (
-                <LoadingSpinner size="sm" inline />
-              ) : (
-                `Reroll (${rerollCost})`
-              )}
-            </GameButton>
-          )}
-          {teamCards.length >= teamSize && (
-            <GameButton
-              variant="primary"
-              size="lg"
-              onClick={() => {
-                playSequence(['arena_button_click', 'arena_success'])
-                setIsTeamPhase(true)
-              }}
-              className="done-shopping-btn"
-            >
-              Done Shopping
-            </GameButton>
-          )}
-        </div>
-      )}
     </div>
   )
 }

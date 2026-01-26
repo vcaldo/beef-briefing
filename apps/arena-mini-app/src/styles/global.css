@@ -2457,11 +2457,11 @@ a:focus:not(:focus-visible),
    transform: scale() doesn't affect layout, so we use negative margins
    to collapse the layout box to match the visual size.
    Formula: margin = size * (scale - 1) / 2
-   Note: Scale 0.21 is 30% smaller than original 0.3 */
+   Note: Scale 0.2415 is 15% larger than original 0.21 */
 .battle-compact-card {
   width: 300px;
   height: 450px;
-  --base-scale: 0.21;
+  --base-scale: 0.2415;
   --anim-scale: 1;
   transform: scale(calc(var(--base-scale) * var(--anim-scale)));
   transform-origin: center;
@@ -2506,7 +2506,7 @@ a:focus:not(:focus-visible),
 
 .team-cards {
   display: flex;
-  gap: 4px;
+  gap: 12px;
 }
 
 .team-a .team-cards {
@@ -4408,7 +4408,7 @@ a:focus:not(:focus-visible),
   }
 
   .team-cards {
-    gap: 2px;
+    gap: 8px;
   }
 }
 
@@ -5050,15 +5050,21 @@ button,
 }
 
 .rpg-shop-header-left {
+  flex: 1;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.rpg-shop-header-center {
+  flex: 0 0 auto;
 }
 
 .rpg-shop-header-right {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: flex-end;
 }
 
 .rpg-shop-title {
@@ -5106,6 +5112,13 @@ button,
 /* Shop cards panel */
 .rpg-shop-cards-panel {
   padding: 6px;
+}
+
+/* Reroll button row inside cards panel */
+.rpg-shop-reroll-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
 }
 
 .rpg-shop-section-header {
@@ -5260,15 +5273,21 @@ button,
 }
 
 .rpg-team-header-left {
+  flex: 1;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.rpg-team-header-center {
+  flex: 0 0 auto;
 }
 
 .rpg-team-header-right {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: flex-end;
 }
 
 .rpg-team-title {

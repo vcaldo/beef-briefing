@@ -2462,11 +2462,11 @@ a:focus:not(:focus-visible),
    transform: scale() doesn't affect layout, so we use negative margins
    to collapse the layout box to match the visual size.
    Formula: margin = size * (scale - 1) / 2
-   Note: Scale 0.2415 is 15% larger than original 0.21 */
+   Note: Scale 0.20 for smaller team cards (~60px wide) */
 .battle-compact-card {
   width: 300px;
   height: 450px;
-  --base-scale: 0.2415;
+  --base-scale: 0.20;
   --anim-scale: 1;
   transform: scale(calc(var(--base-scale) * var(--anim-scale)));
   transform-origin: center;
@@ -2494,10 +2494,12 @@ a:focus:not(:focus-visible),
 
 .battle-team.team-a {
   align-items: flex-end;
+  transform: translateY(-30px); /* Move up for staggered "two teams" effect */
 }
 
 .battle-team.team-b {
   align-items: flex-start;
+  transform: translateY(30px);  /* Move down for staggered "two teams" effect */
 }
 
 .team-label {
@@ -2588,13 +2590,18 @@ a:focus:not(:focus-visible),
   margin: calc(450px * (var(--base-scale) - 1) / 2) calc(300px * (var(--base-scale) - 1) / 2);
 }
 
-/* Empty slot placeholder when card is in arena */
+/* Empty slot placeholder when card is in arena - uses same scaling as battle-compact-card */
 .battle-card-empty-slot {
-  width: 72px;   /* Match battle-compact-card visual width (300 * 0.2415 ≈ 72px) */
-  height: 109px; /* Match battle-compact-card visual height (450 * 0.2415 ≈ 109px) */
+  width: 300px;
+  height: 450px;
+  --rune-scale: 0.20;
+  transform: scale(var(--rune-scale));
+  transform-origin: center;
+  /* Collapse layout box to match visual size (same technique as battle-compact-card) */
+  margin: calc(450px * (var(--rune-scale) - 1) / 2) calc(300px * (var(--rune-scale) - 1) / 2);
   object-fit: fill;
   opacity: 0.5;
-  border-radius: 6px;
+  border-radius: calc(6px / var(--rune-scale)); /* Scale border-radius to appear consistent */
 }
 
 /* Teams row container - holds team stacks below the central arena */
@@ -4480,8 +4487,8 @@ a:focus:not(:focus-visible),
   }
 
   .battle-compact-card {
-    --base-scale: 0.175;
-    /* Margins auto-adjust via calc() - 30% smaller than original 0.25 */
+    --base-scale: 0.15;
+    /* Margins auto-adjust via calc() */
   }
 
   /* Central arena responsive - smallest screens */
@@ -4507,8 +4514,17 @@ a:focus:not(:focus-visible),
   }
 
   .battle-card-empty-slot {
-    width: 52px;
-    height: 79px;
+    --rune-scale: 0.15;
+    margin: calc(450px * (var(--rune-scale) - 1) / 2) calc(300px * (var(--rune-scale) - 1) / 2);
+  }
+
+  /* Reduced stagger for smallest screens */
+  .battle-team.team-a {
+    transform: translateY(-20px);
+  }
+
+  .battle-team.team-b {
+    transform: translateY(20px);
   }
 }
 
@@ -4518,6 +4534,10 @@ a:focus:not(:focus-visible),
     --battle-gap: 8px;
     padding: 8px;
     min-height: auto;
+  }
+
+  .battle-compact-card {
+    --base-scale: 0.175;
   }
 
   .team-cards {
@@ -4547,8 +4567,17 @@ a:focus:not(:focus-visible),
   }
 
   .battle-card-empty-slot {
-    width: 63px;
-    height: 94px;
+    --rune-scale: 0.175;
+    margin: calc(450px * (var(--rune-scale) - 1) / 2) calc(300px * (var(--rune-scale) - 1) / 2);
+  }
+
+  /* Medium stagger for phones */
+  .battle-team.team-a {
+    transform: translateY(-25px);
+  }
+
+  .battle-team.team-b {
+    transform: translateY(25px);
   }
 }
 

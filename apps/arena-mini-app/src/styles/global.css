@@ -3807,7 +3807,6 @@ a:focus:not(:focus-visible),
 .rpg-empty-icon {
   font-size: 48px;
   margin-bottom: 12px;
-  opacity: 0.7;
 }
 
 .rpg-empty-title {

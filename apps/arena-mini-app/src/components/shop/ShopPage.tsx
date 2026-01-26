@@ -380,7 +380,7 @@ export function ShopPage({
             {/* Reroll row with hint text and button */}
             <div className="rpg-shop-reroll-row">
               <span className="rpg-shop-reroll-hint">
-                Replaces all cards. Only before first buy.
+                You can only reroll before buying your first card
               </span>
               <GameButton
                 variant="primary"

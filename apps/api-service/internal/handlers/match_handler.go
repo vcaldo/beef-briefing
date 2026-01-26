@@ -563,6 +563,7 @@ func (h *ArenaHandler) HandleGetProfile(w http.ResponseWriter, r *http.Request) 
 		UserID                  int64   `json:"user_id"`
 		FirstName               string  `json:"first_name"`
 		Username                string  `json:"username,omitempty"`
+		PhotoURL                *string `json:"photo_url,omitempty"`
 		RankedWins              int     `json:"ranked_wins"`
 		RankedLosses            int     `json:"ranked_losses"`
 		RankedDraws             int     `json:"ranked_draws"`
@@ -608,6 +609,7 @@ func (h *ArenaHandler) HandleGetProfile(w http.ResponseWriter, r *http.Request) 
 		UserID:                  profile.UserID,
 		FirstName:               profile.FirstName,
 		Username:                profile.Username,
+		PhotoURL:                profile.PhotoURL,
 		RankedWins:              profile.RankedWins,
 		RankedLosses:            profile.RankedLosses,
 		RankedDraws:             profile.RankedDraws,

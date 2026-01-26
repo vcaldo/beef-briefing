@@ -5012,8 +5012,8 @@ button,
 }
 
 .rpg-empty-icon {
-  width: 48px;
-  height: 48px;
+  width: 144px;
+  height: 144px;
   object-fit: contain;
 }
 
@@ -5064,6 +5064,12 @@ button,
   display: flex;
   align-items: center;
   justify-content: flex-start;
+}
+
+/* Consistent Done button in header */
+.rpg-shop-header-left .done-btn,
+.rpg-team-header-left .submit-btn {
+  min-width: 80px;
 }
 
 .rpg-shop-header-center {
@@ -5127,8 +5133,16 @@ button,
 /* Reroll button row inside cards panel */
 .rpg-shop-reroll-row {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
+  gap: 12px;
+}
+
+.rpg-shop-reroll-hint {
+  font-size: 12px;
+  color: #6a5a4a;
+  line-height: 1.4;
 }
 
 .rpg-shop-section-header {

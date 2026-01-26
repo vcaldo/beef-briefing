@@ -2592,9 +2592,9 @@ a:focus:not(:focus-visible),
 .battle-card-empty-slot {
   width: 72px;   /* Match battle-compact-card visual width (300 * 0.2415 ≈ 72px) */
   height: 109px; /* Match battle-compact-card visual height (450 * 0.2415 ≈ 109px) */
-  background: rgba(0, 0, 0, 0.3);
-  border: 2px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
+  object-fit: fill;
+  opacity: 0.5;
+  border-radius: 6px;
 }
 
 /* Teams row container - holds team stacks below the central arena */

@@ -29,6 +29,7 @@ import type {
   GameConstants,
   PlaceholderPositions,
 } from '../../types'
+import emptySlotPlaceholder from '../../../assets/images/runes/runeBlack_rectangleOutline_003.png'
 
 // Playback speed options (events per second)
 // Index: 0=1x, 1=2x (controlled by parent via speedIndex prop)
@@ -331,11 +332,15 @@ export function BattlePage({
       arenaFighters.left?.cardKey === cardKey ||
       arenaFighters.right?.cardKey === cardKey
 
-    // If card is in arena, render empty placeholder to maintain layout
+    // If card is in arena, render placeholder image to maintain layout
     if (isInArena) {
       return (
         <div key={cardId} className="battle-card-wrapper">
-          <div className="battle-card-empty-slot" />
+          <img
+            src={emptySlotPlaceholder}
+            alt=""
+            className="battle-card-empty-slot"
+          />
         </div>
       )
     }

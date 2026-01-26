@@ -29,27 +29,6 @@ body {
 .app {
   min-height: 100vh;
   padding: 0 0 20px 0;
-  position: relative;
-  background-image: url('../../assets/images/bg/happy-bg.webp');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-}
-
-/* Darkening overlay for better UI contrast */
-.app::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Ensure content stays above the overlay */
-.app > * {
-  position: relative;
-  z-index: 1;
 }
 
 /* Header */

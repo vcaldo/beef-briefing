@@ -1526,7 +1526,7 @@ a:focus:not(:focus-visible),
 
 .reroll-btn {
   font-size: 13px;
-  padding: 6px 12px;
+  padding: 8px !important;
 }
 
 .shop-empty {
@@ -1568,9 +1568,6 @@ a:focus:not(:focus-visible),
   background: linear-gradient(transparent, var(--arena-bg-dark) 30%);
 }
 
-.submit-btn {
-  width: 100%;
-}
 
 .submit-status {
   display: flex;
@@ -5398,6 +5395,8 @@ button,
   font-style: italic;
   color: #5a6a3a;
   margin: 0;
+  text-align: center;
+  padding-top: 16px;
 }
 
 /* Team phase actions - outside panel */

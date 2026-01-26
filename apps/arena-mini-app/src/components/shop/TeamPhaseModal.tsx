@@ -218,21 +218,19 @@ export function TeamPhaseModal({
         <RPGPanel variant="inner" className="rpg-team-modal-header">
           <div className="rpg-team-header-row">
             <div className="rpg-team-header-left">
-              {!isSubmitted && (
-                <GameButton
-                  variant="primary"
-                  size="sm"
-                  onClick={handleSubmitTeam}
-                  disabled={!canSubmit || actionLoading !== null}
-                  className="submit-btn"
-                >
-                  {actionLoading === 'submit' ? (
-                    <LoadingSpinner size="sm" inline />
-                  ) : (
-                    'Done'
-                  )}
-                </GameButton>
-              )}
+              <GameButton
+                variant="primary"
+                size="sm"
+                onClick={handleSubmitTeam}
+                disabled={!canSubmit || actionLoading !== null || isSubmitted}
+                className="submit-btn"
+              >
+                {actionLoading === 'submit' ? (
+                  <LoadingSpinner size="sm" inline />
+                ) : (
+                  'Done'
+                )}
+              </GameButton>
             </div>
             <div className="rpg-team-header-center">
               {shopData?.deadline && (

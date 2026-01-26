@@ -17,6 +17,7 @@ import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
 import { GameButton, RPGPanel } from '../ui'
 import { usePolling, useErrorBanner, usePageBackground } from '../../hooks'
 import { useSoundContext } from '../../contexts'
+import logoUrl from '../../../assets/images/logo/logo.webp'
 
 import type { Match, GameConstants } from '../../types'
 
@@ -510,7 +511,7 @@ export function LobbyPage({
               <RPGPanel variant="inner" className="rpg-empty-state-content">
                 <div className="rpg-empty-state">
                   <p className="rpg-lobby-subtitle">Welcome, {firstName}</p>
-                  <span className="rpg-empty-icon">⚔️</span>
+                  <img src={logoUrl} alt="Arena" className="rpg-empty-icon" />
                   <h3 className="rpg-empty-title">No Active Matches</h3>
                   <p className="rpg-empty-hint">Create a new match to challenge your friends!</p>
                   <GameButton

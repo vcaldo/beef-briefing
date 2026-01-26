@@ -399,7 +399,7 @@ export function BattlePage({
         {/* Team B (left side) */}
         <div className="battle-team team-b">
           <div className="team-label">
-            {userId === battleData.player_b_id ? 'YOU' : battleData.player_b_name}
+            {userId === battleData.player_b_id ? 'You' : battleData.player_b_name}
           </div>
           <div className="team-cards">
             {(battleData.team_b_final?.cards ?? []).map((card) =>
@@ -411,7 +411,7 @@ export function BattlePage({
         {/* Team A (right side) */}
         <div className="battle-team team-a">
           <div className="team-label">
-            {userId === battleData.player_a_id ? 'YOU' : battleData.player_a_name}
+            {userId === battleData.player_a_id ? 'You' : battleData.player_a_name}
           </div>
           <div className="team-cards">
             {(battleData.team_a_final?.cards ?? []).map((card) =>

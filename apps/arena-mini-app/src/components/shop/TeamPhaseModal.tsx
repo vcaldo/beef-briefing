@@ -228,10 +228,8 @@ export function TeamPhaseModal({
                 >
                   {actionLoading === 'submit' ? (
                     <LoadingSpinner size="sm" inline />
-                  ) : isTeamComplete ? (
-                    'Done'
                   ) : (
-                    `Need ${teamSize - teamCards.length} more`
+                    'Done'
                   )}
                 </GameButton>
               )}

@@ -334,7 +334,7 @@ export function ShopPage({
                   disabled={teamCards.length < teamSize}
                   className="done-btn"
                 >
-                  {teamCards.length >= teamSize ? 'Done' : `Need ${teamSize - teamCards.length} more`}
+                  Done
                 </GameButton>
               )}
               {isSubmitted && (

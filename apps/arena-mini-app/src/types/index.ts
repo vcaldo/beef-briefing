@@ -336,6 +336,12 @@ export interface Card {
   username?: string
   /** User's profile photo URL */
   photo_url?: string
+  /** Pre-rendered card image URL (400x600) - fallback */
+  card_image_url?: string
+  /** Compact card image URL (300x450) */
+  compact_card_image_url?: string
+  /** Metadata for stat overlay positioning */
+  placeholder_positions?: PlaceholderPositions | null
   /** Current attack stat (base + upgrades) */
   atk: number
   /** Defense stat value */

@@ -2522,6 +2522,88 @@ a:focus:not(:focus-visible),
   justify-content: flex-start;
 }
 
+/* =============================================================================
+   Central Battle Arena (Fighting Zone)
+   ============================================================================= */
+
+/* Central arena where active combat happens */
+.battle-center-arena {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  min-height: 180px;
+  position: relative;
+}
+
+/* Fighter slots in arena (left=Player B, right=Player A) */
+.arena-fighter-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 145px;   /* 300 * 0.483 ≈ 145px visual width */
+  min-height: 217px;  /* 450 * 0.483 ≈ 217px visual height */
+}
+
+.arena-fighter-left {
+  /* Player B's card - normal orientation */
+}
+
+.arena-fighter-right {
+  /* Player A's card - normal orientation (no flip) */
+}
+
+/* VS indicator between fighters */
+.arena-vs-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--arena-orange);
+  text-shadow:
+    0 0 10px rgba(249, 115, 22, 0.8),
+    0 0 20px rgba(249, 115, 22, 0.4);
+  letter-spacing: 2px;
+  min-width: 40px;
+}
+
+/* Arena card wrapper for positioning */
+.arena-card-wrapper {
+  position: relative;
+}
+
+/* Arena Compact Card - 2x scale (0.2415 * 2 = 0.483)
+   Double the size of battle-compact-card for prominence in fighting zone */
+.arena-compact-card {
+  width: 300px;
+  height: 450px;
+  --base-scale: 0.483;
+  --anim-scale: 1;
+  transform: scale(calc(var(--base-scale) * var(--anim-scale)));
+  transform-origin: center;
+  transition: transform 0.15s ease-out;
+  /* Collapse layout box to match visual size */
+  margin: calc(450px * (var(--base-scale) - 1) / 2) calc(300px * (var(--base-scale) - 1) / 2);
+}
+
+/* Empty slot placeholder when card is in arena */
+.battle-card-empty-slot {
+  width: 72px;   /* Match battle-compact-card visual width (300 * 0.2415 ≈ 72px) */
+  height: 109px; /* Match battle-compact-card visual height (450 * 0.2415 ≈ 109px) */
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+}
+
+/* Teams row container - holds team stacks below the central arena */
+.battle-teams-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+
 /* Legacy event-log classes removed - replaced by battle-log-* classes above */
 
 /* =============================================================================
@@ -4402,6 +4484,33 @@ a:focus:not(:focus-visible),
     --base-scale: 0.175;
     /* Margins auto-adjust via calc() - 30% smaller than original 0.25 */
   }
+
+  /* Central arena responsive - smallest screens */
+  .battle-center-arena {
+    gap: 8px;
+    padding: 8px;
+    min-height: 130px;
+  }
+
+  .arena-compact-card {
+    --base-scale: 0.32;
+    margin: calc(450px * (0.32 - 1) / 2) calc(300px * (0.32 - 1) / 2);
+  }
+
+  .arena-fighter-slot {
+    min-width: 96px;
+    min-height: 144px;
+  }
+
+  .arena-vs-indicator {
+    font-size: 16px;
+    min-width: 24px;
+  }
+
+  .battle-card-empty-slot {
+    width: 52px;
+    height: 79px;
+  }
 }
 
 /* Mobile-specific battle adjustments for tablets and larger phones */
@@ -4414,6 +4523,33 @@ a:focus:not(:focus-visible),
 
   .team-cards {
     gap: 8px;
+  }
+
+  /* Central arena responsive - phones */
+  .battle-center-arena {
+    gap: 12px;
+    padding: 8px 12px;
+    min-height: 150px;
+  }
+
+  .arena-compact-card {
+    --base-scale: 0.4;
+    margin: calc(450px * (0.4 - 1) / 2) calc(300px * (0.4 - 1) / 2);
+  }
+
+  .arena-fighter-slot {
+    min-width: 120px;
+    min-height: 180px;
+  }
+
+  .arena-vs-indicator {
+    font-size: 20px;
+    min-width: 32px;
+  }
+
+  .battle-card-empty-slot {
+    width: 63px;
+    height: 94px;
   }
 }
 

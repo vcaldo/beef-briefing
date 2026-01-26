@@ -5,7 +5,7 @@ export { useErrorBanner } from './useErrorBanner';
 export type { UseErrorBannerOptions, UseErrorBannerReturn } from './useErrorBanner';
 
 export { useBattleAnimation, getCardKey } from './useBattleAnimation';
-export type { UseBattleAnimationReturn, UseBattleAnimationOptions } from './useBattleAnimation';
+export type { UseBattleAnimationReturn, UseBattleAnimationOptions, ArenaFighter, ArenaFightersState } from './useBattleAnimation';
 
 export { useSound } from './useSound';
 export type { UseSoundOptions, UseSoundReturn, SoundId, SoundCategory } from './useSound';

@@ -32,6 +32,28 @@ import { ANIMATION_DURATIONS } from '../types'
 // =============================================================================
 
 /**
+ * Arena fighter state - tracks which cards are currently in the central fighting arena.
+ */
+export interface ArenaFighter {
+  /** Composite key for card state lookup (teamOwnerId_cardId) */
+  cardKey: string
+  /** The card's unique identifier */
+  cardId: number
+  /** The user ID of the team owner (player_a_id or player_b_id) */
+  teamOwnerId: number
+}
+
+/**
+ * Arena fighters state - tracks left (Player B) and right (Player A) fighters.
+ */
+export interface ArenaFightersState {
+  /** Player B's fighter (left side of arena) */
+  left: ArenaFighter | null
+  /** Player A's fighter (right side of arena) */
+  right: ArenaFighter | null
+}
+
+/**
  * Active battle effect state - used to render BattleEffect components.
  */
 export interface ActiveBattleEffect {
@@ -65,6 +87,8 @@ export interface UseBattleAnimationReturn {
   damageTargetKey: string | null
   /** Currently active battle effects (attack, damage, death, spark) - supports multiple simultaneous effects */
   activeEffects: ActiveBattleEffect[]
+  /** Cards currently fighting in the central arena (left=Player B, right=Player A) */
+  arenaFighters: ArenaFightersState
   /** Callback to call when an effect animation completes (pass cardKey to identify which effect) */
   onEffectComplete: (cardKey: string) => void
   /** Start or resume playback */
@@ -237,6 +261,12 @@ export function useBattleAnimation(
   // Battle effect state (attack, damage, death animations) - supports multiple simultaneous effects
   const [activeEffects, setActiveEffects] = useState<ActiveBattleEffect[]>([])
 
+  // Arena fighters state - tracks which cards are in the central fighting arena
+  const [arenaFighters, setArenaFighters] = useState<ArenaFightersState>({
+    left: null,
+    right: null,
+  })
+
   // Deferred death state - cards that should die after the round completes
   // This prevents cards from greying out before their attack animation plays
   // Note: We only use the setter with callbacks, so we don't destructure the state value
@@ -270,6 +300,7 @@ export function useBattleAnimation(
       setCurrentDamage(null)
       setDamageTargetKey(null)
       setActiveEffects([])
+      setArenaFighters({ left: null, right: null })
       setPendingDeaths(new Set())
       currentRoundRef.current = 0
     }
@@ -544,6 +575,12 @@ export function useBattleAnimation(
         }
       }
 
+      // Clear dead cards from arena (they return to team stack as greyed out)
+      setArenaFighters((prev) => ({
+        left: prev.left && deaths.has(prev.left.cardKey) ? null : prev.left,
+        right: prev.right && deaths.has(prev.right.cardKey) ? null : prev.right,
+      }))
+
       // Clear pending deaths
       setPendingDeaths(new Set())
     },
@@ -566,6 +603,8 @@ export function useBattleAnimation(
         }
         return new Set()
       })
+      // Clear arena when battle is complete
+      setArenaFighters({ left: null, right: null })
       setIsPlaying(false)
       isPlayingRef.current = false
       setIsComplete(true)
@@ -605,11 +644,41 @@ export function useBattleAnimation(
       return
     }
 
+    // Update arena fighters for attack events - place fighting cards in central arena
+    // Player A cards go on the RIGHT side, Player B cards go on the LEFT side
+    if (
+      nextEvent.attacker_card_id &&
+      nextEvent.attacker_team_owner_id &&
+      nextEvent.defender_card_id &&
+      nextEvent.defender_team_owner_id
+    ) {
+      const attackerFighter: ArenaFighter = {
+        cardKey: getCardKey(nextEvent.attacker_team_owner_id, nextEvent.attacker_card_id),
+        cardId: nextEvent.attacker_card_id,
+        teamOwnerId: nextEvent.attacker_team_owner_id,
+      }
+      const defenderFighter: ArenaFighter = {
+        cardKey: getCardKey(nextEvent.defender_team_owner_id, nextEvent.defender_card_id),
+        cardId: nextEvent.defender_card_id,
+        teamOwnerId: nextEvent.defender_team_owner_id,
+      }
+
+      // Player A (playerAId) cards go RIGHT, Player B (playerBId) cards go LEFT
+      const attackerIsPlayerA = nextEvent.attacker_team_owner_id === playerAId
+
+      setArenaFighters({
+        // Left side is always Player B's card
+        left: attackerIsPlayerA ? defenderFighter : attackerFighter,
+        // Right side is always Player A's card
+        right: attackerIsPlayerA ? attackerFighter : defenderFighter,
+      })
+    }
+
     // Process attack event with full animation sequence
     setCurrentEventIndex(nextIndex)
     setCurrentPhase('highlight')
     processPhase(nextEvent, 'highlight')
-  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration])
+  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration, playerAId])
 
   // Keep advanceToNextEvent ref in sync for use in processPhase
   // (avoids circular dependency: processPhase -> advanceToNextEvent -> processPhase)
@@ -679,6 +748,7 @@ export function useBattleAnimation(
     setCurrentDamage(null)
     setDamageTargetKey(null)
     setActiveEffects([])
+    setArenaFighters({ left: null, right: null })
     setPendingDeaths(new Set())
     currentRoundRef.current = 0
   }, [battleData, playerAId, playerBId])
@@ -744,6 +814,7 @@ export function useBattleAnimation(
     setCurrentDamage(null)
     setDamageTargetKey(null)
     setActiveEffects([])
+    setArenaFighters({ left: null, right: null })
     setPendingDeaths(new Set())
     currentRoundRef.current = 0
   }, [battleData, playerAId, playerBId])
@@ -758,6 +829,7 @@ export function useBattleAnimation(
     currentDamage,
     damageTargetKey,
     activeEffects,
+    arenaFighters,
     onEffectComplete,
     play,
     pause,

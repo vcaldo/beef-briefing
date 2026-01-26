@@ -500,24 +500,28 @@ export function LobbyPage({
       {!activeMatch && (
         <section className="lobby-matches rpg-lobby-matches">
           {matches.length === 0 ? (
-            <RPGPanel variant="outer" className="rpg-empty-state-panel">
-              <RPGPanel variant="inner" className="rpg-empty-state-content">
-                <div className="rpg-empty-state">
-                  <p className="rpg-lobby-subtitle">Welcome, {firstName}</p>
-                  <img src={logoUrl} alt="Arena" className="rpg-empty-icon" />
-                  <h3 className="rpg-empty-title">No Active Matches</h3>
-                  <p className="rpg-empty-hint">Create a new match to challenge your friends!</p>
-                  <GameButton
-                    variant="primary"
-                    size="lg"
-                    onClick={handleCreateMatch}
-                    disabled={actionLoading !== null}
-                  >
-                    {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : 'Create Match'}
-                  </GameButton>
-                </div>
+            <>
+              <RPGPanel variant="outer" className="rpg-empty-state-panel">
+                <RPGPanel variant="inner" className="rpg-empty-state-content">
+                  <div className="rpg-empty-state">
+                    <p className="rpg-lobby-subtitle">Welcome, {firstName}</p>
+                    <img src={logoUrl} alt="Arena" className="rpg-empty-icon" />
+                    <h3 className="rpg-empty-title">No Active Matches</h3>
+                    <p className="rpg-empty-hint">Create a new match to challenge your friends!</p>
+                  </div>
+                </RPGPanel>
               </RPGPanel>
-            </RPGPanel>
+              <div className="rpg-match-card-actions">
+                <GameButton
+                  variant="primary"
+                  size="lg"
+                  onClick={handleCreateMatch}
+                  disabled={actionLoading !== null}
+                >
+                  {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : 'Create Match'}
+                </GameButton>
+              </div>
+            </>
           ) : (
             <div className="match-list">
               {matches

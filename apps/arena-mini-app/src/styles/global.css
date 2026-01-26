@@ -2494,12 +2494,12 @@ a:focus:not(:focus-visible),
 
 .battle-team.team-a {
   align-items: flex-end;
-  transform: translateY(-50px); /* Move up for staggered "two teams" effect */
+  transform: translateY(-10px); /* Same level as team-b */
 }
 
 .battle-team.team-b {
   align-items: flex-start;
-  transform: translateY(10px);  /* Move down for staggered "two teams" effect */
+  transform: translateY(-10px);  /* Move down for staggered "two teams" effect */
 }
 
 .team-label {

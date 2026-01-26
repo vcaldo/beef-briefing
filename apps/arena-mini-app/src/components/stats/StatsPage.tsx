@@ -17,6 +17,7 @@ import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monit
 import { Avatar } from '@beef-briefing/shared-mini-app/components'
 import { LoadingSpinner } from '../common'
 import { RPGPanel, GameButton } from '../ui'
+import { usePageBackground } from '../../hooks'
 
 import type {
   StatsSubTab,
@@ -66,6 +67,9 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
   // Track mounted state for async cleanup
   const isMountedRef = useRef(true)
+
+  // Apply splash background image
+  usePageBackground({ backgroundId: 'splash' })
 
   // Clear error after timeout
   useEffect(() => {
@@ -765,7 +769,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
   }
 
   return (
-    <div className="stats-page rpg-stats-page">
+    <div className="stats-page rpg-stats-page page-bg page-bg--splash">
       {/* Sub-tabs */}
       <nav className="stats-tabs-rpg" role="tablist">
         <GameButton

@@ -4509,6 +4509,10 @@ button,
 
 /* Active match section */
 .lobby-active-match {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   margin-bottom: 24px;
 }
 

@@ -377,14 +377,18 @@ export function useBattleAnimation(
             onPlaySound?.('arena_battle_attack')
 
             // Trigger 'attack' visual effect on the attacker card
+            // Use requestAnimationFrame to defer position capture until after React renders
+            // the card in the arena (otherwise we capture position from the team stack)
             if (getCardPosition) {
-              const position = getCardPosition(attackerKey)
-              if (position) {
-                setActiveEffects((prev: ActiveBattleEffect[]) => [
-                  ...prev.filter((e: ActiveBattleEffect) => e.cardKey !== attackerKey),
-                  { type: 'attack', position, cardKey: attackerKey },
-                ])
-              }
+              requestAnimationFrame(() => {
+                const position = getCardPosition(attackerKey)
+                if (position) {
+                  setActiveEffects((prev: ActiveBattleEffect[]) => [
+                    ...prev.filter((e: ActiveBattleEffect) => e.cardKey !== attackerKey),
+                    { type: 'attack', position, cardKey: attackerKey },
+                  ])
+                }
+              })
             }
           }
 
@@ -562,17 +566,21 @@ export function useBattleAnimation(
       deaths.forEach(() => onPlaySound?.('arena_battle_death'))
 
       // Trigger 'death' visual effect for ALL deaths simultaneously
+      // Use requestAnimationFrame to defer position capture until after React renders
+      // (ensures we capture position from arena before card moves back to deck)
       if (getCardPosition) {
-        const deathEffects: ActiveBattleEffect[] = []
-        deaths.forEach((cardKey) => {
-          const position = getCardPosition(cardKey)
-          if (position) {
-            deathEffects.push({ type: 'death', position, cardKey })
+        requestAnimationFrame(() => {
+          const deathEffects: ActiveBattleEffect[] = []
+          deaths.forEach((cardKey) => {
+            const position = getCardPosition(cardKey)
+            if (position) {
+              deathEffects.push({ type: 'death', position, cardKey })
+            }
+          })
+          if (deathEffects.length > 0) {
+            setActiveEffects((prev: ActiveBattleEffect[]) => [...prev, ...deathEffects])
           }
         })
-        if (deathEffects.length > 0) {
-          setActiveEffects((prev: ActiveBattleEffect[]) => [...prev, ...deathEffects])
-        }
       }
 
       // Clear dead cards from arena (they return to team stack as greyed out)

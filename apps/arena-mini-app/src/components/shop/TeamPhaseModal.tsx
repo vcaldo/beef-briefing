@@ -214,12 +214,26 @@ export function TeamPhaseModal({
   return (
     <div className="team-phase-page rpg-team-page">
       <RPGPanel variant="outer" className="rpg-team-modal-outer">
-        {/* Header with coins and timer */}
+        {/* Header with button, timer, and coins */}
         <RPGPanel variant="inner" className="rpg-team-modal-header">
           <div className="rpg-team-header-row">
-            <CoinDisplay amount={coins} size="lg" animated />
-            {shopData?.deadline && (
-              <div className="rpg-team-timer">
+            <div className="rpg-team-header-left">
+              <GameButton
+                variant="primary"
+                size="sm"
+                onClick={handleSubmitTeam}
+                disabled={!canSubmit || actionLoading !== null || isSubmitted}
+                className="submit-btn"
+              >
+                {actionLoading === 'submit' ? (
+                  <LoadingSpinner size="sm" inline />
+                ) : (
+                  'Done'
+                )}
+              </GameButton>
+            </div>
+            <div className="rpg-team-header-center">
+              {shopData?.deadline && (
                 <CountdownTimer
                   deadline={shopData.deadline}
                   onExpire={() => {
@@ -227,8 +241,11 @@ export function TeamPhaseModal({
                   }}
                   timerThresholds={gameConstants?.timer_thresholds}
                 />
-              </div>
-            )}
+              )}
+            </div>
+            <div className="rpg-team-header-right">
+              <CoinDisplay amount={coins} size="lg" animated />
+            </div>
           </div>
         </RPGPanel>
 
@@ -333,37 +350,13 @@ export function TeamPhaseModal({
                 <span>Got coins left? Power up! Stack your strongest cards in front so they hit first.</span>
               </div>
             )}
-        </RPGPanel>
 
-        {/* Waiting message - only show if submitted */}
-        {isSubmitted && (
-          <RPGPanel variant="inner-blue" className="rpg-team-waiting">
-            <div className="rpg-team-waiting-icon">⏳</div>
-            <p className="rpg-team-waiting-text">Waiting for opponent...</p>
-          </RPGPanel>
-        )}
-      </RPGPanel>
-
-      {/* Submit button OUTSIDE the box - matches Shop/Lobby pattern */}
-      {!isSubmitted && (
-        <div className="rpg-team-actions">
-          <GameButton
-            variant="primary"
-            size="lg"
-            onClick={handleSubmitTeam}
-            disabled={!canSubmit || actionLoading !== null}
-            className="submit-btn"
-          >
-            {actionLoading === 'submit' ? (
-              <LoadingSpinner size="sm" inline />
-            ) : isTeamComplete ? (
-              'Submit Team'
-            ) : (
-              `Need ${teamSize - teamCards.length} more card${teamSize - teamCards.length > 1 ? 's' : ''}`
+            {/* Waiting message - only show if submitted */}
+            {isSubmitted && (
+              <p className="rpg-team-waiting-text">Waiting for opponent...</p>
             )}
-          </GameButton>
-        </div>
-      )}
+        </RPGPanel>
+      </RPGPanel>
     </div>
   )
 }

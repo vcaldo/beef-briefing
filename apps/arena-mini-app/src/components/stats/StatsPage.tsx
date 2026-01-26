@@ -17,6 +17,7 @@ import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monit
 import { Avatar } from '@beef-briefing/shared-mini-app/components'
 import { LoadingSpinner } from '../common'
 import { RPGPanel, GameButton } from '../ui'
+import { usePageBackground } from '../../hooks'
 
 import type {
   StatsSubTab,
@@ -60,14 +61,15 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
   const [h2hLoading, setH2HLoading] = useState(false)
   const [showH2HModal, setShowH2HModal] = useState(false)
 
-  // Profile modal state
-  const [showProfileModal, setShowProfileModal] = useState(false)
 
   // Error state
   const [error, setError] = useState<string | null>(null)
 
   // Track mounted state for async cleanup
   const isMountedRef = useRef(true)
+
+  // Apply splash background image
+  usePageBackground({ backgroundId: 'splash' })
 
   // Clear error after timeout
   useEffect(() => {
@@ -234,13 +236,18 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
           fetchLeaderboard()
         }
         break
+      case 'profile':
+        if (!profileData) {
+          fetchProfile()
+        }
+        break
       case 'history':
         if (!historyData) {
           fetchHistory()
         }
         break
     }
-  }, [activeSubTab, leaderboardData, historyData, fetchLeaderboard, fetchHistory])
+  }, [activeSubTab, leaderboardData, profileData, historyData, fetchLeaderboard, fetchProfile, fetchHistory])
 
   // Handle tab change with tracking
   const handleSubTabChange = useCallback(
@@ -286,8 +293,8 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
   const handleSelectOpponent = useCallback(
     (opponentId: number) => {
       if (opponentId === userId) {
-        // Clicking own entry opens profile modal
-        setShowProfileModal(true)
+        // Clicking own entry navigates to profile tab
+        setActiveSubTab('profile')
         if (!profileData) {
           fetchProfile()
         }
@@ -305,10 +312,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     setH2HData(null)
   }, [])
 
-  // Handle closing Profile modal
-  const handleCloseProfileModal = useCallback(() => {
-    setShowProfileModal(false)
-  }, [])
 
   // Render rank badge class
   const getRankClass = (rank: number): string => {
@@ -351,14 +354,14 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
             size="sm"
             onClick={() => handleLeaderboardTypeChange('regular')}
           >
-            ⚔️ Casual
+            Casual
           </GameButton>
           <GameButton
             variant={leaderboardType === 'ranked' ? 'primary' : 'neutral'}
             size="sm"
             onClick={() => handleLeaderboardTypeChange('ranked')}
           >
-            🏆 Ranked
+            Ranked
           </GameButton>
         </div>
 
@@ -591,42 +594,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     )
   }
 
-  // Render Profile modal overlay
-  const renderProfileModal = () => {
-    if (!showProfileModal) return null
-
-    return (
-      <div className="rpg-h2h-modal-backdrop" onClick={handleCloseProfileModal}>
-        <div className="rpg-h2h-modal-wrapper" onClick={(e) => e.stopPropagation()}>
-          <RPGPanel variant="outer" className="rpg-h2h-modal-outer">
-            {/* Close button */}
-            <div className="rpg-h2h-close-wrapper">
-              <GameButton
-                variant="danger"
-                size="sm"
-                shape="square"
-                onClick={handleCloseProfileModal}
-                aria-label="Close"
-              >
-                ×
-              </GameButton>
-            </div>
-
-            {/* Loading state */}
-            {profileLoading && !profileData && (
-              <div className="rpg-h2h-loading">
-                <LoadingSpinner message="Loading profile..." />
-              </div>
-            )}
-
-            {/* Profile content */}
-            {(!profileLoading || profileData) && renderProfile()}
-          </RPGPanel>
-        </div>
-      </div>
-    )
-  }
-
   // Render history tab content
   const renderHistory = () => {
     if (historyLoading && !historyData) {
@@ -792,6 +759,8 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     switch (activeSubTab) {
       case 'leaderboard':
         return renderLeaderboard()
+      case 'profile':
+        return renderProfile()
       case 'history':
         return renderHistory()
       default:
@@ -800,7 +769,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
   }
 
   return (
-    <div className="stats-page rpg-stats-page">
+    <div className="stats-page rpg-stats-page page-bg page-bg--splash">
       {/* Sub-tabs */}
       <nav className="stats-tabs-rpg" role="tablist">
         <GameButton
@@ -809,7 +778,15 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
           onClick={() => handleSubTabChange('leaderboard')}
           aria-selected={activeSubTab === 'leaderboard'}
         >
-          📊 Leaderboard
+          Leaderboard
+        </GameButton>
+        <GameButton
+          variant={activeSubTab === 'profile' ? 'primary' : 'neutral'}
+          size="sm"
+          onClick={() => handleSubTabChange('profile')}
+          aria-selected={activeSubTab === 'profile'}
+        >
+          Profile
         </GameButton>
         <GameButton
           variant={activeSubTab === 'history' ? 'primary' : 'neutral'}
@@ -817,7 +794,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
           onClick={() => handleSubTabChange('history')}
           aria-selected={activeSubTab === 'history'}
         >
-          📜 History
+          History
         </GameButton>
       </nav>
 
@@ -845,9 +822,6 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
       {/* H2H Modal */}
       {renderH2HModal()}
-
-      {/* Profile Modal */}
-      {renderProfileModal()}
     </div>
   )
 }

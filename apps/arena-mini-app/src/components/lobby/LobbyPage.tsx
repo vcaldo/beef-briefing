@@ -15,8 +15,9 @@ import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monit
 import { Avatar } from '@beef-briefing/shared-mini-app/components'
 import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
 import { GameButton, RPGPanel } from '../ui'
-import { usePolling, useErrorBanner } from '../../hooks'
+import { usePolling, useErrorBanner, usePageBackground } from '../../hooks'
 import { useSoundContext } from '../../contexts'
+import logoUrl from '../../../assets/images/logo/logo.webp'
 
 import type { Match, GameConstants } from '../../types'
 
@@ -55,6 +56,9 @@ export function LobbyPage({
 
   // Sound system
   const { play, unlockAudio } = useSoundContext()
+
+  // Apply splash background image
+  usePageBackground({ backgroundId: 'splash' })
 
   // Track whether initial fetch is complete - used to distinguish page reload from real-time transitions
   const initialFetchDoneRef = useRef(false)
@@ -373,7 +377,7 @@ export function LobbyPage({
   // Loading state
   if (loading) {
     return (
-      <div className="lobby-page">
+      <div className="lobby-page page-bg page-bg--splash">
         <LoadingSpinner message="Loading matches..." />
       </div>
     )
@@ -384,14 +388,7 @@ export function LobbyPage({
   const canStartEarly = isCreator && activeMatch?.participants && activeMatch.participants.length >= 2
 
   return (
-    <div className="lobby-page rpg-lobby-page">
-      {/* RPG-styled header */}
-      <RPGPanel variant="outer" className="rpg-lobby-header">
-        <RPGPanel variant="inner" className="rpg-lobby-header-content">
-          <h1 className="rpg-lobby-title">Beef Arena</h1>
-        </RPGPanel>
-      </RPGPanel>
-
+    <div className="lobby-page rpg-lobby-page page-bg page-bg--splash">
       {/* Error banner */}
       {error && (
         <ErrorBanner
@@ -503,24 +500,28 @@ export function LobbyPage({
       {!activeMatch && (
         <section className="lobby-matches rpg-lobby-matches">
           {matches.length === 0 ? (
-            <RPGPanel variant="outer" className="rpg-empty-state-panel">
-              <RPGPanel variant="inner" className="rpg-empty-state-content">
-                <div className="rpg-empty-state">
-                  <p className="rpg-lobby-subtitle">Welcome, {firstName}</p>
-                  <span className="rpg-empty-icon">⚔️</span>
-                  <h3 className="rpg-empty-title">No Active Matches</h3>
-                  <p className="rpg-empty-hint">Create a new match to challenge your friends!</p>
-                  <GameButton
-                    variant="primary"
-                    size="lg"
-                    onClick={handleCreateMatch}
-                    disabled={actionLoading !== null}
-                  >
-                    {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : 'Create Match'}
-                  </GameButton>
-                </div>
+            <>
+              <RPGPanel variant="outer" className="rpg-empty-state-panel">
+                <RPGPanel variant="inner" className="rpg-empty-state-content">
+                  <div className="rpg-empty-state">
+                    <p className="rpg-lobby-subtitle">Welcome, {firstName}</p>
+                    <img src={logoUrl} alt="Arena" className="rpg-empty-icon" />
+                    <h3 className="rpg-empty-title">No Active Matches</h3>
+                    <p className="rpg-empty-hint">Create a new match to challenge your friends!</p>
+                  </div>
+                </RPGPanel>
               </RPGPanel>
-            </RPGPanel>
+              <div className="rpg-match-card-actions">
+                <GameButton
+                  variant="primary"
+                  size="lg"
+                  onClick={handleCreateMatch}
+                  disabled={actionLoading !== null}
+                >
+                  {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : 'Create Match'}
+                </GameButton>
+              </div>
+            </>
           ) : (
             <div className="match-list">
               {matches

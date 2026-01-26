@@ -16,7 +16,7 @@ import { useSoundContext } from '../../contexts'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, CountdownTimer, ErrorBanner, CompactCard } from '../common'
 import { GameButton, CoinDisplay, CardSlot, RPGPanel } from '../ui'
-import { usePolling, useErrorBanner } from '../../hooks'
+import { usePolling, useErrorBanner, usePageBackground } from '../../hooks'
 import TeamPhaseModal from './TeamPhaseModal'
 
 import type {
@@ -28,6 +28,25 @@ import type {
 
 // Polling interval (in ms)
 const POLL_INTERVAL = 3000 // 3 seconds
+
+// Reroll icon - circular refresh arrows
+const RerollIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 2v6h-6" />
+    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+    <path d="M3 22v-6h6" />
+    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+  </svg>
+)
 
 interface ShopPageProps {
   activeMatch: Match | null
@@ -56,6 +75,9 @@ export function ShopPage({
   const soundsPreloadedRef = useRef(false)
   // Track if initial shop cards have been loaded (for card_draw sound)
   const initialCardsLoadedRef = useRef(false)
+
+  // Apply splash background image
+  usePageBackground({ backgroundId: 'splash' })
 
   // Preload shop and team sounds on mount
   useEffect(() => {
@@ -263,7 +285,7 @@ export function ShopPage({
   // No active match - should not be on this page
   if (!activeMatch) {
     return (
-      <div className="shop-page">
+      <div className="shop-page page-bg page-bg--splash">
         <div className="shop-error">
           <p>No active match. Return to the lobby to join or create a match.</p>
         </div>
@@ -274,7 +296,7 @@ export function ShopPage({
   // Loading state
   if (loading) {
     return (
-      <div className="shop-page">
+      <div className="shop-page page-bg page-bg--splash">
         <LoadingSpinner message="Loading shop..." />
       </div>
     )
@@ -295,29 +317,43 @@ export function ShopPage({
   }
 
   return (
-    <div className="shop-page rpg-shop-page">
+    <div className="shop-page rpg-shop-page page-bg page-bg--splash">
       <RPGPanel variant="outer" className="rpg-shop-outer">
-        {/* Header with coins and timer */}
+        {/* Header with button, timer, and coins */}
         <RPGPanel variant="inner" className="rpg-shop-header">
           <div className="rpg-shop-header-row">
             <div className="rpg-shop-header-left">
+              {!isSubmitted && (
+                <GameButton
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    playSequence(['arena_button_click', 'arena_success'])
+                    setIsTeamPhase(true)
+                  }}
+                  disabled={teamCards.length < teamSize}
+                  className="done-btn"
+                >
+                  Done
+                </GameButton>
+              )}
               {isSubmitted && (
                 <span className="rpg-shop-submitted-badge">Team Submitted</span>
               )}
             </div>
+            <div className="rpg-shop-header-center">
+              {shopData?.deadline && (
+                <CountdownTimer
+                  deadline={shopData.deadline}
+                  onExpire={() => {
+                    addPageAction('shop_phase_expired', { match_id: activeMatch.id })
+                  }}
+                  timerThresholds={gameConstants?.timer_thresholds}
+                />
+              )}
+            </div>
             <div className="rpg-shop-header-right">
               <CoinDisplay amount={coins} size="lg" animated />
-              {shopData?.deadline && (
-                <div className="rpg-shop-timer">
-                  <CountdownTimer
-                    deadline={shopData.deadline}
-                    onExpire={() => {
-                      addPageAction('shop_phase_expired', { match_id: activeMatch.id })
-                    }}
-                    timerThresholds={gameConstants?.timer_thresholds}
-                  />
-                </div>
-              )}
             </div>
           </div>
         </RPGPanel>
@@ -342,6 +378,27 @@ export function ShopPage({
         {/* Shop cards grid - only show if not submitted */}
         {!isSubmitted && (
           <RPGPanel variant="inner" className="rpg-shop-cards-panel">
+            {/* Reroll row with hint text and button */}
+            <div className="rpg-shop-reroll-row">
+              <span className="rpg-shop-reroll-hint">
+                You can only reroll before buying your first card
+              </span>
+              <GameButton
+                variant="primary"
+                shape="square"
+                size="sm"
+                onClick={handleReroll}
+                disabled={!canReroll || coins < rerollCost || actionLoading !== null}
+                title={`Reroll (${rerollCost} coin)`}
+                className="reroll-btn"
+              >
+                {actionLoading === 'reroll' ? (
+                  <LoadingSpinner size="sm" inline />
+                ) : (
+                  <RerollIcon />
+                )}
+              </GameButton>
+            </div>
             <div className="rpg-shop-grid">
               {shopCards.map((card: EnhancedShopCard) => {
                 const isPurchased = card.is_purchased
@@ -438,41 +495,6 @@ export function ShopPage({
         )}
 
       </RPGPanel>
-
-      {/* Bottom action buttons */}
-      {!isSubmitted && (canReroll || teamCards.length >= teamSize) && (
-        <div className="rpg-shop-actions">
-          {canReroll && (
-            <GameButton
-              variant="primary"
-              size="lg"
-              onClick={handleReroll}
-              disabled={coins < rerollCost || actionLoading !== null}
-              title={`Reroll (${rerollCost} coin)`}
-              className="reroll-btn"
-            >
-              {actionLoading === 'reroll' ? (
-                <LoadingSpinner size="sm" inline />
-              ) : (
-                `Reroll (${rerollCost})`
-              )}
-            </GameButton>
-          )}
-          {teamCards.length >= teamSize && (
-            <GameButton
-              variant="primary"
-              size="lg"
-              onClick={() => {
-                playSequence(['arena_button_click', 'arena_success'])
-                setIsTeamPhase(true)
-              }}
-              className="done-shopping-btn"
-            >
-              Done Shopping
-            </GameButton>
-          )}
-        </div>
-      )}
     </div>
   )
 }

@@ -323,7 +323,7 @@ export function ShopPage({
         <RPGPanel variant="inner" className="rpg-shop-header">
           <div className="rpg-shop-header-row">
             <div className="rpg-shop-header-left">
-              {teamCards.length >= teamSize && !isSubmitted && (
+              {!isSubmitted && (
                 <GameButton
                   variant="primary"
                   size="sm"
@@ -331,9 +331,10 @@ export function ShopPage({
                     playSequence(['arena_button_click', 'arena_success'])
                     setIsTeamPhase(true)
                   }}
+                  disabled={teamCards.length < teamSize}
                   className="done-btn"
                 >
-                  Done
+                  {teamCards.length >= teamSize ? 'Done' : `Need ${teamSize - teamCards.length} more`}
                 </GameButton>
               )}
               {isSubmitted && (

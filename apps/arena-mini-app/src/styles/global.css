@@ -1961,7 +1961,7 @@ a:focus:not(:focus-visible),
   justify-content: flex-end;
   align-items: stretch;
   gap: var(--battle-gap, 16px);
-  padding: 16px;
+  padding: 0 16px 16px 16px;
   /* Background is set via .page-bg--arena when background image is loaded */
   /* Fallback gradient when no background image is available */
   background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
@@ -2494,12 +2494,12 @@ a:focus:not(:focus-visible),
 
 .battle-team.team-a {
   align-items: flex-end;
-  transform: translateY(-30px); /* Move up for staggered "two teams" effect */
+  transform: translateY(-50px); /* Move up for staggered "two teams" effect */
 }
 
 .battle-team.team-b {
   align-items: flex-start;
-  transform: translateY(30px);  /* Move down for staggered "two teams" effect */
+  transform: translateY(10px);  /* Move down for staggered "two teams" effect */
 }
 
 .team-label {
@@ -2513,7 +2513,7 @@ a:focus:not(:focus-visible),
 
 .team-cards {
   display: flex;
-  gap: 12px;
+  gap: 6px;
 }
 
 .team-a .team-cards {

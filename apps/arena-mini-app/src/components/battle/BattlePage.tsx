@@ -29,7 +29,6 @@ import type {
   GameConstants,
   PlaceholderPositions,
 } from '../../types'
-import { getRandomRune } from '../../assets/runeImages'
 
 // Playback speed options (events per second)
 // Index: 0=1x, 1=2x (controlled by parent via speedIndex prop)
@@ -80,9 +79,6 @@ export function BattlePage({
   // Track if user has manually dismissed the victory modal (prevents auto-reopen)
   const [victoryDismissed, setVictoryDismissed] = useState(false)
 
-  // Map of cardKey -> assigned rune URL (persists through playback)
-  const [runeAssignments, setRuneAssignments] = useState<Map<string, string>>(() => new Map())
-
   // Sound context for battle audio
   const { play: playSound, preloadCategory } = useSoundContext()
   const soundsPreloadedRef = useRef(false)
@@ -115,26 +111,6 @@ export function BattlePage({
 
     return { x, y }
   }, [])
-
-  /**
-   * Get the rune image for a card slot. Assigns a random rune if not already assigned.
-   * Runes are assigned per-card and persist through battle playback.
-   */
-  const getRuneForCard = useCallback((cardKey: string): string => {
-    const existing = runeAssignments.get(cardKey)
-    if (existing) {
-      return existing
-    }
-
-    // Assign new random rune
-    const newRune = getRandomRune()
-    setRuneAssignments((prev: Map<string, string>) => {
-      const next = new Map(prev)
-      next.set(cardKey, newRune)
-      return next
-    })
-    return newRune
-  }, [runeAssignments])
 
   // Animation state machine hook
   const {
@@ -280,7 +256,6 @@ export function BattlePage({
     reset()
     setShowVictory(false)
     setVictoryDismissed(false)
-    setRuneAssignments(new Map())
     addPageAction('battle_reset', { match_id: matchId })
   }, [reset, matchId])
 
@@ -356,15 +331,11 @@ export function BattlePage({
       arenaFighters.left?.cardKey === cardKey ||
       arenaFighters.right?.cardKey === cardKey
 
-    // If card is in arena, render placeholder rune image to maintain layout
+    // If card is in arena, render empty placeholder to maintain layout
     if (isInArena) {
       return (
         <div key={cardId} className="battle-card-wrapper">
-          <img
-            src={getRuneForCard(cardKey)}
-            alt=""
-            className="battle-card-empty-slot"
-          />
+          <div className="battle-card-empty-slot" />
         </div>
       )
     }

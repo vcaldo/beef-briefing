@@ -377,26 +377,27 @@ export function ShopPage({
         {/* Shop cards grid - only show if not submitted */}
         {!isSubmitted && (
           <RPGPanel variant="inner" className="rpg-shop-cards-panel">
-            {/* Reroll button at top-right of cards panel */}
-            {canReroll && (
-              <div className="rpg-shop-reroll-row">
-                <GameButton
-                  variant="primary"
-                  shape="square"
-                  size="sm"
-                  onClick={handleReroll}
-                  disabled={coins < rerollCost || actionLoading !== null}
-                  title={`Reroll (${rerollCost} coin)`}
-                  className="reroll-btn"
-                >
-                  {actionLoading === 'reroll' ? (
-                    <LoadingSpinner size="sm" inline />
-                  ) : (
-                    <RerollIcon />
-                  )}
-                </GameButton>
-              </div>
-            )}
+            {/* Reroll row with hint text and button */}
+            <div className="rpg-shop-reroll-row">
+              <span className="rpg-shop-reroll-hint">
+                Replaces all cards. Only before first buy.
+              </span>
+              <GameButton
+                variant="primary"
+                shape="square"
+                size="sm"
+                onClick={handleReroll}
+                disabled={!canReroll || coins < rerollCost || actionLoading !== null}
+                title={`Reroll (${rerollCost} coin)`}
+                className="reroll-btn"
+              >
+                {actionLoading === 'reroll' ? (
+                  <LoadingSpinner size="sm" inline />
+                ) : (
+                  <RerollIcon />
+                )}
+              </GameButton>
+            </div>
             <div className="rpg-shop-grid">
               {shopCards.map((card: EnhancedShopCard) => {
                 const isPurchased = card.is_purchased

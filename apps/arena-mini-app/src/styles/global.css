@@ -5516,6 +5516,11 @@ button,
   line-height: 1.3;
 }
 
+.rpg-victory-stats .game-button {
+  display: block;
+  margin: 16px auto 0;
+}
+
 .rpg-victory-actions {
   display: flex;
   flex-direction: column;

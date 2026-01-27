@@ -4677,6 +4677,11 @@ a:focus:not(:focus-visible),
   .arena-vs {
     font-size: 20px;
   }
+
+  /* Scale up deck cards from 0.16 to 0.18 (54x81px) for better visibility on tiny screens */
+  .deck-compact-card {
+    --deck-scale: 0.18;
+  }
 }
 
 /* Touch target minimum size for accessibility */

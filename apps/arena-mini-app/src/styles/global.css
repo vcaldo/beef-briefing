@@ -4648,6 +4648,11 @@ a:focus:not(:focus-visible),
   .arena-compact-card {
     --arena-scale: 0.45;
   }
+
+  /* Scale down VS indicator from 28px to 24px to match smaller cards */
+  .arena-vs {
+    font-size: 24px;
+  }
 }
 
 /* Mobile-specific battle adjustments for small phones (360px and below) */

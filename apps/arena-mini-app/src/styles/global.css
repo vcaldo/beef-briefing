@@ -2736,6 +2736,13 @@ a:focus:not(:focus-visible),
   }
 }
 
+/* Pause arena animations when battle is paused */
+.arena-paused .arena-card-entering,
+.arena-paused .arena-card-exiting,
+.arena-paused .arena-card-returning {
+  animation-play-state: paused;
+}
+
 /* =============================================================================
    Stats Page
    ============================================================================= */

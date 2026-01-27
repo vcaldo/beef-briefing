@@ -412,7 +412,7 @@ export function BattlePage({
       {/* Central Battle Arena */}
       <div
         ref={battleArenaRef}
-        className="battle-arena-center battle-effect-container"
+        className={`battle-arena-center battle-effect-container${!hookIsPlaying ? ' arena-paused' : ''}`}
       >
         {/* Team B's arena card (left) */}
         {arenaCardB && (() => {

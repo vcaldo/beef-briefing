@@ -917,12 +917,64 @@ export function useBattleAnimation(
           }
         })
       }, ANIMATION_DURATIONS.playStart)
+    } else if (currentPhase === 'arena_transition') {
+      // Resuming during arena transition - CSS animation will resume from paused state
+      // We need to reschedule the transition completion timer
+      // Since CSS animation uses 'forwards' fill mode and continues from where it paused,
+      // we use a short delay to allow the animation to complete
+      const remainingDuration = getScaledDuration(
+        arenaTransitionState === 'entering' ? ANIMATION_DURATIONS.arenaEnter : ANIMATION_DURATIONS.arenaExit
+      )
+      phaseTimeoutRef.current = setTimeout(() => {
+        if (!isPlayingRef.current) return
+
+        if (arenaTransitionState === 'exiting') {
+          // After exit completes, check if we need to enter new cards
+          const { cardA, cardB } = getFrontCards()
+          setArenaCardA(cardA)
+          setArenaCardB(cardB)
+
+          const hasNewCards = cardA !== null || cardB !== null
+          if (hasNewCards) {
+            setArenaTransitionState('entering')
+            phaseTimeoutRef.current = setTimeout(() => {
+              setArenaTransitionState('idle')
+              isArenaTransitionInProgressRef.current = false
+              if (isPlayingRef.current) {
+                advanceToNextEvent()
+              }
+            }, getScaledDuration(ANIMATION_DURATIONS.arenaEnter))
+          } else {
+            setArenaTransitionState('idle')
+            isArenaTransitionInProgressRef.current = false
+            if (isPlayingRef.current) {
+              advanceToNextEvent()
+            }
+          }
+        } else if (arenaTransitionState === 'entering') {
+          // After enter completes, proceed to next event
+          setArenaTransitionState('idle')
+          isArenaTransitionInProgressRef.current = false
+          if (isPlayingRef.current) {
+            advanceToNextEvent()
+          }
+        }
+      }, remainingDuration)
     } else if (currentPhase === 'idle') {
       // Resume from current position
       advanceToNextEvent()
     }
-    // If in middle of a phase, it will continue automatically
-  }, [battleData, isComplete, currentPhase, advanceToNextEvent, initializeArenaCards])
+    // If in middle of a phase (highlight, attack, damage, complete), it will continue automatically
+    // after the CSS transitions complete - we need to reschedule the processPhase timeout
+    else if (currentPhase !== 'idle') {
+      // Resuming during an attack phase - reschedule the phase progression
+      const currentEvent = battleData.events[currentEventIndexRef.current]
+      if (currentEvent) {
+        // Resume the current phase processing
+        processPhase(currentEvent, currentPhase)
+      }
+    }
+  }, [battleData, isComplete, currentPhase, advanceToNextEvent, initializeArenaCards, arenaTransitionState, getFrontCards, getScaledDuration, processPhase])
 
   /**
    * Pause playback.
@@ -1038,9 +1090,36 @@ export function useBattleAnimation(
     setPendingDeaths(new Set())
     pendingDeathsRef.current = new Set()
     currentRoundRef.current = 0
-    // Clear arena state (will be populated by getFrontCards in future tasks)
-    setArenaCardA(null)
-    setArenaCardB(null)
+
+    // Set final arena state based on surviving cards
+    // Find front cards from the final card states
+    let finalFrontA: ArenaCard | null = null
+    let finalFrontB: ArenaCard | null = null
+    let minPosA = Infinity
+    let minPosB = Infinity
+
+    finalCardStates.forEach((state: CardSnapshot, key: string) => {
+      if (!state.is_alive) return
+
+      const parts = key.split('_')
+      const teamOwnerId = parseInt(parts[0], 10)
+      const cardId = state.card_id
+
+      if (teamOwnerId === playerAId) {
+        if (state.position < minPosA) {
+          minPosA = state.position
+          finalFrontA = { cardId, teamOwnerId }
+        }
+      } else if (teamOwnerId === playerBId) {
+        if (state.position < minPosB) {
+          minPosB = state.position
+          finalFrontB = { cardId, teamOwnerId }
+        }
+      }
+    })
+
+    setArenaCardA(finalFrontA)
+    setArenaCardB(finalFrontB)
     setArenaTransitionState('idle')
     isArenaTransitionInProgressRef.current = false
   }, [battleData, playerAId, playerBId])

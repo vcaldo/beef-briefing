@@ -4643,6 +4643,11 @@ a:focus:not(:focus-visible),
   .team-cards {
     gap: 8px;
   }
+
+  /* Scale down arena cards from 0.5 to 0.45 (150x225px -> 135x203px) */
+  .arena-compact-card {
+    --arena-scale: 0.45;
+  }
 }
 
 /* Mobile-specific battle adjustments for small phones (360px and below) */

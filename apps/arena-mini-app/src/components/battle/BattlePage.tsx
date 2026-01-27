@@ -27,6 +27,7 @@ import type {
   Match,
   GameConstants,
   PlaceholderPositions,
+  EnhancedTeamCard,
 } from '../../types'
 
 // Playback speed options (events per second)
@@ -419,7 +420,7 @@ export function BattlePage({
           const cardKey = getCardKey(arenaCardB.teamOwnerId, arenaCardB.cardId)
           const state = cardStates.get(cardKey)
           const animState = animationStates.get(cardKey)
-          const originalCard = battleData.team_b_final?.cards?.find(c => c.card_id === arenaCardB.cardId)
+          const originalCard = battleData.team_b_final?.cards?.find(c => c.card_id === arenaCardB.cardId) as EnhancedTeamCard | undefined
           if (!state || !originalCard) return null
 
           // Check if this card is currently taking damage
@@ -472,7 +473,7 @@ export function BattlePage({
           const cardKey = getCardKey(arenaCardA.teamOwnerId, arenaCardA.cardId)
           const state = cardStates.get(cardKey)
           const animState = animationStates.get(cardKey)
-          const originalCard = battleData.team_a_final?.cards?.find(c => c.card_id === arenaCardA.cardId)
+          const originalCard = battleData.team_a_final?.cards?.find(c => c.card_id === arenaCardA.cardId) as EnhancedTeamCard | undefined
           if (!state || !originalCard) return null
 
           // Check if this card is currently taking damage

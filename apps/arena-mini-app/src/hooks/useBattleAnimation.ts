@@ -963,10 +963,9 @@ export function useBattleAnimation(
     } else if (currentPhase === 'idle') {
       // Resume from current position
       advanceToNextEvent()
-    }
-    // If in middle of a phase (highlight, attack, damage, complete), it will continue automatically
-    // after the CSS transitions complete - we need to reschedule the processPhase timeout
-    else if (currentPhase !== 'idle') {
+    } else {
+      // If in middle of a phase (highlight, attack, damage, complete), it will continue automatically
+      // after the CSS transitions complete - we need to reschedule the processPhase timeout
       // Resuming during an attack phase - reschedule the phase progression
       const currentEvent = battleData.events[currentEventIndexRef.current]
       if (currentEvent) {

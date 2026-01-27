@@ -4628,6 +4628,12 @@ a:focus:not(:focus-visible),
     grid-template-rows: auto 1fr auto 20%;
   }
 
+  /* Reduce arena center spacing to prevent overflow on medium phones */
+  .battle-arena-center {
+    gap: 16px;
+    padding: 12px;
+  }
+
   .battle-arena {
     --battle-gap: 8px;
     padding: 8px;

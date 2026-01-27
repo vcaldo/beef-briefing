@@ -4639,6 +4639,14 @@ a:focus:not(:focus-visible),
   }
 }
 
+/* Mobile-specific battle adjustments for small phones (360px and below) */
+@media (max-width: 360px) {
+  /* Further reduce battle log from 20% to 18% on small phones */
+  .battle-page.arena-layout {
+    grid-template-rows: auto 1fr auto 18%;
+  }
+}
+
 /* Touch target minimum size for accessibility */
 button,
 .btn,

@@ -791,41 +791,41 @@ a:focus:not(:focus-visible),
 /* Damage shake keyframes - rapid horizontal shake with red flash */
 @keyframes card-damage-shake {
   0% {
-    transform: translateX(0) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(0);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   }
   10% {
-    transform: translateX(-6px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(-6px);
     box-shadow:
       0 0 20px rgba(239, 68, 68, 0.8),
       0 0 40px rgba(239, 68, 68, 0.5);
   }
   20% {
-    transform: translateX(6px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(6px);
   }
   30% {
-    transform: translateX(-5px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(-5px);
   }
   40% {
-    transform: translateX(5px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(5px);
   }
   50% {
-    transform: translateX(-4px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(-4px);
   }
   60% {
-    transform: translateX(4px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(4px);
   }
   70% {
-    transform: translateX(-2px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(-2px);
   }
   80% {
-    transform: translateX(2px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(2px);
   }
   90% {
-    transform: translateX(-1px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(-1px);
   }
   100% {
-    transform: translateX(0) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(0);
     box-shadow:
       0 0 15px rgba(239, 68, 68, 0.7),
       0 0 30px rgba(239, 68, 68, 0.4);

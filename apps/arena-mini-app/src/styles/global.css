@@ -4623,6 +4623,11 @@ a:focus:not(:focus-visible),
 
 /* Mobile-specific battle adjustments for tablets and larger phones */
 @media (max-width: 480px) {
+  /* Reduce battle log from 25% to 20% on medium phones */
+  .battle-page.arena-layout {
+    grid-template-rows: auto 1fr auto 20%;
+  }
+
   .battle-arena {
     --battle-gap: 8px;
     padding: 8px;

@@ -4692,6 +4692,17 @@ a:focus:not(:focus-visible),
   .deck-compact-card {
     --deck-scale: 0.18;
   }
+
+  /* Further reduce deck padding from 6px 10px to 4px 8px on smallest phones */
+  .battle-deck-a,
+  .battle-deck-b {
+    padding: 4px 8px;
+  }
+
+  /* Reduce gap between deck cards from default to 3px on smallest phones */
+  .deck-cards {
+    gap: 3px;
+  }
 }
 
 /* Touch target minimum size for accessibility */

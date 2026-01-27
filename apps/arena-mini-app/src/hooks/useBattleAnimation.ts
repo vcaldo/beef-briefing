@@ -566,21 +566,23 @@ export function useBattleAnimation(
       deaths.forEach(() => onPlaySound?.('arena_battle_death'))
 
       // Trigger 'death' visual effect for ALL deaths simultaneously
-      // Use requestAnimationFrame to defer position capture until after React renders
-      // (ensures we capture position from arena before card moves back to deck)
+      // IMPORTANT: Capture positions SYNCHRONOUSLY while card is still in arena
+      // (before setArenaFighters clears it). Then defer the effect creation to next frame.
       if (getCardPosition) {
-        requestAnimationFrame(() => {
-          const deathEffects: ActiveBattleEffect[] = []
-          deaths.forEach((cardKey) => {
-            const position = getCardPosition(cardKey)
-            if (position) {
-              deathEffects.push({ type: 'death', position, cardKey })
-            }
-          })
-          if (deathEffects.length > 0) {
-            setActiveEffects((prev: ActiveBattleEffect[]) => [...prev, ...deathEffects])
+        // Capture positions NOW while cards are still in arena
+        const deathEffects: ActiveBattleEffect[] = []
+        deaths.forEach((cardKey) => {
+          const position = getCardPosition(cardKey)
+          if (position) {
+            deathEffects.push({ type: 'death', position, cardKey })
           }
         })
+        // Defer effect creation to next frame (after arena clear renders)
+        if (deathEffects.length > 0) {
+          requestAnimationFrame(() => {
+            setActiveEffects((prev: ActiveBattleEffect[]) => [...prev, ...deathEffects])
+          })
+        }
       }
 
       // Clear dead cards from arena (they return to team stack as greyed out)

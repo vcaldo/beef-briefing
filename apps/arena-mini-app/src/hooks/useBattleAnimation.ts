@@ -278,6 +278,8 @@ export function useBattleAnimation(
   const isPlayingRef = useRef(isPlaying)
   const currentEventIndexRef = useRef(currentEventIndex)
   const advanceToNextEventRef = useRef<(() => void) | null>(null)
+  // Track if an arena transition is currently in progress
+  const isArenaTransitionInProgressRef = useRef(false)
 
   // Keep currentEventIndex ref in sync
   useEffect(() => {
@@ -307,6 +309,7 @@ export function useBattleAnimation(
       setArenaCardA(null)
       setArenaCardB(null)
       setArenaTransitionState('idle')
+      isArenaTransitionInProgressRef.current = false
     }
   }, [battleData, playerAId, playerBId])
 
@@ -680,6 +683,9 @@ export function useBattleAnimation(
       newFrontB: ArenaCard | null,
       onComplete: () => void
     ) => {
+      // Mark that we're starting a transition
+      isArenaTransitionInProgressRef.current = true
+
       // Check if we have existing arena cards that need to exit
       const hasExistingCards = arenaCardA !== null || arenaCardB !== null
 
@@ -703,11 +709,13 @@ export function useBattleAnimation(
             phaseTimeoutRef.current = setTimeout(() => {
               // Transition complete
               setArenaTransitionState('idle')
+              isArenaTransitionInProgressRef.current = false
               onComplete()
             }, getScaledDuration(ANIMATION_DURATIONS.arenaEnter))
           } else {
             // No new cards, transition complete
             setArenaTransitionState('idle')
+            isArenaTransitionInProgressRef.current = false
             onComplete()
           }
         }, getScaledDuration(ANIMATION_DURATIONS.arenaExit))
@@ -725,17 +733,56 @@ export function useBattleAnimation(
 
           phaseTimeoutRef.current = setTimeout(() => {
             setArenaTransitionState('idle')
+            isArenaTransitionInProgressRef.current = false
             onComplete()
           }, getScaledDuration(ANIMATION_DURATIONS.arenaEnter))
         } else {
           // No cards at all, just complete
           setArenaTransitionState('idle')
+          isArenaTransitionInProgressRef.current = false
           onComplete()
         }
       }
     },
     [arenaCardA, arenaCardB, getScaledDuration]
   )
+
+  /**
+   * Complete the battle after all events have been processed.
+   * Handles final arena transition for dead cards exiting before showing victory.
+   */
+  const completeBattle = useCallback(() => {
+    // Capture pending deaths to pass to arena transition check
+    const deathsToExclude = new Set(pendingDeathsRef.current)
+
+    // Apply any remaining pending deaths
+    setPendingDeaths((currentPendingDeaths: Set<string>) => {
+      if (currentPendingDeaths.size > 0) {
+        applyPendingDeaths(currentPendingDeaths)
+      }
+      return new Set()
+    })
+
+    // Check if final arena transition is needed (dead cards should exit)
+    const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded(deathsToExclude)
+
+    if (needsTransition) {
+      // Perform final arena transition before marking complete
+      performArenaTransition(newFrontA, newFrontB, () => {
+        // Now we can mark battle as complete
+        setIsPlaying(false)
+        isPlayingRef.current = false
+        setIsComplete(true)
+        setCurrentPhase('idle')
+      })
+    } else {
+      // No transition needed, mark complete immediately
+      setIsPlaying(false)
+      isPlayingRef.current = false
+      setIsComplete(true)
+      setCurrentPhase('idle')
+    }
+  }, [applyPendingDeaths, checkArenaTransitionNeeded, performArenaTransition])
 
   /**
    * Advance to the next event in the sequence.
@@ -746,17 +793,8 @@ export function useBattleAnimation(
     const nextIndex = currentEventIndexRef.current + 1
 
     if (nextIndex >= battleData.events.length) {
-      // All events processed - apply any remaining pending deaths
-      setPendingDeaths((currentPendingDeaths: Set<string>) => {
-        if (currentPendingDeaths.size > 0) {
-          applyPendingDeaths(currentPendingDeaths)
-        }
-        return new Set()
-      })
-      setIsPlaying(false)
-      isPlayingRef.current = false
-      setIsComplete(true)
-      setCurrentPhase('idle')
+      // All events processed - handle final transition and completion
+      completeBattle()
       return
     }
 
@@ -818,7 +856,7 @@ export function useBattleAnimation(
       setCurrentPhase('highlight')
       processPhase(nextEvent, 'highlight')
     }
-  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration, checkArenaTransitionNeeded, performArenaTransition])
+  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration, checkArenaTransitionNeeded, performArenaTransition, completeBattle])
 
   // Keep advanceToNextEvent ref in sync for use in processPhase
   // (avoids circular dependency: processPhase -> advanceToNextEvent -> processPhase)
@@ -933,6 +971,7 @@ export function useBattleAnimation(
     setArenaCardA(null)
     setArenaCardB(null)
     setArenaTransitionState('idle')
+    isArenaTransitionInProgressRef.current = false
   }, [battleData, playerAId, playerBId])
 
   /**
@@ -1003,6 +1042,7 @@ export function useBattleAnimation(
     setArenaCardA(null)
     setArenaCardB(null)
     setArenaTransitionState('idle')
+    isArenaTransitionInProgressRef.current = false
   }, [battleData, playerAId, playerBId])
 
   return {

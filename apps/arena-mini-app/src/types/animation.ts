@@ -63,6 +63,7 @@ export type CardAnimationState = 'idle' | 'attacking' | 'taking_damage'
  */
 export type EventAnimationPhase =
   | 'idle'
+  | 'arena_transition'
   | 'highlight'
   | 'attack'
   | 'damage'
@@ -114,6 +115,12 @@ export const ANIMATION_DURATIONS = {
 
   /** Delay before starting the first event on play */
   playStart: 100,
+
+  /** Arena card enter animation duration (scale up from deck to arena) */
+  arenaEnter: 400,
+
+  /** Arena card exit animation duration (scale down from arena back to deck) */
+  arenaExit: 400,
 } as const
 
 /**

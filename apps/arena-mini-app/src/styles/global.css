@@ -2525,6 +2525,170 @@ a:focus:not(:focus-visible),
 /* Legacy event-log classes removed - replaced by battle-log-* classes above */
 
 /* =============================================================================
+   Battle Arena Layout (Grid-based)
+   New grid layout with deck strips, central arena, and compact battle log
+   ============================================================================= */
+
+/* Override default battle-page for arena layout */
+.battle-page.arena-layout {
+  display: grid;
+  grid-template-rows: auto 1fr auto 25%;
+  grid-template-areas:
+    "deck-b"
+    "arena"
+    "deck-a"
+    "log";
+  height: 100vh;
+  padding-bottom: var(--tab-bar-height);
+  background: var(--arena-bg-dark);
+  overflow: hidden;
+}
+
+/* Team B Deck - Upper area, aligned left */
+.battle-deck-b {
+  grid-area: deck-b;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 8px 12px;
+  gap: 4px;
+}
+
+/* Team A Deck - Lower area, aligned right */
+.battle-deck-a {
+  grid-area: deck-a;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 8px 12px;
+  gap: 4px;
+}
+
+/* Deck label styling */
+.battle-deck-b .deck-label,
+.battle-deck-a .deck-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tg-theme-hint-color);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Deck cards container */
+.deck-cards {
+  display: flex;
+  gap: 4px;
+}
+
+/* Deck compact card - Scale 0.16 from 300x450 base
+   Visual size: 48x72px
+   Margin formula: size * (scale - 1) / 2 */
+.deck-compact-card {
+  width: 300px;
+  height: 450px;
+  --deck-scale: 0.16;
+  transform: scale(var(--deck-scale));
+  transform-origin: center;
+  /* Collapse layout box: 300 * (0.16 - 1) / 2 = -126, 450 * (0.16 - 1) / 2 = -189 */
+  margin: calc(450px * (var(--deck-scale) - 1) / 2) calc(300px * (var(--deck-scale) - 1) / 2);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* Dead cards in deck show greyed out */
+.deck-compact-card.dead {
+  filter: grayscale(100%);
+  opacity: 0.5;
+}
+
+/* Placeholder for cards currently in arena
+   Visual size matches deck-compact-card: 48x72px */
+.deck-card-placeholder {
+  width: 48px;
+  height: 72px;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Compact battle log - Bottom 25% of screen */
+.battle-log-compact {
+  grid-area: log;
+  max-height: calc(25vh - 40px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 74, 58, 0.3) transparent;
+}
+
+.battle-log-compact::-webkit-scrollbar {
+  width: 4px;
+}
+
+.battle-log-compact::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.battle-log-compact::-webkit-scrollbar-thumb {
+  background: rgba(90, 74, 58, 0.3);
+  border-radius: 2px;
+}
+
+/* -----------------------------------------------------------------------------
+   Central Battle Arena
+   ----------------------------------------------------------------------------- */
+
+/* Central arena container */
+.battle-arena-center {
+  grid-area: arena;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+  padding: 16px;
+  background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
+  position: relative;
+}
+
+/* Arena compact card - Scale 0.5 from 300x450 base
+   Visual size: 150x225px
+   Margin formula: size * (scale - 1) / 2 */
+.arena-compact-card {
+  width: 300px;
+  height: 450px;
+  --arena-scale: 0.5;
+  transform: scale(var(--arena-scale));
+  transform-origin: center;
+  /* Collapse layout box: 300 * (0.5 - 1) / 2 = -75, 450 * (0.5 - 1) / 2 = -112.5 */
+  margin: calc(450px * (var(--arena-scale) - 1) / 2) calc(300px * (var(--arena-scale) - 1) / 2);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 0 60px rgba(249, 115, 22, 0.2);
+}
+
+/* VS indicator between arena cards */
+.arena-vs {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--arena-orange, #f97316);
+  text-shadow:
+    0 0 10px rgba(249, 115, 22, 0.8),
+    0 0 20px rgba(249, 115, 22, 0.5),
+    0 0 30px rgba(249, 115, 22, 0.3);
+  letter-spacing: 2px;
+  user-select: none;
+}
+
+/* Arena card positioning modifiers */
+.arena-card-left {
+  order: 1;
+}
+
+.arena-card-right {
+  order: 3;
+}
+
+.arena-vs {
+  order: 2;
+}
+
+/* =============================================================================
    Stats Page
    ============================================================================= */
 .stats-tabs {

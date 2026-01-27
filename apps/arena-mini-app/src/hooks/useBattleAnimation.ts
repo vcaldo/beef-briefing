@@ -88,8 +88,8 @@ export interface UseBattleAnimationReturn {
   arenaCardB: ArenaCard | null
   /** Current state of arena card transitions */
   arenaTransitionState: ArenaTransitionState
-  /** Get the front (lowest position) alive card for each team */
-  getFrontCards: () => { cardA: ArenaCard | null; cardB: ArenaCard | null }
+  /** Get the front (lowest position) alive card for each team. Optionally exclude cards that are pending death. */
+  getFrontCards: (excludeDeaths?: Set<string>) => { cardA: ArenaCard | null; cardB: ArenaCard | null }
   /** Start or resume playback */
   play: () => void
   /** Pause playback */
@@ -269,6 +269,8 @@ export function useBattleAnimation(
   // This prevents cards from greying out before their attack animation plays
   // Note: We only use the setter with callbacks, so we don't destructure the state value
   const [, setPendingDeaths] = useState<Set<string>>(() => new Set())
+  // Also track pending deaths in a ref for synchronous access in arena transition checks
+  const pendingDeathsRef = useRef<Set<string>>(new Set())
   const currentRoundRef = useRef<number>(0)
 
   // Refs for cleanup and state access in callbacks
@@ -299,6 +301,7 @@ export function useBattleAnimation(
       setDamageTargetKey(null)
       setActiveEffects([])
       setPendingDeaths(new Set())
+      pendingDeathsRef.current = new Set()
       currentRoundRef.current = 0
       // Reset arena state
       setArenaCardA(null)
@@ -521,7 +524,9 @@ export function useBattleAnimation(
               event.defender_team_owner_id,
               event.defender_card_id
             )
-            setPendingDeaths((prev) => new Set(prev).add(defenderKey))
+            setPendingDeaths((prev: Set<string>) => new Set(prev).add(defenderKey))
+            // Also update ref for synchronous access in arena transition checks
+            pendingDeathsRef.current = new Set(pendingDeathsRef.current).add(defenderKey)
           }
 
           // Clear animation states back to idle
@@ -576,8 +581,9 @@ export function useBattleAnimation(
         }
       }
 
-      // Clear pending deaths
+      // Clear pending deaths (both state and ref)
       setPendingDeaths(new Set())
+      pendingDeathsRef.current = new Set()
     },
     [onPlaySound, getCardPosition]
   )
@@ -586,9 +592,10 @@ export function useBattleAnimation(
    * Get the front (lowest position) alive card for each team.
    * Used to determine which cards should be displayed in the central arena.
    *
+   * @param excludeDeaths - Optional set of card keys to treat as dead (for pending deaths that haven't been applied yet)
    * @returns Object with cardA and cardB - the front cards for each team, or null if no alive cards remain
    */
-  const getFrontCards = useCallback((): { cardA: ArenaCard | null; cardB: ArenaCard | null } => {
+  const getFrontCards = useCallback((excludeDeaths?: Set<string>): { cardA: ArenaCard | null; cardB: ArenaCard | null } => {
     let frontA: ArenaCard | null = null
     let frontB: ArenaCard | null = null
     let minPosA = Infinity
@@ -597,6 +604,9 @@ export function useBattleAnimation(
     cardStates.forEach((state: CardSnapshot, key: string) => {
       // Skip dead cards
       if (!state.is_alive) return
+
+      // Skip cards in the excludeDeaths set (pending deaths not yet applied to state)
+      if (excludeDeaths && excludeDeaths.has(key)) return
 
       // Parse composite key to determine team ownership
       const parts = key.split('_')
@@ -625,14 +635,15 @@ export function useBattleAnimation(
    * Check if arena cards need to change based on current front cards.
    * Compares current arena cards with what the front cards should be.
    *
+   * @param excludeDeaths - Optional set of card keys to treat as dead (for pending deaths not yet applied to state)
    * @returns Object with needsTransition flag and the new front cards
    */
-  const checkArenaTransitionNeeded = useCallback((): {
+  const checkArenaTransitionNeeded = useCallback((excludeDeaths?: Set<string>): {
     needsTransition: boolean
     newFrontA: ArenaCard | null
     newFrontB: ArenaCard | null
   } => {
-    const { cardA: newFrontA, cardB: newFrontB } = getFrontCards()
+    const { cardA: newFrontA, cardB: newFrontB } = getFrontCards(excludeDeaths)
 
     // Check if arena card A differs from front card A
     const arenaAChanged =
@@ -754,6 +765,11 @@ export function useBattleAnimation(
     const isNonAttackEvent = nextEvent.type !== 'attack'
     const isRoundTransition = nextEvent.round !== prevRound && prevRound !== 0
 
+    // Capture pending deaths BEFORE applying them, so we can pass them to arena transition check.
+    // This handles simultaneous card deaths: both cards die in the same round, and we need to
+    // transition to the next front cards for both teams atomically.
+    const deathsToExclude = new Set(pendingDeathsRef.current)
+
     // Apply pending deaths at round boundaries:
     // - When transitioning to a different round
     // - When processing non-attack events (death, advance, summary, victory)
@@ -783,7 +799,8 @@ export function useBattleAnimation(
 
     // Process attack event with full animation sequence
     // First, check if arena cards need to change (e.g., after a death)
-    const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded()
+    // Pass the captured deathsToExclude to exclude cards that died but haven't been applied to state yet
+    const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded(deathsToExclude)
 
     if (needsTransition) {
       // Arena cards need to change - perform transition before attack
@@ -910,6 +927,7 @@ export function useBattleAnimation(
     setDamageTargetKey(null)
     setActiveEffects([])
     setPendingDeaths(new Set())
+    pendingDeathsRef.current = new Set()
     currentRoundRef.current = 0
     // Reset arena state
     setArenaCardA(null)
@@ -979,6 +997,7 @@ export function useBattleAnimation(
     setDamageTargetKey(null)
     setActiveEffects([])
     setPendingDeaths(new Set())
+    pendingDeathsRef.current = new Set()
     currentRoundRef.current = 0
     // Clear arena state (will be populated by getFrontCards in future tasks)
     setArenaCardA(null)

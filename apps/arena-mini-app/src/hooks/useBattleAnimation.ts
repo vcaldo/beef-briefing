@@ -44,6 +44,21 @@ export interface ActiveBattleEffect {
 }
 
 /**
+ * Arena card reference - identifies a card currently in the arena.
+ */
+export interface ArenaCard {
+  /** The card's unique identifier */
+  cardId: number
+  /** The user ID of the team owner (player_a_id or player_b_id) */
+  teamOwnerId: number
+}
+
+/**
+ * Arena transition state - tracks the current state of arena card transitions.
+ */
+export type ArenaTransitionState = 'idle' | 'entering' | 'exiting'
+
+/**
  * Return value from useBattleAnimation hook.
  */
 export interface UseBattleAnimationReturn {
@@ -67,6 +82,12 @@ export interface UseBattleAnimationReturn {
   activeEffects: ActiveBattleEffect[]
   /** Callback to call when an effect animation completes (pass cardKey to identify which effect) */
   onEffectComplete: (cardKey: string) => void
+  /** Card currently in arena for Team A (player A's front card) */
+  arenaCardA: ArenaCard | null
+  /** Card currently in arena for Team B (player B's front card) */
+  arenaCardB: ArenaCard | null
+  /** Current state of arena card transitions */
+  arenaTransitionState: ArenaTransitionState
   /** Start or resume playback */
   play: () => void
   /** Pause playback */
@@ -237,6 +258,11 @@ export function useBattleAnimation(
   // Battle effect state (attack, damage, death animations) - supports multiple simultaneous effects
   const [activeEffects, setActiveEffects] = useState<ActiveBattleEffect[]>([])
 
+  // Arena state - tracks which cards are currently in the central arena
+  const [arenaCardA, setArenaCardA] = useState<ArenaCard | null>(null)
+  const [arenaCardB, setArenaCardB] = useState<ArenaCard | null>(null)
+  const [arenaTransitionState, setArenaTransitionState] = useState<ArenaTransitionState>('idle')
+
   // Deferred death state - cards that should die after the round completes
   // This prevents cards from greying out before their attack animation plays
   // Note: We only use the setter with callbacks, so we don't destructure the state value
@@ -272,6 +298,10 @@ export function useBattleAnimation(
       setActiveEffects([])
       setPendingDeaths(new Set())
       currentRoundRef.current = 0
+      // Reset arena state
+      setArenaCardA(null)
+      setArenaCardB(null)
+      setArenaTransitionState('idle')
     }
   }, [battleData, playerAId, playerBId])
 
@@ -681,6 +711,10 @@ export function useBattleAnimation(
     setActiveEffects([])
     setPendingDeaths(new Set())
     currentRoundRef.current = 0
+    // Reset arena state
+    setArenaCardA(null)
+    setArenaCardB(null)
+    setArenaTransitionState('idle')
   }, [battleData, playerAId, playerBId])
 
   /**
@@ -746,6 +780,10 @@ export function useBattleAnimation(
     setActiveEffects([])
     setPendingDeaths(new Set())
     currentRoundRef.current = 0
+    // Clear arena state (will be populated by getFrontCards in future tasks)
+    setArenaCardA(null)
+    setArenaCardB(null)
+    setArenaTransitionState('idle')
   }, [battleData, playerAId, playerBId])
 
   return {
@@ -759,6 +797,9 @@ export function useBattleAnimation(
     damageTargetKey,
     activeEffects,
     onEffectComplete,
+    arenaCardA,
+    arenaCardB,
+    arenaTransitionState,
     play,
     pause,
     reset,

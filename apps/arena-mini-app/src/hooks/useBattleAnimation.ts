@@ -88,6 +88,8 @@ export interface UseBattleAnimationReturn {
   arenaCardB: ArenaCard | null
   /** Current state of arena card transitions */
   arenaTransitionState: ArenaTransitionState
+  /** Get the front (lowest position) alive card for each team */
+  getFrontCards: () => { cardA: ArenaCard | null; cardB: ArenaCard | null }
   /** Start or resume playback */
   play: () => void
   /** Pause playback */
@@ -648,6 +650,45 @@ export function useBattleAnimation(
   }, [advanceToNextEvent])
 
   /**
+   * Get the front (lowest position) alive card for each team.
+   * Used to determine which cards should be displayed in the central arena.
+   *
+   * @returns Object with cardA and cardB - the front cards for each team, or null if no alive cards remain
+   */
+  const getFrontCards = useCallback((): { cardA: ArenaCard | null; cardB: ArenaCard | null } => {
+    let frontA: ArenaCard | null = null
+    let frontB: ArenaCard | null = null
+    let minPosA = Infinity
+    let minPosB = Infinity
+
+    cardStates.forEach((state: CardSnapshot, key: string) => {
+      // Skip dead cards
+      if (!state.is_alive) return
+
+      // Parse composite key to determine team ownership
+      const parts = key.split('_')
+      const teamOwnerId = parseInt(parts[0], 10)
+      const cardId = state.card_id
+
+      if (teamOwnerId === playerAId) {
+        // Team A card - check if it has a lower position than current front
+        if (state.position < minPosA) {
+          minPosA = state.position
+          frontA = { cardId, teamOwnerId }
+        }
+      } else if (teamOwnerId === playerBId) {
+        // Team B card - check if it has a lower position than current front
+        if (state.position < minPosB) {
+          minPosB = state.position
+          frontB = { cardId, teamOwnerId }
+        }
+      }
+    })
+
+    return { cardA: frontA, cardB: frontB }
+  }, [cardStates, playerAId, playerBId])
+
+  /**
    * Start or resume playback.
    */
   const play = useCallback(() => {
@@ -800,6 +841,7 @@ export function useBattleAnimation(
     arenaCardA,
     arenaCardB,
     arenaTransitionState,
+    getFrontCards,
     play,
     pause,
     reset,

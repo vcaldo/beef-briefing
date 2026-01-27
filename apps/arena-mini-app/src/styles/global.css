@@ -2689,8 +2689,10 @@ a:focus:not(:focus-visible),
 }
 
 /* Arena Card Animations */
+/* Duration is controlled by --arena-transition-duration CSS variable (set in BattlePage.tsx)
+   to scale with playback speed. Defaults to 400ms if variable not set. */
 .arena-card-entering {
-  animation: arena-card-enter 0.4s ease-out forwards;
+  animation: arena-card-enter var(--arena-transition-duration, 0.4s) ease-out forwards;
 }
 
 @keyframes arena-card-enter {
@@ -2705,7 +2707,7 @@ a:focus:not(:focus-visible),
 }
 
 .arena-card-exiting {
-  animation: arena-card-exit 0.4s ease-in forwards;
+  animation: arena-card-exit var(--arena-transition-duration, 0.4s) ease-in forwards;
 }
 
 @keyframes arena-card-exit {
@@ -2720,7 +2722,7 @@ a:focus:not(:focus-visible),
 }
 
 .arena-card-returning {
-  animation: arena-card-return 0.4s ease-in-out forwards;
+  animation: arena-card-return var(--arena-transition-duration, 0.4s) ease-in-out forwards;
 }
 
 @keyframes arena-card-return {

@@ -394,6 +394,9 @@ export function BattlePage({
         // Scale HP bar transition duration with playback speed
         // At 1x (value=1000), duration is 300ms; at 2x (value=500), duration is 150ms
         '--hp-transition-duration': `${(PLAYBACK_SPEEDS[speedIndex].value / 1000) * 300}ms`,
+        // Scale arena card enter/exit animation duration with playback speed
+        // At 1x (value=1000), duration is 400ms; at 2x (value=667), duration is ~267ms
+        '--arena-transition-duration': `${(PLAYBACK_SPEEDS[speedIndex].value / 1000) * 400}ms`,
       } as React.CSSProperties}
     >
       {/* Team B Deck - Upper Left */}

@@ -638,10 +638,26 @@ export function useBattleAnimation(
     }
 
     // Process attack event with full animation sequence
-    setCurrentEventIndex(nextIndex)
-    setCurrentPhase('highlight')
-    processPhase(nextEvent, 'highlight')
-  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration])
+    // First, check if arena cards need to change (e.g., after a death)
+    const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded()
+
+    if (needsTransition) {
+      // Arena cards need to change - perform transition before attack
+      setCurrentEventIndex(nextIndex)
+      performArenaTransition(newFrontA, newFrontB, () => {
+        // After arena transition completes, proceed to highlight phase
+        if (isPlayingRef.current) {
+          setCurrentPhase('highlight')
+          processPhase(nextEvent, 'highlight')
+        }
+      })
+    } else {
+      // No arena transition needed - proceed directly to highlight
+      setCurrentEventIndex(nextIndex)
+      setCurrentPhase('highlight')
+      processPhase(nextEvent, 'highlight')
+    }
+  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration, checkArenaTransitionNeeded, performArenaTransition])
 
   // Keep advanceToNextEvent ref in sync for use in processPhase
   // (avoids circular dependency: processPhase -> advanceToNextEvent -> processPhase)
@@ -687,6 +703,111 @@ export function useBattleAnimation(
 
     return { cardA: frontA, cardB: frontB }
   }, [cardStates, playerAId, playerBId])
+
+  /**
+   * Check if arena cards need to change based on current front cards.
+   * Compares current arena cards with what the front cards should be.
+   *
+   * @returns Object with needsTransition flag and the new front cards
+   */
+  const checkArenaTransitionNeeded = useCallback((): {
+    needsTransition: boolean
+    newFrontA: ArenaCard | null
+    newFrontB: ArenaCard | null
+  } => {
+    const { cardA: newFrontA, cardB: newFrontB } = getFrontCards()
+
+    // Check if arena card A differs from front card A
+    const arenaAChanged =
+      (arenaCardA === null && newFrontA !== null) ||
+      (arenaCardA !== null && newFrontA === null) ||
+      (arenaCardA !== null && newFrontA !== null &&
+        (arenaCardA.cardId !== newFrontA.cardId || arenaCardA.teamOwnerId !== newFrontA.teamOwnerId))
+
+    // Check if arena card B differs from front card B
+    const arenaBChanged =
+      (arenaCardB === null && newFrontB !== null) ||
+      (arenaCardB !== null && newFrontB === null) ||
+      (arenaCardB !== null && newFrontB !== null &&
+        (arenaCardB.cardId !== newFrontB.cardId || arenaCardB.teamOwnerId !== newFrontB.teamOwnerId))
+
+    return {
+      needsTransition: arenaAChanged || arenaBChanged,
+      newFrontA,
+      newFrontB,
+    }
+  }, [getFrontCards, arenaCardA, arenaCardB])
+
+  /**
+   * Perform arena card transition sequence.
+   * Sequence: exit animation (if cards in arena) → update arena cards → enter animation → callback
+   *
+   * @param newFrontA - New front card for Team A (or null if none)
+   * @param newFrontB - New front card for Team B (or null if none)
+   * @param onComplete - Callback to run after transition completes
+   */
+  const performArenaTransition = useCallback(
+    (
+      newFrontA: ArenaCard | null,
+      newFrontB: ArenaCard | null,
+      onComplete: () => void
+    ) => {
+      // Check if we have existing arena cards that need to exit
+      const hasExistingCards = arenaCardA !== null || arenaCardB !== null
+
+      if (hasExistingCards) {
+        // Phase 1: Exit animation for current arena cards
+        setArenaTransitionState('exiting')
+        setCurrentPhase('arena_transition')
+
+        phaseTimeoutRef.current = setTimeout(() => {
+          // Phase 2: Update arena cards after exit animation
+          setArenaCardA(newFrontA)
+          setArenaCardB(newFrontB)
+
+          // Check if we have new cards to enter
+          const hasNewCards = newFrontA !== null || newFrontB !== null
+
+          if (hasNewCards) {
+            // Phase 3: Enter animation for new arena cards
+            setArenaTransitionState('entering')
+
+            phaseTimeoutRef.current = setTimeout(() => {
+              // Transition complete
+              setArenaTransitionState('idle')
+              onComplete()
+            }, getScaledDuration(ANIMATION_DURATIONS.arenaEnter))
+          } else {
+            // No new cards, transition complete
+            setArenaTransitionState('idle')
+            onComplete()
+          }
+        }, getScaledDuration(ANIMATION_DURATIONS.arenaExit))
+      } else {
+        // No existing arena cards - skip exit, go directly to enter
+        setArenaCardA(newFrontA)
+        setArenaCardB(newFrontB)
+
+        const hasNewCards = newFrontA !== null || newFrontB !== null
+
+        if (hasNewCards) {
+          // Enter animation for new arena cards
+          setArenaTransitionState('entering')
+          setCurrentPhase('arena_transition')
+
+          phaseTimeoutRef.current = setTimeout(() => {
+            setArenaTransitionState('idle')
+            onComplete()
+          }, getScaledDuration(ANIMATION_DURATIONS.arenaEnter))
+        } else {
+          // No cards at all, just complete
+          setArenaTransitionState('idle')
+          onComplete()
+        }
+      }
+    },
+    [arenaCardA, arenaCardB, getScaledDuration]
+  )
 
   /**
    * Start or resume playback.

@@ -583,89 +583,6 @@ export function useBattleAnimation(
   )
 
   /**
-   * Advance to the next event in the sequence.
-   */
-  const advanceToNextEvent = useCallback(() => {
-    if (!battleData || !isPlayingRef.current) return
-
-    const nextIndex = currentEventIndexRef.current + 1
-
-    if (nextIndex >= battleData.events.length) {
-      // All events processed - apply any remaining pending deaths
-      setPendingDeaths((currentPendingDeaths: Set<string>) => {
-        if (currentPendingDeaths.size > 0) {
-          applyPendingDeaths(currentPendingDeaths)
-        }
-        return new Set()
-      })
-      setIsPlaying(false)
-      isPlayingRef.current = false
-      setIsComplete(true)
-      setCurrentPhase('idle')
-      return
-    }
-
-    const nextEvent = battleData.events[nextIndex]
-    const prevRound = currentRoundRef.current
-    const isNonAttackEvent = nextEvent.type !== 'attack'
-    const isRoundTransition = nextEvent.round !== prevRound && prevRound !== 0
-
-    // Apply pending deaths at round boundaries:
-    // - When transitioning to a different round
-    // - When processing non-attack events (death, advance, summary, victory)
-    if (isNonAttackEvent || isRoundTransition) {
-      setPendingDeaths((currentPendingDeaths: Set<string>) => {
-        if (currentPendingDeaths.size > 0) {
-          applyPendingDeaths(currentPendingDeaths)
-        }
-        return new Set()
-      })
-    }
-
-    // Update current round tracking
-    currentRoundRef.current = nextEvent.round
-
-    // Skip animation for non-attack events (death, advance, summary, victory)
-    // These are informational - the visual state is handled via pending deaths
-    if (isNonAttackEvent) {
-      setCurrentEventIndex(nextIndex)
-      setCurrentPhase('idle')
-      // Small gap then advance to next event
-      phaseTimeoutRef.current = setTimeout(() => {
-        advanceToNextEventRef.current?.()
-      }, getScaledDuration(ANIMATION_DURATIONS.eventGap))
-      return
-    }
-
-    // Process attack event with full animation sequence
-    // First, check if arena cards need to change (e.g., after a death)
-    const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded()
-
-    if (needsTransition) {
-      // Arena cards need to change - perform transition before attack
-      setCurrentEventIndex(nextIndex)
-      performArenaTransition(newFrontA, newFrontB, () => {
-        // After arena transition completes, proceed to highlight phase
-        if (isPlayingRef.current) {
-          setCurrentPhase('highlight')
-          processPhase(nextEvent, 'highlight')
-        }
-      })
-    } else {
-      // No arena transition needed - proceed directly to highlight
-      setCurrentEventIndex(nextIndex)
-      setCurrentPhase('highlight')
-      processPhase(nextEvent, 'highlight')
-    }
-  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration, checkArenaTransitionNeeded, performArenaTransition])
-
-  // Keep advanceToNextEvent ref in sync for use in processPhase
-  // (avoids circular dependency: processPhase -> advanceToNextEvent -> processPhase)
-  useEffect(() => {
-    advanceToNextEventRef.current = advanceToNextEvent
-  }, [advanceToNextEvent])
-
-  /**
    * Get the front (lowest position) alive card for each team.
    * Used to determine which cards should be displayed in the central arena.
    *
@@ -810,6 +727,122 @@ export function useBattleAnimation(
   )
 
   /**
+   * Advance to the next event in the sequence.
+   */
+  const advanceToNextEvent = useCallback(() => {
+    if (!battleData || !isPlayingRef.current) return
+
+    const nextIndex = currentEventIndexRef.current + 1
+
+    if (nextIndex >= battleData.events.length) {
+      // All events processed - apply any remaining pending deaths
+      setPendingDeaths((currentPendingDeaths: Set<string>) => {
+        if (currentPendingDeaths.size > 0) {
+          applyPendingDeaths(currentPendingDeaths)
+        }
+        return new Set()
+      })
+      setIsPlaying(false)
+      isPlayingRef.current = false
+      setIsComplete(true)
+      setCurrentPhase('idle')
+      return
+    }
+
+    const nextEvent = battleData.events[nextIndex]
+    const prevRound = currentRoundRef.current
+    const isNonAttackEvent = nextEvent.type !== 'attack'
+    const isRoundTransition = nextEvent.round !== prevRound && prevRound !== 0
+
+    // Apply pending deaths at round boundaries:
+    // - When transitioning to a different round
+    // - When processing non-attack events (death, advance, summary, victory)
+    if (isNonAttackEvent || isRoundTransition) {
+      setPendingDeaths((currentPendingDeaths: Set<string>) => {
+        if (currentPendingDeaths.size > 0) {
+          applyPendingDeaths(currentPendingDeaths)
+        }
+        return new Set()
+      })
+    }
+
+    // Update current round tracking
+    currentRoundRef.current = nextEvent.round
+
+    // Skip animation for non-attack events (death, advance, summary, victory)
+    // These are informational - the visual state is handled via pending deaths
+    if (isNonAttackEvent) {
+      setCurrentEventIndex(nextIndex)
+      setCurrentPhase('idle')
+      // Small gap then advance to next event
+      phaseTimeoutRef.current = setTimeout(() => {
+        advanceToNextEventRef.current?.()
+      }, getScaledDuration(ANIMATION_DURATIONS.eventGap))
+      return
+    }
+
+    // Process attack event with full animation sequence
+    // First, check if arena cards need to change (e.g., after a death)
+    const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded()
+
+    if (needsTransition) {
+      // Arena cards need to change - perform transition before attack
+      setCurrentEventIndex(nextIndex)
+      performArenaTransition(newFrontA, newFrontB, () => {
+        // After arena transition completes, proceed to highlight phase
+        if (isPlayingRef.current) {
+          setCurrentPhase('highlight')
+          processPhase(nextEvent, 'highlight')
+        }
+      })
+    } else {
+      // No arena transition needed - proceed directly to highlight
+      setCurrentEventIndex(nextIndex)
+      setCurrentPhase('highlight')
+      processPhase(nextEvent, 'highlight')
+    }
+  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration, checkArenaTransitionNeeded, performArenaTransition])
+
+  // Keep advanceToNextEvent ref in sync for use in processPhase
+  // (avoids circular dependency: processPhase -> advanceToNextEvent -> processPhase)
+  useEffect(() => {
+    advanceToNextEventRef.current = advanceToNextEvent
+  }, [advanceToNextEvent])
+
+  /**
+   * Initialize arena cards at battle start.
+   * Gets the front cards and performs an enter animation before the first event.
+   *
+   * @param onComplete - Callback to run after initialization completes
+   */
+  const initializeArenaCards = useCallback(
+    (onComplete: () => void) => {
+      const { cardA, cardB } = getFrontCards()
+
+      // Set initial arena cards
+      setArenaCardA(cardA)
+      setArenaCardB(cardB)
+
+      // If we have cards, play enter animation
+      const hasCards = cardA !== null || cardB !== null
+
+      if (hasCards) {
+        setArenaTransitionState('entering')
+        setCurrentPhase('arena_transition')
+
+        phaseTimeoutRef.current = setTimeout(() => {
+          setArenaTransitionState('idle')
+          onComplete()
+        }, getScaledDuration(ANIMATION_DURATIONS.arenaEnter))
+      } else {
+        // No cards to display, just complete
+        onComplete()
+      }
+    },
+    [getFrontCards, getScaledDuration]
+  )
+
+  /**
    * Start or resume playback.
    */
   const play = useCallback(() => {
@@ -818,18 +851,23 @@ export function useBattleAnimation(
     setIsPlaying(true)
     isPlayingRef.current = true
 
-    // If we haven't started yet, advance to first event
+    // If we haven't started yet, initialize arena and advance to first event
     if (currentEventIndexRef.current === -1) {
       // Small delay before starting
       phaseTimeoutRef.current = setTimeout(() => {
-        advanceToNextEvent()
+        // Initialize arena cards with enter animation, then proceed to first event
+        initializeArenaCards(() => {
+          if (isPlayingRef.current) {
+            advanceToNextEvent()
+          }
+        })
       }, ANIMATION_DURATIONS.playStart)
     } else if (currentPhase === 'idle') {
       // Resume from current position
       advanceToNextEvent()
     }
     // If in middle of a phase, it will continue automatically
-  }, [battleData, isComplete, currentPhase, advanceToNextEvent])
+  }, [battleData, isComplete, currentPhase, advanceToNextEvent, initializeArenaCards])
 
   /**
    * Pause playback.

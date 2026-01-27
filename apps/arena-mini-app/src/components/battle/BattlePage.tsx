@@ -123,6 +123,9 @@ export function BattlePage({
     damageTargetKey,
     activeEffects,
     onEffectComplete,
+    arenaCardA,
+    arenaCardB,
+    arenaTransitionState,
     play,
     pause,
     reset,
@@ -307,61 +310,6 @@ export function BattlePage({
     (battleData.is_draw && false) // No winner on draw
   const isDraw = battleData.is_draw
 
-  // Render a battle card
-  const renderBattleCard = (
-    cardId: number,
-    teamOwnerId: number,
-    originalCard: {
-      name: string
-      photo_url?: string
-      username?: string
-      card_image_url?: string
-      placeholder_positions?: PlaceholderPositions | null
-    }
-  ) => {
-    // Use composite key to look up state (handles same card on both teams)
-    const cardKey = getCardKey(teamOwnerId, cardId)
-    const state = cardStates.get(cardKey)
-    if (!state) return null
-
-    // Get animation state from the animation state machine
-    const animState = animationStates.get(cardKey)
-
-    // Check if this card is currently taking damage and should show damage number
-    const isDamageTarget = damageTargetKey === cardKey
-    const damageToShow =
-      isDamageTarget && currentDamage !== null ? currentDamage : undefined
-
-    // Ref callback to register card element for effect positioning
-    const setCardRef = (el: HTMLDivElement | null) => {
-      if (el) {
-        cardRefsMap.current.set(cardKey, el)
-      } else {
-        cardRefsMap.current.delete(cardKey)
-      }
-    }
-
-    return (
-      <div key={cardId} className="battle-card-wrapper" ref={setCardRef}>
-        <CompactCard
-          imageUrl={originalCard.card_image_url || ''}
-          positions={originalCard.placeholder_positions}
-          currentStats={{
-            atk: state.atk,
-            hp: state.hp,
-            maxHp: state.max_hp,
-          }}
-          animationState={animState}
-          damageNumber={damageToShow}
-          isDead={!state.is_alive}
-          cardName={state.name}
-          cardId={cardId}
-          className="battle-compact-card"
-        />
-      </div>
-    )
-  }
-
   // Get event message text
   const getEventMessage = (event: CombatEvent): string => {
     if (event.message) return event.message
@@ -384,43 +332,189 @@ export function BattlePage({
     }
   }
 
+  // Player labels
+  const playerALabel = userId === battleData.player_a_id ? 'You' : battleData.player_a_name
+  const playerBLabel = userId === battleData.player_b_id ? 'You' : battleData.player_b_name
+
+  // Check if a card is currently in the arena
+  const isCardInArena = (cardId: number, teamOwnerId: number): boolean => {
+    if (arenaCardA && arenaCardA.cardId === cardId && arenaCardA.teamOwnerId === teamOwnerId) {
+      return true
+    }
+    if (arenaCardB && arenaCardB.cardId === cardId && arenaCardB.teamOwnerId === teamOwnerId) {
+      return true
+    }
+    return false
+  }
+
+  // Render a deck card (small version in the deck strip)
+  const renderDeckCard = (
+    cardId: number,
+    teamOwnerId: number,
+    originalCard: {
+      name: string
+      photo_url?: string
+      username?: string
+      card_image_url?: string
+      placeholder_positions?: PlaceholderPositions | null
+    }
+  ) => {
+    const cardKey = getCardKey(teamOwnerId, cardId)
+    const state = cardStates.get(cardKey)
+    if (!state) return null
+
+    // If card is in arena, show placeholder
+    if (isCardInArena(cardId, teamOwnerId)) {
+      return <div key={cardId} className="deck-card-placeholder" />
+    }
+
+    // Otherwise render compact deck card
+    return (
+      <div key={cardId} className={`deck-compact-card ${!state.is_alive ? 'dead' : ''}`}>
+        <CompactCard
+          imageUrl={originalCard.card_image_url || ''}
+          positions={originalCard.placeholder_positions}
+          currentStats={{
+            atk: state.atk,
+            hp: state.hp,
+            maxHp: state.max_hp,
+          }}
+          isDead={!state.is_alive}
+          cardName={state.name}
+          cardId={cardId}
+        />
+      </div>
+    )
+  }
+
   return (
-    <div className="battle-page">
-      {/* Battle Arena */}
+    <div
+      className="battle-page arena-layout"
+      style={{
+        // Scale HP bar transition duration with playback speed
+        // At 1x (value=1000), duration is 300ms; at 2x (value=500), duration is 150ms
+        '--hp-transition-duration': `${(PLAYBACK_SPEEDS[speedIndex].value / 1000) * 300}ms`,
+      } as React.CSSProperties}
+    >
+      {/* Team B Deck - Upper Left */}
+      <div className="battle-deck battle-deck-b">
+        <div className="deck-label">{playerBLabel}</div>
+        <div className="deck-cards">
+          {(battleData.team_b_final?.cards ?? []).map((card) =>
+            renderDeckCard(card.card_id, battleData.player_b_id, card)
+          )}
+        </div>
+      </div>
+
+      {/* Central Battle Arena */}
       <div
         ref={battleArenaRef}
-        className="battle-arena battle-effect-container page-bg page-bg--arena"
-        style={{
-          // Scale HP bar transition duration with playback speed
-          // At 1x (value=1000), duration is 300ms; at 2x (value=500), duration is 150ms
-          '--hp-transition-duration': `${(PLAYBACK_SPEEDS[speedIndex].value / 1000) * 300}ms`,
-        } as React.CSSProperties}
+        className="battle-arena-center battle-effect-container"
       >
-        {/* Team B (left side) */}
-        <div className="battle-team team-b">
-          <div className="team-label">
-            {userId === battleData.player_b_id ? 'You' : battleData.player_b_name}
-          </div>
-          <div className="team-cards">
-            {(battleData.team_b_final?.cards ?? []).map((card) =>
-              renderBattleCard(card.card_id, battleData.player_b_id, card)
-            )}
-          </div>
-        </div>
+        {/* Team B's arena card (left) */}
+        {arenaCardB && (() => {
+          const cardKey = getCardKey(arenaCardB.teamOwnerId, arenaCardB.cardId)
+          const state = cardStates.get(cardKey)
+          const animState = animationStates.get(cardKey)
+          const originalCard = battleData.team_b_final?.cards?.find(c => c.card_id === arenaCardB.cardId)
+          if (!state || !originalCard) return null
 
-        {/* Team A (right side) */}
-        <div className="battle-team team-a">
-          <div className="team-label">
-            {userId === battleData.player_a_id ? 'You' : battleData.player_a_name}
-          </div>
-          <div className="team-cards">
-            {(battleData.team_a_final?.cards ?? []).map((card) =>
-              renderBattleCard(card.card_id, battleData.player_a_id, card)
-            )}
-          </div>
-        </div>
+          // Check if this card is currently taking damage
+          const isDamageTarget = damageTargetKey === cardKey
+          const damageToShow = isDamageTarget && currentDamage !== null ? currentDamage : undefined
 
-        {/* Battle Effects - renders animated effects at card positions (supports multiple simultaneous effects) */}
+          // Build animation class
+          const transitionClass = arenaTransitionState === 'entering' ? 'arena-card-entering'
+            : arenaTransitionState === 'exiting' ? 'arena-card-exiting' : ''
+
+          // Ref callback to register card element
+          const setCardRef = (el: HTMLDivElement | null) => {
+            if (el) {
+              cardRefsMap.current.set(cardKey, el)
+            } else {
+              cardRefsMap.current.delete(cardKey)
+            }
+          }
+
+          return (
+            <div
+              key={cardKey}
+              className={`arena-card arena-card-left ${transitionClass}`}
+              ref={setCardRef}
+            >
+              <CompactCard
+                imageUrl={originalCard.card_image_url || ''}
+                positions={originalCard.placeholder_positions}
+                currentStats={{
+                  atk: state.atk,
+                  hp: state.hp,
+                  maxHp: state.max_hp,
+                }}
+                animationState={animState}
+                damageNumber={damageToShow}
+                isDead={!state.is_alive}
+                cardName={state.name}
+                cardId={arenaCardB.cardId}
+                className="arena-compact-card"
+              />
+            </div>
+          )
+        })()}
+
+        {/* VS Indicator */}
+        {arenaCardA && arenaCardB && <div className="arena-vs">VS</div>}
+
+        {/* Team A's arena card (right) */}
+        {arenaCardA && (() => {
+          const cardKey = getCardKey(arenaCardA.teamOwnerId, arenaCardA.cardId)
+          const state = cardStates.get(cardKey)
+          const animState = animationStates.get(cardKey)
+          const originalCard = battleData.team_a_final?.cards?.find(c => c.card_id === arenaCardA.cardId)
+          if (!state || !originalCard) return null
+
+          // Check if this card is currently taking damage
+          const isDamageTarget = damageTargetKey === cardKey
+          const damageToShow = isDamageTarget && currentDamage !== null ? currentDamage : undefined
+
+          // Build animation class
+          const transitionClass = arenaTransitionState === 'entering' ? 'arena-card-entering'
+            : arenaTransitionState === 'exiting' ? 'arena-card-exiting' : ''
+
+          // Ref callback to register card element
+          const setCardRef = (el: HTMLDivElement | null) => {
+            if (el) {
+              cardRefsMap.current.set(cardKey, el)
+            } else {
+              cardRefsMap.current.delete(cardKey)
+            }
+          }
+
+          return (
+            <div
+              key={cardKey}
+              className={`arena-card arena-card-right ${transitionClass}`}
+              ref={setCardRef}
+            >
+              <CompactCard
+                imageUrl={originalCard.card_image_url || ''}
+                positions={originalCard.placeholder_positions}
+                currentStats={{
+                  atk: state.atk,
+                  hp: state.hp,
+                  maxHp: state.max_hp,
+                }}
+                animationState={animState}
+                damageNumber={damageToShow}
+                isDead={!state.is_alive}
+                cardName={state.name}
+                cardId={arenaCardA.cardId}
+                className="arena-compact-card"
+              />
+            </div>
+          )
+        })()}
+
+        {/* Battle Effects - renders animated effects at card positions */}
         {activeEffects.map((effect) => (
           <BattleEffect
             key={`${effect.type}-${effect.cardKey}`}
@@ -432,8 +526,19 @@ export function BattlePage({
         ))}
       </div>
 
-      {/* Event Log */}
+      {/* Team A Deck - Bottom Right */}
+      <div className="battle-deck battle-deck-a">
+        <div className="deck-label">{playerALabel}</div>
+        <div className="deck-cards">
+          {(battleData.team_a_final?.cards ?? []).map((card) =>
+            renderDeckCard(card.card_id, battleData.player_a_id, card)
+          )}
+        </div>
+      </div>
+
+      {/* Battle Log - Bottom 25% */}
       <BattleLog
+        className="battle-log-compact"
         combats={battleData.combats}
         events={battleData.events}
         currentEventIndex={currentEventIndex}

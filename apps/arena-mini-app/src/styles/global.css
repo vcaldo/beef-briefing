@@ -2535,7 +2535,8 @@ a:focus:not(:focus-visible),
     "arena"
     "deck-a"
     "log";
-  height: 100vh;
+  min-height: 100vh; /* Fallback for browsers without dvh support */
+  height: 100dvh; /* Dynamic viewport height - adapts to mobile address bar */
   padding-bottom: var(--tab-bar-height);
   background: var(--arena-bg-dark);
   overflow: hidden;

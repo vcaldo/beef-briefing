@@ -4662,6 +4662,11 @@ a:focus:not(:focus-visible),
     gap: 12px;
     padding: 8px;
   }
+
+  /* Further scale down arena cards from 0.45 to 0.38 (114x171px) on small phones */
+  .arena-compact-card {
+    --arena-scale: 0.38;
+  }
 }
 
 /* Touch target minimum size for accessibility */

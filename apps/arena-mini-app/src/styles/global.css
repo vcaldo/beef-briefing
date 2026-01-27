@@ -4672,6 +4672,11 @@ a:focus:not(:focus-visible),
   .arena-compact-card {
     --arena-scale: 0.38;
   }
+
+  /* Further scale down VS indicator from 24px to 20px on small phones */
+  .arena-vs {
+    font-size: 20px;
+  }
 }
 
 /* Touch target minimum size for accessibility */

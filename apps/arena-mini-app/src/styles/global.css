@@ -4653,6 +4653,16 @@ a:focus:not(:focus-visible),
   .arena-vs {
     font-size: 24px;
   }
+
+  /* Reduce deck padding and label font on medium phones */
+  .battle-deck-a,
+  .battle-deck-b {
+    padding: 6px 10px;
+  }
+
+  .deck-label {
+    font-size: 10px;
+  }
 }
 
 /* Mobile-specific battle adjustments for small phones (360px and below) */

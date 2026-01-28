@@ -4693,6 +4693,12 @@ a:focus:not(:focus-visible),
     --deck-scale: 0.18;
   }
 
+  /* Scale down deck card placeholder to match deck cards (54x81px) on small phones */
+  .deck-card-placeholder {
+    width: 54px;
+    height: 81px;
+  }
+
   /* Further reduce deck padding from 6px 10px to 4px 8px on smallest phones */
   .battle-deck-a,
   .battle-deck-b {

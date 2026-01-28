@@ -126,7 +126,7 @@ export function BattlePage({
     onEffectComplete,
     arenaCardA,
     arenaCardB,
-    arenaTransitionState,
+    transitioningCards,
     play,
     pause,
     reset,
@@ -427,9 +427,9 @@ export function BattlePage({
           const isDamageTarget = damageTargetKey === cardKey
           const damageToShow = isDamageTarget && currentDamage !== null ? currentDamage : undefined
 
-          // Build animation class
-          const transitionClass = arenaTransitionState === 'entering' ? 'arena-card-entering'
-            : arenaTransitionState === 'exiting' ? 'arena-card-exiting' : ''
+          // Build animation class - only animate if this specific card is transitioning
+          const transitionClass = transitioningCards.exiting.has(cardKey) ? 'arena-card-exiting'
+            : transitioningCards.entering.has(cardKey) ? 'arena-card-entering' : ''
 
           // Ref callback to register card element
           const setCardRef = (el: HTMLDivElement | null) => {
@@ -480,9 +480,9 @@ export function BattlePage({
           const isDamageTarget = damageTargetKey === cardKey
           const damageToShow = isDamageTarget && currentDamage !== null ? currentDamage : undefined
 
-          // Build animation class
-          const transitionClass = arenaTransitionState === 'entering' ? 'arena-card-entering'
-            : arenaTransitionState === 'exiting' ? 'arena-card-exiting' : ''
+          // Build animation class - only animate if this specific card is transitioning
+          const transitionClass = transitioningCards.exiting.has(cardKey) ? 'arena-card-exiting'
+            : transitioningCards.entering.has(cardKey) ? 'arena-card-entering' : ''
 
           // Ref callback to register card element
           const setCardRef = (el: HTMLDivElement | null) => {

@@ -68,6 +68,7 @@ export type EventAnimationPhase =
   | 'attack'
   | 'damage'
   | 'complete'
+  | 'death_animation'
 
 // =============================================================================
 // ANIMATION DURATIONS
@@ -121,6 +122,9 @@ export const ANIMATION_DURATIONS = {
 
   /** Arena card exit animation duration (scale down from arena back to deck) */
   arenaExit: 400,
+
+  /** Death effect animation duration (9 frames × 70ms per frame) */
+  deathEffect: 630,
 } as const
 
 /**

@@ -2642,7 +2642,7 @@ a:focus:not(:focus-visible),
   align-items: center;
   gap: 32px;
   padding: 16px;
-  background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
+  background: transparent;
   position: relative;
 }
 

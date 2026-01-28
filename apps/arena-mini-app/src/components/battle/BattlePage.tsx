@@ -390,7 +390,7 @@ export function BattlePage({
 
   return (
     <div
-      className="battle-page arena-layout"
+      className="battle-page arena-layout page-bg page-bg--arena"
       style={{
         // Scale HP bar transition duration with playback speed
         // At 1x (value=1000), duration is 300ms; at 2x (value=500), duration is 150ms

@@ -794,12 +794,54 @@ export function useBattleAnimation(
   )
 
   /**
+   * Handle completion of death animation phase.
+   * Called after death effects have finished playing, before arena transition.
+   *
+   * @param nextEvent - The next event to process after transition
+   * @param nextIndex - Index of the next event
+   * @param deathsToExclude - Card keys that died (for arena transition check)
+   */
+  const handleDeathAnimationComplete = useCallback((
+    nextEvent: BattleEvent,
+    nextIndex: number,
+    deathsToExclude: Set<string>
+  ) => {
+    const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded(deathsToExclude)
+
+    if (nextEvent.type !== 'attack') {
+      // Non-attack event - skip animation, just advance
+      setCurrentEventIndex(nextIndex)
+      setCurrentPhase('idle')
+      phaseTimeoutRef.current = setTimeout(() => {
+        advanceToNextEventRef.current?.()
+      }, getScaledDuration(ANIMATION_DURATIONS.eventGap))
+      return
+    }
+
+    // Attack event - handle arena transition if needed
+    if (needsTransition) {
+      setCurrentEventIndex(nextIndex)
+      performArenaTransition(newFrontA, newFrontB, () => {
+        if (isPlayingRef.current) {
+          setCurrentPhase('highlight')
+          processPhase(nextEvent, 'highlight')
+        }
+      })
+    } else {
+      setCurrentEventIndex(nextIndex)
+      setCurrentPhase('highlight')
+      processPhase(nextEvent, 'highlight')
+    }
+  }, [checkArenaTransitionNeeded, performArenaTransition, processPhase, getScaledDuration])
+
+  /**
    * Complete the battle after all events have been processed.
    * Handles final arena transition for dead cards exiting before showing victory.
    */
   const completeBattle = useCallback(() => {
     // Capture pending deaths to pass to arena transition check
     const deathsToExclude = new Set(pendingDeathsRef.current)
+    const hasDeaths = deathsToExclude.size > 0
 
     // Apply any remaining pending deaths
     setPendingDeaths((currentPendingDeaths: Set<string>) => {
@@ -809,26 +851,38 @@ export function useBattleAnimation(
       return new Set()
     })
 
-    // Check if final arena transition is needed (dead cards should exit)
-    const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded(deathsToExclude)
+    // Helper to finalize the battle after any animations complete
+    const finalizeBattle = () => {
+      // Check if final arena transition is needed (dead cards should exit)
+      const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded(deathsToExclude)
 
-    if (needsTransition) {
-      // Perform final arena transition before marking complete
-      performArenaTransition(newFrontA, newFrontB, () => {
-        // Now we can mark battle as complete
+      if (needsTransition) {
+        // Perform final arena transition before marking complete
+        performArenaTransition(newFrontA, newFrontB, () => {
+          // Now we can mark battle as complete
+          setIsPlaying(false)
+          isPlayingRef.current = false
+          setIsComplete(true)
+          setCurrentPhase('idle')
+        })
+      } else {
+        // No transition needed, mark complete immediately
         setIsPlaying(false)
         isPlayingRef.current = false
         setIsComplete(true)
         setCurrentPhase('idle')
-      })
-    } else {
-      // No transition needed, mark complete immediately
-      setIsPlaying(false)
-      isPlayingRef.current = false
-      setIsComplete(true)
-      setCurrentPhase('idle')
+      }
     }
-  }, [applyPendingDeaths, checkArenaTransitionNeeded, performArenaTransition])
+
+    // If there were deaths, wait for death animation before final transition
+    if (hasDeaths) {
+      setCurrentPhase('death_animation')
+      phaseTimeoutRef.current = setTimeout(finalizeBattle,
+        getScaledDuration(ANIMATION_DURATIONS.deathEffect))
+    } else {
+      finalizeBattle()
+    }
+  }, [applyPendingDeaths, checkArenaTransitionNeeded, performArenaTransition, getScaledDuration])
 
   /**
    * Advance to the next event in the sequence.
@@ -853,21 +907,31 @@ export function useBattleAnimation(
     // This handles simultaneous card deaths: both cards die in the same round, and we need to
     // transition to the next front cards for both teams atomically.
     const deathsToExclude = new Set(pendingDeathsRef.current)
+    const hasDeaths = deathsToExclude.size > 0
 
-    // Apply pending deaths at round boundaries:
-    // - When transitioning to a different round
-    // - When processing non-attack events (death, advance, summary, victory)
-    if (isNonAttackEvent || isRoundTransition) {
+    // Update current round tracking
+    currentRoundRef.current = nextEvent.round
+
+    // If there are deaths at round boundary, wait for death animation before transitioning
+    if (hasDeaths && (isNonAttackEvent || isRoundTransition)) {
+      // Apply pending deaths (card greys out, death effect starts)
       setPendingDeaths((currentPendingDeaths: Set<string>) => {
         if (currentPendingDeaths.size > 0) {
           applyPendingDeaths(currentPendingDeaths)
         }
         return new Set()
       })
+
+      // Wait for death animation to complete before arena transition
+      setCurrentPhase('death_animation')
+      phaseTimeoutRef.current = setTimeout(() => {
+        handleDeathAnimationComplete(nextEvent, nextIndex, deathsToExclude)
+      }, getScaledDuration(ANIMATION_DURATIONS.deathEffect))
+
+      return  // handleDeathAnimationComplete will continue the flow
     }
 
-    // Update current round tracking
-    currentRoundRef.current = nextEvent.round
+    // No deaths to handle - proceed with normal flow
 
     // Skip animation for non-attack events (death, advance, summary, victory)
     // These are informational - the visual state is handled via pending deaths
@@ -902,7 +966,7 @@ export function useBattleAnimation(
       setCurrentPhase('highlight')
       processPhase(nextEvent, 'highlight')
     }
-  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration, checkArenaTransitionNeeded, performArenaTransition, completeBattle])
+  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration, checkArenaTransitionNeeded, performArenaTransition, completeBattle, handleDeathAnimationComplete])
 
   // Keep advanceToNextEvent ref in sync for use in processPhase
   // (avoids circular dependency: processPhase -> advanceToNextEvent -> processPhase)
@@ -1017,6 +1081,13 @@ export function useBattleAnimation(
           }
         }
       }, remainingDuration)
+    } else if (currentPhase === 'death_animation') {
+      // Resuming during death animation - reschedule the completion
+      // Use full duration as we don't track partial progress
+      phaseTimeoutRef.current = setTimeout(() => {
+        if (!isPlayingRef.current) return
+        advanceToNextEvent()
+      }, getScaledDuration(ANIMATION_DURATIONS.deathEffect))
     } else if (currentPhase === 'idle') {
       // Resume from current position
       advanceToNextEvent()

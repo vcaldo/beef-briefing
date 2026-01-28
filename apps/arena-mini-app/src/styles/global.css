@@ -2529,7 +2529,7 @@ a:focus:not(:focus-visible),
 /* Override default battle-page for arena layout */
 .battle-page.arena-layout {
   display: grid;
-  grid-template-rows: auto 1fr auto 25%;
+  grid-template-rows: auto 1fr auto 30%;
   grid-template-areas:
     "deck-b"
     "arena"
@@ -2578,13 +2578,13 @@ a:focus:not(:focus-visible),
   gap: 4px;
 }
 
-/* Deck compact card - Scale 0.16 from 300x450 base
-   Visual size: 48x72px
+/* Deck compact card - Scale 0.22 from 300x450 base
+   Visual size: 66x99px
    Margin formula: size * (scale - 1) / 2 */
 .deck-compact-card {
   width: 300px;
   height: 450px;
-  --deck-scale: 0.16;
+  --deck-scale: 0.22;
   transform: scale(var(--deck-scale));
   transform-origin: center;
   /* Collapse layout box: 300 * (0.16 - 1) / 2 = -126, 450 * (0.16 - 1) / 2 = -189 */
@@ -2599,10 +2599,10 @@ a:focus:not(:focus-visible),
 }
 
 /* Placeholder for cards currently in arena
-   Visual size matches deck-compact-card: 48x72px */
+   Visual size matches deck-compact-card: 66x99px */
 .deck-card-placeholder {
-  width: 48px;
-  height: 72px;
+  width: 66px;
+  height: 99px;
   border: 2px dashed rgba(255, 255, 255, 0.2);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.05);

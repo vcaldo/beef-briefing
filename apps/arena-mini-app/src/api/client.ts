@@ -4,6 +4,7 @@
  */
 
 import { BaseApiClient } from '@beef-briefing/shared-mini-app/api'
+import type { AuthResponse } from '@beef-briefing/shared-mini-app/types'
 import type {
   Match,
   MatchesResponse,
@@ -91,6 +92,47 @@ interface ProfileApiResponse {
 class ArenaApiClient extends BaseApiClient {
   constructor(baseUrl?: string) {
     super(baseUrl || import.meta.env.VITE_API_URL || '')
+  }
+
+  // =============================================================================
+  // AUTHENTICATION (Games API)
+  // =============================================================================
+
+  /**
+   * Authenticate with Telegram Games API signature.
+   * Alternative to authenticate() for game-launched Mini Apps.
+   *
+   * @param params - Game authentication parameters
+   * @param params.chat_id - The chat ID where the game was launched
+   * @param params.user_id - The user ID of the player
+   * @param params.match_id - Optional match ID to join specific match
+   * @param params.ts - Timestamp from game launch
+   * @param params.sig - Signature from Telegram Games API
+   * @returns User info and JWT token
+   */
+  async authenticateGame(params: {
+    chat_id: number
+    user_id: number
+    match_id?: string
+    ts: number
+    sig: string
+  }): Promise<AuthResponse> {
+    const response = await fetch(`${this.baseUrl}/api/v1/mini-app/auth/game`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Authentication failed' }))
+      throw new Error(errorData.error || errorData.detail || 'Game authentication failed')
+    }
+
+    const data: AuthResponse = await response.json()
+    this.token = data.token
+    this.chatId = data.chat_id ?? null
+    this.isAdmin = data.is_admin ?? false
+    return data
   }
 
   // =============================================================================

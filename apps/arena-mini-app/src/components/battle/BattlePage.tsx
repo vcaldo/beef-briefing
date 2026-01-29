@@ -108,6 +108,21 @@ export function BattlePage({
     continuousRate: 3,
   })
 
+  // Resize particle canvas to match viewport
+  useEffect(() => {
+    const resizeCanvas = () => {
+      const canvas = particleCanvasRef.current
+      if (canvas) {
+        canvas.width = window.innerWidth
+        canvas.height = window.innerHeight
+      }
+    }
+
+    resizeCanvas()
+    window.addEventListener('resize', resizeCanvas)
+    return () => window.removeEventListener('resize', resizeCanvas)
+  }, [particleCanvasRef])
+
   /**
    * Get the center position of a card element relative to the battle arena.
    * Used by useBattleAnimation to position battle effects.

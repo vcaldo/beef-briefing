@@ -912,7 +912,45 @@ export function useBattleAnimation(
     // Update current round tracking
     currentRoundRef.current = nextEvent.round
 
-    // If there are deaths at round boundary, wait for death animation before transitioning
+    // Check if arena transition is needed (do this early to determine if death animation is required)
+    const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded(deathsToExclude)
+
+    // Determine if any pending deaths are currently in the arena and need to exit.
+    // This ensures death animation plays WHILE the card is visible in the arena,
+    // not after it has already started exiting.
+    const arenaTransitionInvolvesDeath = needsTransition && (
+      (arenaCardA && deathsToExclude.has(getCardKey(arenaCardA.teamOwnerId, arenaCardA.cardId))) ||
+      (arenaCardB && deathsToExclude.has(getCardKey(arenaCardB.teamOwnerId, arenaCardB.cardId)))
+    )
+
+    // Check if the dead card is the attacker in the next event (simultaneous combat).
+    // If so, let them complete their attack first before applying death animation.
+    // This ensures the dead card's "last attack" plays while still in the arena.
+    const deadCardIsAttacker = nextEvent.type === 'attack' &&
+      nextEvent.attacker_card_id && nextEvent.attacker_team_owner_id &&
+      deathsToExclude.has(getCardKey(nextEvent.attacker_team_owner_id, nextEvent.attacker_card_id))
+
+    // If there are deaths that are in the arena, play death animation before transitioning.
+    // BUT: if the dead card is about to attack, let them attack first (simultaneous combat).
+    if (hasDeaths && arenaTransitionInvolvesDeath && !deadCardIsAttacker) {
+      // Apply pending deaths (card greys out, death effect starts)
+      setPendingDeaths((currentPendingDeaths: Set<string>) => {
+        if (currentPendingDeaths.size > 0) {
+          applyPendingDeaths(currentPendingDeaths)
+        }
+        return new Set()
+      })
+
+      // Wait for death animation to complete before arena transition
+      setCurrentPhase('death_animation')
+      phaseTimeoutRef.current = setTimeout(() => {
+        handleDeathAnimationComplete(nextEvent, nextIndex, deathsToExclude)
+      }, getScaledDuration(ANIMATION_DURATIONS.deathEffect))
+
+      return  // handleDeathAnimationComplete will continue the flow
+    }
+
+    // If there are deaths at round boundary (but not involving arena transition), wait for death animation
     if (hasDeaths && (isNonAttackEvent || isRoundTransition)) {
       // Apply pending deaths (card greys out, death effect starts)
       setPendingDeaths((currentPendingDeaths: Set<string>) => {
@@ -946,10 +984,7 @@ export function useBattleAnimation(
     }
 
     // Process attack event with full animation sequence
-    // First, check if arena cards need to change (e.g., after a death)
-    // Pass the captured deathsToExclude to exclude cards that died but haven't been applied to state yet
-    const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded(deathsToExclude)
-
+    // Arena transition check was already done earlier, reuse those values
     if (needsTransition) {
       // Arena cards need to change - perform transition before attack
       setCurrentEventIndex(nextIndex)
@@ -966,7 +1001,7 @@ export function useBattleAnimation(
       setCurrentPhase('highlight')
       processPhase(nextEvent, 'highlight')
     }
-  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration, checkArenaTransitionNeeded, performArenaTransition, completeBattle, handleDeathAnimationComplete])
+  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration, checkArenaTransitionNeeded, performArenaTransition, completeBattle, handleDeathAnimationComplete, arenaCardA, arenaCardB])
 
   // Keep advanceToNextEvent ref in sync for use in processPhase
   // (avoids circular dependency: processPhase -> advanceToNextEvent -> processPhase)

@@ -130,8 +130,11 @@ export const ANIMATION_DURATIONS = {
   /** Victory return animation duration (winner card exits arena) */
   victoryReturn: 400,
 
-  /** Victory celebration duration (deck shake + particles) */
-  victoryCelebration: 2000,
+  /** Victory cards fly to center animation duration */
+  victoryCardFlyIn: 600,
+
+  /** Victory celebration duration (cards pulse + particles) */
+  victoryCelebration: 3500,
 } as const
 
 /**

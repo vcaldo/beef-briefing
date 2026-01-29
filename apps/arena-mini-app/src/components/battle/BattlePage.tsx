@@ -95,8 +95,10 @@ export function BattlePage({
 
   // Victory celebration state
   const [celebratingDeckOwner, setCelebratingDeckOwner] = useState<number | null>(null)
+  // Track which cards are flying to center for celebration
+  const [celebrationCards, setCelebrationCards] = useState<EnhancedTeamCard[] | null>(null)
 
-  // Victory particle system
+  // Victory particle system (5x particles for enhanced celebration)
   const {
     canvasRef: particleCanvasRef,
     startAnimation: startParticles,
@@ -104,8 +106,10 @@ export function BattlePage({
   } = useVictoryParticles({
     // Scale duration with playback speed
     duration: (PLAYBACK_SPEEDS[speedIndex].value / 1000) * ANIMATION_DURATIONS.victoryCelebration,
-    burstCount: 60,
-    continuousRate: 3,
+    burstCount: 300,        // 5x more particles (was 60)
+    continuousRate: 15,     // 5x continuous rate (was 3)
+    spreadX: 200,           // Larger spread for center explosion
+    spreadY: 200,
   })
 
   // Resize particle canvas to match viewport
@@ -148,29 +152,32 @@ export function BattlePage({
   /**
    * Handle victory celebration start.
    * Triggered by useBattleAnimation after arena cards exit.
-   * Starts deck shake animation and particle effects.
+   * Animates winner's cards to center and starts particle effects.
    */
   const handleVictoryCelebrationStart = useCallback((winnerId: number | null, isDraw: boolean) => {
     if (isDraw || winnerId === null) return
 
-    // Set celebrating deck (triggers CSS animation)
+    // Set celebrating deck (triggers CSS animation to hide deck cards)
     setCelebratingDeckOwner(winnerId)
 
-    // Get deck position for particles
+    // Get winner's cards for flying animation
     const isWinnerA = winnerId === battleData?.player_a_id
-    const deckRef = isWinnerA ? deckRefA : deckRefB
-    const deckElement = deckRef.current
+    const winnerCards = isWinnerA
+      ? battleData?.team_a_final?.cards
+      : battleData?.team_b_final?.cards
 
-    if (deckElement) {
-      const deckRect = deckElement.getBoundingClientRect()
-
-      // Calculate deck center position for particles
-      const centerX = deckRect.left + deckRect.width / 2
-      const centerY = deckRect.top + deckRect.height / 2
-
-      // Start particle animation at deck center
-      startParticles(centerX, centerY)
+    // Start flying animation (cards to center)
+    if (winnerCards) {
+      setCelebrationCards([...winnerCards] as EnhancedTeamCard[])
     }
+
+    // Start particles at SCREEN CENTER after cards arrive
+    // Delay matches the fly-in animation duration
+    setTimeout(() => {
+      const centerX = window.innerWidth / 2
+      const centerY = window.innerHeight / 2
+      startParticles(centerX, centerY)
+    }, ANIMATION_DURATIONS.victoryCardFlyIn)
 
     addPageAction('victory_celebration_started', {
       match_id: activeMatch?.id,
@@ -312,6 +319,7 @@ export function BattlePage({
   useEffect(() => {
     if (isComplete && showVictory) {
       setCelebratingDeckOwner(null)
+      setCelebrationCards(null)
       stopParticles()
     }
   }, [isComplete, showVictory, stopParticles])
@@ -333,6 +341,7 @@ export function BattlePage({
     setShowVictory(false)
     setVictoryDismissed(false)
     setCelebratingDeckOwner(null)
+    setCelebrationCards(null)
     stopParticles()
     addPageAction('battle_reset', { match_id: matchId })
   }, [reset, matchId, stopParticles])
@@ -607,6 +616,33 @@ export function BattlePage({
         ref={particleCanvasRef}
         className="victory-particle-canvas"
       />
+
+      {/* Celebration cards flying to center */}
+      {celebrationCards && (
+        <div className="victory-celebration-overlay">
+          <div className="victory-cards-container">
+            {celebrationCards.map((card, index) => (
+              <div
+                key={card.card_id}
+                className="victory-flying-card"
+                style={{ '--card-index': index } as React.CSSProperties}
+              >
+                <CompactCard
+                  imageUrl={card.card_image_url || ''}
+                  positions={card.placeholder_positions}
+                  currentStats={{
+                    atk: card.atk,
+                    hp: card.max_hp,
+                    maxHp: card.max_hp,
+                  }}
+                  cardName={card.name}
+                  cardId={card.card_id}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Victory Screen Overlay */}
       {showVictory && (

@@ -865,7 +865,7 @@ export function useBattleAnimation(
 
     /**
      * Start victory celebration after all cards have exited arena.
-     * This triggers deck shake animation and particles before showing popup.
+     * This triggers cards flying to center and particles before showing popup.
      */
     const startVictoryCelebration = () => {
       // Skip celebration for draws - go straight to completion
@@ -880,16 +880,19 @@ export function useBattleAnimation(
       // Trigger victory celebration phase
       setCurrentPhase('victory_celebration')
 
-      // Notify parent to start celebration animations (deck shake, particles)
+      // Notify parent to start celebration animations (cards fly to center, particles)
       onVictoryCelebrationStart?.(winnerId, isDraw)
 
-      // Wait for celebration to complete before showing victory popup
+      // Wait for full celebration: fly-in + main celebration
+      const totalDuration = ANIMATION_DURATIONS.victoryCardFlyIn +
+                            ANIMATION_DURATIONS.victoryCelebration
+
       phaseTimeoutRef.current = setTimeout(() => {
         setIsPlaying(false)
         isPlayingRef.current = false
         setIsComplete(true)
         setCurrentPhase('idle')
-      }, getScaledDuration(ANIMATION_DURATIONS.victoryCelebration))
+      }, getScaledDuration(totalDuration))
     }
 
     /**

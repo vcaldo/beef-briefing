@@ -221,6 +221,55 @@ func (s *MiniAppService) ValidateInitData(initData string, maxAgeSeconds int64) 
 	}, nil
 }
 
+// ValidateGameSignature validates a Games API signature for arena authentication.
+// The signature is an HMAC-SHA256 hash of the data string using the bot token as the key.
+// Data format: "chat_id=%d&match_id=%s&ts=%d&user_id=%d" (alphabetically sorted keys)
+// Timestamp must be within 24 hours of current time.
+func (s *MiniAppService) ValidateGameSignature(chatID, userID int64, matchID string, ts int64, sig string) error {
+	// Validate required parameters
+	if chatID == 0 {
+		return apperror.ErrMissingGameChatID
+	}
+	if userID == 0 {
+		return apperror.ErrMissingGameUserID
+	}
+	if matchID == "" {
+		return apperror.ErrMissingGameMatchID
+	}
+	if ts == 0 {
+		return apperror.ErrMissingGameTimestamp
+	}
+	if sig == "" {
+		return apperror.ErrMissingGameSignature
+	}
+
+	// Validate timestamp is within 24 hours
+	now := time.Now().Unix()
+	timeDiff := now - ts
+	if timeDiff < 0 {
+		return apperror.ErrFutureGameTimestamp
+	}
+	if timeDiff > 86400 { // 24 hours in seconds
+		return apperror.ErrExpiredGameTimestamp
+	}
+
+	// Build data string with alphabetically sorted keys
+	// Format: "chat_id=%d&match_id=%s&ts=%d&user_id=%d"
+	dataString := fmt.Sprintf("chat_id=%d&match_id=%s&ts=%d&user_id=%d", chatID, matchID, ts, userID)
+
+	// Calculate HMAC-SHA256 using bot token as key
+	mac := hmac.New(sha256.New, []byte(s.botToken))
+	mac.Write([]byte(dataString))
+	expectedSig := hex.EncodeToString(mac.Sum(nil))
+
+	// Constant-time comparison to prevent timing attacks
+	if !hmac.Equal([]byte(expectedSig), []byte(sig)) {
+		return apperror.ErrInvalidGameSignature
+	}
+
+	return nil
+}
+
 // Authenticate validates init data and returns a JWT token
 func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*AuthResponse, error) {
 	defer nrutil.StartSegment(ctx, "service:mini-app:authenticate")()
@@ -267,6 +316,70 @@ func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*Au
 		FirstName:    validated.FirstName,
 		Username:     validated.Username,
 		IsAdmin:      s.config.IsAdmin(validated.UserID),
+		ChatTimezone: chatTimezone,
+	}, nil
+}
+
+// AuthenticateGame validates a Games API signature and returns a JWT token.
+// This is used for arena authentication via signed game URLs from the Telegram bot.
+func (s *MiniAppService) AuthenticateGame(ctx context.Context, chatID, userID int64, matchID string, ts int64, sig string) (*AuthResponse, error) {
+	defer nrutil.StartSegment(ctx, "service:mini-app:authenticate-game")()
+
+	// Validate signature first
+	if err := s.ValidateGameSignature(chatID, userID, matchID, ts, sig); err != nil {
+		return nil, err
+	}
+
+	// Look up user from database to get their name info
+	var firstName string
+	var username *string
+	userInfo, err := s.repo.GetUserInfo(ctx, userID)
+	if err != nil {
+		slog.Warn("failed to get user info", "user_id", userID, "error", err)
+		// Continue with defaults - user might not be in our database yet
+	}
+	if userInfo != nil {
+		firstName = userInfo.FirstName
+		username = userInfo.Username
+	} else {
+		// User not found in database - use placeholder
+		// This can happen if user joins via game URL before sending any messages
+		firstName = "Player"
+	}
+
+	// Create JWT token
+	chatIDPtr := &chatID
+	token, err := s.jwtAuth.CreateToken(userID, chatIDPtr, username, firstName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create JWT token: %w", err)
+	}
+
+	// Fetch chat title and timezone
+	var chatTitle *string
+	var chatTimezone *string
+	chatTitle, err = s.repo.GetChatTitle(ctx, chatID)
+	if err != nil {
+		slog.Warn("failed to get chat title", "chat_id", chatID, "error", err)
+	}
+	chatTimezone, err = s.repo.GetChatTimezone(ctx, chatID)
+	if err != nil {
+		slog.Warn("failed to get chat timezone", "chat_id", chatID, "error", err)
+	}
+
+	slog.Info("Games API auth successful",
+		"user_id", userID,
+		"chat_id", chatID,
+		"match_id", matchID,
+	)
+
+	return &AuthResponse{
+		Token:        token,
+		UserID:       userID,
+		ChatID:       chatIDPtr,
+		ChatTitle:    chatTitle,
+		FirstName:    firstName,
+		Username:     username,
+		IsAdmin:      s.config.IsAdmin(userID),
 		ChatTimezone: chatTimezone,
 	}, nil
 }

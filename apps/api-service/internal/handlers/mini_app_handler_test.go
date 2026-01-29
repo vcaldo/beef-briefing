@@ -24,6 +24,7 @@ import (
 
 type mockMiniAppService struct {
 	authenticateFunc        func(ctx context.Context, initData string) (*services.AuthResponse, error)
+	authenticateGameFunc    func(ctx context.Context, chatID, userID int64, matchID string, ts int64, sig string) (*services.AuthResponse, error)
 	getOverviewStatsFunc    func(ctx context.Context, chatID int64, period string, tz *time.Location) (*repository.OverviewStats, error)
 	getDailyActivityFunc    func(ctx context.Context, chatID int64, period string, tz *time.Location) ([]repository.DailyActivity, error)
 	getUserRankingsFunc     func(ctx context.Context, chatID int64, metric, period string, page, limit int, tz *time.Location) ([]services.UserRankingWithPhoto, int, error)
@@ -46,6 +47,13 @@ func (m *mockMiniAppService) ValidateInitData(initData string, maxAgeSeconds int
 func (m *mockMiniAppService) Authenticate(ctx context.Context, initData string) (*services.AuthResponse, error) {
 	if m.authenticateFunc != nil {
 		return m.authenticateFunc(ctx, initData)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockMiniAppService) AuthenticateGame(ctx context.Context, chatID, userID int64, matchID string, ts int64, sig string) (*services.AuthResponse, error) {
+	if m.authenticateGameFunc != nil {
+		return m.authenticateGameFunc(ctx, chatID, userID, matchID, ts, sig)
 	}
 	return nil, errors.New("not implemented")
 }

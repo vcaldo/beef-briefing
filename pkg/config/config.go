@@ -63,6 +63,9 @@ type Config struct {
 
 	// CORS Configuration
 	CORSOrigins string `envconfig:"CORS_ORIGINS"`
+
+	// Games API / Arena Configuration
+	ArenaBaseURL string `envconfig:"ARENA_BASE_URL" default:"http://localhost:5175"`
 }
 
 // DSN returns PostgreSQL connection string

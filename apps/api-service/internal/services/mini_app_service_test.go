@@ -900,3 +900,165 @@ func TestGetReactionsOverview_TimeSeriesData(t *testing.T) {
 		t.Errorf("expected count 100, got %d", result.TopReactions[0].Count)
 	}
 }
+
+// =====================================================
+// GAMES API SIGNATURE VALIDATION TESTS
+// =====================================================
+
+// generateValidGameSignature creates a valid HMAC-SHA256 signature for Games API authentication.
+// Data format: "chat_id=%d&match_id=%s&ts=%d&user_id=%d" (alphabetically sorted keys)
+func generateValidGameSignature(botToken string, chatID, userID int64, matchID string, ts int64) string {
+	dataString := fmt.Sprintf("chat_id=%d&match_id=%s&ts=%d&user_id=%d", chatID, matchID, ts, userID)
+	mac := hmac.New(sha256.New, []byte(botToken))
+	mac.Write([]byte(dataString))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// TestValidateGameSignature_ValidSignature verifies that ValidateGameSignature
+// successfully validates a properly signed Games API request.
+func TestValidateGameSignature_ValidSignature(t *testing.T) {
+	botToken := "test-bot-token-123456"
+	svc := newTestMiniAppService(testutil.NewMockMiniAppRepository(), nil, "test-jwt-secret", botToken)
+
+	chatID := int64(-1002345678901)
+	userID := int64(12345)
+	matchID := "match-abc123"
+	ts := time.Now().Unix()
+	sig := generateValidGameSignature(botToken, chatID, userID, matchID, ts)
+
+	// Execute
+	err := svc.ValidateGameSignature(chatID, userID, matchID, ts, sig)
+
+	// Verify
+	if err != nil {
+		t.Fatalf("expected no error for valid signature, got %v", err)
+	}
+}
+
+// TestValidateGameSignature_InvalidSignature verifies that ValidateGameSignature
+// returns ErrInvalidGameSignature when the signature is invalid or tampered with.
+func TestValidateGameSignature_InvalidSignature(t *testing.T) {
+	botToken := "test-bot-token-123456"
+	svc := newTestMiniAppService(testutil.NewMockMiniAppRepository(), nil, "test-jwt-secret", botToken)
+
+	chatID := int64(-1002345678901)
+	userID := int64(12345)
+	matchID := "match-abc123"
+	ts := time.Now().Unix()
+
+	// Generate valid signature then tamper with it
+	validSig := generateValidGameSignature(botToken, chatID, userID, matchID, ts)
+	tamperedSig := "0000" + validSig[4:] // Change first 4 characters
+
+	// Execute
+	err := svc.ValidateGameSignature(chatID, userID, matchID, ts, tamperedSig)
+
+	// Verify
+	if err == nil {
+		t.Fatal("expected error for invalid signature, got nil")
+	}
+	if err != apperror.ErrInvalidGameSignature {
+		t.Errorf("expected ErrInvalidGameSignature, got %v", err)
+	}
+}
+
+// TestValidateGameSignature_ExpiredTimestamp verifies that ValidateGameSignature
+// returns ErrExpiredGameTimestamp when the timestamp is older than 24 hours.
+func TestValidateGameSignature_ExpiredTimestamp(t *testing.T) {
+	botToken := "test-bot-token-123456"
+	svc := newTestMiniAppService(testutil.NewMockMiniAppRepository(), nil, "test-jwt-secret", botToken)
+
+	chatID := int64(-1002345678901)
+	userID := int64(12345)
+	matchID := "match-abc123"
+	ts := time.Now().Unix() - 86401 // 24 hours + 1 second old
+	sig := generateValidGameSignature(botToken, chatID, userID, matchID, ts)
+
+	// Execute
+	err := svc.ValidateGameSignature(chatID, userID, matchID, ts, sig)
+
+	// Verify
+	if err == nil {
+		t.Fatal("expected error for expired timestamp, got nil")
+	}
+	if err != apperror.ErrExpiredGameTimestamp {
+		t.Errorf("expected ErrExpiredGameTimestamp, got %v", err)
+	}
+}
+
+// TestValidateGameSignature_TamperedParams verifies that ValidateGameSignature
+// returns ErrInvalidGameSignature when request params don't match the signature.
+func TestValidateGameSignature_TamperedParams(t *testing.T) {
+	botToken := "test-bot-token-123456"
+	svc := newTestMiniAppService(testutil.NewMockMiniAppRepository(), nil, "test-jwt-secret", botToken)
+
+	chatID := int64(-1002345678901)
+	userID := int64(12345)
+	matchID := "match-abc123"
+	ts := time.Now().Unix()
+
+	// Generate signature with original params
+	sig := generateValidGameSignature(botToken, chatID, userID, matchID, ts)
+
+	testCases := []struct {
+		name        string
+		chatID      int64
+		userID      int64
+		matchID     string
+		ts          int64
+		sig         string
+		expectedErr error
+	}{
+		{
+			name:        "tampered chat_id",
+			chatID:      chatID + 1, // Different chat_id
+			userID:      userID,
+			matchID:     matchID,
+			ts:          ts,
+			sig:         sig,
+			expectedErr: apperror.ErrInvalidGameSignature,
+		},
+		{
+			name:        "tampered user_id",
+			chatID:      chatID,
+			userID:      userID + 1, // Different user_id
+			matchID:     matchID,
+			ts:          ts,
+			sig:         sig,
+			expectedErr: apperror.ErrInvalidGameSignature,
+		},
+		{
+			name:        "tampered match_id",
+			chatID:      chatID,
+			userID:      userID,
+			matchID:     "different-match", // Different match_id
+			ts:          ts,
+			sig:         sig,
+			expectedErr: apperror.ErrInvalidGameSignature,
+		},
+		{
+			name:        "tampered timestamp",
+			chatID:      chatID,
+			userID:      userID,
+			matchID:     matchID,
+			ts:          ts + 100, // Different timestamp
+			sig:         sig,
+			expectedErr: apperror.ErrInvalidGameSignature,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Execute
+			err := svc.ValidateGameSignature(tc.chatID, tc.userID, tc.matchID, tc.ts, tc.sig)
+
+			// Verify
+			if err == nil {
+				t.Fatalf("expected error for %s, got nil", tc.name)
+			}
+			if err != tc.expectedErr {
+				t.Errorf("expected %v for %s, got %v", tc.expectedErr, tc.name, err)
+			}
+		})
+	}
+}

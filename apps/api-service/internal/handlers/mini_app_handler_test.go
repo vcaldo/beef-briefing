@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/middleware"
 	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/services"
@@ -23,11 +24,11 @@ import (
 // =============================================================================
 
 type mockMiniAppService struct {
-	authenticateFunc        func(ctx context.Context, initData string) (*services.AuthResponse, error)
-	authenticateGameFunc    func(ctx context.Context, chatID, userID int64, matchID string, ts int64, sig string) (*services.AuthResponse, error)
-	getOverviewStatsFunc    func(ctx context.Context, chatID int64, period string, tz *time.Location) (*repository.OverviewStats, error)
-	getDailyActivityFunc    func(ctx context.Context, chatID int64, period string, tz *time.Location) ([]repository.DailyActivity, error)
-	getUserRankingsFunc     func(ctx context.Context, chatID int64, metric, period string, page, limit int, tz *time.Location) ([]services.UserRankingWithPhoto, int, error)
+	authenticateFunc         func(ctx context.Context, initData string) (*services.AuthResponse, error)
+	authenticateGameFunc     func(ctx context.Context, chatID, userID int64, matchID string, ts int64, sig string) (*services.AuthResponse, error)
+	getOverviewStatsFunc     func(ctx context.Context, chatID int64, period string, tz *time.Location) (*repository.OverviewStats, error)
+	getDailyActivityFunc     func(ctx context.Context, chatID int64, period string, tz *time.Location) ([]repository.DailyActivity, error)
+	getUserRankingsFunc      func(ctx context.Context, chatID int64, metric, period string, page, limit int, tz *time.Location) ([]services.UserRankingWithPhoto, int, error)
 	getReactionsOverviewFunc func(ctx context.Context, chatID int64, period string, limit int, tz *time.Location) (*services.ReactionsOverviewResponse, error)
 	getRepliesOverviewFunc   func(ctx context.Context, chatID int64, period string, limit int, tz *time.Location) (*services.RepliesOverviewResponse, error)
 	getUserProfileFunc       func(ctx context.Context, chatID, userID int64, period string, tz *time.Location) (*services.ProfileResponse, error)
@@ -236,6 +237,396 @@ func createRequestWithJWTClaims(method, url string, body []byte, userID int64, c
 	}
 	ctx := context.WithValue(req.Context(), middleware.JWTContextKey, claims)
 	return req.WithContext(ctx)
+}
+
+// =============================================================================
+// HandleGameAuth Tests (Games API Authentication)
+// =============================================================================
+
+func TestHandleGameAuth_SuccessfulAuth(t *testing.T) {
+	handler, mockService, _ := newTestMiniAppHandler()
+
+	chatID := int64(-1003280306634)
+	userID := int64(12345)
+	matchID := "match-abc-123"
+	ts := time.Now().Unix()
+	sig := "valid-signature"
+
+	mockService.authenticateGameFunc = func(ctx context.Context, cID, uID int64, mID string, timestamp int64, signature string) (*services.AuthResponse, error) {
+		if cID != chatID {
+			t.Errorf("unexpected chat_id: %d", cID)
+		}
+		if uID != userID {
+			t.Errorf("unexpected user_id: %d", uID)
+		}
+		if mID != matchID {
+			t.Errorf("unexpected match_id: %s", mID)
+		}
+		if timestamp != ts {
+			t.Errorf("unexpected ts: %d", timestamp)
+		}
+		if signature != sig {
+			t.Errorf("unexpected sig: %s", signature)
+		}
+		return &services.AuthResponse{
+			Token:  "jwt_token_from_game_auth",
+			UserID: userID,
+			ChatID: &chatID,
+		}, nil
+	}
+
+	body := map[string]interface{}{
+		"chat_id":  chatID,
+		"user_id":  userID,
+		"match_id": matchID,
+		"ts":       ts,
+		"sig":      sig,
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/auth/game", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.HandleGameAuth(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var response services.AuthResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response.Token != "jwt_token_from_game_auth" {
+		t.Errorf("expected token 'jwt_token_from_game_auth', got '%s'", response.Token)
+	}
+	if response.UserID != userID {
+		t.Errorf("expected user_id %d, got %d", userID, response.UserID)
+	}
+	if response.ChatID == nil || *response.ChatID != chatID {
+		t.Errorf("expected chat_id %d, got %v", chatID, response.ChatID)
+	}
+}
+
+func TestHandleGameAuth_InvalidSignature(t *testing.T) {
+	handler, mockService, _ := newTestMiniAppHandler()
+
+	mockService.authenticateGameFunc = func(ctx context.Context, chatID, userID int64, matchID string, ts int64, sig string) (*services.AuthResponse, error) {
+		return nil, apperror.ErrInvalidGameSignature
+	}
+
+	body := map[string]interface{}{
+		"chat_id":  int64(-1003280306634),
+		"user_id":  int64(12345),
+		"match_id": "match-abc-123",
+		"ts":       time.Now().Unix(),
+		"sig":      "invalid-signature",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/auth/game", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.HandleGameAuth(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var response map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response["error"] != "invalid game signature" {
+		t.Errorf("expected error 'invalid game signature', got '%s'", response["error"])
+	}
+}
+
+func TestHandleGameAuth_ExpiredTimestamp(t *testing.T) {
+	handler, mockService, _ := newTestMiniAppHandler()
+
+	mockService.authenticateGameFunc = func(ctx context.Context, chatID, userID int64, matchID string, ts int64, sig string) (*services.AuthResponse, error) {
+		return nil, apperror.ErrExpiredGameTimestamp
+	}
+
+	body := map[string]interface{}{
+		"chat_id":  int64(-1003280306634),
+		"user_id":  int64(12345),
+		"match_id": "match-abc-123",
+		"ts":       time.Now().Add(-25 * time.Hour).Unix(), // Expired timestamp
+		"sig":      "some-signature",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/auth/game", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.HandleGameAuth(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var response map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response["error"] != "game timestamp expired" {
+		t.Errorf("expected error 'game timestamp expired', got '%s'", response["error"])
+	}
+}
+
+func TestHandleGameAuth_FutureTimestamp(t *testing.T) {
+	handler, mockService, _ := newTestMiniAppHandler()
+
+	mockService.authenticateGameFunc = func(ctx context.Context, chatID, userID int64, matchID string, ts int64, sig string) (*services.AuthResponse, error) {
+		return nil, apperror.ErrFutureGameTimestamp
+	}
+
+	body := map[string]interface{}{
+		"chat_id":  int64(-1003280306634),
+		"user_id":  int64(12345),
+		"match_id": "match-abc-123",
+		"ts":       time.Now().Add(1 * time.Hour).Unix(), // Future timestamp
+		"sig":      "some-signature",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/auth/game", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.HandleGameAuth(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var response map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response["error"] != "timestamp is in the future" {
+		t.Errorf("expected error 'timestamp is in the future', got '%s'", response["error"])
+	}
+}
+
+func TestHandleGameAuth_MissingChatID(t *testing.T) {
+	handler, _, _ := newTestMiniAppHandler()
+
+	body := map[string]interface{}{
+		// chat_id is missing (will be 0)
+		"user_id":  int64(12345),
+		"match_id": "match-abc-123",
+		"ts":       time.Now().Unix(),
+		"sig":      "some-signature",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/auth/game", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.HandleGameAuth(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var response map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response["error"] != "chat_id is required" {
+		t.Errorf("expected error 'chat_id is required', got '%s'", response["error"])
+	}
+}
+
+func TestHandleGameAuth_MissingUserID(t *testing.T) {
+	handler, _, _ := newTestMiniAppHandler()
+
+	body := map[string]interface{}{
+		"chat_id": int64(-1003280306634),
+		// user_id is missing (will be 0)
+		"match_id": "match-abc-123",
+		"ts":       time.Now().Unix(),
+		"sig":      "some-signature",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/auth/game", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.HandleGameAuth(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var response map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response["error"] != "user_id is required" {
+		t.Errorf("expected error 'user_id is required', got '%s'", response["error"])
+	}
+}
+
+func TestHandleGameAuth_MissingMatchID(t *testing.T) {
+	handler, _, _ := newTestMiniAppHandler()
+
+	body := map[string]interface{}{
+		"chat_id": int64(-1003280306634),
+		"user_id": int64(12345),
+		// match_id is missing (will be "")
+		"ts":  time.Now().Unix(),
+		"sig": "some-signature",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/auth/game", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.HandleGameAuth(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var response map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response["error"] != "match_id is required" {
+		t.Errorf("expected error 'match_id is required', got '%s'", response["error"])
+	}
+}
+
+func TestHandleGameAuth_MissingTimestamp(t *testing.T) {
+	handler, _, _ := newTestMiniAppHandler()
+
+	body := map[string]interface{}{
+		"chat_id":  int64(-1003280306634),
+		"user_id":  int64(12345),
+		"match_id": "match-abc-123",
+		// ts is missing (will be 0)
+		"sig": "some-signature",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/auth/game", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.HandleGameAuth(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var response map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response["error"] != "ts is required" {
+		t.Errorf("expected error 'ts is required', got '%s'", response["error"])
+	}
+}
+
+func TestHandleGameAuth_MissingSignature(t *testing.T) {
+	handler, _, _ := newTestMiniAppHandler()
+
+	body := map[string]interface{}{
+		"chat_id":  int64(-1003280306634),
+		"user_id":  int64(12345),
+		"match_id": "match-abc-123",
+		"ts":       time.Now().Unix(),
+		// sig is missing (will be "")
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/auth/game", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.HandleGameAuth(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var response map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response["error"] != "sig is required" {
+		t.Errorf("expected error 'sig is required', got '%s'", response["error"])
+	}
+}
+
+func TestHandleGameAuth_InvalidJSON(t *testing.T) {
+	handler, _, _ := newTestMiniAppHandler()
+
+	body := `{invalid json}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/auth/game", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.HandleGameAuth(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var response map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response["error"] != "invalid request body" {
+		t.Errorf("expected error 'invalid request body', got '%s'", response["error"])
+	}
+}
+
+func TestHandleGameAuth_ServiceErrorReturns401(t *testing.T) {
+	handler, mockService, _ := newTestMiniAppHandler()
+
+	mockService.authenticateGameFunc = func(ctx context.Context, chatID, userID int64, matchID string, ts int64, sig string) (*services.AuthResponse, error) {
+		return nil, errors.New("some generic service error")
+	}
+
+	body := map[string]interface{}{
+		"chat_id":  int64(-1003280306634),
+		"user_id":  int64(12345),
+		"match_id": "match-abc-123",
+		"ts":       time.Now().Unix(),
+		"sig":      "some-signature",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mini-app/auth/game", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.HandleGameAuth(rr, req)
+
+	// Generic service errors should return 401 with generic message
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var response map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if response["error"] != "authentication failed" {
+		t.Errorf("expected error 'authentication failed', got '%s'", response["error"])
+	}
 }
 
 // =============================================================================

@@ -72,7 +72,7 @@ func main() {
 	technicalHandler := handlers.NewTechnicalHandler(nrApp)
 	deckHandler := handlers.NewDeckHandler(nrApp)
 	rankingHandler := handlers.NewRankingHandler(nrApp)
-	matchHandler := handlers.NewMatchHandler(apiClient, nrApp)
+	matchHandler := handlers.NewMatchHandler(apiClient, nrApp, cfg.ArenaGameShortName, cfg.ArenaBaseURL)
 	callbackHandler := handlers.NewCallbackHandler(apiClient, nrApp, cfg.ArenaBaseURL, cfg.TelegramBotToken)
 	rankedHandler := handlers.NewRankedHandler(apiClient, nrApp)
 

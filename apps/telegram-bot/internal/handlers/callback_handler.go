@@ -210,7 +210,7 @@ func (h *CallbackHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, ch
 		creatorID = *match.CreatorUserID
 	}
 
-	messageText := fmt.Sprintf(
+	caption := fmt.Sprintf(
 		"⚔️ *Arena Match*\n\n"+
 			"👤 Creator: [user](tg://user?id=%d)\n"+
 			"⏰ Join window: 5 minutes\n"+
@@ -232,10 +232,10 @@ func (h *CallbackHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, ch
 		},
 	}
 
-	_, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
+	_, err := b.EditMessageCaption(ctx, &bot.EditMessageCaptionParams{
 		ChatID:      chatID,
 		MessageID:   messageID,
-		Text:        messageText,
+		Caption:     caption,
 		ParseMode:   models.ParseModeMarkdown,
 		ReplyMarkup: keyboard,
 	})
@@ -254,7 +254,7 @@ func (h *CallbackHandler) updateMatchStartedMessage(ctx context.Context, b *bot.
 		participantMentions += fmt.Sprintf("[user](tg://user?id=%d)", p.UserID)
 	}
 
-	messageText := fmt.Sprintf(
+	caption := fmt.Sprintf(
 		"⚔️ *Arena Match Started!*\n\n"+
 			"🎮 Format: %s\n"+
 			"👥 Participants: %s\n\n"+
@@ -265,10 +265,10 @@ func (h *CallbackHandler) updateMatchStartedMessage(ctx context.Context, b *bot.
 	)
 
 	// Remove action buttons since match has started
-	_, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
+	_, err := b.EditMessageCaption(ctx, &bot.EditMessageCaptionParams{
 		ChatID:    chatID,
 		MessageID: messageID,
-		Text:      messageText,
+		Caption:   caption,
 		ParseMode: models.ParseModeMarkdown,
 	})
 	if err != nil {

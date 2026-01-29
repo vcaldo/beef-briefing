@@ -85,6 +85,9 @@ services:
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       ENVIRONMENT: production
       LOG_LEVEL: info
+      # Games API Configuration
+      ARENA_GAME_SHORT_NAME: ${ARENA_GAME_SHORT_NAME}
+      ARENA_BASE_URL: ${ARENA_BASE_URL}
     volumes:
       - ./secrets/apps/telegram-bot:/app/secrets:ro
     depends_on:

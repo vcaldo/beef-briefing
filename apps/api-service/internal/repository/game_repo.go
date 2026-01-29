@@ -77,7 +77,7 @@ func scanMatch(row rowScanner) (*Match, error) {
 // participantColumns is the standard column order for Participant queries
 const participantColumns = `id, match_id, user_id, status, joined_at, coins_remaining,
        shop_cards, team, team_order, team_submitted_at,
-       placement, wins, losses, total_damage_dealt`
+       placement, wins, losses, total_damage_dealt, has_rerolled`
 
 // scanParticipant scans a row into a Participant struct
 func scanParticipant(row rowScanner) (*Participant, error) {
@@ -86,6 +86,7 @@ func scanParticipant(row rowScanner) (*Participant, error) {
 		&p.ID, &p.MatchID, &p.UserID, &p.Status, &p.JoinedAt,
 		&p.CoinsRemaining, &p.ShopCards, &p.Team, &p.TeamOrder,
 		&p.TeamSubmittedAt, &p.Placement, &p.Wins, &p.Losses, &p.TotalDamageDealt,
+		&p.HasRerolled,
 	)
 	return p, err
 }
@@ -217,6 +218,7 @@ type Participant struct {
 	Wins             int               `json:"wins"`
 	Losses           int               `json:"losses"`
 	TotalDamageDealt int               `json:"total_damage_dealt"`
+	HasRerolled      bool              `json:"has_rerolled"`
 }
 
 // ParticipantWithUser includes user info
@@ -472,6 +474,10 @@ func (r *GameRepository) UpdateParticipantShop(ctx context.Context, matchID stri
 
 func (r *GameRepository) SubmitTeam(ctx context.Context, matchID string, userID int64) error {
 	return r.participantRepo.SubmitTeam(ctx, matchID, userID)
+}
+
+func (r *GameRepository) SetParticipantRerolled(ctx context.Context, matchID string, userID int64) error {
+	return r.participantRepo.SetParticipantRerolled(ctx, matchID, userID)
 }
 
 func (r *GameRepository) GetParticipantCount(ctx context.Context, matchID string) (int, error) {

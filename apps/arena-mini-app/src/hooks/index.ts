@@ -15,3 +15,6 @@ export type { UseImagesReturn } from './useImages';
 
 export { usePageBackground } from './usePageBackground';
 export type { UsePageBackgroundOptions, UsePageBackgroundReturn } from './usePageBackground';
+
+export { useVictoryParticles } from './useVictoryParticles';
+export type { UseVictoryParticlesOptions, UseVictoryParticlesReturn, Particle } from './useVictoryParticles';

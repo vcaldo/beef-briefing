@@ -44,6 +44,21 @@ export interface ActiveBattleEffect {
 }
 
 /**
+ * Arena card reference - identifies a card currently in the arena.
+ */
+export interface ArenaCard {
+  /** The card's unique identifier */
+  cardId: number
+  /** The user ID of the team owner (player_a_id or player_b_id) */
+  teamOwnerId: number
+}
+
+/**
+ * Arena transition state - tracks the current state of arena card transitions.
+ */
+export type ArenaTransitionState = 'idle' | 'entering' | 'exiting'
+
+/**
  * Return value from useBattleAnimation hook.
  */
 export interface UseBattleAnimationReturn {
@@ -67,6 +82,16 @@ export interface UseBattleAnimationReturn {
   activeEffects: ActiveBattleEffect[]
   /** Callback to call when an effect animation completes (pass cardKey to identify which effect) */
   onEffectComplete: (cardKey: string) => void
+  /** Card currently in arena for Team A (player A's front card) */
+  arenaCardA: ArenaCard | null
+  /** Card currently in arena for Team B (player B's front card) */
+  arenaCardB: ArenaCard | null
+  /** Current state of arena card transitions */
+  arenaTransitionState: ArenaTransitionState
+  /** Which specific cards are currently transitioning (for per-card animation classes) */
+  transitioningCards: { entering: Set<string>; exiting: Set<string> }
+  /** Get the front (lowest position) alive card for each team. Optionally exclude cards that are pending death. */
+  getFrontCards: (excludeDeaths?: Set<string>) => { cardA: ArenaCard | null; cardB: ArenaCard | null }
   /** Start or resume playback */
   play: () => void
   /** Pause playback */
@@ -95,6 +120,13 @@ export interface UseBattleAnimationOptions {
    * If not provided, effects will not be displayed.
    */
   getCardPosition?: (cardKey: string) => EffectPosition | null
+  /**
+   * Optional callback triggered when victory celebration should start.
+   * Called after arena cards exit but before isComplete is set to true.
+   * @param winnerTeamOwnerId - User ID of the winning team owner (null for draw)
+   * @param isDraw - True if the battle ended in a draw
+   */
+  onVictoryCelebrationStart?: (winnerTeamOwnerId: number | null, isDraw: boolean) => void
 }
 
 // =============================================================================
@@ -216,7 +248,7 @@ export function useBattleAnimation(
   battleData: BattleResult | null,
   options: UseBattleAnimationOptions
 ): UseBattleAnimationReturn {
-  const { playbackSpeed, playerAId, playerBId, onPlaySound, getCardPosition } = options
+  const { playbackSpeed, playerAId, playerBId, onPlaySound, getCardPosition, onVictoryCelebrationStart } = options
 
   // Core state
   const [cardStates, setCardStates] = useState<Map<string, CardSnapshot>>(
@@ -237,10 +269,22 @@ export function useBattleAnimation(
   // Battle effect state (attack, damage, death animations) - supports multiple simultaneous effects
   const [activeEffects, setActiveEffects] = useState<ActiveBattleEffect[]>([])
 
+  // Arena state - tracks which cards are currently in the central arena
+  const [arenaCardA, setArenaCardA] = useState<ArenaCard | null>(null)
+  const [arenaCardB, setArenaCardB] = useState<ArenaCard | null>(null)
+  const [arenaTransitionState, setArenaTransitionState] = useState<ArenaTransitionState>('idle')
+  // Track which specific cards are currently transitioning (for per-card animations)
+  const [transitioningCards, setTransitioningCards] = useState<{
+    entering: Set<string>
+    exiting: Set<string>
+  }>({ entering: new Set(), exiting: new Set() })
+
   // Deferred death state - cards that should die after the round completes
   // This prevents cards from greying out before their attack animation plays
   // Note: We only use the setter with callbacks, so we don't destructure the state value
   const [, setPendingDeaths] = useState<Set<string>>(() => new Set())
+  // Also track pending deaths in a ref for synchronous access in arena transition checks
+  const pendingDeathsRef = useRef<Set<string>>(new Set())
   const currentRoundRef = useRef<number>(0)
 
   // Refs for cleanup and state access in callbacks
@@ -248,6 +292,8 @@ export function useBattleAnimation(
   const isPlayingRef = useRef(isPlaying)
   const currentEventIndexRef = useRef(currentEventIndex)
   const advanceToNextEventRef = useRef<(() => void) | null>(null)
+  // Track if an arena transition is currently in progress
+  const isArenaTransitionInProgressRef = useRef(false)
 
   // Keep currentEventIndex ref in sync
   useEffect(() => {
@@ -271,7 +317,13 @@ export function useBattleAnimation(
       setDamageTargetKey(null)
       setActiveEffects([])
       setPendingDeaths(new Set())
+      pendingDeathsRef.current = new Set()
       currentRoundRef.current = 0
+      // Reset arena state
+      setArenaCardA(null)
+      setArenaCardB(null)
+      setArenaTransitionState('idle')
+      isArenaTransitionInProgressRef.current = false
     }
   }, [battleData, playerAId, playerBId])
 
@@ -489,7 +541,9 @@ export function useBattleAnimation(
               event.defender_team_owner_id,
               event.defender_card_id
             )
-            setPendingDeaths((prev) => new Set(prev).add(defenderKey))
+            setPendingDeaths((prev: Set<string>) => new Set(prev).add(defenderKey))
+            // Also update ref for synchronous access in arena transition checks
+            pendingDeathsRef.current = new Set(pendingDeathsRef.current).add(defenderKey)
           }
 
           // Clear animation states back to idle
@@ -544,11 +598,364 @@ export function useBattleAnimation(
         }
       }
 
-      // Clear pending deaths
+      // Clear pending deaths (both state and ref)
       setPendingDeaths(new Set())
+      pendingDeathsRef.current = new Set()
     },
     [onPlaySound, getCardPosition]
   )
+
+  /**
+   * Get the front (lowest position) alive card for each team.
+   * Used to determine which cards should be displayed in the central arena.
+   *
+   * @param excludeDeaths - Optional set of card keys to treat as dead (for pending deaths that haven't been applied yet)
+   * @returns Object with cardA and cardB - the front cards for each team, or null if no alive cards remain
+   */
+  const getFrontCards = useCallback((excludeDeaths?: Set<string>): { cardA: ArenaCard | null; cardB: ArenaCard | null } => {
+    let frontA: ArenaCard | null = null
+    let frontB: ArenaCard | null = null
+    let minPosA = Infinity
+    let minPosB = Infinity
+
+    cardStates.forEach((state: CardSnapshot, key: string) => {
+      // Skip dead cards
+      if (!state.is_alive) return
+
+      // Skip cards in the excludeDeaths set (pending deaths not yet applied to state)
+      if (excludeDeaths && excludeDeaths.has(key)) return
+
+      // Parse composite key to determine team ownership
+      const parts = key.split('_')
+      const teamOwnerId = parseInt(parts[0], 10)
+      const cardId = state.card_id
+
+      if (teamOwnerId === playerAId) {
+        // Team A card - check if it has a lower position than current front
+        if (state.position < minPosA) {
+          minPosA = state.position
+          frontA = { cardId, teamOwnerId }
+        }
+      } else if (teamOwnerId === playerBId) {
+        // Team B card - check if it has a lower position than current front
+        if (state.position < minPosB) {
+          minPosB = state.position
+          frontB = { cardId, teamOwnerId }
+        }
+      }
+    })
+
+    return { cardA: frontA, cardB: frontB }
+  }, [cardStates, playerAId, playerBId])
+
+  /**
+   * Check if arena cards need to change based on current front cards.
+   * Compares current arena cards with what the front cards should be.
+   *
+   * @param excludeDeaths - Optional set of card keys to treat as dead (for pending deaths not yet applied to state)
+   * @returns Object with needsTransition flag and the new front cards
+   */
+  const checkArenaTransitionNeeded = useCallback((excludeDeaths?: Set<string>): {
+    needsTransition: boolean
+    newFrontA: ArenaCard | null
+    newFrontB: ArenaCard | null
+  } => {
+    const { cardA: newFrontA, cardB: newFrontB } = getFrontCards(excludeDeaths)
+
+    // Check if arena card A differs from front card A
+    const arenaAChanged =
+      (arenaCardA === null && newFrontA !== null) ||
+      (arenaCardA !== null && newFrontA === null) ||
+      (arenaCardA !== null && newFrontA !== null &&
+        (arenaCardA.cardId !== newFrontA.cardId || arenaCardA.teamOwnerId !== newFrontA.teamOwnerId))
+
+    // Check if arena card B differs from front card B
+    const arenaBChanged =
+      (arenaCardB === null && newFrontB !== null) ||
+      (arenaCardB !== null && newFrontB === null) ||
+      (arenaCardB !== null && newFrontB !== null &&
+        (arenaCardB.cardId !== newFrontB.cardId || arenaCardB.teamOwnerId !== newFrontB.teamOwnerId))
+
+    return {
+      needsTransition: arenaAChanged || arenaBChanged,
+      newFrontA,
+      newFrontB,
+    }
+  }, [getFrontCards, arenaCardA, arenaCardB])
+
+  /**
+   * Perform arena card transition sequence.
+   * Sequence: exit animation (if cards in arena) → update arena cards → enter animation → callback
+   *
+   * Only animates cards that actually changed (single card death = single card animates).
+   *
+   * @param newFrontA - New front card for Team A (or null if none)
+   * @param newFrontB - New front card for Team B (or null if none)
+   * @param onComplete - Callback to run after transition completes
+   */
+  const performArenaTransition = useCallback(
+    (
+      newFrontA: ArenaCard | null,
+      newFrontB: ArenaCard | null,
+      onComplete: () => void
+    ) => {
+      // Mark that we're starting a transition
+      isArenaTransitionInProgressRef.current = true
+
+      // Determine which cards are actually changing
+      const aChanged =
+        (arenaCardA === null && newFrontA !== null) ||
+        (arenaCardA !== null && newFrontA === null) ||
+        (arenaCardA !== null && newFrontA !== null &&
+          (arenaCardA.cardId !== newFrontA.cardId || arenaCardA.teamOwnerId !== newFrontA.teamOwnerId))
+      const bChanged =
+        (arenaCardB === null && newFrontB !== null) ||
+        (arenaCardB !== null && newFrontB === null) ||
+        (arenaCardB !== null && newFrontB !== null &&
+          (arenaCardB.cardId !== newFrontB.cardId || arenaCardB.teamOwnerId !== newFrontB.teamOwnerId))
+
+      // Build exit set with only cards that are leaving
+      const exitingKeys = new Set<string>()
+      if (aChanged && arenaCardA) {
+        exitingKeys.add(getCardKey(arenaCardA.teamOwnerId, arenaCardA.cardId))
+      }
+      if (bChanged && arenaCardB) {
+        exitingKeys.add(getCardKey(arenaCardB.teamOwnerId, arenaCardB.cardId))
+      }
+
+      // Build enter set with only new cards coming in
+      const enteringKeys = new Set<string>()
+      if (aChanged && newFrontA) {
+        enteringKeys.add(getCardKey(newFrontA.teamOwnerId, newFrontA.cardId))
+      }
+      if (bChanged && newFrontB) {
+        enteringKeys.add(getCardKey(newFrontB.teamOwnerId, newFrontB.cardId))
+      }
+
+      // Check if we have cards to exit
+      const hasCardsToExit = exitingKeys.size > 0
+
+      if (hasCardsToExit) {
+        // Phase 1: Exit animation for cards that are leaving
+        setArenaTransitionState('exiting')
+        setTransitioningCards({ entering: new Set(), exiting: exitingKeys })
+        setCurrentPhase('arena_transition')
+
+        phaseTimeoutRef.current = setTimeout(() => {
+          // Phase 2: Update arena cards after exit animation
+          setArenaCardA(newFrontA)
+          setArenaCardB(newFrontB)
+
+          // Check if we have new cards to enter
+          const hasCardsToEnter = enteringKeys.size > 0
+
+          if (hasCardsToEnter) {
+            // Phase 3: Enter animation for new cards
+            setArenaTransitionState('entering')
+            setTransitioningCards({ entering: enteringKeys, exiting: new Set() })
+
+            phaseTimeoutRef.current = setTimeout(() => {
+              // Transition complete
+              setArenaTransitionState('idle')
+              setTransitioningCards({ entering: new Set(), exiting: new Set() })
+              isArenaTransitionInProgressRef.current = false
+              onComplete()
+            }, getScaledDuration(ANIMATION_DURATIONS.arenaEnter))
+          } else {
+            // No new cards, transition complete
+            setArenaTransitionState('idle')
+            setTransitioningCards({ entering: new Set(), exiting: new Set() })
+            isArenaTransitionInProgressRef.current = false
+            onComplete()
+          }
+        }, getScaledDuration(ANIMATION_DURATIONS.arenaExit))
+      } else {
+        // No cards to exit - skip exit, go directly to enter
+        setArenaCardA(newFrontA)
+        setArenaCardB(newFrontB)
+
+        const hasCardsToEnter = enteringKeys.size > 0
+
+        if (hasCardsToEnter) {
+          // Enter animation for new cards
+          setArenaTransitionState('entering')
+          setTransitioningCards({ entering: enteringKeys, exiting: new Set() })
+          setCurrentPhase('arena_transition')
+
+          phaseTimeoutRef.current = setTimeout(() => {
+            setArenaTransitionState('idle')
+            setTransitioningCards({ entering: new Set(), exiting: new Set() })
+            isArenaTransitionInProgressRef.current = false
+            onComplete()
+          }, getScaledDuration(ANIMATION_DURATIONS.arenaEnter))
+        } else {
+          // No cards at all, just complete
+          setArenaTransitionState('idle')
+          setTransitioningCards({ entering: new Set(), exiting: new Set() })
+          isArenaTransitionInProgressRef.current = false
+          onComplete()
+        }
+      }
+    },
+    [arenaCardA, arenaCardB, getScaledDuration]
+  )
+
+  /**
+   * Handle completion of death animation phase.
+   * Called after death effects have finished playing, before arena transition.
+   *
+   * @param nextEvent - The next event to process after transition
+   * @param nextIndex - Index of the next event
+   * @param deathsToExclude - Card keys that died (for arena transition check)
+   */
+  const handleDeathAnimationComplete = useCallback((
+    nextEvent: BattleEvent,
+    nextIndex: number,
+    deathsToExclude: Set<string>
+  ) => {
+    const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded(deathsToExclude)
+
+    if (nextEvent.type !== 'attack') {
+      // Non-attack event - skip animation, just advance
+      setCurrentEventIndex(nextIndex)
+      setCurrentPhase('idle')
+      phaseTimeoutRef.current = setTimeout(() => {
+        advanceToNextEventRef.current?.()
+      }, getScaledDuration(ANIMATION_DURATIONS.eventGap))
+      return
+    }
+
+    // Attack event - handle arena transition if needed
+    if (needsTransition) {
+      setCurrentEventIndex(nextIndex)
+      performArenaTransition(newFrontA, newFrontB, () => {
+        if (isPlayingRef.current) {
+          setCurrentPhase('highlight')
+          processPhase(nextEvent, 'highlight')
+        }
+      })
+    } else {
+      setCurrentEventIndex(nextIndex)
+      setCurrentPhase('highlight')
+      processPhase(nextEvent, 'highlight')
+    }
+  }, [checkArenaTransitionNeeded, performArenaTransition, processPhase, getScaledDuration])
+
+  /**
+   * Complete the battle after all events have been processed.
+   * Handles final arena transition for dead cards exiting before showing victory.
+   * Now includes victory celebration phase with deck animation before showing popup.
+   */
+  const completeBattle = useCallback(() => {
+    // Capture pending deaths to pass to arena transition check
+    const deathsToExclude = new Set(pendingDeathsRef.current)
+    const hasDeaths = deathsToExclude.size > 0
+
+    // Apply any remaining pending deaths
+    setPendingDeaths((currentPendingDeaths: Set<string>) => {
+      if (currentPendingDeaths.size > 0) {
+        applyPendingDeaths(currentPendingDeaths)
+      }
+      return new Set()
+    })
+
+    // Determine winner for celebration callback
+    const winnerId = battleData?.winner_id ?? null
+    const isDraw = battleData?.is_draw ?? false
+
+    /**
+     * Start victory celebration after all cards have exited arena.
+     * This triggers cards flying to center and particles before showing popup.
+     */
+    const startVictoryCelebration = () => {
+      // Skip celebration for draws - go straight to completion
+      if (isDraw) {
+        setIsPlaying(false)
+        isPlayingRef.current = false
+        setIsComplete(true)
+        setCurrentPhase('idle')
+        return
+      }
+
+      // Trigger victory celebration phase
+      setCurrentPhase('victory_celebration')
+
+      // Notify parent to start celebration animations (cards fly to center, particles)
+      onVictoryCelebrationStart?.(winnerId, isDraw)
+
+      // Wait for full celebration: fly-in + main celebration
+      const totalDuration = ANIMATION_DURATIONS.victoryCardFlyIn +
+                            ANIMATION_DURATIONS.victoryCelebration
+
+      phaseTimeoutRef.current = setTimeout(() => {
+        setIsPlaying(false)
+        isPlayingRef.current = false
+        setIsComplete(true)
+        setCurrentPhase('idle')
+      }, getScaledDuration(totalDuration))
+    }
+
+    /**
+     * Exit ALL arena cards (including winner) then start celebration.
+     * This ensures the winning card returns to the deck before celebrating.
+     */
+    const exitAllArenaCards = () => {
+      // Collect ALL cards currently in arena (not just dead ones)
+      const victoryExitingKeys = new Set<string>()
+      if (arenaCardA) {
+        victoryExitingKeys.add(getCardKey(arenaCardA.teamOwnerId, arenaCardA.cardId))
+      }
+      if (arenaCardB) {
+        victoryExitingKeys.add(getCardKey(arenaCardB.teamOwnerId, arenaCardB.cardId))
+      }
+
+      if (victoryExitingKeys.size > 0) {
+        // Animate cards exiting arena
+        setArenaTransitionState('exiting')
+        setTransitioningCards({ entering: new Set(), exiting: victoryExitingKeys })
+
+        phaseTimeoutRef.current = setTimeout(() => {
+          // Clear arena cards after exit animation
+          setArenaCardA(null)
+          setArenaCardB(null)
+          setArenaTransitionState('idle')
+          setTransitioningCards({ entering: new Set(), exiting: new Set() })
+
+          // Now start the celebration
+          startVictoryCelebration()
+        }, getScaledDuration(ANIMATION_DURATIONS.victoryReturn))
+      } else {
+        // No cards in arena, start celebration directly
+        startVictoryCelebration()
+      }
+    }
+
+    // Helper to finalize the battle after death animations complete
+    const finalizeBattle = () => {
+      // Check if final arena transition is needed (dead cards should exit first)
+      const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded(deathsToExclude)
+
+      if (needsTransition) {
+        // Perform arena transition for dead cards first
+        performArenaTransition(newFrontA, newFrontB, () => {
+          // After dead cards exit, now exit ALL remaining cards for victory
+          exitAllArenaCards()
+        })
+      } else {
+        // No dead card transition needed, exit all cards for victory
+        exitAllArenaCards()
+      }
+    }
+
+    // If there were deaths, wait for death animation before final transition
+    if (hasDeaths) {
+      setCurrentPhase('death_animation')
+      phaseTimeoutRef.current = setTimeout(finalizeBattle,
+        getScaledDuration(ANIMATION_DURATIONS.deathEffect))
+    } else {
+      finalizeBattle()
+    }
+  }, [applyPendingDeaths, checkArenaTransitionNeeded, performArenaTransition, getScaledDuration, battleData, arenaCardA, arenaCardB, onVictoryCelebrationStart])
 
   /**
    * Advance to the next event in the sequence.
@@ -559,17 +966,8 @@ export function useBattleAnimation(
     const nextIndex = currentEventIndexRef.current + 1
 
     if (nextIndex >= battleData.events.length) {
-      // All events processed - apply any remaining pending deaths
-      setPendingDeaths((currentPendingDeaths: Set<string>) => {
-        if (currentPendingDeaths.size > 0) {
-          applyPendingDeaths(currentPendingDeaths)
-        }
-        return new Set()
-      })
-      setIsPlaying(false)
-      isPlayingRef.current = false
-      setIsComplete(true)
-      setCurrentPhase('idle')
+      // All events processed - handle final transition and completion
+      completeBattle()
       return
     }
 
@@ -578,20 +976,73 @@ export function useBattleAnimation(
     const isNonAttackEvent = nextEvent.type !== 'attack'
     const isRoundTransition = nextEvent.round !== prevRound && prevRound !== 0
 
-    // Apply pending deaths at round boundaries:
-    // - When transitioning to a different round
-    // - When processing non-attack events (death, advance, summary, victory)
-    if (isNonAttackEvent || isRoundTransition) {
+    // Capture pending deaths BEFORE applying them, so we can pass them to arena transition check.
+    // This handles simultaneous card deaths: both cards die in the same round, and we need to
+    // transition to the next front cards for both teams atomically.
+    const deathsToExclude = new Set(pendingDeathsRef.current)
+    const hasDeaths = deathsToExclude.size > 0
+
+    // Update current round tracking
+    currentRoundRef.current = nextEvent.round
+
+    // Check if arena transition is needed (do this early to determine if death animation is required)
+    const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded(deathsToExclude)
+
+    // Determine if any pending deaths are currently in the arena and need to exit.
+    // This ensures death animation plays WHILE the card is visible in the arena,
+    // not after it has already started exiting.
+    const arenaTransitionInvolvesDeath = needsTransition && (
+      (arenaCardA && deathsToExclude.has(getCardKey(arenaCardA.teamOwnerId, arenaCardA.cardId))) ||
+      (arenaCardB && deathsToExclude.has(getCardKey(arenaCardB.teamOwnerId, arenaCardB.cardId)))
+    )
+
+    // Check if the dead card is the attacker in the next event (simultaneous combat).
+    // If so, let them complete their attack first before applying death animation.
+    // This ensures the dead card's "last attack" plays while still in the arena.
+    const deadCardIsAttacker = nextEvent.type === 'attack' &&
+      nextEvent.attacker_card_id && nextEvent.attacker_team_owner_id &&
+      deathsToExclude.has(getCardKey(nextEvent.attacker_team_owner_id, nextEvent.attacker_card_id))
+
+    // If there are deaths that are in the arena, play death animation before transitioning.
+    // BUT: if the dead card is about to attack, let them attack first (simultaneous combat).
+    if (hasDeaths && arenaTransitionInvolvesDeath && !deadCardIsAttacker) {
+      // Apply pending deaths (card greys out, death effect starts)
       setPendingDeaths((currentPendingDeaths: Set<string>) => {
         if (currentPendingDeaths.size > 0) {
           applyPendingDeaths(currentPendingDeaths)
         }
         return new Set()
       })
+
+      // Wait for death animation to complete before arena transition
+      setCurrentPhase('death_animation')
+      phaseTimeoutRef.current = setTimeout(() => {
+        handleDeathAnimationComplete(nextEvent, nextIndex, deathsToExclude)
+      }, getScaledDuration(ANIMATION_DURATIONS.deathEffect))
+
+      return  // handleDeathAnimationComplete will continue the flow
     }
 
-    // Update current round tracking
-    currentRoundRef.current = nextEvent.round
+    // If there are deaths at round boundary (but not involving arena transition), wait for death animation
+    if (hasDeaths && (isNonAttackEvent || isRoundTransition)) {
+      // Apply pending deaths (card greys out, death effect starts)
+      setPendingDeaths((currentPendingDeaths: Set<string>) => {
+        if (currentPendingDeaths.size > 0) {
+          applyPendingDeaths(currentPendingDeaths)
+        }
+        return new Set()
+      })
+
+      // Wait for death animation to complete before arena transition
+      setCurrentPhase('death_animation')
+      phaseTimeoutRef.current = setTimeout(() => {
+        handleDeathAnimationComplete(nextEvent, nextIndex, deathsToExclude)
+      }, getScaledDuration(ANIMATION_DURATIONS.deathEffect))
+
+      return  // handleDeathAnimationComplete will continue the flow
+    }
+
+    // No deaths to handle - proceed with normal flow
 
     // Skip animation for non-attack events (death, advance, summary, victory)
     // These are informational - the visual state is handled via pending deaths
@@ -606,16 +1057,75 @@ export function useBattleAnimation(
     }
 
     // Process attack event with full animation sequence
-    setCurrentEventIndex(nextIndex)
-    setCurrentPhase('highlight')
-    processPhase(nextEvent, 'highlight')
-  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration])
+    // Arena transition check was already done earlier, reuse those values
+    // Skip arena transition if the dead card is about to attack (they need to stay visible in arena)
+    if (needsTransition && !deadCardIsAttacker) {
+      // Arena cards need to change - perform transition before attack
+      setCurrentEventIndex(nextIndex)
+      performArenaTransition(newFrontA, newFrontB, () => {
+        // After arena transition completes, proceed to highlight phase
+        if (isPlayingRef.current) {
+          setCurrentPhase('highlight')
+          processPhase(nextEvent, 'highlight')
+        }
+      })
+    } else {
+      // No arena transition needed - proceed directly to highlight
+      setCurrentEventIndex(nextIndex)
+      setCurrentPhase('highlight')
+      processPhase(nextEvent, 'highlight')
+    }
+  }, [battleData, processPhase, applyPendingDeaths, getScaledDuration, checkArenaTransitionNeeded, performArenaTransition, completeBattle, handleDeathAnimationComplete, arenaCardA, arenaCardB])
 
   // Keep advanceToNextEvent ref in sync for use in processPhase
   // (avoids circular dependency: processPhase -> advanceToNextEvent -> processPhase)
   useEffect(() => {
     advanceToNextEventRef.current = advanceToNextEvent
   }, [advanceToNextEvent])
+
+  /**
+   * Initialize arena cards at battle start.
+   * Gets the front cards and performs an enter animation before the first event.
+   *
+   * @param onComplete - Callback to run after initialization completes
+   */
+  const initializeArenaCards = useCallback(
+    (onComplete: () => void) => {
+      const { cardA, cardB } = getFrontCards()
+
+      // Set initial arena cards
+      setArenaCardA(cardA)
+      setArenaCardB(cardB)
+
+      // Build entering set with all initial cards
+      const enteringKeys = new Set<string>()
+      if (cardA) {
+        enteringKeys.add(getCardKey(cardA.teamOwnerId, cardA.cardId))
+      }
+      if (cardB) {
+        enteringKeys.add(getCardKey(cardB.teamOwnerId, cardB.cardId))
+      }
+
+      // If we have cards, play enter animation
+      const hasCards = cardA !== null || cardB !== null
+
+      if (hasCards) {
+        setArenaTransitionState('entering')
+        setTransitioningCards({ entering: enteringKeys, exiting: new Set() })
+        setCurrentPhase('arena_transition')
+
+        phaseTimeoutRef.current = setTimeout(() => {
+          setArenaTransitionState('idle')
+          setTransitioningCards({ entering: new Set(), exiting: new Set() })
+          onComplete()
+        }, getScaledDuration(ANIMATION_DURATIONS.arenaEnter))
+      } else {
+        // No cards to display, just complete
+        onComplete()
+      }
+    },
+    [getFrontCards, getScaledDuration]
+  )
 
   /**
    * Start or resume playback.
@@ -626,18 +1136,81 @@ export function useBattleAnimation(
     setIsPlaying(true)
     isPlayingRef.current = true
 
-    // If we haven't started yet, advance to first event
+    // If we haven't started yet, initialize arena and advance to first event
     if (currentEventIndexRef.current === -1) {
       // Small delay before starting
       phaseTimeoutRef.current = setTimeout(() => {
-        advanceToNextEvent()
+        // Initialize arena cards with enter animation, then proceed to first event
+        initializeArenaCards(() => {
+          if (isPlayingRef.current) {
+            advanceToNextEvent()
+          }
+        })
       }, ANIMATION_DURATIONS.playStart)
+    } else if (currentPhase === 'arena_transition') {
+      // Resuming during arena transition - CSS animation will resume from paused state
+      // We need to reschedule the transition completion timer
+      // Since CSS animation uses 'forwards' fill mode and continues from where it paused,
+      // we use a short delay to allow the animation to complete
+      const remainingDuration = getScaledDuration(
+        arenaTransitionState === 'entering' ? ANIMATION_DURATIONS.arenaEnter : ANIMATION_DURATIONS.arenaExit
+      )
+      phaseTimeoutRef.current = setTimeout(() => {
+        if (!isPlayingRef.current) return
+
+        if (arenaTransitionState === 'exiting') {
+          // After exit completes, check if we need to enter new cards
+          const { cardA, cardB } = getFrontCards()
+          setArenaCardA(cardA)
+          setArenaCardB(cardB)
+
+          const hasNewCards = cardA !== null || cardB !== null
+          if (hasNewCards) {
+            setArenaTransitionState('entering')
+            phaseTimeoutRef.current = setTimeout(() => {
+              setArenaTransitionState('idle')
+              isArenaTransitionInProgressRef.current = false
+              if (isPlayingRef.current) {
+                advanceToNextEvent()
+              }
+            }, getScaledDuration(ANIMATION_DURATIONS.arenaEnter))
+          } else {
+            setArenaTransitionState('idle')
+            isArenaTransitionInProgressRef.current = false
+            if (isPlayingRef.current) {
+              advanceToNextEvent()
+            }
+          }
+        } else if (arenaTransitionState === 'entering') {
+          // After enter completes, proceed to next event
+          setArenaTransitionState('idle')
+          isArenaTransitionInProgressRef.current = false
+          if (isPlayingRef.current) {
+            advanceToNextEvent()
+          }
+        }
+      }, remainingDuration)
+    } else if (currentPhase === 'death_animation') {
+      // Resuming during death animation - reschedule the completion
+      // Use full duration as we don't track partial progress
+      phaseTimeoutRef.current = setTimeout(() => {
+        if (!isPlayingRef.current) return
+        advanceToNextEvent()
+      }, getScaledDuration(ANIMATION_DURATIONS.deathEffect))
     } else if (currentPhase === 'idle') {
       // Resume from current position
       advanceToNextEvent()
+    } else {
+      // If in middle of a phase (highlight, attack, damage, complete), it will continue automatically
+      // after the CSS transitions complete - we need to reschedule the processPhase timeout
+      // Resuming during an attack phase - reschedule the phase progression
+      const currentEvent = battleData.events[currentEventIndexRef.current]
+      if (currentEvent) {
+        // Resume the current phase processing
+        processPhase(currentEvent, currentPhase)
+      }
     }
-    // If in middle of a phase, it will continue automatically
-  }, [battleData, isComplete, currentPhase, advanceToNextEvent])
+  }, [battleData, isComplete, currentPhase, advanceToNextEvent, initializeArenaCards, arenaTransitionState, getFrontCards, getScaledDuration, processPhase])
 
   /**
    * Pause playback.
@@ -680,7 +1253,13 @@ export function useBattleAnimation(
     setDamageTargetKey(null)
     setActiveEffects([])
     setPendingDeaths(new Set())
+    pendingDeathsRef.current = new Set()
     currentRoundRef.current = 0
+    // Reset arena state
+    setArenaCardA(null)
+    setArenaCardB(null)
+    setArenaTransitionState('idle')
+    isArenaTransitionInProgressRef.current = false
   }, [battleData, playerAId, playerBId])
 
   /**
@@ -745,7 +1324,40 @@ export function useBattleAnimation(
     setDamageTargetKey(null)
     setActiveEffects([])
     setPendingDeaths(new Set())
+    pendingDeathsRef.current = new Set()
     currentRoundRef.current = 0
+
+    // Set final arena state based on surviving cards
+    // Find front cards from the final card states
+    let finalFrontA: ArenaCard | null = null
+    let finalFrontB: ArenaCard | null = null
+    let minPosA = Infinity
+    let minPosB = Infinity
+
+    finalCardStates.forEach((state: CardSnapshot, key: string) => {
+      if (!state.is_alive) return
+
+      const parts = key.split('_')
+      const teamOwnerId = parseInt(parts[0], 10)
+      const cardId = state.card_id
+
+      if (teamOwnerId === playerAId) {
+        if (state.position < minPosA) {
+          minPosA = state.position
+          finalFrontA = { cardId, teamOwnerId }
+        }
+      } else if (teamOwnerId === playerBId) {
+        if (state.position < minPosB) {
+          minPosB = state.position
+          finalFrontB = { cardId, teamOwnerId }
+        }
+      }
+    })
+
+    setArenaCardA(finalFrontA)
+    setArenaCardB(finalFrontB)
+    setArenaTransitionState('idle')
+    isArenaTransitionInProgressRef.current = false
   }, [battleData, playerAId, playerBId])
 
   return {
@@ -759,6 +1371,11 @@ export function useBattleAnimation(
     damageTargetKey,
     activeEffects,
     onEffectComplete,
+    arenaCardA,
+    arenaCardB,
+    arenaTransitionState,
+    transitioningCards,
+    getFrontCards,
     play,
     pause,
     reset,

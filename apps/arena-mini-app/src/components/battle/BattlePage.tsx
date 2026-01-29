@@ -16,17 +16,17 @@ import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, ErrorDisplay } from '../common'
 import { RPGPanel, GameButton } from '../ui'
 import { CompactCard } from '../common/CompactCard'
-import { BattleLog } from './BattleLog'
 import { BattleEffect } from './BattleEffect'
 import type { EffectPosition } from './BattleEffect'
-import { useBattleAnimation, getCardKey, usePageBackground } from '../../hooks'
+import { useBattleAnimation, getCardKey, usePageBackground, useVictoryParticles } from '../../hooks'
 import { useSoundContext } from '../../contexts'
+import { ANIMATION_DURATIONS } from '../../types'
 import type {
   BattleResult,
-  CombatEvent,
   Match,
   GameConstants,
   PlaceholderPositions,
+  EnhancedTeamCard,
 } from '../../types'
 
 // Playback speed options (events per second)
@@ -89,6 +89,44 @@ export function BattlePage({
   const battleArenaRef = useRef<HTMLDivElement>(null)
   const cardRefsMap = useRef<Map<string, HTMLDivElement>>(new Map())
 
+  // Refs for deck elements (used for victory celebration positioning)
+  const deckRefA = useRef<HTMLDivElement>(null)
+  const deckRefB = useRef<HTMLDivElement>(null)
+
+  // Victory celebration state
+  const [celebratingDeckOwner, setCelebratingDeckOwner] = useState<number | null>(null)
+  // Track which cards are flying to center for celebration
+  const [celebrationCards, setCelebrationCards] = useState<EnhancedTeamCard[] | null>(null)
+
+  // Victory particle system (5x particles for enhanced celebration)
+  const {
+    canvasRef: particleCanvasRef,
+    startAnimation: startParticles,
+    stopAnimation: stopParticles,
+  } = useVictoryParticles({
+    // Scale duration with playback speed
+    duration: (PLAYBACK_SPEEDS[speedIndex].value / 1000) * ANIMATION_DURATIONS.victoryCelebration,
+    burstCount: 300,        // 5x more particles (was 60)
+    continuousRate: 15,     // 5x continuous rate (was 3)
+    spreadX: 200,           // Larger spread for center explosion
+    spreadY: 200,
+  })
+
+  // Resize particle canvas to match viewport
+  useEffect(() => {
+    const resizeCanvas = () => {
+      const canvas = particleCanvasRef.current
+      if (canvas) {
+        canvas.width = window.innerWidth
+        canvas.height = window.innerHeight
+      }
+    }
+
+    resizeCanvas()
+    window.addEventListener('resize', resizeCanvas)
+    return () => window.removeEventListener('resize', resizeCanvas)
+  }, [particleCanvasRef])
+
   /**
    * Get the center position of a card element relative to the battle arena.
    * Used by useBattleAnimation to position battle effects.
@@ -111,18 +149,56 @@ export function BattlePage({
     return { x, y }
   }, [])
 
+  /**
+   * Handle victory celebration start.
+   * Triggered by useBattleAnimation after arena cards exit.
+   * Animates winner's cards to center and starts particle effects.
+   */
+  const handleVictoryCelebrationStart = useCallback((winnerId: number | null, isDraw: boolean) => {
+    if (isDraw || winnerId === null) return
+
+    // Set celebrating deck (triggers CSS animation to hide deck cards)
+    setCelebratingDeckOwner(winnerId)
+
+    // Get winner's cards for flying animation
+    const isWinnerA = winnerId === battleData?.player_a_id
+    const winnerCards = isWinnerA
+      ? battleData?.team_a_final?.cards
+      : battleData?.team_b_final?.cards
+
+    // Start flying animation (cards to center)
+    if (winnerCards) {
+      setCelebrationCards([...winnerCards] as EnhancedTeamCard[])
+    }
+
+    // Start particles at SCREEN CENTER after cards arrive
+    // Delay matches the fly-in animation duration
+    setTimeout(() => {
+      const centerX = window.innerWidth / 2
+      const centerY = window.innerHeight / 2
+      startParticles(centerX, centerY)
+    }, ANIMATION_DURATIONS.victoryCardFlyIn)
+
+    addPageAction('victory_celebration_started', {
+      match_id: activeMatch?.id,
+      winner_id: winnerId,
+    })
+  }, [battleData, activeMatch, startParticles])
+
   // Animation state machine hook
   const {
     cardStates,
     animationStates,
     currentEventIndex,
-    currentPhase,
     isPlaying: hookIsPlaying,
     isComplete,
     currentDamage,
     damageTargetKey,
     activeEffects,
     onEffectComplete,
+    arenaCardA,
+    arenaCardB,
+    transitioningCards,
     play,
     pause,
     reset,
@@ -133,6 +209,7 @@ export function BattlePage({
     playerBId: battleData?.player_b_id ?? 0,
     onPlaySound: playSound,
     getCardPosition,
+    onVictoryCelebrationStart: handleVictoryCelebrationStart,
   })
 
   // Sync parent isPlaying state with hook
@@ -238,6 +315,15 @@ export function BattlePage({
     }
   }, [isComplete, showVictory, victoryDismissed, matchId, battleData, userId, playSound])
 
+  // Clear celebration state when victory popup appears
+  useEffect(() => {
+    if (isComplete && showVictory) {
+      setCelebratingDeckOwner(null)
+      setCelebrationCards(null)
+      stopParticles()
+    }
+  }, [isComplete, showVictory, stopParticles])
+
   // Notify parent when battle completion state changes
   useEffect(() => {
     onCompleteChange?.(isComplete)
@@ -254,8 +340,11 @@ export function BattlePage({
     reset()
     setShowVictory(false)
     setVictoryDismissed(false)
+    setCelebratingDeckOwner(null)
+    setCelebrationCards(null)
+    stopParticles()
     addPageAction('battle_reset', { match_id: matchId })
-  }, [reset, matchId])
+  }, [reset, matchId, stopParticles])
 
   // Handle replay trigger from parent (TabBar replay button)
   const prevReplayTriggerRef = useRef(replayTrigger)
@@ -307,8 +396,23 @@ export function BattlePage({
     (battleData.is_draw && false) // No winner on draw
   const isDraw = battleData.is_draw
 
-  // Render a battle card
-  const renderBattleCard = (
+  // Player labels
+  const playerALabel = userId === battleData.player_a_id ? 'You' : battleData.player_a_name
+  const playerBLabel = userId === battleData.player_b_id ? 'You' : battleData.player_b_name
+
+  // Check if a card is currently in the arena
+  const isCardInArena = (cardId: number, teamOwnerId: number): boolean => {
+    if (arenaCardA && arenaCardA.cardId === cardId && arenaCardA.teamOwnerId === teamOwnerId) {
+      return true
+    }
+    if (arenaCardB && arenaCardB.cardId === cardId && arenaCardB.teamOwnerId === teamOwnerId) {
+      return true
+    }
+    return false
+  }
+
+  // Render a deck card (small version in the deck strip)
+  const renderDeckCard = (
     cardId: number,
     teamOwnerId: number,
     originalCard: {
@@ -317,32 +421,22 @@ export function BattlePage({
       username?: string
       card_image_url?: string
       placeholder_positions?: PlaceholderPositions | null
+      position: number
     }
   ) => {
-    // Use composite key to look up state (handles same card on both teams)
     const cardKey = getCardKey(teamOwnerId, cardId)
     const state = cardStates.get(cardKey)
     if (!state) return null
 
-    // Get animation state from the animation state machine
-    const animState = animationStates.get(cardKey)
-
-    // Check if this card is currently taking damage and should show damage number
-    const isDamageTarget = damageTargetKey === cardKey
-    const damageToShow =
-      isDamageTarget && currentDamage !== null ? currentDamage : undefined
-
-    // Ref callback to register card element for effect positioning
-    const setCardRef = (el: HTMLDivElement | null) => {
-      if (el) {
-        cardRefsMap.current.set(cardKey, el)
-      } else {
-        cardRefsMap.current.delete(cardKey)
-      }
+    // If card is in arena, show placeholder
+    if (isCardInArena(cardId, teamOwnerId)) {
+      return <div key={cardId} className="deck-card-placeholder" />
     }
 
+    // Otherwise render compact deck card
     return (
-      <div key={cardId} className="battle-card-wrapper" ref={setCardRef}>
+      <div key={cardId} className={`deck-compact-card ${!state.is_alive ? 'dead' : ''}`}>
+        <span className="deck-card-order">{originalCard.position + 1}</span>
         <CompactCard
           imageUrl={originalCard.card_image_url || ''}
           positions={originalCard.placeholder_positions}
@@ -351,76 +445,148 @@ export function BattlePage({
             hp: state.hp,
             maxHp: state.max_hp,
           }}
-          animationState={animState}
-          damageNumber={damageToShow}
           isDead={!state.is_alive}
           cardName={state.name}
           cardId={cardId}
-          className="battle-compact-card"
         />
       </div>
     )
   }
 
-  // Get event message text
-  const getEventMessage = (event: CombatEvent): string => {
-    if (event.message) return event.message
-
-    switch (event.type) {
-      case 'attack':
-        return `Attack! ${event.damage} damage dealt`
-      case 'damage':
-        return `${event.damage} damage (${event.hp_before} → ${event.hp_after} HP)`
-      case 'death':
-        return `Card defeated!`
-      case 'advance':
-        return `Next card advances`
-      case 'victory':
-        return `Victory!`
-      case 'summary':
-        return `Combat summary`
-      default:
-        return `Event: ${event.type}`
-    }
-  }
-
   return (
-    <div className="battle-page">
-      {/* Battle Arena */}
+    <div
+      className="battle-page arena-layout page-bg page-bg--arena"
+      style={{
+        // Scale HP bar transition duration with playback speed
+        // At 1x (value=1000), duration is 300ms; at 2x (value=500), duration is 150ms
+        '--hp-transition-duration': `${(PLAYBACK_SPEEDS[speedIndex].value / 1000) * 300}ms`,
+        // Scale arena card enter/exit animation duration with playback speed
+        // At 1x (value=1000), duration is 400ms; at 2x (value=667), duration is ~267ms
+        '--arena-transition-duration': `${(PLAYBACK_SPEEDS[speedIndex].value / 1000) * 400}ms`,
+      } as React.CSSProperties}
+    >
+      {/* Team B Deck - Upper Left */}
+      <div
+        ref={deckRefB}
+        className={`battle-deck battle-deck-b${celebratingDeckOwner === battleData.player_b_id ? ' deck-celebrating' : ''}`}
+      >
+        <div className="deck-label">{playerBLabel}</div>
+        <div className="deck-cards">
+          {[...(battleData.team_b_final?.cards ?? [])].reverse().map((card) =>
+            renderDeckCard(card.card_id, battleData.player_b_id, card)
+          )}
+        </div>
+      </div>
+
+      {/* Central Battle Arena */}
       <div
         ref={battleArenaRef}
-        className="battle-arena battle-effect-container page-bg page-bg--arena"
-        style={{
-          // Scale HP bar transition duration with playback speed
-          // At 1x (value=1000), duration is 300ms; at 2x (value=500), duration is 150ms
-          '--hp-transition-duration': `${(PLAYBACK_SPEEDS[speedIndex].value / 1000) * 300}ms`,
-        } as React.CSSProperties}
+        className={`battle-arena-center battle-effect-container${!hookIsPlaying ? ' arena-paused' : ''}`}
       >
-        {/* Team B (left side) */}
-        <div className="battle-team team-b">
-          <div className="team-label">
-            {userId === battleData.player_b_id ? 'You' : battleData.player_b_name}
-          </div>
-          <div className="team-cards">
-            {(battleData.team_b_final?.cards ?? []).map((card) =>
-              renderBattleCard(card.card_id, battleData.player_b_id, card)
-            )}
-          </div>
-        </div>
+        {/* Team B's arena card (left) */}
+        {arenaCardB && (() => {
+          const cardKey = getCardKey(arenaCardB.teamOwnerId, arenaCardB.cardId)
+          const state = cardStates.get(cardKey)
+          const animState = animationStates.get(cardKey)
+          const originalCard = battleData.team_b_final?.cards?.find(c => c.card_id === arenaCardB.cardId) as EnhancedTeamCard | undefined
+          if (!state || !originalCard) return null
 
-        {/* Team A (right side) */}
-        <div className="battle-team team-a">
-          <div className="team-label">
-            {userId === battleData.player_a_id ? 'You' : battleData.player_a_name}
-          </div>
-          <div className="team-cards">
-            {(battleData.team_a_final?.cards ?? []).map((card) =>
-              renderBattleCard(card.card_id, battleData.player_a_id, card)
-            )}
-          </div>
-        </div>
+          // Check if this card is currently taking damage
+          const isDamageTarget = damageTargetKey === cardKey
+          const damageToShow = isDamageTarget && currentDamage !== null ? currentDamage : undefined
 
-        {/* Battle Effects - renders animated effects at card positions (supports multiple simultaneous effects) */}
+          // Build animation class - only animate if this specific card is transitioning
+          const transitionClass = transitioningCards.exiting.has(cardKey) ? 'arena-card-exiting'
+            : transitioningCards.entering.has(cardKey) ? 'arena-card-entering' : ''
+
+          // Ref callback to register card element
+          const setCardRef = (el: HTMLDivElement | null) => {
+            if (el) {
+              cardRefsMap.current.set(cardKey, el)
+            } else {
+              cardRefsMap.current.delete(cardKey)
+            }
+          }
+
+          return (
+            <div
+              key={cardKey}
+              className={`arena-card arena-card-left ${transitionClass}`}
+              ref={setCardRef}
+            >
+              <CompactCard
+                imageUrl={originalCard.card_image_url || ''}
+                positions={originalCard.placeholder_positions}
+                currentStats={{
+                  atk: state.atk,
+                  hp: state.hp,
+                  maxHp: state.max_hp,
+                }}
+                animationState={animState}
+                damageNumber={damageToShow}
+                isDead={!state.is_alive}
+                cardName={state.name}
+                cardId={arenaCardB.cardId}
+                className="arena-compact-card"
+              />
+            </div>
+          )
+        })()}
+
+        {/* VS Indicator */}
+        {arenaCardA && arenaCardB && <div className="arena-vs">VS</div>}
+
+        {/* Team A's arena card (right) */}
+        {arenaCardA && (() => {
+          const cardKey = getCardKey(arenaCardA.teamOwnerId, arenaCardA.cardId)
+          const state = cardStates.get(cardKey)
+          const animState = animationStates.get(cardKey)
+          const originalCard = battleData.team_a_final?.cards?.find(c => c.card_id === arenaCardA.cardId) as EnhancedTeamCard | undefined
+          if (!state || !originalCard) return null
+
+          // Check if this card is currently taking damage
+          const isDamageTarget = damageTargetKey === cardKey
+          const damageToShow = isDamageTarget && currentDamage !== null ? currentDamage : undefined
+
+          // Build animation class - only animate if this specific card is transitioning
+          const transitionClass = transitioningCards.exiting.has(cardKey) ? 'arena-card-exiting'
+            : transitioningCards.entering.has(cardKey) ? 'arena-card-entering' : ''
+
+          // Ref callback to register card element
+          const setCardRef = (el: HTMLDivElement | null) => {
+            if (el) {
+              cardRefsMap.current.set(cardKey, el)
+            } else {
+              cardRefsMap.current.delete(cardKey)
+            }
+          }
+
+          return (
+            <div
+              key={cardKey}
+              className={`arena-card arena-card-right ${transitionClass}`}
+              ref={setCardRef}
+            >
+              <CompactCard
+                imageUrl={originalCard.card_image_url || ''}
+                positions={originalCard.placeholder_positions}
+                currentStats={{
+                  atk: state.atk,
+                  hp: state.hp,
+                  maxHp: state.max_hp,
+                }}
+                animationState={animState}
+                damageNumber={damageToShow}
+                isDead={!state.is_alive}
+                cardName={state.name}
+                cardId={arenaCardA.cardId}
+                className="arena-compact-card"
+              />
+            </div>
+          )
+        })()}
+
+        {/* Battle Effects - renders animated effects at card positions */}
         {activeEffects.map((effect) => (
           <BattleEffect
             key={`${effect.type}-${effect.cardKey}`}
@@ -432,19 +598,51 @@ export function BattlePage({
         ))}
       </div>
 
-      {/* Event Log */}
-      <BattleLog
-        combats={battleData.combats}
-        events={battleData.events}
-        currentEventIndex={currentEventIndex}
-        currentPhase={currentPhase}
-        getEventMessage={getEventMessage}
-        playerAId={battleData.player_a_id}
-        playerBId={battleData.player_b_id}
-        playerAName={battleData.player_a_name}
-        playerBName={battleData.player_b_name}
-        currentUserId={userId}
+      {/* Team A Deck - Bottom Right (position 1 is leftmost, facing arena) */}
+      <div
+        ref={deckRefA}
+        className={`battle-deck battle-deck-a${celebratingDeckOwner === battleData.player_a_id ? ' deck-celebrating' : ''}`}
+      >
+        <div className="deck-label">{playerALabel}</div>
+        <div className="deck-cards">
+          {[...(battleData.team_a_final?.cards ?? [])].map((card) =>
+            renderDeckCard(card.card_id, battleData.player_a_id, card)
+          )}
+        </div>
+      </div>
+
+      {/* Victory Particle Canvas - full viewport overlay for celebration */}
+      <canvas
+        ref={particleCanvasRef}
+        className="victory-particle-canvas"
       />
+
+      {/* Celebration cards flying to center */}
+      {celebrationCards && (
+        <div className="victory-celebration-overlay">
+          <div className="victory-cards-container">
+            {celebrationCards.map((card, index) => (
+              <div
+                key={card.card_id}
+                className="victory-flying-card"
+                style={{ '--card-index': index } as React.CSSProperties}
+              >
+                <CompactCard
+                  imageUrl={card.card_image_url || ''}
+                  positions={card.placeholder_positions}
+                  currentStats={{
+                    atk: card.atk,
+                    hp: card.max_hp,
+                    maxHp: card.max_hp,
+                  }}
+                  cardName={card.name}
+                  cardId={card.card_id}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Victory Screen Overlay */}
       {showVictory && (

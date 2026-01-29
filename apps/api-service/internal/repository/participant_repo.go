@@ -82,7 +82,7 @@ func (r *ParticipantRepository) GetMatchParticipants(ctx context.Context, matchI
 	query := `
 		SELECT p.id, p.match_id, p.user_id, p.status, p.joined_at, p.coins_remaining,
 		       p.shop_cards, p.team, p.team_order, p.team_submitted_at,
-		       p.placement, p.wins, p.losses, p.total_damage_dealt,
+		       p.placement, p.wins, p.losses, p.total_damage_dealt, p.has_rerolled,
 		       u.first_name, COALESCE(u.username, ''),
 		       (SELECT minio_object_key FROM user_profile_photos WHERE user_id = u.id ORDER BY width DESC LIMIT 1)
 		FROM game_match_participants p
@@ -104,6 +104,7 @@ func (r *ParticipantRepository) GetMatchParticipants(ctx context.Context, matchI
 			&p.ID, &p.MatchID, &p.UserID, &p.Status, &p.JoinedAt,
 			&p.CoinsRemaining, &p.ShopCards, &p.Team, &p.TeamOrder,
 			&p.TeamSubmittedAt, &p.Placement, &p.Wins, &p.Losses, &p.TotalDamageDealt,
+			&p.HasRerolled,
 			&p.FirstName, &p.Username, &p.PhotoObjectKey,
 		)
 		if err != nil {
@@ -148,6 +149,19 @@ func (r *ParticipantRepository) SubmitTeam(ctx context.Context, matchID string, 
 		UPDATE game_match_participants
 		SET status = 'ready',
 		    team_submitted_at = NOW()
+		WHERE match_id = $1 AND user_id = $2
+	`
+	_, err := r.db.ExecContext(ctx, query, matchID, userID)
+	return err
+}
+
+// SetParticipantRerolled marks that a participant has used their reroll
+func (r *ParticipantRepository) SetParticipantRerolled(ctx context.Context, matchID string, userID int64) error {
+	defer nrutil.StartSegment(ctx, "db:set-participant-rerolled")()
+
+	query := `
+		UPDATE game_match_participants
+		SET has_rerolled = true
 		WHERE match_id = $1 AND user_id = $2
 	`
 	_, err := r.db.ExecContext(ctx, query, matchID, userID)

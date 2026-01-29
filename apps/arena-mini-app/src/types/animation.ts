@@ -63,10 +63,13 @@ export type CardAnimationState = 'idle' | 'attacking' | 'taking_damage'
  */
 export type EventAnimationPhase =
   | 'idle'
+  | 'arena_transition'
   | 'highlight'
   | 'attack'
   | 'damage'
   | 'complete'
+  | 'death_animation'
+  | 'victory_celebration'
 
 // =============================================================================
 // ANIMATION DURATIONS
@@ -114,6 +117,24 @@ export const ANIMATION_DURATIONS = {
 
   /** Delay before starting the first event on play */
   playStart: 100,
+
+  /** Arena card enter animation duration (scale up from deck to arena) */
+  arenaEnter: 400,
+
+  /** Arena card exit animation duration (scale down from arena back to deck) */
+  arenaExit: 400,
+
+  /** Death effect animation duration (9 frames × 70ms per frame) */
+  deathEffect: 630,
+
+  /** Victory return animation duration (winner card exits arena) */
+  victoryReturn: 400,
+
+  /** Victory cards fly to center animation duration */
+  victoryCardFlyIn: 600,
+
+  /** Victory celebration duration (cards pulse + particles) */
+  victoryCelebration: 3500,
 } as const
 
 /**

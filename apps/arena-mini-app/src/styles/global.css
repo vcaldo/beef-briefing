@@ -558,7 +558,7 @@ a:focus:not(:focus-visible),
 /* Card dead/eliminated state - !important to override animation states */
 .card-dead {
   filter: grayscale(1) !important;
-  opacity: 0.5 !important;
+  opacity: 0.7 !important;
   transition: filter 0.3s ease, opacity 0.3s ease;
 }
 
@@ -749,9 +749,9 @@ a:focus:not(:focus-visible),
   transition: filter 0.3s ease, opacity 0.3s ease, box-shadow 0.2s ease;
 }
 
-/* Attacking state - orange glow with scale up, pulsing animation */
+/* Attacking state - orange glow with pulsing animation (no scale to prevent layout shifts on mobile) */
 .compact-card-anim-attacking {
-  --anim-scale: 1.05;
+  --anim-scale: 1;
   box-shadow:
     0 0 20px rgba(249, 115, 22, 0.6),
     0 0 40px rgba(249, 115, 22, 0.4),
@@ -760,21 +760,18 @@ a:focus:not(:focus-visible),
   z-index: 10;
 }
 
-/* Attack pulse keyframes - scale up with intensifying orange glow */
+/* Attack pulse keyframes - intensifying orange glow only (no scale to prevent layout shifts on mobile) */
 @keyframes card-attack-pulse {
   0% {
-    --anim-scale: 1;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   }
   50% {
-    --anim-scale: 1.08;
     box-shadow:
       0 0 25px rgba(249, 115, 22, 0.8),
       0 0 50px rgba(249, 115, 22, 0.5),
       0 0 75px rgba(249, 115, 22, 0.3);
   }
   100% {
-    --anim-scale: 1.05;
     box-shadow:
       0 0 20px rgba(249, 115, 22, 0.6),
       0 0 40px rgba(249, 115, 22, 0.4),
@@ -794,41 +791,41 @@ a:focus:not(:focus-visible),
 /* Damage shake keyframes - rapid horizontal shake with red flash */
 @keyframes card-damage-shake {
   0% {
-    transform: translateX(0) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(0) scale(var(--arena-scale, 1));
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   }
   10% {
-    transform: translateX(-6px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(-6px) scale(var(--arena-scale, 1));
     box-shadow:
       0 0 20px rgba(239, 68, 68, 0.8),
       0 0 40px rgba(239, 68, 68, 0.5);
   }
   20% {
-    transform: translateX(6px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(6px) scale(var(--arena-scale, 1));
   }
   30% {
-    transform: translateX(-5px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(-5px) scale(var(--arena-scale, 1));
   }
   40% {
-    transform: translateX(5px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(5px) scale(var(--arena-scale, 1));
   }
   50% {
-    transform: translateX(-4px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(-4px) scale(var(--arena-scale, 1));
   }
   60% {
-    transform: translateX(4px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(4px) scale(var(--arena-scale, 1));
   }
   70% {
-    transform: translateX(-2px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(-2px) scale(var(--arena-scale, 1));
   }
   80% {
-    transform: translateX(2px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(2px) scale(var(--arena-scale, 1));
   }
   90% {
-    transform: translateX(-1px) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(-1px) scale(var(--arena-scale, 1));
   }
   100% {
-    transform: translateX(0) scale(calc(var(--base-scale, 1) * var(--anim-scale, 1)));
+    transform: translateX(0) scale(var(--arena-scale, 1));
     box-shadow:
       0 0 15px rgba(239, 68, 68, 0.7),
       0 0 30px rgba(239, 68, 68, 0.4);
@@ -1526,7 +1523,7 @@ a:focus:not(:focus-visible),
 
 .reroll-btn {
   font-size: 13px;
-  padding: 8px !important;
+  padding: 12px !important;
 }
 
 .shop-empty {
@@ -2523,6 +2520,338 @@ a:focus:not(:focus-visible),
 }
 
 /* Legacy event-log classes removed - replaced by battle-log-* classes above */
+
+/* =============================================================================
+   Battle Arena Layout (Grid-based)
+   Full-screen arena layout with deck strips at top and bottom edges
+   ============================================================================= */
+
+/* Override default battle-page for arena layout */
+.battle-page.arena-layout {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "deck-b"
+    "arena"
+    "deck-a";
+  min-height: 100vh; /* Fallback for browsers without dvh support */
+  height: 100dvh; /* Dynamic viewport height - adapts to mobile address bar */
+  padding-bottom: var(--tab-bar-height);
+  background: var(--arena-bg-dark);
+  overflow: hidden;
+}
+
+/* Team B Deck - Upper area, aligned to top-left */
+.battle-deck-b {
+  grid-area: deck-b;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 4px 12px;
+  padding-top: max(4px, env(safe-area-inset-top));
+  gap: 4px;
+}
+
+/* Team A Deck - Lower area, aligned to bottom-right */
+.battle-deck-a {
+  grid-area: deck-a;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 4px 12px;
+  gap: 4px;
+}
+
+/* Deck label styling */
+.battle-deck-b .deck-label,
+.battle-deck-a .deck-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tg-theme-hint-color);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Deck cards container */
+.deck-cards {
+  display: flex;
+  gap: 4px;
+}
+
+/* Deck compact card - Scale 0.30 from 300x450 base
+   Visual size: 90x135px
+   Margin formula: size * (scale - 1) / 2 */
+.deck-compact-card {
+  position: relative;
+  width: 300px;
+  height: 450px;
+  --deck-scale: 0.30;
+  transform: scale(var(--deck-scale));
+  transform-origin: center;
+  /* Collapse layout box: 300 * (0.16 - 1) / 2 = -126, 450 * (0.16 - 1) / 2 = -189 */
+  margin: calc(450px * (var(--deck-scale) - 1) / 2) calc(300px * (var(--deck-scale) - 1) / 2);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* Dead cards in deck show greyed out */
+.deck-compact-card.dead {
+  filter: grayscale(100%);
+  opacity: 0.5;
+}
+
+/* Order number badge for deck cards - shows battle order (1, 2, 3) */
+.deck-card-order {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 22px;
+  font-weight: 600;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Placeholder for cards currently in arena
+   Visual size matches deck-compact-card: 90x135px */
+.deck-card-placeholder {
+  width: 90px;
+  height: 135px;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* -----------------------------------------------------------------------------
+   Victory Deck Celebration
+   ----------------------------------------------------------------------------- */
+
+/* Deck shake animation for victory celebration */
+@keyframes deck-shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  10% { transform: translateX(-3px) rotate(-0.5deg); }
+  20% { transform: translateX(4px) rotate(0.5deg); }
+  30% { transform: translateX(-4px) rotate(-0.5deg); }
+  40% { transform: translateX(3px) rotate(0.5deg); }
+  50% { transform: translateX(-3px) rotate(-0.5deg); }
+  60% { transform: translateX(4px) rotate(0.5deg); }
+  70% { transform: translateX(-4px) rotate(-0.5deg); }
+  80% { transform: translateX(3px) rotate(0.5deg); }
+  90% { transform: translateX(-3px) rotate(-0.5deg); }
+}
+
+/* Apply shake to celebrating deck container */
+.deck-celebrating {
+  animation: deck-shake 0.8s ease-in-out;
+}
+
+/* Hide deck cards during celebration (they fly to center instead) */
+.deck-celebrating .deck-compact-card {
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+
+/* Golden glow effect on celebrating deck */
+.deck-celebrating .deck-cards {
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.6))
+          drop-shadow(0 0 16px rgba(255, 165, 0, 0.4));
+}
+
+/* Victory particle canvas - full viewport overlay */
+.victory-particle-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* -----------------------------------------------------------------------------
+   Victory Celebration Cards (Flying to Center)
+   ----------------------------------------------------------------------------- */
+
+/* Victory celebration overlay - covers entire viewport */
+.victory-celebration-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  z-index: 90; /* Below particles (100) but above arena */
+}
+
+/* Container for the 3 victory cards */
+.victory-cards-container {
+  display: flex;
+  gap: 16px;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+/* Individual flying card wrapper */
+.victory-flying-card {
+  animation: fly-to-center 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+             victory-pulse 1.5s ease-in-out 0.6s infinite;
+  /* Stagger animation based on card index */
+  animation-delay: calc(var(--card-index) * 0.1s), calc(0.6s + var(--card-index) * 0.1s);
+  opacity: 0;
+  transform: scale(0.3);
+}
+
+@keyframes fly-to-center {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(100px);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(0.6) translateY(0) rotate(calc((var(--card-index) - 1) * 5deg));
+  }
+}
+
+@keyframes victory-pulse {
+  0%, 100% {
+    transform: scale(0.6) rotate(calc((var(--card-index) - 1) * 5deg));
+    filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.6));
+  }
+  50% {
+    transform: scale(0.65) rotate(calc((var(--card-index) - 1) * 5deg));
+    filter: drop-shadow(0 0 25px rgba(255, 215, 0, 0.9))
+            drop-shadow(0 0 50px rgba(255, 165, 0, 0.6));
+  }
+}
+
+/* Enhanced golden glow for celebration cards */
+.victory-flying-card .compact-card {
+  box-shadow:
+    0 0 20px rgba(255, 215, 0, 0.5),
+    0 0 40px rgba(255, 165, 0, 0.3),
+    0 0 60px rgba(255, 215, 0, 0.2);
+}
+
+/* -----------------------------------------------------------------------------
+   Central Battle Arena
+   ----------------------------------------------------------------------------- */
+
+/* Central arena container */
+.battle-arena-center {
+  grid-area: arena;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+  padding: 16px;
+  background: transparent;
+  position: relative;
+}
+
+/* Arena compact card - Scale 0.5 from 300x450 base
+   Visual size: 150x225px
+   Margin formula: size * (scale - 1) / 2 */
+.arena-compact-card {
+  width: 300px;
+  height: 450px;
+  --arena-scale: 0.5;
+  transform: scale(var(--arena-scale));
+  transform-origin: center;
+  /* Collapse layout box: 300 * (0.5 - 1) / 2 = -75, 450 * (0.5 - 1) / 2 = -112.5 */
+  margin: calc(450px * (var(--arena-scale) - 1) / 2) calc(300px * (var(--arena-scale) - 1) / 2);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 0 60px rgba(249, 115, 22, 0.2);
+}
+
+/* VS indicator between arena cards */
+.arena-vs {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--arena-orange, #f97316);
+  text-shadow:
+    0 0 10px rgba(249, 115, 22, 0.8),
+    0 0 20px rgba(249, 115, 22, 0.5),
+    0 0 30px rgba(249, 115, 22, 0.3);
+  letter-spacing: 2px;
+  user-select: none;
+}
+
+/* Arena card positioning modifiers */
+.arena-card-left {
+  order: 1;
+}
+
+.arena-card-right {
+  order: 3;
+}
+
+.arena-vs {
+  order: 2;
+}
+
+/* Arena Card Animations */
+/* Duration is controlled by --arena-transition-duration CSS variable (set in BattlePage.tsx)
+   to scale with playback speed. Defaults to 400ms if variable not set. */
+.arena-card-entering {
+  animation: arena-card-enter var(--arena-transition-duration, 0.4s) ease-out forwards;
+}
+
+@keyframes arena-card-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.arena-card-exiting {
+  animation: arena-card-exit var(--arena-transition-duration, 0.4s) ease-in forwards;
+}
+
+@keyframes arena-card-exit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+
+.arena-card-returning {
+  animation: arena-card-return var(--arena-transition-duration, 0.4s) ease-in-out forwards;
+}
+
+@keyframes arena-card-return {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0.6;
+    transform: scale(0.3);
+  }
+}
+
+/* Pause arena animations when battle is paused */
+.arena-paused .arena-card-entering,
+.arena-paused .arena-card-exiting,
+.arena-paused .arena-card-returning {
+  animation-play-state: paused;
+}
 
 /* =============================================================================
    Stats Page
@@ -4178,6 +4507,69 @@ a:focus:not(:focus-visible),
 }
 
 /* =============================================================================
+   Battle Log Modal (History View)
+   ============================================================================= */
+
+.rpg-battlelog-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+  backdrop-filter: blur(4px);
+}
+
+.rpg-battlelog-modal-wrapper {
+  width: 100%;
+  max-width: 400px;
+  max-height: 80vh;
+  animation: slideUp 0.3s ease-out;
+}
+
+.rpg-battlelog-modal-outer {
+  position: relative;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.rpg-battlelog-close-wrapper {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+}
+
+.rpg-battlelog-loading {
+  padding: 48px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Static battle log - all events visible, no animation */
+.rpg-battlelog-static {
+  margin: 0;
+}
+
+.rpg-battlelog-static .battle-log-content {
+  min-height: 200px;
+  max-height: 60vh;
+}
+
+.rpg-battlelog-static .battle-log-combat {
+  opacity: 1;
+}
+
+.rpg-battlelog-static .battle-log-combat.slide-in {
+  animation: none;
+}
+
+/* =============================================================================
    Common Animations
    ============================================================================= */
 @keyframes spin {
@@ -4406,6 +4798,17 @@ a:focus:not(:focus-visible),
 
 /* Mobile-specific battle adjustments for tablets and larger phones */
 @media (max-width: 480px) {
+  /* Full-screen arena layout (no log row) */
+  .battle-page.arena-layout {
+    grid-template-rows: auto 1fr auto;
+  }
+
+  /* Reduce arena center spacing to prevent overflow on medium phones */
+  .battle-arena-center {
+    gap: 16px;
+    padding: 12px;
+  }
+
   .battle-arena {
     --battle-gap: 8px;
     padding: 8px;
@@ -4414,6 +4817,72 @@ a:focus:not(:focus-visible),
 
   .team-cards {
     gap: 8px;
+  }
+
+  /* Scale down arena cards from 0.5 to 0.45 (150x225px -> 135x203px) */
+  .arena-compact-card {
+    --arena-scale: 0.45;
+  }
+
+  /* Scale down VS indicator from 28px to 24px to match smaller cards */
+  .arena-vs {
+    font-size: 24px;
+  }
+
+  /* Reduce deck padding and label font on medium phones */
+  .battle-deck-a,
+  .battle-deck-b {
+    padding: 6px 10px;
+  }
+
+  .deck-label {
+    font-size: 10px;
+  }
+}
+
+/* Mobile-specific battle adjustments for small phones (360px and below) */
+@media (max-width: 360px) {
+  /* Full-screen arena layout (no log row) */
+  .battle-page.arena-layout {
+    grid-template-rows: auto 1fr auto;
+  }
+
+  /* Further reduce arena center spacing for smallest phones */
+  .battle-arena-center {
+    gap: 12px;
+    padding: 8px;
+  }
+
+  /* Further scale down arena cards from 0.45 to 0.38 (114x171px) on small phones */
+  .arena-compact-card {
+    --arena-scale: 0.38;
+  }
+
+  /* Further scale down VS indicator from 24px to 20px on small phones */
+  .arena-vs {
+    font-size: 20px;
+  }
+
+  /* Scale down deck cards to 0.24 (72x108px) on small phones */
+  .deck-compact-card {
+    --deck-scale: 0.24;
+  }
+
+  /* Scale down deck card placeholder to match deck cards (72x108px) on small phones */
+  .deck-card-placeholder {
+    width: 72px;
+    height: 108px;
+  }
+
+  /* Further reduce deck padding from 6px 10px to 4px 8px on smallest phones */
+  .battle-deck-a,
+  .battle-deck-b {
+    padding: 4px 8px;
+  }
+
+  /* Reduce gap between deck cards from default to 3px on smallest phones */
+  .deck-cards {
+    gap: 3px;
   }
 }
 

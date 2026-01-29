@@ -2630,6 +2630,56 @@ a:focus:not(:focus-visible),
 }
 
 /* -----------------------------------------------------------------------------
+   Victory Deck Celebration
+   ----------------------------------------------------------------------------- */
+
+/* Deck shake animation for victory celebration */
+@keyframes deck-shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  10% { transform: translateX(-3px) rotate(-0.5deg); }
+  20% { transform: translateX(4px) rotate(0.5deg); }
+  30% { transform: translateX(-4px) rotate(-0.5deg); }
+  40% { transform: translateX(3px) rotate(0.5deg); }
+  50% { transform: translateX(-3px) rotate(-0.5deg); }
+  60% { transform: translateX(4px) rotate(0.5deg); }
+  70% { transform: translateX(-4px) rotate(-0.5deg); }
+  80% { transform: translateX(3px) rotate(0.5deg); }
+  90% { transform: translateX(-3px) rotate(-0.5deg); }
+}
+
+/* Apply shake to celebrating deck container */
+.deck-celebrating {
+  animation: deck-shake 0.8s ease-in-out;
+}
+
+/* Individual cards in celebrating deck vibrate */
+.deck-celebrating .deck-compact-card {
+  animation: deck-card-vibrate 0.15s ease-in-out infinite alternate;
+}
+
+@keyframes deck-card-vibrate {
+  0% { transform: scale(var(--deck-scale)) translateY(0); }
+  100% { transform: scale(var(--deck-scale)) translateY(-3px); }
+}
+
+/* Golden glow effect on celebrating deck */
+.deck-celebrating .deck-cards {
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.6))
+          drop-shadow(0 0 16px rgba(255, 165, 0, 0.4));
+}
+
+/* Victory particle canvas - full viewport overlay */
+.victory-particle-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* -----------------------------------------------------------------------------
    Central Battle Arena
    ----------------------------------------------------------------------------- */
 

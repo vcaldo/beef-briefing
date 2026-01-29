@@ -293,6 +293,14 @@ export function BattlePage({
     }
   }, [isComplete, showVictory, victoryDismissed, matchId, battleData, userId, playSound])
 
+  // Clear celebration state when victory popup appears
+  useEffect(() => {
+    if (isComplete && showVictory) {
+      setCelebratingDeckOwner(null)
+      stopParticles()
+    }
+  }, [isComplete, showVictory, stopParticles])
+
   // Notify parent when battle completion state changes
   useEffect(() => {
     onCompleteChange?.(isComplete)
@@ -309,8 +317,10 @@ export function BattlePage({
     reset()
     setShowVictory(false)
     setVictoryDismissed(false)
+    setCelebratingDeckOwner(null)
+    stopParticles()
     addPageAction('battle_reset', { match_id: matchId })
-  }, [reset, matchId])
+  }, [reset, matchId, stopParticles])
 
   // Handle replay trigger from parent (TabBar replay button)
   const prevReplayTriggerRef = useRef(replayTrigger)
@@ -432,7 +442,10 @@ export function BattlePage({
       } as React.CSSProperties}
     >
       {/* Team B Deck - Upper Left */}
-      <div className="battle-deck battle-deck-b">
+      <div
+        ref={deckRefB}
+        className={`battle-deck battle-deck-b${celebratingDeckOwner === battleData.player_b_id ? ' deck-celebrating' : ''}`}
+      >
         <div className="deck-label">{playerBLabel}</div>
         <div className="deck-cards">
           {(battleData.team_b_final?.cards ?? []).map((card) =>
@@ -562,7 +575,10 @@ export function BattlePage({
       </div>
 
       {/* Team A Deck - Bottom Right (reversed so position 1 is rightmost, facing arena) */}
-      <div className="battle-deck battle-deck-a">
+      <div
+        ref={deckRefA}
+        className={`battle-deck battle-deck-a${celebratingDeckOwner === battleData.player_a_id ? ' deck-celebrating' : ''}`}
+      >
         <div className="deck-label">{playerALabel}</div>
         <div className="deck-cards">
           {[...(battleData.team_a_final?.cards ?? [])].reverse().map((card) =>
@@ -570,6 +586,12 @@ export function BattlePage({
           )}
         </div>
       </div>
+
+      {/* Victory Particle Canvas - full viewport overlay for celebration */}
+      <canvas
+        ref={particleCanvasRef}
+        className="victory-particle-canvas"
+      />
 
       {/* Victory Screen Overlay */}
       {showVictory && (

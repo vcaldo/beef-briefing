@@ -211,7 +211,7 @@ export function ShopPage({
    * Game mechanics:
    * - Each card costs cardCost (default: 3 coins)
    * - Card is added to first empty team slot
-   * - IMPORTANT: First purchase permanently disables reroll (canReroll → false)
+   * - IMPORTANT: Reroll can only be used once (canReroll → false after first reroll)
    * - Team can hold up to teamSize cards (default: 3)
    *
    * The cardIndex identifies which shop slot to purchase from (0-indexed).
@@ -251,7 +251,7 @@ export function ShopPage({
    * CRITICAL GAME MECHANIC:
    * - Reroll costs 1 coin
    * - Can ONLY reroll BEFORE buying any card
-   * - After first card purchase, reroll is permanently disabled (canReroll=false)
+   * - Reroll can only be used once per match (canReroll=false after first reroll)
    * - This is enforced both in UI (button disabled) and backend (API returns error)
    *
    * The canReroll flag comes from the API response and reflects server-side state.
@@ -267,7 +267,7 @@ export function ShopPage({
         match_id: activeMatch.id,
         coins_remaining: data.coins,
       })
-      // Note: After reroll, canReroll remains true until a card is bought
+      // Note: After reroll, canReroll will be false (one reroll per match)
       setShopData(data)
       playSequence(['arena_card_shuffle', 'arena_card_draw'])
     } catch (err) {
@@ -381,7 +381,7 @@ export function ShopPage({
             {/* Reroll row with hint text and button */}
             <div className="rpg-shop-reroll-row">
               <span className="rpg-shop-reroll-hint">
-                You can only reroll before buying your first card
+                You can only reroll once
               </span>
               <GameButton
                 variant="primary"

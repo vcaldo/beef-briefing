@@ -142,12 +142,12 @@ func teamOrderToInt(order []int64) []int {
 }
 
 // computeShopAffordability calculates which actions are affordable (buy, reroll, upgrade, submit).
-func (s *ShopService) computeShopAffordability(coins int, teamSize int, isReady bool) ShopAffordability {
+func (s *ShopService) computeShopAffordability(coins int, teamSize int, isReady bool, hasRerolled bool) ShopAffordability {
 	remainingCards := shop.TeamSize - teamSize
 	coinsNeededForCards := remainingCards * shop.CardCost
 
 	canBuy := coins >= shop.CardCost && teamSize < shop.TeamSize
-	canReroll := teamSize == 0 && coins >= shop.RerollCost
+	canReroll := !hasRerolled && coins >= shop.RerollCost
 	canUpgrade := coins >= (shop.UpgradeCost + coinsNeededForCards)
 	canSubmit := teamSize == shop.TeamSize && !isReady
 
@@ -170,8 +170,8 @@ func (s *ShopService) computeShopAffordability(coins int, teamSize int, isReady 
 
 	if !canReroll {
 		var reason string
-		if teamSize > 0 {
-			reason = "cannot reroll after purchasing cards"
+		if hasRerolled {
+			reason = "already rerolled"
 		} else {
 			reason = fmt.Sprintf("need %d coins", shop.RerollCost)
 		}
@@ -366,7 +366,7 @@ func (s *ShopService) GetShop(ctx context.Context, matchID string, userID int64)
 	// Build enhanced response with affordability and upgrade previews
 	enhancedCards := s.enhanceShopCards(cards, participant.CoinsRemaining, len(team))
 	enhancedTeam := s.enhanceTeamCards(team, participant.CoinsRemaining, len(team))
-	affordability := s.computeShopAffordability(participant.CoinsRemaining, len(team), false)
+	affordability := s.computeShopAffordability(participant.CoinsRemaining, len(team), false, participant.HasRerolled)
 
 	return &EnhancedShopResponse{
 		MatchID:       matchID,
@@ -440,7 +440,7 @@ func (s *ShopService) BuyCard(ctx context.Context, matchID string, userID int64,
 	return s.GetShop(ctx, matchID, userID)
 }
 
-// Reroll replaces all shop cards with new ones, only available before first card purchase.
+// Reroll replaces all shop cards with new ones, only available once per match.
 // Requires coins for both the reroll cost and enough to complete the full team after.
 func (s *ShopService) Reroll(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error) {
 	defer nrutil.StartSegment(ctx, "service:shop:reroll")()
@@ -449,6 +449,12 @@ func (s *ShopService) Reroll(ctx context.Context, matchID string, userID int64) 
 	if err != nil {
 		return nil, err
 	}
+
+	// Reroll is only allowed once per match
+	if participant.HasRerolled {
+		return nil, fmt.Errorf("reroll already used")
+	}
+
 	if participant.CoinsRemaining < shop.RerollCost {
 		return nil, apperror.ErrNotEnoughCoins
 	}
@@ -459,11 +465,6 @@ func (s *ShopService) Reroll(ctx context.Context, matchID string, userID int64) 
 		if err := jsonutil.Unmarshal(*participant.Team, &currentTeam); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal team: %w", err)
 		}
-	}
-
-	// Reroll is only allowed before first purchase (team must be empty)
-	if len(currentTeam) > 0 {
-		return nil, fmt.Errorf("reroll not allowed after purchasing cards")
 	}
 
 	// Calculate coins needed to complete team
@@ -525,6 +526,11 @@ func (s *ShopService) Reroll(ctx context.Context, matchID string, userID int64) 
 
 	if err := s.gameRepo.UpdateParticipantShop(ctx, matchID, userID, coins, shopCardsJSON, teamJSON, participant.TeamOrder); err != nil {
 		return nil, fmt.Errorf("failed to save shop state: %w", err)
+	}
+
+	// Mark that the participant has used their reroll
+	if err := s.gameRepo.SetParticipantRerolled(ctx, matchID, userID); err != nil {
+		return nil, fmt.Errorf("failed to mark reroll used: %w", err)
 	}
 
 	// Record card transaction metric

@@ -550,7 +550,7 @@ Turn-based card battle arena where users build teams from weekly stats cards and
 |----------|------|-------------|
 | Starting coins | 10 | Coins at match start |
 | Card purchase | 3 | Buy a card from shop |
-| Reroll | 1 | Refresh shop (before first buy only) |
+| Reroll | 1 | Refresh shop (once per match) |
 | Upgrade | 1 | +1 ATK or +3 HP per upgrade |
 | Team size | 3 | Cards required for battle |
 
@@ -575,7 +575,7 @@ Turn-based card battle arena where users build teams from weekly stats cards and
 **Critical Implementation Notes**:
 - **Player-relative damage**: `damage_dealt` and `damage_taken` are calculated from the requesting user's perspective. If the user is Player A, `damage_dealt` = `team_a_damage` and `damage_taken` = `team_b_damage`. Values are swapped for Player B.
 - **React error #310**: Prevented by awaiting SDK init before render and initializing timer state to `0`
-- **Reroll mechanic**: Permanently disabled after first card purchase (not per-round)
+- **Reroll mechanic**: Limited to once per match (disabled after first reroll)
 - **Shop polling**: Must continue after team submission to detect battle phase transition
 - **Compact cards**: Use `placeholder_positions` metadata for stat overlay positioning
 

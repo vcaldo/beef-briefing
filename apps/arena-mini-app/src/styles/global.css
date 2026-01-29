@@ -1523,7 +1523,7 @@ a:focus:not(:focus-visible),
 
 .reroll-btn {
   font-size: 13px;
-  padding: 8px !important;
+  padding: 12px !important;
 }
 
 .shop-empty {
@@ -2578,13 +2578,14 @@ a:focus:not(:focus-visible),
   gap: 4px;
 }
 
-/* Deck compact card - Scale 0.22 from 300x450 base
-   Visual size: 66x99px
+/* Deck compact card - Scale 0.30 from 300x450 base
+   Visual size: 90x135px
    Margin formula: size * (scale - 1) / 2 */
 .deck-compact-card {
+  position: relative;
   width: 300px;
   height: 450px;
-  --deck-scale: 0.22;
+  --deck-scale: 0.30;
   transform: scale(var(--deck-scale));
   transform-origin: center;
   /* Collapse layout box: 300 * (0.16 - 1) / 2 = -126, 450 * (0.16 - 1) / 2 = -189 */
@@ -2598,11 +2599,31 @@ a:focus:not(:focus-visible),
   opacity: 0.5;
 }
 
+/* Order number badge for deck cards - shows battle order (1, 2, 3) */
+.deck-card-order {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 22px;
+  font-weight: 600;
+  z-index: 10;
+  pointer-events: none;
+}
+
 /* Placeholder for cards currently in arena
-   Visual size matches deck-compact-card: 66x99px */
+   Visual size matches deck-compact-card: 90x135px */
 .deck-card-placeholder {
-  width: 66px;
-  height: 99px;
+  width: 90px;
+  height: 135px;
   border: 2px dashed rgba(255, 255, 255, 0.2);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.05);
@@ -4729,15 +4750,15 @@ a:focus:not(:focus-visible),
     font-size: 20px;
   }
 
-  /* Scale up deck cards from 0.16 to 0.18 (54x81px) for better visibility on tiny screens */
+  /* Scale down deck cards to 0.24 (72x108px) on small phones */
   .deck-compact-card {
-    --deck-scale: 0.18;
+    --deck-scale: 0.24;
   }
 
-  /* Scale down deck card placeholder to match deck cards (54x81px) on small phones */
+  /* Scale down deck card placeholder to match deck cards (72x108px) on small phones */
   .deck-card-placeholder {
-    width: 54px;
-    height: 81px;
+    width: 72px;
+    height: 108px;
   }
 
   /* Further reduce deck padding from 6px 10px to 4px 8px on smallest phones */

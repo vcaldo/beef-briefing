@@ -607,6 +607,23 @@ func (m *MockGameRepository) SubmitTeam(ctx context.Context, matchID string, use
 	return nil
 }
 
+// SetParticipantRerolled marks that a participant has used their reroll.
+func (m *MockGameRepository) SetParticipantRerolled(ctx context.Context, matchID string, userID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.Participants[matchID] == nil {
+		return errors.New("match not found")
+	}
+	p := m.Participants[matchID][userID]
+	if p == nil {
+		return errors.New("participant not found")
+	}
+
+	p.HasRerolled = true
+	return nil
+}
+
 // GetParticipantCount returns the number of participants in a match.
 func (m *MockGameRepository) GetParticipantCount(ctx context.Context, matchID string) (int, error) {
 	m.mu.RLock()

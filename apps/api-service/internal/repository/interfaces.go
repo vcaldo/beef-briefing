@@ -134,6 +134,7 @@ type GameRepositoryInterface interface {
 	RemoveParticipant(ctx context.Context, matchID string, userID int64) error
 	UpdateParticipantShop(ctx context.Context, matchID string, userID int64, coins int, shopCards, team json.RawMessage, teamOrder []int64) error
 	SubmitTeam(ctx context.Context, matchID string, userID int64) error
+	SetParticipantRerolled(ctx context.Context, matchID string, userID int64) error
 	GetParticipantCount(ctx context.Context, matchID string) (int, error)
 	GetReadyParticipantCount(ctx context.Context, matchID string) (int, error)
 

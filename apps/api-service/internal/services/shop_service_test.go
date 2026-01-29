@@ -520,8 +520,8 @@ func TestSubmitTeam_AllReady_TriggersBattle(t *testing.T) {
 	}
 }
 
-// TestReroll_DisabledAfterPurchase verifies that reroll fails after buying first card.
-func TestReroll_DisabledAfterPurchase(t *testing.T) {
+// TestReroll_DisabledAfterFirstReroll verifies that reroll fails after using the single reroll.
+func TestReroll_DisabledAfterFirstReroll(t *testing.T) {
 	ctx := context.Background()
 	mockRepo := testutil.NewMockGameRepository()
 
@@ -529,7 +529,7 @@ func TestReroll_DisabledAfterPurchase(t *testing.T) {
 	svc := &ShopService{
 		db:       nil,
 		gameRepo: mockRepo,
-		dealer:   nil, // Not needed - test only validates team size check
+		dealer:   nil, // Not needed - test only validates hasRerolled check
 		nrApp:    nil,
 	}
 
@@ -538,28 +538,27 @@ func TestReroll_DisabledAfterPurchase(t *testing.T) {
 
 	match := newTestMatch(matchID, repository.MatchStatusShopPhase)
 
-	// Create participant with 1 card already purchased (team not empty)
+	// Create participant that has already used their reroll
 	cards := []*battle.ShopCard{
-		{Index: 0, CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, IsPurchased: true},
+		{Index: 0, CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, IsPurchased: false},
 		{Index: 1, CardID: 2, UserID: 102, Name: "Bob", ATK: 12, HP: 28, IsPurchased: false},
 	}
-	team := []*battle.Card{
-		{CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, MaxHP: 30, Position: 0},
-	}
+	team := []*battle.Card{} // Empty team (reroll doesn't depend on team now)
 	participant := newTestParticipantWithShop(matchID, userID, cards, team, 10) // Enough coins
+	participant.HasRerolled = true                                              // Already used reroll
 
 	mockRepo.Matches[matchID] = match
 	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
 		userID: participant,
 	}
 
-	// Attempt reroll (should fail because team is not empty)
+	// Attempt reroll (should fail because already rerolled)
 	_, err := svc.Reroll(ctx, matchID, userID)
 
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	expectedMsg := "reroll not allowed after purchasing cards"
+	expectedMsg := "reroll already used"
 	if err.Error() != expectedMsg {
 		t.Errorf("expected error %q, got %q", expectedMsg, err.Error())
 	}

@@ -333,6 +333,7 @@ export function BattlePage({
       username?: string
       card_image_url?: string
       placeholder_positions?: PlaceholderPositions | null
+      position: number
     }
   ) => {
     const cardKey = getCardKey(teamOwnerId, cardId)
@@ -347,6 +348,7 @@ export function BattlePage({
     // Otherwise render compact deck card
     return (
       <div key={cardId} className={`deck-compact-card ${!state.is_alive ? 'dead' : ''}`}>
+        <span className="deck-card-order">{originalCard.position + 1}</span>
         <CompactCard
           imageUrl={originalCard.card_image_url || ''}
           positions={originalCard.placeholder_positions}

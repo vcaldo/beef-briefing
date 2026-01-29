@@ -476,6 +476,10 @@ func (r *GameRepository) SubmitTeam(ctx context.Context, matchID string, userID 
 	return r.participantRepo.SubmitTeam(ctx, matchID, userID)
 }
 
+func (r *GameRepository) SetParticipantRerolled(ctx context.Context, matchID string, userID int64) error {
+	return r.participantRepo.SetParticipantRerolled(ctx, matchID, userID)
+}
+
 func (r *GameRepository) GetParticipantCount(ctx context.Context, matchID string) (int, error) {
 	return r.participantRepo.GetParticipantCount(ctx, matchID)
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 
 import { apiClient } from './api/client'
 import { preloadAllDuringSplash } from './utils/assetPreloader'
+import { parseGameUrlParams } from './utils/urlParams'
 import { setCustomAttribute, addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { ErrorBoundary } from '@beef-briefing/shared-mini-app/components'
 import { TabBar, SplashScreen, ErrorDisplay, LoadingSpinner } from './components/common'
@@ -79,39 +80,16 @@ function App() {
     async function authenticate() {
       try {
         // Parse URL query parameters
-        const urlParams = new URLSearchParams(window.location.search)
-        const chatIdStr = urlParams.get('chat_id')
-        const userIdStr = urlParams.get('user_id')
-        const matchId = urlParams.get('match_id') || ''
-        const tsStr = urlParams.get('ts')
-        const sig = urlParams.get('sig')
+        const parseResult = parseGameUrlParams(window.location.search)
 
-        // Validate required parameters
-        if (!sig) {
-          setError('Missing signature parameter. Please launch the game from Telegram.')
+        if (!parseResult.success) {
+          setError(parseResult.error)
           setAppState('error')
-          addPageAction('auth_failed', { reason: 'missing_sig' })
+          addPageAction('auth_failed', { reason: parseResult.reason })
           return
         }
 
-        if (!chatIdStr || !userIdStr || !tsStr) {
-          setError('Missing required URL parameters')
-          setAppState('error')
-          addPageAction('auth_failed', { reason: 'missing_params' })
-          return
-        }
-
-        // Parse numeric parameters
-        const chatId = parseInt(chatIdStr, 10)
-        const userId = parseInt(userIdStr, 10)
-        const ts = parseInt(tsStr, 10)
-
-        if (isNaN(chatId) || isNaN(userId) || isNaN(ts)) {
-          setError('Invalid URL parameters')
-          setAppState('error')
-          addPageAction('auth_failed', { reason: 'invalid_params' })
-          return
-        }
+        const { chatId, userId, matchId, ts, sig } = parseResult.params
 
         // Authenticate using Games API
         const auth = await apiClient.authenticateGame({

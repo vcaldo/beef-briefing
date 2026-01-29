@@ -203,27 +203,19 @@ func (h *CallbackHandler) handleStartMatch(ctx context.Context, b *bot.Bot, call
 	h.updateMatchStartedMessage(ctx, b, chatID, messageID, match)
 }
 
-// updateMatchMessage updates the match message with current participant info
+// updateMatchMessage updates the match message buttons
+// Note: Game messages (from SendGame) don't have captions, so we only update the reply markup
 func (h *CallbackHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, match *client.ArenaMatch) {
-	var creatorID int64
-	if match.CreatorUserID != nil {
-		creatorID = *match.CreatorUserID
-	}
-
-	caption := fmt.Sprintf(
-		"⚔️ *Arena Match*\n\n"+
-			"👤 Creator: [user](tg://user?id=%d)\n"+
-			"⏰ Join window: 5 minutes\n"+
-			"👥 Participants: %d\n\n"+
-			"Click *Join Match* to participate!",
-		creatorID,
-		len(match.Participants),
-	)
+	// Build participant count into button text so users see updated info
+	joinText := fmt.Sprintf("➕ Join (%d)", len(match.Participants))
 
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
 			{
-				{Text: "🎮 Join Match", CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
+				{Text: "🎮 Play Arena", CallbackGame: &models.CallbackGame{}},
+			},
+			{
+				{Text: joinText, CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
 				{Text: "🚪 Leave", CallbackData: fmt.Sprintf("leave_match:%s", match.ID)},
 			},
 			{
@@ -232,11 +224,9 @@ func (h *CallbackHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, ch
 		},
 	}
 
-	_, err := b.EditMessageCaption(ctx, &bot.EditMessageCaptionParams{
+	_, err := b.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
 		ChatID:      chatID,
 		MessageID:   messageID,
-		Caption:     caption,
-		ParseMode:   models.ParseModeMarkdown,
 		ReplyMarkup: keyboard,
 	})
 	if err != nil {
@@ -245,31 +235,21 @@ func (h *CallbackHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, ch
 }
 
 // updateMatchStartedMessage updates the message when match starts
+// Keeps the Play button but removes join/leave/start buttons since match has started
 func (h *CallbackHandler) updateMatchStartedMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, match *client.ArenaMatch) {
-	participantMentions := ""
-	for _, p := range match.Participants {
-		if participantMentions != "" {
-			participantMentions += ", "
-		}
-		participantMentions += fmt.Sprintf("[user](tg://user?id=%d)", p.UserID)
+	// Keep only the Play button since match has started
+	keyboard := &models.InlineKeyboardMarkup{
+		InlineKeyboard: [][]models.InlineKeyboardButton{
+			{
+				{Text: fmt.Sprintf("🎮 Play Arena (%d players)", len(match.Participants)), CallbackGame: &models.CallbackGame{}},
+			},
+		},
 	}
 
-	caption := fmt.Sprintf(
-		"⚔️ *Arena Match Started!*\n\n"+
-			"🎮 Format: %s\n"+
-			"👥 Participants: %s\n\n"+
-			"⏰ You have 3 minutes to build your team!\n"+
-			"Open the game to select and arrange your cards.",
-		match.Format,
-		participantMentions,
-	)
-
-	// Remove action buttons since match has started
-	_, err := b.EditMessageCaption(ctx, &bot.EditMessageCaptionParams{
-		ChatID:    chatID,
-		MessageID: messageID,
-		Caption:   caption,
-		ParseMode: models.ParseModeMarkdown,
+	_, err := b.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
+		ChatID:      chatID,
+		MessageID:   messageID,
+		ReplyMarkup: keyboard,
 	})
 	if err != nil {
 		slog.Error("failed to update match started message", "error", err)

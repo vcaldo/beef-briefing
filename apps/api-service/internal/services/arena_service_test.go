@@ -212,6 +212,26 @@ func (m *mockGameRepository) GetActiveMatches(ctx context.Context, chatID int64)
 	return matches, nil
 }
 
+// GetUserActiveMatch retrieves a user's active match in a specific chat
+func (m *mockGameRepository) GetUserActiveMatch(ctx context.Context, chatID, userID int64) (*repository.Match, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, match := range m.matches {
+		if match.ChatID == chatID &&
+			match.Status != repository.MatchStatusCompleted &&
+			match.Status != repository.MatchStatusCancelled {
+			// Check if user is a participant
+			if participants, ok := m.participants[match.ID]; ok {
+				if _, isParticipant := participants[userID]; isParticipant {
+					return copyMatch(match), nil
+				}
+			}
+		}
+	}
+	return nil, nil
+}
+
 // GetMatchesByStatus retrieves matches by status
 // Returns deep copies to prevent data races.
 func (m *mockGameRepository) GetMatchesByStatus(ctx context.Context, status repository.MatchStatus) ([]*repository.Match, error) {

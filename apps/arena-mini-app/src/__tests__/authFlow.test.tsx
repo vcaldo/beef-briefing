@@ -46,6 +46,52 @@ vi.mock('../utils/assetPreloader', () => ({
 // Store original window.location
 const originalLocation = window.location
 
+// Helper to mock window.location
+function mockWindowLocation(search: string) {
+  Object.defineProperty(window, 'location', {
+    value: {
+      ...originalLocation,
+      search,
+      reload: vi.fn(),
+    },
+    writable: true,
+    configurable: true,
+  })
+}
+
+// Helper to restore window.location
+function restoreWindowLocation() {
+  Object.defineProperty(window, 'location', {
+    value: originalLocation,
+    writable: true,
+    configurable: true,
+  })
+}
+
+// Mock GameConstants matching the actual interface
+const mockGameConstants = {
+  starting_coins: 10,
+  card_cost: 3,
+  reroll_cost: 1,
+  upgrade_cost: 1,
+  upgrade_amount: 3,
+  team_size: 3,
+  shop_size: 6,
+  join_window_seconds: 300,
+  shop_phase_seconds: 180,
+  minimum_cards_required: 1,
+  hp_bar_thresholds: {
+    high: 66,
+    medium: 33,
+    colors: { high: '#22c55e', medium: '#eab308', low: '#ef4444' },
+  },
+  timer_thresholds: {
+    safe: 120,
+    warning: 30,
+    colors: { safe: '#22c55e', warning: '#eab308', urgent: '#ef4444' },
+  },
+}
+
 describe('Auth Flow', () => {
   beforeEach(() => {
     // Reset mocks
@@ -53,16 +99,12 @@ describe('Auth Flow', () => {
     vi.useFakeTimers()
 
     // Mock window.location with valid URL params
-    delete (window as unknown as { location?: Location }).location
-    window.location = {
-      ...originalLocation,
-      search: '?chat_id=-1001234567890&user_id=123456&match_id=abc123&ts=1706540800&sig=validSignature123',
-    } as Location
+    mockWindowLocation('?chat_id=-1001234567890&user_id=123456&match_id=abc123&ts=1706540800&sig=validSignature123')
   })
 
   afterEach(() => {
     // Restore window.location
-    window.location = originalLocation
+    restoreWindowLocation()
     vi.useRealTimers()
   })
 
@@ -79,16 +121,7 @@ describe('Auth Flow', () => {
 
     beforeEach(() => {
       vi.mocked(apiClient.authenticateGame).mockResolvedValue(mockAuthResponse)
-      vi.mocked(apiClient.getConstants).mockResolvedValue({
-        starting_coins: 10,
-        card_cost: 3,
-        reroll_cost: 1,
-        upgrade_cost: 1,
-        team_size: 3,
-        shop_size: 3,
-        atk_bonus_per_upgrade: 1,
-        hp_bonus_per_upgrade: 3,
-      })
+      vi.mocked(apiClient.getConstants).mockResolvedValue(mockGameConstants)
     })
 
     it('calls authenticateGame with correct parameters from URL', async () => {
@@ -160,10 +193,7 @@ describe('Auth Flow', () => {
 
     it('handles empty match_id for lobby-only access', async () => {
       // Update URL to have no match_id
-      window.location = {
-        ...originalLocation,
-        search: '?chat_id=-1001234567890&user_id=123456&ts=1706540800&sig=validSignature123',
-      } as Location
+      mockWindowLocation('?chat_id=-1001234567890&user_id=123456&ts=1706540800&sig=validSignature123')
 
       render(<App />)
 
@@ -213,10 +243,7 @@ describe('Auth Flow', () => {
     })
 
     it('shows error when signature is missing from URL', async () => {
-      window.location = {
-        ...originalLocation,
-        search: '?chat_id=-1001234567890&user_id=123456&ts=1706540800',
-      } as Location
+      mockWindowLocation('?chat_id=-1001234567890&user_id=123456&ts=1706540800')
 
       render(<App />)
 
@@ -230,10 +257,7 @@ describe('Auth Flow', () => {
     })
 
     it('shows error when required URL params are missing', async () => {
-      window.location = {
-        ...originalLocation,
-        search: '?sig=validSignature123',
-      } as Location
+      mockWindowLocation('?sig=validSignature123')
 
       render(<App />)
 
@@ -278,16 +302,7 @@ describe('Auth Flow', () => {
         first_name: 'John',
         username: 'johndoe',
       })
-      vi.mocked(apiClient.getConstants).mockResolvedValue({
-        starting_coins: 10,
-        card_cost: 3,
-        reroll_cost: 1,
-        upgrade_cost: 1,
-        team_size: 3,
-        shop_size: 3,
-        atk_bonus_per_upgrade: 1,
-        hp_bonus_per_upgrade: 3,
-      })
+      vi.mocked(apiClient.getConstants).mockResolvedValue(mockGameConstants)
     })
 
     it('shows splash screen during loading state', () => {

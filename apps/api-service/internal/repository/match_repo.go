@@ -113,6 +113,7 @@ func (r *MatchRepository) GetActiveMatches(ctx context.Context, chatID int64) ([
 func (r *MatchRepository) GetUserActiveMatch(ctx context.Context, chatID, userID int64) (*Match, error) {
 	defer r.startDBSegment(ctx, "get-user-active-match")()
 
+	// Use matchColumnsAliased to avoid ambiguous column references in JOIN
 	query := fmt.Sprintf(`
 		SELECT %s
 		FROM game_matches m
@@ -120,7 +121,7 @@ func (r *MatchRepository) GetUserActiveMatch(ctx context.Context, chatID, userID
 		WHERE m.chat_id = $1 AND p.user_id = $2 AND m.status NOT IN ('completed', 'cancelled')
 		ORDER BY m.created_at DESC
 		LIMIT 1
-	`, matchColumns)
+	`, matchColumnsAliased)
 
 	match, err := scanMatch(r.db.QueryRowContext(ctx, query, chatID, userID))
 	if err == sql.ErrNoRows {

@@ -104,10 +104,14 @@ func (h *MatchHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Up
 	}
 
 	// Create inline keyboard with game callback buttons
+	// NOTE: CallbackGame button is REQUIRED for SendGame - it opens the game when clicked
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
 			{
-				{Text: "🎮 Join Match", CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
+				{Text: "🎮 Play Arena", CallbackGame: &models.CallbackGame{}},
+			},
+			{
+				{Text: "➕ Join Match", CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
 				{Text: "🚪 Leave", CallbackData: fmt.Sprintf("leave_match:%s", match.ID)},
 			},
 			{

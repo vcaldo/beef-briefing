@@ -119,6 +119,7 @@ type GameRepositoryInterface interface {
 	CreateMatch(ctx context.Context, chatID int64, matchType MatchType, creatorUserID *int64, tournamentDate *string) (*Match, error)
 	GetMatch(ctx context.Context, matchID string) (*Match, error)
 	GetActiveMatches(ctx context.Context, chatID int64) ([]*Match, error)
+	GetUserActiveMatch(ctx context.Context, chatID, userID int64) (*Match, error)
 	GetMatchesByStatus(ctx context.Context, status MatchStatus) ([]*Match, error)
 	UpdateMatchStatus(ctx context.Context, matchID string, status MatchStatus) error
 	UpdateMatchFormat(ctx context.Context, matchID string, format MatchFormat) error

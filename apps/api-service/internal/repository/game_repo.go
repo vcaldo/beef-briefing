@@ -388,6 +388,10 @@ func (r *GameRepository) GetActiveMatches(ctx context.Context, chatID int64) ([]
 	return r.matchRepo.GetActiveMatches(ctx, chatID)
 }
 
+func (r *GameRepository) GetUserActiveMatch(ctx context.Context, chatID, userID int64) (*Match, error) {
+	return r.matchRepo.GetUserActiveMatch(ctx, chatID, userID)
+}
+
 func (r *GameRepository) UpdateMatchStatus(ctx context.Context, matchID string, status MatchStatus) error {
 	return r.matchRepo.UpdateMatchStatus(ctx, matchID, status)
 }

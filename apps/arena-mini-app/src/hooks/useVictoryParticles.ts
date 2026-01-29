@@ -45,7 +45,7 @@ export interface UseVictoryParticlesReturn {
   /** Stop the animation and clear particles */
   stopAnimation: () => void
   /** Ref to attach to canvas element */
-  canvasRef: React.RefObject<HTMLCanvasElement | null>
+  canvasRef: React.RefObject<HTMLCanvasElement>
 }
 
 // =============================================================================

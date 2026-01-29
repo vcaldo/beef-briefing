@@ -463,7 +463,7 @@ export function BattlePage({
       >
         <div className="deck-label">{playerBLabel}</div>
         <div className="deck-cards">
-          {(battleData.team_b_final?.cards ?? []).map((card) =>
+          {[...(battleData.team_b_final?.cards ?? [])].reverse().map((card) =>
             renderDeckCard(card.card_id, battleData.player_b_id, card)
           )}
         </div>
@@ -589,14 +589,14 @@ export function BattlePage({
         ))}
       </div>
 
-      {/* Team A Deck - Bottom Right (reversed so position 1 is rightmost, facing arena) */}
+      {/* Team A Deck - Bottom Right (position 1 is leftmost, facing arena) */}
       <div
         ref={deckRefA}
         className={`battle-deck battle-deck-a${celebratingDeckOwner === battleData.player_a_id ? ' deck-celebrating' : ''}`}
       >
         <div className="deck-label">{playerALabel}</div>
         <div className="deck-cards">
-          {[...(battleData.team_a_final?.cards ?? [])].reverse().map((card) =>
+          {[...(battleData.team_a_final?.cards ?? [])].map((card) =>
             renderDeckCard(card.card_id, battleData.player_a_id, card)
           )}
         </div>

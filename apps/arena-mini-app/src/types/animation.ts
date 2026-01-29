@@ -69,6 +69,7 @@ export type EventAnimationPhase =
   | 'damage'
   | 'complete'
   | 'death_animation'
+  | 'victory_celebration'
 
 // =============================================================================
 // ANIMATION DURATIONS
@@ -125,6 +126,12 @@ export const ANIMATION_DURATIONS = {
 
   /** Death effect animation duration (9 frames × 70ms per frame) */
   deathEffect: 630,
+
+  /** Victory return animation duration (winner card exits arena) */
+  victoryReturn: 400,
+
+  /** Victory celebration duration (deck shake + particles) */
+  victoryCelebration: 2000,
 } as const
 
 /**

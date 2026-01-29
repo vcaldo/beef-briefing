@@ -18,8 +18,9 @@ import { RPGPanel, GameButton } from '../ui'
 import { CompactCard } from '../common/CompactCard'
 import { BattleEffect } from './BattleEffect'
 import type { EffectPosition } from './BattleEffect'
-import { useBattleAnimation, getCardKey, usePageBackground } from '../../hooks'
+import { useBattleAnimation, getCardKey, usePageBackground, useVictoryParticles } from '../../hooks'
 import { useSoundContext } from '../../contexts'
+import { ANIMATION_DURATIONS } from '../../types'
 import type {
   BattleResult,
   Match,
@@ -88,6 +89,25 @@ export function BattlePage({
   const battleArenaRef = useRef<HTMLDivElement>(null)
   const cardRefsMap = useRef<Map<string, HTMLDivElement>>(new Map())
 
+  // Refs for deck elements (used for victory celebration positioning)
+  const deckRefA = useRef<HTMLDivElement>(null)
+  const deckRefB = useRef<HTMLDivElement>(null)
+
+  // Victory celebration state
+  const [celebratingDeckOwner, setCelebratingDeckOwner] = useState<number | null>(null)
+
+  // Victory particle system
+  const {
+    canvasRef: particleCanvasRef,
+    startAnimation: startParticles,
+    stopAnimation: stopParticles,
+  } = useVictoryParticles({
+    // Scale duration with playback speed
+    duration: (PLAYBACK_SPEEDS[speedIndex].value / 1000) * ANIMATION_DURATIONS.victoryCelebration,
+    burstCount: 60,
+    continuousRate: 3,
+  })
+
   /**
    * Get the center position of a card element relative to the battle arena.
    * Used by useBattleAnimation to position battle effects.
@@ -109,6 +129,39 @@ export function BattlePage({
 
     return { x, y }
   }, [])
+
+  /**
+   * Handle victory celebration start.
+   * Triggered by useBattleAnimation after arena cards exit.
+   * Starts deck shake animation and particle effects.
+   */
+  const handleVictoryCelebrationStart = useCallback((winnerId: number | null, isDraw: boolean) => {
+    if (isDraw || winnerId === null) return
+
+    // Set celebrating deck (triggers CSS animation)
+    setCelebratingDeckOwner(winnerId)
+
+    // Get deck position for particles
+    const isWinnerA = winnerId === battleData?.player_a_id
+    const deckRef = isWinnerA ? deckRefA : deckRefB
+    const deckElement = deckRef.current
+
+    if (deckElement) {
+      const deckRect = deckElement.getBoundingClientRect()
+
+      // Calculate deck center position for particles
+      const centerX = deckRect.left + deckRect.width / 2
+      const centerY = deckRect.top + deckRect.height / 2
+
+      // Start particle animation at deck center
+      startParticles(centerX, centerY)
+    }
+
+    addPageAction('victory_celebration_started', {
+      match_id: activeMatch?.id,
+      winner_id: winnerId,
+    })
+  }, [battleData, activeMatch, startParticles])
 
   // Animation state machine hook
   const {
@@ -134,6 +187,7 @@ export function BattlePage({
     playerBId: battleData?.player_b_id ?? 0,
     onPlaySound: playSound,
     getCardPosition,
+    onVictoryCelebrationStart: handleVictoryCelebrationStart,
   })
 
   // Sync parent isPlaying state with hook
@@ -507,11 +561,11 @@ export function BattlePage({
         ))}
       </div>
 
-      {/* Team A Deck - Bottom Right */}
+      {/* Team A Deck - Bottom Right (reversed so position 1 is rightmost, facing arena) */}
       <div className="battle-deck battle-deck-a">
         <div className="deck-label">{playerALabel}</div>
         <div className="deck-cards">
-          {(battleData.team_a_final?.cards ?? []).map((card) =>
+          {[...(battleData.team_a_final?.cards ?? [])].reverse().map((card) =>
             renderDeckCard(card.card_id, battleData.player_a_id, card)
           )}
         </div>

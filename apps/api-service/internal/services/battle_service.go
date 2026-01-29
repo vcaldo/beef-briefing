@@ -223,12 +223,12 @@ func (s *BattleService) runBattle(ctx context.Context, matchID string, pA, pB *r
 	// Record battle completion metric
 	recordBattleCompletion(s.nrApp, matchID, "1v1", result.WinnerID, result.IsDraw, result.NumRounds, result.TeamADamage, result.TeamBDamage)
 
-	// Save round
-	teamAJSON, err := jsonutil.Marshal(orderedA)
+	// Save round (use teamA.Cards/teamB.Cards to preserve correct Position values set by NewTeam)
+	teamAJSON, err := jsonutil.Marshal(teamA.Cards)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal team A: %w", err)
 	}
-	teamBJSON, err := jsonutil.Marshal(orderedB)
+	teamBJSON, err := jsonutil.Marshal(teamB.Cards)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal team B: %w", err)
 	}

@@ -120,6 +120,13 @@ export interface UseBattleAnimationOptions {
    * If not provided, effects will not be displayed.
    */
   getCardPosition?: (cardKey: string) => EffectPosition | null
+  /**
+   * Optional callback triggered when victory celebration should start.
+   * Called after arena cards exit but before isComplete is set to true.
+   * @param winnerTeamOwnerId - User ID of the winning team owner (null for draw)
+   * @param isDraw - True if the battle ended in a draw
+   */
+  onVictoryCelebrationStart?: (winnerTeamOwnerId: number | null, isDraw: boolean) => void
 }
 
 // =============================================================================
@@ -241,7 +248,7 @@ export function useBattleAnimation(
   battleData: BattleResult | null,
   options: UseBattleAnimationOptions
 ): UseBattleAnimationReturn {
-  const { playbackSpeed, playerAId, playerBId, onPlaySound, getCardPosition } = options
+  const { playbackSpeed, playerAId, playerBId, onPlaySound, getCardPosition, onVictoryCelebrationStart } = options
 
   // Core state
   const [cardStates, setCardStates] = useState<Map<string, CardSnapshot>>(
@@ -837,6 +844,7 @@ export function useBattleAnimation(
   /**
    * Complete the battle after all events have been processed.
    * Handles final arena transition for dead cards exiting before showing victory.
+   * Now includes victory celebration phase with deck animation before showing popup.
    */
   const completeBattle = useCallback(() => {
     // Capture pending deaths to pass to arena transition check
@@ -851,26 +859,88 @@ export function useBattleAnimation(
       return new Set()
     })
 
-    // Helper to finalize the battle after any animations complete
-    const finalizeBattle = () => {
-      // Check if final arena transition is needed (dead cards should exit)
-      const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded(deathsToExclude)
+    // Determine winner for celebration callback
+    const winnerId = battleData?.winner_id ?? null
+    const isDraw = battleData?.is_draw ?? false
 
-      if (needsTransition) {
-        // Perform final arena transition before marking complete
-        performArenaTransition(newFrontA, newFrontB, () => {
-          // Now we can mark battle as complete
-          setIsPlaying(false)
-          isPlayingRef.current = false
-          setIsComplete(true)
-          setCurrentPhase('idle')
-        })
-      } else {
-        // No transition needed, mark complete immediately
+    /**
+     * Start victory celebration after all cards have exited arena.
+     * This triggers deck shake animation and particles before showing popup.
+     */
+    const startVictoryCelebration = () => {
+      // Skip celebration for draws - go straight to completion
+      if (isDraw) {
         setIsPlaying(false)
         isPlayingRef.current = false
         setIsComplete(true)
         setCurrentPhase('idle')
+        return
+      }
+
+      // Trigger victory celebration phase
+      setCurrentPhase('victory_celebration')
+
+      // Notify parent to start celebration animations (deck shake, particles)
+      onVictoryCelebrationStart?.(winnerId, isDraw)
+
+      // Wait for celebration to complete before showing victory popup
+      phaseTimeoutRef.current = setTimeout(() => {
+        setIsPlaying(false)
+        isPlayingRef.current = false
+        setIsComplete(true)
+        setCurrentPhase('idle')
+      }, getScaledDuration(ANIMATION_DURATIONS.victoryCelebration))
+    }
+
+    /**
+     * Exit ALL arena cards (including winner) then start celebration.
+     * This ensures the winning card returns to the deck before celebrating.
+     */
+    const exitAllArenaCards = () => {
+      // Collect ALL cards currently in arena (not just dead ones)
+      const victoryExitingKeys = new Set<string>()
+      if (arenaCardA) {
+        victoryExitingKeys.add(getCardKey(arenaCardA.teamOwnerId, arenaCardA.cardId))
+      }
+      if (arenaCardB) {
+        victoryExitingKeys.add(getCardKey(arenaCardB.teamOwnerId, arenaCardB.cardId))
+      }
+
+      if (victoryExitingKeys.size > 0) {
+        // Animate cards exiting arena
+        setArenaTransitionState('exiting')
+        setTransitioningCards({ entering: new Set(), exiting: victoryExitingKeys })
+
+        phaseTimeoutRef.current = setTimeout(() => {
+          // Clear arena cards after exit animation
+          setArenaCardA(null)
+          setArenaCardB(null)
+          setArenaTransitionState('idle')
+          setTransitioningCards({ entering: new Set(), exiting: new Set() })
+
+          // Now start the celebration
+          startVictoryCelebration()
+        }, getScaledDuration(ANIMATION_DURATIONS.victoryReturn))
+      } else {
+        // No cards in arena, start celebration directly
+        startVictoryCelebration()
+      }
+    }
+
+    // Helper to finalize the battle after death animations complete
+    const finalizeBattle = () => {
+      // Check if final arena transition is needed (dead cards should exit first)
+      const { needsTransition, newFrontA, newFrontB } = checkArenaTransitionNeeded(deathsToExclude)
+
+      if (needsTransition) {
+        // Perform arena transition for dead cards first
+        performArenaTransition(newFrontA, newFrontB, () => {
+          // After dead cards exit, now exit ALL remaining cards for victory
+          exitAllArenaCards()
+        })
+      } else {
+        // No dead card transition needed, exit all cards for victory
+        exitAllArenaCards()
       }
     }
 
@@ -882,7 +952,7 @@ export function useBattleAnimation(
     } else {
       finalizeBattle()
     }
-  }, [applyPendingDeaths, checkArenaTransitionNeeded, performArenaTransition, getScaledDuration])
+  }, [applyPendingDeaths, checkArenaTransitionNeeded, performArenaTransition, getScaledDuration, battleData, arenaCardA, arenaCardB, onVictoryCelebrationStart])
 
   /**
    * Advance to the next event in the sequence.

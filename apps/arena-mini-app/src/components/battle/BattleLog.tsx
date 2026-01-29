@@ -357,13 +357,14 @@ export const BattleLog = ({
   }, [combats, eventOffsets, currentEventIndex, animated])
 
   /**
-   * Auto-scroll to bottom when new events appear
+   * Auto-scroll to bottom when new events appear (only in animated mode)
+   * In static mode (history view), we want to start at the top
    */
   useEffect(() => {
-    if (contentRef.current) {
+    if (animated && contentRef.current) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight
     }
-  }, [visibleCombats.length, currentEventIndex])
+  }, [animated, visibleCombats.length, currentEventIndex])
 
   /**
    * Get icon URL for event type

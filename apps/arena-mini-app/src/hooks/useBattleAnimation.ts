@@ -985,7 +985,8 @@ export function useBattleAnimation(
 
     // Process attack event with full animation sequence
     // Arena transition check was already done earlier, reuse those values
-    if (needsTransition) {
+    // Skip arena transition if the dead card is about to attack (they need to stay visible in arena)
+    if (needsTransition && !deadCardIsAttacker) {
       // Arena cards need to change - perform transition before attack
       setCurrentEventIndex(nextIndex)
       performArenaTransition(newFrontA, newFrontB, () => {

@@ -2523,18 +2523,17 @@ a:focus:not(:focus-visible),
 
 /* =============================================================================
    Battle Arena Layout (Grid-based)
-   New grid layout with deck strips, central arena, and compact battle log
+   Full-screen arena layout with deck strips at top and bottom edges
    ============================================================================= */
 
 /* Override default battle-page for arena layout */
 .battle-page.arena-layout {
   display: grid;
-  grid-template-rows: auto 1fr auto 30%;
+  grid-template-rows: auto 1fr auto;
   grid-template-areas:
     "deck-b"
     "arena"
-    "deck-a"
-    "log";
+    "deck-a";
   min-height: 100vh; /* Fallback for browsers without dvh support */
   height: 100dvh; /* Dynamic viewport height - adapts to mobile address bar */
   padding-bottom: var(--tab-bar-height);
@@ -2542,23 +2541,24 @@ a:focus:not(:focus-visible),
   overflow: hidden;
 }
 
-/* Team B Deck - Upper area, aligned left */
+/* Team B Deck - Upper area, aligned to top-left */
 .battle-deck-b {
   grid-area: deck-b;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 8px 12px;
+  padding: 4px 12px;
+  padding-top: max(4px, env(safe-area-inset-top));
   gap: 4px;
 }
 
-/* Team A Deck - Lower area, aligned right */
+/* Team A Deck - Lower area, aligned to bottom-right */
 .battle-deck-a {
   grid-area: deck-a;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  padding: 8px 12px;
+  padding: 4px 12px;
   gap: 4px;
 }
 
@@ -2606,28 +2606,6 @@ a:focus:not(:focus-visible),
   border: 2px dashed rgba(255, 255, 255, 0.2);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.05);
-}
-
-/* Compact battle log - Bottom 25% of screen */
-.battle-log-compact {
-  grid-area: log;
-  max-height: calc(25vh - 40px);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(90, 74, 58, 0.3) transparent;
-}
-
-.battle-log-compact::-webkit-scrollbar {
-  width: 4px;
-}
-
-.battle-log-compact::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.battle-log-compact::-webkit-scrollbar-thumb {
-  background: rgba(90, 74, 58, 0.3);
-  border-radius: 2px;
 }
 
 /* -----------------------------------------------------------------------------
@@ -4395,6 +4373,69 @@ a:focus:not(:focus-visible),
 }
 
 /* =============================================================================
+   Battle Log Modal (History View)
+   ============================================================================= */
+
+.rpg-battlelog-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+  backdrop-filter: blur(4px);
+}
+
+.rpg-battlelog-modal-wrapper {
+  width: 100%;
+  max-width: 400px;
+  max-height: 80vh;
+  animation: slideUp 0.3s ease-out;
+}
+
+.rpg-battlelog-modal-outer {
+  position: relative;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.rpg-battlelog-close-wrapper {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+}
+
+.rpg-battlelog-loading {
+  padding: 48px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Static battle log - all events visible, no animation */
+.rpg-battlelog-static {
+  margin: 0;
+}
+
+.rpg-battlelog-static .battle-log-content {
+  min-height: 200px;
+  max-height: 60vh;
+}
+
+.rpg-battlelog-static .battle-log-combat {
+  opacity: 1;
+}
+
+.rpg-battlelog-static .battle-log-combat.slide-in {
+  animation: none;
+}
+
+/* =============================================================================
    Common Animations
    ============================================================================= */
 @keyframes spin {
@@ -4623,9 +4664,9 @@ a:focus:not(:focus-visible),
 
 /* Mobile-specific battle adjustments for tablets and larger phones */
 @media (max-width: 480px) {
-  /* Reduce battle log from 25% to 20% on medium phones */
+  /* Full-screen arena layout (no log row) */
   .battle-page.arena-layout {
-    grid-template-rows: auto 1fr auto 20%;
+    grid-template-rows: auto 1fr auto;
   }
 
   /* Reduce arena center spacing to prevent overflow on medium phones */
@@ -4667,9 +4708,9 @@ a:focus:not(:focus-visible),
 
 /* Mobile-specific battle adjustments for small phones (360px and below) */
 @media (max-width: 360px) {
-  /* Further reduce battle log from 20% to 18% on small phones */
+  /* Full-screen arena layout (no log row) */
   .battle-page.arena-layout {
-    grid-template-rows: auto 1fr auto 18%;
+    grid-template-rows: auto 1fr auto;
   }
 
   /* Further reduce arena center spacing for smallest phones */

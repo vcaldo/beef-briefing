@@ -16,14 +16,12 @@ import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring'
 import { LoadingSpinner, ErrorDisplay } from '../common'
 import { RPGPanel, GameButton } from '../ui'
 import { CompactCard } from '../common/CompactCard'
-import { BattleLog } from './BattleLog'
 import { BattleEffect } from './BattleEffect'
 import type { EffectPosition } from './BattleEffect'
 import { useBattleAnimation, getCardKey, usePageBackground } from '../../hooks'
 import { useSoundContext } from '../../contexts'
 import type {
   BattleResult,
-  CombatEvent,
   Match,
   GameConstants,
   PlaceholderPositions,
@@ -117,7 +115,6 @@ export function BattlePage({
     cardStates,
     animationStates,
     currentEventIndex,
-    currentPhase,
     isPlaying: hookIsPlaying,
     isComplete,
     currentDamage,
@@ -310,28 +307,6 @@ export function BattlePage({
     battleData.winner_id === userId ||
     (battleData.is_draw && false) // No winner on draw
   const isDraw = battleData.is_draw
-
-  // Get event message text
-  const getEventMessage = (event: CombatEvent): string => {
-    if (event.message) return event.message
-
-    switch (event.type) {
-      case 'attack':
-        return `Attack! ${event.damage} damage dealt`
-      case 'damage':
-        return `${event.damage} damage (${event.hp_before} → ${event.hp_after} HP)`
-      case 'death':
-        return `Card defeated!`
-      case 'advance':
-        return `Next card advances`
-      case 'victory':
-        return `Victory!`
-      case 'summary':
-        return `Combat summary`
-      default:
-        return `Event: ${event.type}`
-    }
-  }
 
   // Player labels
   const playerALabel = userId === battleData.player_a_id ? 'You' : battleData.player_a_name
@@ -539,21 +514,6 @@ export function BattlePage({
           )}
         </div>
       </div>
-
-      {/* Battle Log - Bottom 25% */}
-      <BattleLog
-        className="battle-log-compact"
-        combats={battleData.combats}
-        events={battleData.events}
-        currentEventIndex={currentEventIndex}
-        currentPhase={currentPhase}
-        getEventMessage={getEventMessage}
-        playerAId={battleData.player_a_id}
-        playerBId={battleData.player_b_id}
-        playerAName={battleData.player_a_name}
-        playerBName={battleData.player_b_name}
-        currentUserId={userId}
-      />
 
       {/* Victory Screen Overlay */}
       {showVictory && (

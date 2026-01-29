@@ -17,6 +17,7 @@ import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monit
 import { Avatar } from '@beef-briefing/shared-mini-app/components'
 import { LoadingSpinner } from '../common'
 import { RPGPanel, GameButton } from '../ui'
+import { BattleLog } from '../battle/BattleLog'
 import { usePageBackground } from '../../hooks'
 
 import type {
@@ -27,6 +28,7 @@ import type {
   HistoryResponse,
   MatchHistoryEntry,
   H2HResponse,
+  BattleResult,
 } from '../../types'
 
 // Page size for pagination
@@ -61,6 +63,10 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
   const [h2hLoading, setH2HLoading] = useState(false)
   const [showH2HModal, setShowH2HModal] = useState(false)
 
+  // Battle log modal state
+  const [battleLogData, setBattleLogData] = useState<BattleResult | null>(null)
+  const [battleLogLoading, setBattleLogLoading] = useState(false)
+  const [showBattleLogModal, setShowBattleLogModal] = useState(false)
 
   // Error state
   const [error, setError] = useState<string | null>(null)
@@ -214,6 +220,41 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
       }
     },
     [chatId]
+  )
+
+  // Fetch battle log data for history modal
+  const fetchBattleLog = useCallback(
+    async (matchId: string) => {
+      if (!isMountedRef.current) return
+
+      setBattleLogLoading(true)
+      setShowBattleLogModal(true)
+
+      try {
+        const data = await apiClient.getBattle(matchId)
+        if (!isMountedRef.current) return
+
+        setBattleLogData(data)
+        addPageAction('battle_log_loaded', {
+          match_id: matchId,
+          num_events: data.events.length,
+        })
+      } catch (err) {
+        if (!isMountedRef.current) return
+
+        console.error('Failed to fetch battle log:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load battle log')
+        if (err instanceof Error) {
+          noticeError(err, { context: 'fetch_battle_log' })
+        }
+        setShowBattleLogModal(false)
+      } finally {
+        if (isMountedRef.current) {
+          setBattleLogLoading(false)
+        }
+      }
+    },
+    []
   )
 
   /**
@@ -609,10 +650,10 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
                 <div
                   key={match.match_id}
                   className={`rpg-history-item ${getResultClass(match.result)}`}
-                  onClick={() => handleSelectOpponent(match.opponent.user_id)}
+                  onClick={() => fetchBattleLog(match.match_id)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleSelectOpponent(match.opponent.user_id))}
+                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), fetchBattleLog(match.match_id))}
                 >
                   <div className="rpg-history-result">
                     <span className={`rpg-result-badge ${match.result}`}>
@@ -754,6 +795,60 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     )
   }
 
+  // Close battle log modal
+  const handleCloseBattleLogModal = useCallback(() => {
+    setShowBattleLogModal(false)
+    setBattleLogData(null)
+  }, [])
+
+  // Render battle log modal overlay
+  const renderBattleLogModal = () => {
+    if (!showBattleLogModal) return null
+
+    return (
+      <div className="rpg-battlelog-modal-backdrop" onClick={handleCloseBattleLogModal}>
+        <div className="rpg-battlelog-modal-wrapper" onClick={(e) => e.stopPropagation()}>
+          <RPGPanel variant="outer" className="rpg-battlelog-modal-outer">
+            {/* Close button */}
+            <div className="rpg-battlelog-close-wrapper">
+              <GameButton
+                variant="danger"
+                size="sm"
+                shape="square"
+                onClick={handleCloseBattleLogModal}
+                aria-label="Close"
+              >
+                ×
+              </GameButton>
+            </div>
+
+            {/* Loading state */}
+            {battleLogLoading && (
+              <div className="rpg-battlelog-loading">
+                <LoadingSpinner message="Loading battle log..." />
+              </div>
+            )}
+
+            {/* Battle log display */}
+            {!battleLogLoading && battleLogData && (
+              <BattleLog
+                className="rpg-battlelog-static"
+                combats={battleLogData.combats}
+                events={battleLogData.events}
+                animated={false}
+                playerAId={battleLogData.player_a_id}
+                playerBId={battleLogData.player_b_id}
+                playerAName={battleLogData.player_a_name}
+                playerBName={battleLogData.player_b_name}
+                currentUserId={userId}
+              />
+            )}
+          </RPGPanel>
+        </div>
+      </div>
+    )
+  }
+
   // Render active sub-tab content
   const renderContent = () => {
     switch (activeSubTab) {
@@ -822,6 +917,9 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
       {/* H2H Modal */}
       {renderH2HModal()}
+
+      {/* Battle Log Modal */}
+      {renderBattleLogModal()}
     </div>
   )
 }

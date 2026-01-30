@@ -666,6 +666,7 @@ type ArenaMatch struct {
 	CreatedAt         string             `json:"created_at"`
 	Participants      []ArenaParticipant `json:"participants"`
 	CardCount         int                `json:"card_count"`
+	TelegramMessageID *int64             `json:"telegram_message_id,omitempty"`
 }
 
 // ArenaParticipant represents a participant in a match

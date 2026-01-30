@@ -108,14 +108,8 @@ func (h *MatchHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Up
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
 			{
-				{Text: "🎮 Play Arena", CallbackGame: &models.CallbackGame{}},
-			},
-			{
-				{Text: "➕ Join Match", CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
-				{Text: "🚪 Leave", CallbackData: fmt.Sprintf("leave_match:%s", match.ID)},
-			},
-			{
-				{Text: "▶️ Start Match", CallbackData: fmt.Sprintf("start_match:%s", match.ID)},
+				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
+				{Text: "➕ Join Game", CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
 			},
 		},
 	}

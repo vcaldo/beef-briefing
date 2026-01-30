@@ -207,19 +207,13 @@ func (h *CallbackHandler) handleStartMatch(ctx context.Context, b *bot.Bot, call
 // Note: Game messages (from SendGame) don't have captions, so we only update the reply markup
 func (h *CallbackHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, match *client.ArenaMatch) {
 	// Build participant count into button text so users see updated info
-	joinText := fmt.Sprintf("➕ Join (%d)", len(match.Participants))
+	joinText := fmt.Sprintf("➕ Join Game (%d)", len(match.Participants))
 
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
 			{
-				{Text: "🎮 Play Arena", CallbackGame: &models.CallbackGame{}},
-			},
-			{
+				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
 				{Text: joinText, CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
-				{Text: "🚪 Leave", CallbackData: fmt.Sprintf("leave_match:%s", match.ID)},
-			},
-			{
-				{Text: "▶️ Start Match", CallbackData: fmt.Sprintf("start_match:%s", match.ID)},
 			},
 		},
 	}
@@ -235,13 +229,13 @@ func (h *CallbackHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, ch
 }
 
 // updateMatchStartedMessage updates the message when match starts
-// Keeps the Play button but removes join/leave/start buttons since match has started
+// Keeps the Open Game button but removes join button since match has started
 func (h *CallbackHandler) updateMatchStartedMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, match *client.ArenaMatch) {
-	// Keep only the Play button since match has started
+	// Keep only the Open Game button since match has started
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
 			{
-				{Text: fmt.Sprintf("🎮 Play Arena (%d players)", len(match.Participants)), CallbackGame: &models.CallbackGame{}},
+				{Text: fmt.Sprintf("🎮 Open Game (%d players)", len(match.Participants)), CallbackGame: &models.CallbackGame{}},
 			},
 		},
 	}

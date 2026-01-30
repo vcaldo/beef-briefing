@@ -1166,3 +1166,54 @@ func (h *ArenaHandler) HandleGetChatOpenMatch(w http.ResponseWriter, r *http.Req
 
 	httputil.RespondJSON(w, match, http.StatusOK)
 }
+
+// HandleSetTelegramMessageID updates the telegram_message_id for a match.
+// PATCH /api/v1/arena/match/{id}/message-id
+func (h *ArenaHandler) HandleSetTelegramMessageID(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:set-telegram-message-id")
+	}
+
+	vars := mux.Vars(r)
+	matchID := vars["id"]
+	if matchID == "" {
+		httputil.RespondError(w, "match ID is required", http.StatusBadRequest)
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("match_id", matchID)
+	}
+
+	var req struct {
+		TelegramMessageID int64 `json:"telegram_message_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.TelegramMessageID == 0 {
+		httputil.RespondError(w, "telegram_message_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("telegram_message_id", req.TelegramMessageID)
+	}
+
+	err := h.service.SetTelegramMessageID(ctx, matchID, req.TelegramMessageID)
+	if err != nil {
+		slog.Error("failed to set telegram message ID", "error", err, "match_id", matchID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "failed to set telegram message ID", http.StatusInternalServerError)
+		return
+	}
+
+	httputil.RespondJSON(w, map[string]string{"status": "ok"}, http.StatusOK)
+}

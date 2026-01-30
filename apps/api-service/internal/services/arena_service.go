@@ -878,3 +878,9 @@ func (s *ArenaService) GetChatOpenMatch(ctx context.Context, chatID int64) (*rep
 	defer nrutil.StartSegment(ctx, "service:arena:get-chat-open-match")()
 	return s.gameRepo.GetChatOpenMatch(ctx, chatID)
 }
+
+// SetTelegramMessageID updates the telegram_message_id for a match
+func (s *ArenaService) SetTelegramMessageID(ctx context.Context, matchID string, messageID int64) error {
+	defer nrutil.StartSegment(ctx, "service:arena:set-telegram-message-id")()
+	return s.gameRepo.SetTelegramMessageID(ctx, matchID, messageID)
+}

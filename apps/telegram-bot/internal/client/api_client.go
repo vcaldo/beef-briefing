@@ -702,10 +702,11 @@ type ForceSubmitResult struct {
 
 // Arena-specific errors
 var (
-	ErrMatchNotFound  = fmt.Errorf("match not found")
-	ErrMatchNotOpen   = fmt.Errorf("match is not open")
-	ErrNotEnoughCards = fmt.Errorf("not enough cards")
-	ErrAlreadyJoined  = fmt.Errorf("already joined")
+	ErrMatchNotFound      = fmt.Errorf("match not found")
+	ErrMatchNotOpen       = fmt.Errorf("match is not open")
+	ErrNotEnoughCards     = fmt.Errorf("not enough cards")
+	ErrAlreadyJoined      = fmt.Errorf("already joined")
+	ErrActiveMatchExists  = fmt.Errorf("active match already exists")
 )
 
 // CreateArenaMatch creates a new arena match
@@ -767,6 +768,9 @@ func (c *APIClient) CreateArenaMatch(ctx context.Context, chatID, creatorUserID 
 		body, _ := io.ReadAll(resp.Body)
 		if bytes.Contains(body, []byte("not enough cards")) {
 			return nil, ErrNotEnoughCards
+		}
+		if bytes.Contains(body, []byte("active match already exists")) {
+			return nil, ErrActiveMatchExists
 		}
 		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
 	}

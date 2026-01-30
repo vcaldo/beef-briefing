@@ -111,7 +111,8 @@ func (s *MatchScheduler) handleAutoStart(ctx context.Context, match client.Pendi
 	if result.Action == "started" {
 		s.sendMatchStartedNotification(ctx, result.ChatID, result.MatchID, result.Participants)
 	} else if result.Action == "cancelled" {
-		s.sendMatchCancelledNotification(ctx, result.ChatID, result.Reason)
+		// Silent cancel - no notification
+		slog.Info("match cancelled silently", "match_id", result.MatchID, "reason", result.Reason)
 	}
 }
 
@@ -194,25 +195,6 @@ func (s *MatchScheduler) sendShopPhaseDM(ctx context.Context, userID int64, matc
 		slog.Debug("failed to send shop phase DM", "user_id", userID, "error", err)
 	} else {
 		slog.Info("sent shop phase DM", "user_id", userID, "match_id", matchID)
-	}
-}
-
-// sendMatchCancelledNotification sends a notification when a match is cancelled
-func (s *MatchScheduler) sendMatchCancelledNotification(ctx context.Context, chatID int64, reason string) {
-	text := fmt.Sprintf(
-		"❌ *Arena Match Cancelled*\n\n"+
-			"Reason: %s\n\n"+
-			"Use /match to start a new match.",
-		reason,
-	)
-
-	_, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:    chatID,
-		Text:      text,
-		ParseMode: "Markdown",
-	})
-	if err != nil {
-		slog.Error("failed to send match cancelled notification", "chat_id", chatID, "error", err)
 	}
 }
 

@@ -159,6 +159,15 @@ func (r *MatchRepository) GetChatOpenMatch(ctx context.Context, chatID int64) (*
 	return match, nil
 }
 
+// SetTelegramMessageID updates the telegram_message_id for a match
+func (r *MatchRepository) SetTelegramMessageID(ctx context.Context, matchID string, messageID int64) error {
+	defer nrutil.StartSegment(ctx, "db:set-telegram-message-id")()
+
+	query := `UPDATE game_matches SET telegram_message_id = $2 WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, matchID, messageID)
+	return err
+}
+
 // UpdateMatchStatus updates the status of a match
 func (r *MatchRepository) UpdateMatchStatus(ctx context.Context, matchID string, status MatchStatus) error {
 	defer nrutil.StartSegment(ctx, "db:update-match-status")()

@@ -872,3 +872,9 @@ func (s *ArenaService) populateLeaderboardPhotoURLs(ctx context.Context, entries
 		}
 	}
 }
+
+// GetChatOpenMatch retrieves an open regular match for a chat
+func (s *ArenaService) GetChatOpenMatch(ctx context.Context, chatID int64) (*repository.Match, error) {
+	defer nrutil.StartSegment(ctx, "service:arena:get-chat-open-match")()
+	return s.gameRepo.GetChatOpenMatch(ctx, chatID)
+}

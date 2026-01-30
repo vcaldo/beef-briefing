@@ -428,3 +428,10 @@ func (s *MatchService) GetRecentMatchesVsOpponent(ctx context.Context, chatID, u
 
 	return s.gameRepo.GetRecentMatchesVsOpponent(ctx, chatID, userID, opponentID, limit)
 }
+
+// GetChatOpenMatch retrieves an open regular match for a chat
+func (s *MatchService) GetChatOpenMatch(ctx context.Context, chatID int64) (*repository.Match, error) {
+	defer nrutil.StartSegment(ctx, "service:match:get-chat-open-match")()
+
+	return s.gameRepo.GetChatOpenMatch(ctx, chatID)
+}

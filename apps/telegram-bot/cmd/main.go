@@ -73,6 +73,7 @@ func main() {
 	deckHandler := handlers.NewDeckHandler(nrApp)
 	rankingHandler := handlers.NewRankingHandler(nrApp)
 	matchHandler := handlers.NewMatchHandler(apiClient, nrApp, cfg.ArenaGameShortName, cfg.ArenaBaseURL)
+	joinHandler := handlers.NewJoinHandler(matchHandler)
 	callbackHandler := handlers.NewCallbackHandler(apiClient, nrApp, cfg.ArenaBaseURL, cfg.TelegramBotToken)
 	rankedHandler := handlers.NewRankedHandler(apiClient, nrApp)
 
@@ -117,6 +118,7 @@ func main() {
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/deck", bot.MatchTypePrefix, deckHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/ranking", bot.MatchTypePrefix, rankingHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/match", bot.MatchTypePrefix, matchHandler.Handle)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/join", bot.MatchTypePrefix, joinHandler.Handle)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/ranked", bot.MatchTypePrefix, rankedHandler.Handle)
 
 	// Register callback query handler for inline buttons

@@ -134,6 +134,40 @@ func (r *MatchRepository) GetUserActiveMatch(ctx context.Context, chatID, userID
 	return match, nil
 }
 
+// GetChatOpenMatch retrieves an open regular match for a chat
+func (r *MatchRepository) GetChatOpenMatch(ctx context.Context, chatID int64) (*Match, error) {
+	defer r.startDBSegment(ctx, "get-chat-open-match")()
+
+	query := fmt.Sprintf(`
+		SELECT %s
+		FROM game_matches
+		WHERE chat_id = $1
+		  AND status = 'open'
+		  AND match_type = 'regular'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, matchColumns)
+
+	match, err := scanMatch(r.db.QueryRowContext(ctx, query, chatID))
+	if err == sql.ErrNoRows {
+		return nil, nil // No open match found
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query chat open match: %w", err)
+	}
+
+	return match, nil
+}
+
+// SetTelegramMessageID updates the telegram_message_id for a match
+func (r *MatchRepository) SetTelegramMessageID(ctx context.Context, matchID string, messageID int64) error {
+	defer nrutil.StartSegment(ctx, "db:set-telegram-message-id")()
+
+	query := `UPDATE game_matches SET telegram_message_id = $2 WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, matchID, messageID)
+	return err
+}
+
 // UpdateMatchStatus updates the status of a match
 func (r *MatchRepository) UpdateMatchStatus(ctx context.Context, matchID string, status MatchStatus) error {
 	defer nrutil.StartSegment(ctx, "db:update-match-status")()

@@ -428,3 +428,17 @@ func (s *MatchService) GetRecentMatchesVsOpponent(ctx context.Context, chatID, u
 
 	return s.gameRepo.GetRecentMatchesVsOpponent(ctx, chatID, userID, opponentID, limit)
 }
+
+// GetChatOpenMatch retrieves an open regular match for a chat
+func (s *MatchService) GetChatOpenMatch(ctx context.Context, chatID int64) (*repository.Match, error) {
+	defer nrutil.StartSegment(ctx, "service:match:get-chat-open-match")()
+
+	return s.gameRepo.GetChatOpenMatch(ctx, chatID)
+}
+
+// SetTelegramMessageID updates the telegram message ID for a match
+func (s *MatchService) SetTelegramMessageID(ctx context.Context, matchID string, messageID int64) error {
+	defer nrutil.StartSegment(ctx, "service:match:set-telegram-message-id")()
+
+	return s.gameRepo.SetTelegramMessageID(ctx, matchID, messageID)
+}

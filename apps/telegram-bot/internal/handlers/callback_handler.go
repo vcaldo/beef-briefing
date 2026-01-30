@@ -131,11 +131,41 @@ func (h *CallbackHandler) handleJoinMatch(ctx context.Context, b *bot.Bot, callb
 		return
 	}
 
-	slog.Info("user joined match", "match_id", matchID, "user_id", userID)
+	slog.Info("user joined match", "match_id", matchID, "user_id", userID, "participant_count", len(match.Participants))
 	h.answerCallback(ctx, b, callback.ID, "You've joined the match!")
 
-	// Update the message with new participant count
-	h.updateMatchMessage(ctx, b, chatID, messageID, match)
+	// Update the message with new participant count (if we have telegram_message_id)
+	if match.TelegramMessageID != nil && *match.TelegramMessageID != 0 {
+		// Use the stored telegram_message_id instead of the current message_id
+		h.updateMatchMessageByTelegramID(ctx, b, chatID, int(*match.TelegramMessageID), match)
+	} else {
+		// Fallback: update the current message if no telegram_message_id is stored
+		h.updateMatchMessage(ctx, b, chatID, messageID, match)
+	}
+
+	// Send notification message
+	username := ""
+	if callback.From.Username != "" {
+		username = "@" + callback.From.Username
+	} else if callback.From.FirstName != "" {
+		username = callback.From.FirstName
+	} else {
+		username = fmt.Sprintf("User %d", userID)
+	}
+
+	notificationText := fmt.Sprintf("**%s** joined the match!\n\n👥 Participants: %d\n\nUse /join to enter the arena!", username, len(match.Participants))
+	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:    chatID,
+		Text:      notificationText,
+		ParseMode: models.ParseModeMarkdown,
+	})
+	if err != nil {
+		slog.Error("failed to send join notification", "match_id", matchID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		// Don't return - join was successful, notification is just nice to have
+	}
 }
 
 // handleLeaveMatch handles the leave_match callback
@@ -225,6 +255,32 @@ func (h *CallbackHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, ch
 	})
 	if err != nil {
 		slog.Error("failed to update match message", "error", err)
+	}
+}
+
+// updateMatchMessageByTelegramID updates the match message using the stored telegram_message_id
+func (h *CallbackHandler) updateMatchMessageByTelegramID(ctx context.Context, b *bot.Bot, chatID int64, telegramMessageID int, match *client.ArenaMatch) {
+	// Build participant count into button text so users see updated info
+	joinText := fmt.Sprintf("➕ Join Game (%d)", len(match.Participants))
+
+	keyboard := &models.InlineKeyboardMarkup{
+		InlineKeyboard: [][]models.InlineKeyboardButton{
+			{
+				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
+				{Text: joinText, CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
+			},
+		},
+	}
+
+	_, err := b.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
+		ChatID:      chatID,
+		MessageID:   telegramMessageID,
+		ReplyMarkup: keyboard,
+	})
+	if err != nil {
+		slog.Error("failed to update match message by telegram_message_id", "chat_id", chatID, "telegram_message_id", telegramMessageID, "error", err)
+	} else {
+		slog.Debug("updated match message keyboard", "chat_id", chatID, "telegram_message_id", telegramMessageID, "participant_count", len(match.Participants))
 	}
 }
 

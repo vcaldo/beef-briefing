@@ -348,6 +348,50 @@ func (m *MockGameRepository) GetUserActiveMatch(ctx context.Context, chatID, use
 	return nil, nil // No active match found
 }
 
+// GetChatOpenMatch retrieves an open regular match for a chat.
+// Returns nil if no open match is found.
+func (m *MockGameRepository) GetChatOpenMatch(ctx context.Context, chatID int64) (*repository.Match, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Check for error injection
+	if m.GetActiveMatchesError != nil {
+		return nil, m.GetActiveMatchesError
+	}
+
+	// Find an open regular match for the chat
+	var newestMatch *repository.Match
+	for _, match := range m.Matches {
+		if match.ChatID == chatID &&
+			match.Status == repository.MatchStatusOpen &&
+			match.MatchType == repository.MatchTypeRegular {
+			// Keep the newest match (most recent created_at)
+			if newestMatch == nil || match.CreatedAt.After(newestMatch.CreatedAt) {
+				newestMatch = match
+			}
+		}
+	}
+
+	if newestMatch != nil {
+		return copyMatch(newestMatch), nil
+	}
+	return nil, nil // No open match found
+}
+
+// SetTelegramMessageID updates the telegram message ID for a match.
+func (m *MockGameRepository) SetTelegramMessageID(ctx context.Context, matchID string, messageID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	match, exists := m.Matches[matchID]
+	if !exists {
+		return nil // Match not found - silent fail like real implementation
+	}
+
+	match.TelegramMessageID = &messageID
+	return nil
+}
+
 // GetMatchesByStatus retrieves matches by status.
 // Returns deep copies to prevent data races.
 func (m *MockGameRepository) GetMatchesByStatus(ctx context.Context, status repository.MatchStatus) ([]*repository.Match, error) {

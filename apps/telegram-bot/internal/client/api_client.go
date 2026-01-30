@@ -666,6 +666,7 @@ type ArenaMatch struct {
 	CreatedAt         string             `json:"created_at"`
 	Participants      []ArenaParticipant `json:"participants"`
 	CardCount         int                `json:"card_count"`
+	TelegramMessageID *int64             `json:"telegram_message_id,omitempty"`
 }
 
 // ArenaParticipant represents a participant in a match
@@ -702,10 +703,11 @@ type ForceSubmitResult struct {
 
 // Arena-specific errors
 var (
-	ErrMatchNotFound  = fmt.Errorf("match not found")
-	ErrMatchNotOpen   = fmt.Errorf("match is not open")
-	ErrNotEnoughCards = fmt.Errorf("not enough cards")
-	ErrAlreadyJoined  = fmt.Errorf("already joined")
+	ErrMatchNotFound      = fmt.Errorf("match not found")
+	ErrMatchNotOpen       = fmt.Errorf("match is not open")
+	ErrNotEnoughCards     = fmt.Errorf("not enough cards")
+	ErrAlreadyJoined      = fmt.Errorf("already joined")
+	ErrActiveMatchExists  = fmt.Errorf("active match already exists")
 )
 
 // CreateArenaMatch creates a new arena match
@@ -768,6 +770,9 @@ func (c *APIClient) CreateArenaMatch(ctx context.Context, chatID, creatorUserID 
 		if bytes.Contains(body, []byte("not enough cards")) {
 			return nil, ErrNotEnoughCards
 		}
+		if bytes.Contains(body, []byte("active match already exists")) {
+			return nil, ErrActiveMatchExists
+		}
 		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
 	}
 
@@ -814,6 +819,71 @@ func (c *APIClient) GetArenaMatch(ctx context.Context, matchID string) (*ArenaMa
 	}
 
 	return &result, nil
+}
+
+// GetChatOpenMatch retrieves an open match for a chat
+func (c *APIClient) GetChatOpenMatch(ctx context.Context, chatID int64) (*ArenaMatch, error) {
+	apiURL := fmt.Sprintf("%s/api/v1/arena/matches/open?chat_id=%d", c.baseURL, chatID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "GET")
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // No open match found - return nil, not an error
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result ArenaMatch
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// SetMatchTelegramMessageID updates the telegram_message_id for a match
+func (c *APIClient) SetMatchTelegramMessageID(ctx context.Context, matchID string, messageID int64) error {
+	reqBody := struct {
+		TelegramMessageID int64 `json:"telegram_message_id"`
+	}{TelegramMessageID: messageID}
+
+	bodyJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%s/message-id", c.baseURL, matchID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, apiURL, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "PATCH")
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	return nil
 }
 
 // JoinArenaMatch joins a match

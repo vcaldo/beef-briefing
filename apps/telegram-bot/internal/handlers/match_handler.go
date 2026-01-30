@@ -300,16 +300,99 @@ func (h *MatchHandler) createNewMatch(ctx context.Context, b *bot.Bot, update *m
 // joinExistingMatch joins an existing match and updates the game modal.
 // This is a helper function for HandleMatchOrJoin (task 6.3).
 func (h *MatchHandler) joinExistingMatch(ctx context.Context, b *bot.Bot, update *models.Update, match *client.ArenaMatch, userID int64, txn *newrelic.Transaction) {
-	// TODO: Implement task 6.3
-	// 1. Join the existing match via API (JoinMatch)
-	// 2. If user already joined, send "You've already joined this match!" message
-	// 3. Call updateMatchMessage to edit the game modal
+	// 1. Join the existing match via API
+	updatedMatch, err := h.apiClient.JoinArenaMatch(ctx, match.ID, userID)
+	if err != nil {
+		// 2. If user already joined, send "You've already joined this match!" message
+		if errors.Is(err, client.ErrAlreadyJoined) {
+			slog.Debug("user already joined match", "match_id", match.ID, "user_id", userID)
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: match.ChatID,
+				Text:   "You've already joined this match! Click 'Open Game' to continue.",
+			})
+			return
+		}
+
+		// Other errors
+		slog.Error("failed to join match", "match_id", match.ID, "user_id", userID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: match.ChatID,
+			Text:   "Failed to join match. Please try again later.",
+		})
+		return
+	}
+
+	slog.Info("user joined match", "match_id", match.ID, "user_id", userID, "participant_count", len(updatedMatch.Participants))
+	if txn != nil {
+		txn.AddAttribute("match_id", match.ID)
+		txn.AddAttribute("participant_count", len(updatedMatch.Participants))
+	}
+
+	// 3. Call updateMatchMessage to edit the game modal (if we have a message ID)
+	if updatedMatch.TelegramMessageID != nil && *updatedMatch.TelegramMessageID != 0 {
+		h.updateMatchMessage(ctx, b, updatedMatch.ChatID, int(*updatedMatch.TelegramMessageID), len(updatedMatch.Participants), updatedMatch.ID)
+	} else {
+		slog.Warn("no telegram message ID to update", "match_id", match.ID)
+	}
+
 	// 4. Send notification message
-	slog.Warn("joinExistingMatch not yet implemented", "match_id", match.ID, "user_id", userID)
-	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: match.ChatID,
-		Text:   "Match joining is not yet fully implemented.",
+	// Get the username from the update
+	username := ""
+	if update.Message != nil && update.Message.From != nil {
+		if update.Message.From.Username != "" {
+			username = "@" + update.Message.From.Username
+		} else if update.Message.From.FirstName != "" {
+			username = update.Message.From.FirstName
+		} else {
+			username = fmt.Sprintf("User %d", userID)
+		}
+	} else {
+		username = fmt.Sprintf("User %d", userID)
+	}
+
+	notificationText := fmt.Sprintf("**%s** joined the match!\n\n👥 Participants: %d\n\nUse /join to enter the arena!", username, len(updatedMatch.Participants))
+	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:    match.ChatID,
+		Text:      notificationText,
+		ParseMode: models.ParseModeMarkdown,
 	})
+	if err != nil {
+		slog.Error("failed to send join notification", "match_id", match.ID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		// Don't return - join was successful, notification is just nice to have
+	}
+}
+
+// updateMatchMessage edits the game modal to update the participant count.
+// This is a helper function for joinExistingMatch (task 6.4).
+func (h *MatchHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, participantCount int, matchID string) {
+	// Create updated inline keyboard with new participant count
+	keyboard := &models.InlineKeyboardMarkup{
+		InlineKeyboard: [][]models.InlineKeyboardButton{
+			{
+				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
+				{Text: fmt.Sprintf("➕ Join Game (%d)", participantCount), CallbackData: fmt.Sprintf("join_match:%s", matchID)},
+			},
+		},
+	}
+
+	// Edit the message's reply markup (inline keyboard)
+	_, err := b.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
+		ChatID:      chatID,
+		MessageID:   messageID,
+		ReplyMarkup: keyboard,
+	})
+	if err != nil {
+		// Log error but don't fail - the join notification provides the count anyway
+		slog.Warn("failed to update match message", "chat_id", chatID, "message_id", messageID, "error", err)
+	} else {
+		slog.Debug("updated match message keyboard", "chat_id", chatID, "message_id", messageID, "participant_count", participantCount)
+	}
 }
 
 // FormatParticipantList formats the list of participants for display

@@ -403,6 +403,10 @@ func (r *GameRepository) GetChatOpenMatch(ctx context.Context, chatID int64) (*M
 	return r.matchRepo.GetChatOpenMatch(ctx, chatID)
 }
 
+func (r *GameRepository) SetTelegramMessageID(ctx context.Context, matchID string, messageID int64) error {
+	return r.matchRepo.SetTelegramMessageID(ctx, matchID, messageID)
+}
+
 func (r *GameRepository) UpdateMatchStatus(ctx context.Context, matchID string, status MatchStatus) error {
 	return r.matchRepo.UpdateMatchStatus(ctx, matchID, status)
 }

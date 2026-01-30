@@ -435,3 +435,10 @@ func (s *MatchService) GetChatOpenMatch(ctx context.Context, chatID int64) (*rep
 
 	return s.gameRepo.GetChatOpenMatch(ctx, chatID)
 }
+
+// SetTelegramMessageID updates the telegram message ID for a match
+func (s *MatchService) SetTelegramMessageID(ctx context.Context, matchID string, messageID int64) error {
+	defer nrutil.StartSegment(ctx, "service:match:set-telegram-message-id")()
+
+	return s.gameRepo.SetTelegramMessageID(ctx, matchID, messageID)
+}

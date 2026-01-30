@@ -821,6 +821,38 @@ func (c *APIClient) GetArenaMatch(ctx context.Context, matchID string) (*ArenaMa
 	return &result, nil
 }
 
+// GetChatOpenMatch retrieves an open match for a chat
+func (c *APIClient) GetChatOpenMatch(ctx context.Context, chatID int64) (*ArenaMatch, error) {
+	apiURL := fmt.Sprintf("%s/api/v1/arena/matches/open?chat_id=%d", c.baseURL, chatID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "GET")
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // No open match found - return nil, not an error
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result ArenaMatch
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
 // JoinArenaMatch joins a match
 func (c *APIClient) JoinArenaMatch(ctx context.Context, matchID string, userID int64) (*ArenaMatch, error) {
 	reqBody := struct {

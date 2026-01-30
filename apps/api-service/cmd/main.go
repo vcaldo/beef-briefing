@@ -298,6 +298,8 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		api.HandleFunc("/arena/match/{id}/auto-start", arenaHandler.HandleBotAutoStartMatch).Methods("POST")
 		api.HandleFunc("/arena/match/{id}/force-submit", arenaHandler.HandleBotForceSubmitTeams).Methods("POST")
 		api.HandleFunc("/arena/match/{id}/share-data", arenaHandler.HandleBotGetShareData).Methods("GET")
+		api.HandleFunc("/arena/matches/open", arenaHandler.HandleGetChatOpenMatch).Methods("GET")
+		api.HandleFunc("/arena/match/{id}/message-id", arenaHandler.HandleSetTelegramMessageID).Methods("PATCH")
 
 		// Ranked tournament bot endpoints
 		api.HandleFunc("/arena/tournament/today", arenaHandler.HandleBotGetTodayTournament).Methods("GET")

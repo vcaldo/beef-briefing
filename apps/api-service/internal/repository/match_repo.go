@@ -142,7 +142,7 @@ func (r *MatchRepository) GetChatOpenMatch(ctx context.Context, chatID int64) (*
 		SELECT %s
 		FROM game_matches
 		WHERE chat_id = $1
-		  AND status = 'lobby'
+		  AND status = 'open'
 		  AND match_type = 'regular'
 		ORDER BY created_at DESC
 		LIMIT 1

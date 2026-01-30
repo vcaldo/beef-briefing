@@ -169,12 +169,29 @@ func (h *MatchHandler) createNewMatch(ctx context.Context, b *bot.Bot, update *m
 		return
 	}
 
+	// Get creator name for display
+	creatorName := ""
+	if update.Message != nil && update.Message.From != nil {
+		if update.Message.From.Username != "" {
+			creatorName = "@" + update.Message.From.Username
+		} else if update.Message.From.FirstName != "" {
+			creatorName = update.Message.From.FirstName
+		} else {
+			creatorName = fmt.Sprintf("User %d", userID)
+		}
+	} else {
+		creatorName = fmt.Sprintf("User %d", userID)
+	}
+
 	// Create inline keyboard with game callback buttons
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
 			{
 				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
 				{Text: "➕ Join Game (1)", CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
+			},
+			{
+				{Text: fmt.Sprintf("👥 %s", creatorName), CallbackData: "noop"},
 			},
 		},
 	}
@@ -244,7 +261,7 @@ func (h *MatchHandler) joinExistingMatch(ctx context.Context, b *bot.Bot, update
 
 	// 3. Call updateMatchMessage to edit the game modal (if we have a message ID)
 	if updatedMatch.TelegramMessageID != nil && *updatedMatch.TelegramMessageID != 0 {
-		h.updateMatchMessage(ctx, b, updatedMatch.ChatID, int(*updatedMatch.TelegramMessageID), len(updatedMatch.Participants), updatedMatch.ID)
+		h.updateMatchMessage(ctx, b, updatedMatch.ChatID, int(*updatedMatch.TelegramMessageID), updatedMatch.Participants, updatedMatch.ID)
 	} else {
 		slog.Warn("no telegram message ID to update", "match_id", match.ID)
 	}
@@ -279,15 +296,18 @@ func (h *MatchHandler) joinExistingMatch(ctx context.Context, b *bot.Bot, update
 	}
 }
 
-// updateMatchMessage edits the game modal to update the participant count.
+// updateMatchMessage edits the game modal to update the participant list.
 // This is a helper function for joinExistingMatch (task 6.4).
-func (h *MatchHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, participantCount int, matchID string) {
-	// Create updated inline keyboard with new participant count
+func (h *MatchHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, participants []client.ArenaParticipant, matchID string) {
+	// Create updated inline keyboard with participant count and list
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
 			{
 				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
-				{Text: fmt.Sprintf("➕ Join Game (%d)", participantCount), CallbackData: fmt.Sprintf("join_match:%s", matchID)},
+				{Text: fmt.Sprintf("➕ Join Game (%d)", len(participants)), CallbackData: fmt.Sprintf("join_match:%s", matchID)},
+			},
+			{
+				{Text: fmt.Sprintf("👥 %s", FormatParticipantList(participants)), CallbackData: "noop"},
 			},
 		},
 	}
@@ -302,7 +322,7 @@ func (h *MatchHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, chatI
 		// Log error but don't fail - the join notification provides the count anyway
 		slog.Warn("failed to update match message", "chat_id", chatID, "message_id", messageID, "error", err)
 	} else {
-		slog.Debug("updated match message keyboard", "chat_id", chatID, "message_id", messageID, "participant_count", participantCount)
+		slog.Debug("updated match message keyboard", "chat_id", chatID, "message_id", messageID, "participant_count", len(participants))
 	}
 }
 

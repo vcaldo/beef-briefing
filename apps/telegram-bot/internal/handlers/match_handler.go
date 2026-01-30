@@ -188,16 +188,113 @@ func (h *MatchHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Up
 // createNewMatch creates a new match and sends the game modal.
 // This is a helper function for HandleMatchOrJoin (task 6.2).
 func (h *MatchHandler) createNewMatch(ctx context.Context, b *bot.Bot, update *models.Update, chatID int64, userID int64, txn *newrelic.Transaction) {
-	// TODO: Implement task 6.2
-	// 1. Create match via API (CreateMatch)
-	// 2. Send game modal via Telegram (existing SendGame call)
-	// 3. Save telegram message ID via SetMatchTelegramMessageID
-	// 4. Handle ErrActiveMatchExists by falling back to joinExistingMatch
-	slog.Warn("createNewMatch not yet implemented", "chat_id", chatID, "user_id", userID)
-	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: chatID,
-		Text:   "Match creation is not yet fully implemented.",
+	// 1. Create match via API
+	match, err := h.apiClient.CreateArenaMatch(ctx, chatID, userID)
+	if err != nil {
+		// 4. Handle ErrActiveMatchExists by falling back to joinExistingMatch
+		if errors.Is(err, client.ErrActiveMatchExists) {
+			slog.Debug("active match exists, fetching and joining", "chat_id", chatID, "user_id", userID)
+			// Fetch the existing match and join it
+			existingMatch, fetchErr := h.apiClient.GetChatOpenMatch(ctx, chatID)
+			if fetchErr != nil {
+				slog.Error("failed to fetch existing match after ErrActiveMatchExists", "chat_id", chatID, "error", fetchErr)
+				if txn != nil {
+					txn.NoticeError(fetchErr)
+				}
+				b.SendMessage(ctx, &bot.SendMessageParams{
+					ChatID: chatID,
+					Text:   "Failed to join existing match. Please try again later.",
+				})
+				return
+			}
+			if existingMatch == nil {
+				slog.Error("got ErrActiveMatchExists but GetChatOpenMatch returned nil", "chat_id", chatID)
+				b.SendMessage(ctx, &bot.SendMessageParams{
+					ChatID: chatID,
+					Text:   "Failed to find existing match. Please try again later.",
+				})
+				return
+			}
+			// Join the existing match
+			h.joinExistingMatch(ctx, b, update, existingMatch, userID, txn)
+			return
+		}
+
+		// Handle ErrNotEnoughCards
+		if errors.Is(err, client.ErrNotEnoughCards) {
+			slog.Debug("not enough cards for match", "chat_id", chatID)
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: chatID,
+				Text:   "Not enough cards in this group. Need at least 10 cards to start a match.",
+			})
+			return
+		}
+
+		// Other errors
+		slog.Error("failed to create match", "chat_id", chatID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: chatID,
+			Text:   "Failed to create match. Please try again later.",
+		})
+		return
+	}
+
+	slog.Info("match created", "match_id", match.ID, "chat_id", chatID, "creator", userID)
+	if txn != nil {
+		txn.AddAttribute("match_id", match.ID)
+	}
+
+	// 2. Send game modal via Telegram
+	// Check if Games API is configured
+	if h.gameShortName == "" {
+		slog.Warn("ARENA_GAME_SHORT_NAME not configured, Games API unavailable", "chat_id", chatID)
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: chatID,
+			Text:   "The arena feature is not configured. Please contact the administrator.",
+		})
+		return
+	}
+
+	// Create inline keyboard with game callback buttons
+	keyboard := &models.InlineKeyboardMarkup{
+		InlineKeyboard: [][]models.InlineKeyboardButton{
+			{
+				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
+				{Text: "➕ Join Game (1)", CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
+			},
+		},
+	}
+
+	// Send game message using SendGame (Games API)
+	msg, err := b.SendGame(ctx, &bot.SendGameParams{
+		ChatID:       chatID,
+		GameShorName: h.gameShortName,
+		ReplyMarkup:  keyboard,
 	})
+	if err != nil {
+		slog.Error("failed to send game message", "match_id", match.ID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		return
+	}
+
+	// 3. Save telegram message ID via SetMatchTelegramMessageID
+	if msg != nil && msg.ID != 0 {
+		err = h.apiClient.SetMatchTelegramMessageID(ctx, match.ID, int64(msg.ID))
+		if err != nil {
+			slog.Error("failed to save telegram message ID", "match_id", match.ID, "message_id", msg.ID, "error", err)
+			if txn != nil {
+				txn.NoticeError(err)
+			}
+			// Don't return - message was sent successfully, this is just metadata
+		} else {
+			slog.Debug("saved telegram message ID", "match_id", match.ID, "message_id", msg.ID)
+		}
+	}
 }
 
 // joinExistingMatch joins an existing match and updates the game modal.

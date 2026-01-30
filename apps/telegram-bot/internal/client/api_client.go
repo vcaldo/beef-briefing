@@ -854,7 +854,7 @@ func (c *APIClient) GetChatOpenMatch(ctx context.Context, chatID int64) (*ArenaM
 }
 
 // SetMatchTelegramMessageID updates the telegram_message_id for a match
-func (c *APIClient) SetMatchTelegramMessageID(ctx context.Context, matchID int64, messageID int64) error {
+func (c *APIClient) SetMatchTelegramMessageID(ctx context.Context, matchID string, messageID int64) error {
 	reqBody := struct {
 		TelegramMessageID int64 `json:"telegram_message_id"`
 	}{TelegramMessageID: messageID}
@@ -864,7 +864,7 @@ func (c *APIClient) SetMatchTelegramMessageID(ctx context.Context, matchID int64
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%d/message-id", c.baseURL, matchID)
+	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%s/message-id", c.baseURL, matchID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, apiURL, bytes.NewReader(bodyJSON))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)

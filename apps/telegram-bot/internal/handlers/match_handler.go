@@ -34,6 +34,62 @@ func NewMatchHandler(apiClient *client.APIClient, nrApp *newrelic.Application, g
 	}
 }
 
+// HandleMatchOrJoin is the unified handler for both /match and /join commands.
+// It checks if an open match exists in the chat and either joins it or creates a new one.
+func (h *MatchHandler) HandleMatchOrJoin(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if update.Message == nil {
+		return
+	}
+
+	chatID := update.Message.Chat.ID
+	userID := update.Message.From.ID
+	chatType := update.Message.Chat.Type
+
+	slog.Debug("received match or join command", "chat_id", chatID, "user_id", userID, "chat_type", chatType)
+
+	// Only allow in group or supergroup chats
+	if chatType != "group" && chatType != "supergroup" {
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: chatID,
+			Text:   "This command only works in group chats.",
+		})
+		return
+	}
+
+	// Start New Relic transaction if available
+	var txn *newrelic.Transaction
+	if h.nrApp != nil {
+		txn = h.nrApp.StartTransaction("bot:match-or-join-command")
+		defer txn.End()
+		ctx = newrelic.NewContext(ctx, txn)
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("user_id", userID)
+	}
+
+	// Check for existing open match
+	match, err := h.apiClient.GetChatOpenMatch(ctx, chatID)
+	if err != nil {
+		slog.Error("failed to check for open match", "chat_id", chatID, "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: chatID,
+			Text:   "Failed to check for existing matches. Please try again later.",
+		})
+		return
+	}
+
+	// Branch based on whether match exists
+	if match == nil {
+		// No existing match - create new one
+		h.createNewMatch(ctx, b, update, chatID, userID, txn)
+	} else {
+		// Match exists - join it
+		h.joinExistingMatch(ctx, b, update, match, userID, txn)
+	}
+}
+
 // Handle processes the /match command
 func (h *MatchHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 	if update.Message == nil {
@@ -127,6 +183,36 @@ func (h *MatchHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Up
 			txn.NoticeError(err)
 		}
 	}
+}
+
+// createNewMatch creates a new match and sends the game modal.
+// This is a helper function for HandleMatchOrJoin (task 6.2).
+func (h *MatchHandler) createNewMatch(ctx context.Context, b *bot.Bot, update *models.Update, chatID int64, userID int64, txn *newrelic.Transaction) {
+	// TODO: Implement task 6.2
+	// 1. Create match via API (CreateMatch)
+	// 2. Send game modal via Telegram (existing SendGame call)
+	// 3. Save telegram message ID via SetMatchTelegramMessageID
+	// 4. Handle ErrActiveMatchExists by falling back to joinExistingMatch
+	slog.Warn("createNewMatch not yet implemented", "chat_id", chatID, "user_id", userID)
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: chatID,
+		Text:   "Match creation is not yet fully implemented.",
+	})
+}
+
+// joinExistingMatch joins an existing match and updates the game modal.
+// This is a helper function for HandleMatchOrJoin (task 6.3).
+func (h *MatchHandler) joinExistingMatch(ctx context.Context, b *bot.Bot, update *models.Update, match *client.ArenaMatch, userID int64, txn *newrelic.Transaction) {
+	// TODO: Implement task 6.3
+	// 1. Join the existing match via API (JoinMatch)
+	// 2. If user already joined, send "You've already joined this match!" message
+	// 3. Call updateMatchMessage to edit the game modal
+	// 4. Send notification message
+	slog.Warn("joinExistingMatch not yet implemented", "match_id", match.ID, "user_id", userID)
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: match.ChatID,
+		Text:   "Match joining is not yet fully implemented.",
+	})
 }
 
 // FormatParticipantList formats the list of participants for display

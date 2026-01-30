@@ -853,6 +853,39 @@ func (c *APIClient) GetChatOpenMatch(ctx context.Context, chatID int64) (*ArenaM
 	return &result, nil
 }
 
+// SetMatchTelegramMessageID updates the telegram_message_id for a match
+func (c *APIClient) SetMatchTelegramMessageID(ctx context.Context, matchID int64, messageID int64) error {
+	reqBody := struct {
+		TelegramMessageID int64 `json:"telegram_message_id"`
+	}{TelegramMessageID: messageID}
+
+	bodyJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v1/arena/match/%d/message-id", c.baseURL, matchID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, apiURL, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "PATCH")
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	return nil
+}
+
 // JoinArenaMatch joins a match
 func (c *APIClient) JoinArenaMatch(ctx context.Context, matchID string, userID int64) (*ArenaMatch, error) {
 	reqBody := struct {

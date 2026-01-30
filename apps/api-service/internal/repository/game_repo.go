@@ -45,12 +45,12 @@ type rowScanner interface {
 // matchColumns is the standard column order for Match queries
 const matchColumns = `id, chat_id, match_type, format, status, created_at, join_deadline,
        shop_phase_started_at, shop_phase_deadline, battle_started_at, completed_at,
-       tournament_date, creator_user_id, current_round, winner_user_id`
+       tournament_date, creator_user_id, current_round, winner_user_id, telegram_message_id`
 
 // matchColumnsAliased is matchColumns with table alias 'm.' prefix for JOIN queries
 const matchColumnsAliased = `m.id, m.chat_id, m.match_type, m.format, m.status, m.created_at, m.join_deadline,
        m.shop_phase_started_at, m.shop_phase_deadline, m.battle_started_at, m.completed_at,
-       m.tournament_date, m.creator_user_id, m.current_round, m.winner_user_id`
+       m.tournament_date, m.creator_user_id, m.current_round, m.winner_user_id, m.telegram_message_id`
 
 // scanMatch scans a row into a Match struct, handling nullable fields
 func scanMatch(row rowScanner) (*Match, error) {
@@ -63,6 +63,7 @@ func scanMatch(row rowScanner) (*Match, error) {
 		&match.CreatedAt, &match.JoinDeadline, &match.ShopPhaseStartedAt,
 		&match.ShopPhaseDeadline, &match.BattleStartedAt, &match.CompletedAt,
 		&tournDate, &match.CreatorUserID, &match.CurrentRound, &match.WinnerUserID,
+		&match.TelegramMessageID,
 	)
 	if err != nil {
 		return nil, err
@@ -205,6 +206,7 @@ type Match struct {
 	CreatorUserID      *int64       `json:"creator_user_id,omitempty"`
 	CurrentRound       int          `json:"current_round"`
 	WinnerUserID       *int64       `json:"winner_user_id,omitempty"`
+	TelegramMessageID  *int64       `json:"telegram_message_id,omitempty"`
 }
 
 // Participant represents a match participant

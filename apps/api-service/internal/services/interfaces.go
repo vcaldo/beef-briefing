@@ -99,6 +99,7 @@ type MiniAppServiceInterface interface {
 	// Authentication Methods
 	ValidateInitData(initData string, maxAgeSeconds int64) (*ValidatedInitData, error)
 	Authenticate(ctx context.Context, initData string) (*AuthResponse, error)
+	AuthenticateGame(ctx context.Context, chatID, userID int64, matchID string, ts int64, sig string) (*AuthResponse, error)
 
 	// Overview Stats Methods
 	GetOverviewStats(ctx context.Context, chatID int64, period string, tz *time.Location) (*repository.OverviewStats, error)

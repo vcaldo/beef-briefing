@@ -40,6 +40,15 @@ type AuthRequest struct {
 	InitData string `json:"init_data"`
 }
 
+// GameAuthRequest represents the Games API authentication request body
+type GameAuthRequest struct {
+	ChatID  int64  `json:"chat_id"`
+	UserID  int64  `json:"user_id"`
+	MatchID string `json:"match_id"`
+	TS      int64  `json:"ts"`
+	Sig     string `json:"sig"`
+}
+
 // HandleAuth handles Mini App authentication.
 // POST /api/v1/mini-app/auth
 func (h *MiniAppHandler) HandleAuth(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +80,82 @@ func (h *MiniAppHandler) HandleAuth(w http.ResponseWriter, r *http.Request) {
 			txn.NoticeError(err)
 		}
 		httputil.RespondError(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("user_id", response.UserID)
+		if response.ChatID != nil {
+			txn.AddAttribute("chat_id", *response.ChatID)
+		}
+	}
+
+	httputil.RespondJSON(w, response, http.StatusOK)
+}
+
+// HandleGameAuth handles Games API authentication via signed URL parameters.
+// POST /api/v1/mini-app/auth/game
+func (h *MiniAppHandler) HandleGameAuth(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:mini-app:auth:game")
+	}
+
+	var req GameAuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Error("failed to decode game auth request", "error", err)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if req.ChatID == 0 {
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
+		return
+	}
+	if req.UserID == 0 {
+		httputil.RespondError(w, "user_id is required", http.StatusBadRequest)
+		return
+	}
+	if req.MatchID == "" {
+		httputil.RespondError(w, "match_id is required", http.StatusBadRequest)
+		return
+	}
+	if req.TS == 0 {
+		httputil.RespondError(w, "ts is required", http.StatusBadRequest)
+		return
+	}
+	if req.Sig == "" {
+		httputil.RespondError(w, "sig is required", http.StatusBadRequest)
+		return
+	}
+
+	response, err := h.service.AuthenticateGame(ctx, req.ChatID, req.UserID, req.MatchID, req.TS, req.Sig)
+	if err != nil {
+		slog.Warn("Games API auth failed", "error", err, "chat_id", req.ChatID, "user_id", req.UserID, "match_id", req.MatchID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+
+		// Determine appropriate status code based on error type
+		switch {
+		case errors.Is(err, apperror.ErrMissingGameChatID),
+			errors.Is(err, apperror.ErrMissingGameUserID),
+			errors.Is(err, apperror.ErrMissingGameMatchID),
+			errors.Is(err, apperror.ErrMissingGameTimestamp),
+			errors.Is(err, apperror.ErrMissingGameSignature):
+			httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, apperror.ErrInvalidGameSignature),
+			errors.Is(err, apperror.ErrExpiredGameTimestamp),
+			errors.Is(err, apperror.ErrFutureGameTimestamp):
+			httputil.RespondError(w, err.Error(), http.StatusUnauthorized)
+		default:
+			httputil.RespondError(w, "authentication failed", http.StatusUnauthorized)
+		}
 		return
 	}
 

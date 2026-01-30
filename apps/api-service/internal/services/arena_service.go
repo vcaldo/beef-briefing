@@ -296,6 +296,35 @@ func (s *ArenaService) GetActiveMatches(ctx context.Context, chatID int64) ([]*M
 	return responses, nil
 }
 
+// GetUserActiveMatch retrieves a user's active match in a specific chat
+func (s *ArenaService) GetUserActiveMatch(ctx context.Context, chatID, userID int64) (*MatchResponse, error) {
+	defer nrutil.StartSegment(ctx, "service:arena:get-user-active-match")()
+
+	match, err := s.gameRepo.GetUserActiveMatch(ctx, chatID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user active match: %w", err)
+	}
+
+	// Return nil if no active match found
+	if match == nil {
+		return nil, nil
+	}
+
+	// Get participants for the match
+	participants, err := s.gameRepo.GetMatchParticipants(ctx, match.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match participants: %w", err)
+	}
+
+	// Populate photo URLs
+	s.populateParticipantPhotoURLs(ctx, participants)
+
+	return &MatchResponse{
+		Match:        match,
+		Participants: participants,
+	}, nil
+}
+
 // JoinMatch adds a user to a match
 func (s *ArenaService) JoinMatch(ctx context.Context, matchID string, userID int64) (*MatchResponse, error) {
 	defer nrutil.StartSegment(ctx, "service:arena:join-match")()

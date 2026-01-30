@@ -2,10 +2,14 @@ package handlers
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"beef-briefing/apps/telegram-bot/internal/client"
 
@@ -16,16 +20,34 @@ import (
 
 // CallbackHandler handles callback queries from inline keyboards
 type CallbackHandler struct {
-	apiClient *client.APIClient
-	nrApp     *newrelic.Application
+	apiClient    *client.APIClient
+	nrApp        *newrelic.Application
+	arenaBaseURL string
+	botToken     string
 }
 
 // NewCallbackHandler creates a new CallbackHandler
-func NewCallbackHandler(apiClient *client.APIClient, nrApp *newrelic.Application) *CallbackHandler {
+func NewCallbackHandler(apiClient *client.APIClient, nrApp *newrelic.Application, arenaBaseURL, botToken string) *CallbackHandler {
 	return &CallbackHandler{
-		apiClient: apiClient,
-		nrApp:     nrApp,
+		apiClient:    apiClient,
+		nrApp:        nrApp,
+		arenaBaseURL: arenaBaseURL,
+		botToken:     botToken,
 	}
+}
+
+// signGameURL generates an HMAC-SHA256 signature for Games API authentication.
+// The signature format matches the API service validation:
+// data = "chat_id=%d&match_id=%s&ts=%d&user_id=%d" (alphabetically sorted keys)
+// Returns the hex-encoded signature.
+func signGameURL(botToken string, chatID, userID int64, matchID string, ts int64) string {
+	// Build data string with alphabetically sorted keys (must match API service!)
+	dataString := fmt.Sprintf("chat_id=%d&match_id=%s&ts=%d&user_id=%d", chatID, matchID, ts, userID)
+
+	// Calculate HMAC-SHA256 using bot token as key (raw, not hashed)
+	mac := hmac.New(sha256.New, []byte(botToken))
+	mac.Write([]byte(dataString))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 // Handle processes callback queries
@@ -181,40 +203,24 @@ func (h *CallbackHandler) handleStartMatch(ctx context.Context, b *bot.Bot, call
 	h.updateMatchStartedMessage(ctx, b, chatID, messageID, match)
 }
 
-// updateMatchMessage updates the match message with current participant info
+// updateMatchMessage updates the match message buttons
+// Note: Game messages (from SendGame) don't have captions, so we only update the reply markup
 func (h *CallbackHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, match *client.ArenaMatch) {
-	var creatorID int64
-	if match.CreatorUserID != nil {
-		creatorID = *match.CreatorUserID
-	}
-
-	messageText := fmt.Sprintf(
-		"⚔️ *Arena Match*\n\n"+
-			"👤 Creator: [user](tg://user?id=%d)\n"+
-			"⏰ Join window: 5 minutes\n"+
-			"👥 Participants: %d\n\n"+
-			"Click *Join Match* to participate!",
-		creatorID,
-		len(match.Participants),
-	)
+	// Build participant count into button text so users see updated info
+	joinText := fmt.Sprintf("➕ Join Game (%d)", len(match.Participants))
 
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
 			{
-				{Text: "🎮 Join Match", CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
-				{Text: "🚪 Leave", CallbackData: fmt.Sprintf("leave_match:%s", match.ID)},
-			},
-			{
-				{Text: "▶️ Start Match", CallbackData: fmt.Sprintf("start_match:%s", match.ID)},
+				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
+				{Text: joinText, CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
 			},
 		},
 	}
 
-	_, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
+	_, err := b.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
 		ChatID:      chatID,
 		MessageID:   messageID,
-		Text:        messageText,
-		ParseMode:   models.ParseModeMarkdown,
 		ReplyMarkup: keyboard,
 	})
 	if err != nil {
@@ -223,31 +229,21 @@ func (h *CallbackHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, ch
 }
 
 // updateMatchStartedMessage updates the message when match starts
+// Keeps the Open Game button but removes join button since match has started
 func (h *CallbackHandler) updateMatchStartedMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, match *client.ArenaMatch) {
-	participantMentions := ""
-	for _, p := range match.Participants {
-		if participantMentions != "" {
-			participantMentions += ", "
-		}
-		participantMentions += fmt.Sprintf("[user](tg://user?id=%d)", p.UserID)
+	// Keep only the Open Game button since match has started
+	keyboard := &models.InlineKeyboardMarkup{
+		InlineKeyboard: [][]models.InlineKeyboardButton{
+			{
+				{Text: fmt.Sprintf("🎮 Open Game (%d players)", len(match.Participants)), CallbackGame: &models.CallbackGame{}},
+			},
+		},
 	}
 
-	messageText := fmt.Sprintf(
-		"⚔️ *Arena Match Started!*\n\n"+
-			"🎮 Format: %s\n"+
-			"👥 Participants: %s\n\n"+
-			"⏰ You have 3 minutes to build your team!\n"+
-			"Open the game to select and arrange your cards.",
-		match.Format,
-		participantMentions,
-	)
-
-	// Remove action buttons since match has started
-	_, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
-		ChatID:    chatID,
-		MessageID: messageID,
-		Text:      messageText,
-		ParseMode: models.ParseModeMarkdown,
+	_, err := b.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
+		ChatID:      chatID,
+		MessageID:   messageID,
+		ReplyMarkup: keyboard,
 	})
 	if err != nil {
 		slog.Error("failed to update match started message", "error", err)
@@ -277,15 +273,37 @@ func (h *CallbackHandler) handleGameCallback(ctx context.Context, b *bot.Bot, ca
 	userID := callback.From.ID
 	chatID := callback.Message.Message.Chat.ID
 
-	// Build game URL with query parameters
+	// Query user's active match from API
+	match, err := h.apiClient.GetUserActiveMatch(ctx, chatID, userID)
+	if err != nil {
+		slog.Error("failed to get user active match", "user_id", userID, "chat_id", chatID, "error", err)
+		h.answerCallback(ctx, b, callback.ID, "Failed to load game. Please try again.")
+		return
+	}
+
+	// If no active match, still allow access to lobby (match_id will be empty)
+	matchID := ""
+	if match != nil {
+		matchID = match.ID
+	}
+
+	// Generate timestamp and signature for Games API authentication
+	ts := time.Now().Unix()
+	sig := signGameURL(h.botToken, chatID, userID, matchID, ts)
+
+	// Build signed game URL with all authentication parameters
 	gameURL := fmt.Sprintf(
-		"https://arena.barra-pesada.online?chat_id=%d&user_id=%d",
+		"%s?chat_id=%d&user_id=%d&match_id=%s&ts=%d&sig=%s",
+		h.arenaBaseURL,
 		chatID,
 		userID,
+		matchID,
+		ts,
+		sig,
 	)
 
 	// Answer callback query with game URL
-	_, err := b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+	_, err = b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 		CallbackQueryID: callback.ID,
 		URL:             gameURL,
 	})
@@ -294,7 +312,7 @@ func (h *CallbackHandler) handleGameCallback(ctx context.Context, b *bot.Bot, ca
 		return
 	}
 
-	slog.Info("game callback answered", "user_id", userID, "chat_id", chatID, "game_url", gameURL)
+	slog.Info("game callback answered", "user_id", userID, "chat_id", chatID, "match_id", matchID, "game_url", gameURL)
 }
 
 // =====================================================

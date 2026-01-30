@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
-import { useLaunchParams } from '@telegram-apps/sdk-react'
 
 import { apiClient } from './api/client'
 import { preloadAllDuringSplash } from './utils/assetPreloader'
+import { parseGameUrlParams } from './utils/urlParams'
 import { setCustomAttribute, addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { ErrorBoundary } from '@beef-briefing/shared-mini-app/components'
 import { TabBar, SplashScreen, ErrorDisplay, LoadingSpinner } from './components/common'
@@ -43,14 +43,6 @@ function App() {
   const [hasBattleEverCompleted, setHasBattleEverCompleted] = useState(false)
   const [replayTrigger, setReplayTrigger] = useState(0)
 
-  // Get launch params from Telegram
-  let launchParams: ReturnType<typeof useLaunchParams> | null = null
-  try {
-    launchParams = useLaunchParams()
-  } catch {
-    // Not in Telegram context
-  }
-
   // Set timezone attribute on mount
   useEffect(() => {
     try {
@@ -87,20 +79,26 @@ function App() {
   useEffect(() => {
     async function authenticate() {
       try {
-        const initDataRaw = launchParams?.initDataRaw
-        if (!initDataRaw) {
-          // Development fallback
-          if (import.meta.env.DEV) {
-            setError('No init data available. Running in development mode without Telegram context.')
-          } else {
-            setError('This app must be opened from Telegram')
-          }
+        // Parse URL query parameters
+        const parseResult = parseGameUrlParams(window.location.search)
+
+        if (!parseResult.success) {
+          setError(parseResult.error)
           setAppState('error')
-          addPageAction('auth_failed', { reason: 'no_init_data' })
+          addPageAction('auth_failed', { reason: parseResult.reason })
           return
         }
 
-        const auth = await apiClient.authenticate(initDataRaw)
+        const { chatId, userId, matchId, ts, sig } = parseResult.params
+
+        // Authenticate using Games API
+        const auth = await apiClient.authenticateGame({
+          chat_id: chatId,
+          user_id: userId,
+          match_id: matchId,
+          ts,
+          sig,
+        })
 
         if (!auth.chat_id) {
           setError('Please open this app from a group chat using the /arena command')
@@ -148,7 +146,7 @@ function App() {
 
     authenticate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [launchParams?.initDataRaw])
+  }, [])
 
   // Handle tab change with tracking
   const handleTabChange = useCallback(

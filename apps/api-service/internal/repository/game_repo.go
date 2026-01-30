@@ -47,6 +47,11 @@ const matchColumns = `id, chat_id, match_type, format, status, created_at, join_
        shop_phase_started_at, shop_phase_deadline, battle_started_at, completed_at,
        tournament_date, creator_user_id, current_round, winner_user_id`
 
+// matchColumnsAliased is matchColumns with table alias 'm.' prefix for JOIN queries
+const matchColumnsAliased = `m.id, m.chat_id, m.match_type, m.format, m.status, m.created_at, m.join_deadline,
+       m.shop_phase_started_at, m.shop_phase_deadline, m.battle_started_at, m.completed_at,
+       m.tournament_date, m.creator_user_id, m.current_round, m.winner_user_id`
+
 // scanMatch scans a row into a Match struct, handling nullable fields
 func scanMatch(row rowScanner) (*Match, error) {
 	match := &Match{}
@@ -386,6 +391,10 @@ func (r *GameRepository) GetMatch(ctx context.Context, matchID string) (*Match, 
 
 func (r *GameRepository) GetActiveMatches(ctx context.Context, chatID int64) ([]*Match, error) {
 	return r.matchRepo.GetActiveMatches(ctx, chatID)
+}
+
+func (r *GameRepository) GetUserActiveMatch(ctx context.Context, chatID, userID int64) (*Match, error) {
+	return r.matchRepo.GetUserActiveMatch(ctx, chatID, userID)
 }
 
 func (r *GameRepository) UpdateMatchStatus(ctx context.Context, matchID string, status MatchStatus) error {

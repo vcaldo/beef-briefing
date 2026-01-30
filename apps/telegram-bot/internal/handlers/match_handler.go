@@ -16,17 +16,21 @@ import (
 
 // MatchHandler handles the /match command
 type MatchHandler struct {
-	apiClient   *client.APIClient
-	nrApp       *newrelic.Application
-	botUsername string
+	apiClient     *client.APIClient
+	nrApp         *newrelic.Application
+	botUsername   string
+	gameShortName string
+	arenaBaseURL  string
 }
 
 // NewMatchHandler creates a new MatchHandler
-func NewMatchHandler(apiClient *client.APIClient, nrApp *newrelic.Application) *MatchHandler {
+func NewMatchHandler(apiClient *client.APIClient, nrApp *newrelic.Application, gameShortName, arenaBaseURL string) *MatchHandler {
 	return &MatchHandler{
-		apiClient:   apiClient,
-		nrApp:       nrApp,
-		botUsername: os.Getenv("TELEGRAM_BOT_USERNAME"),
+		apiClient:     apiClient,
+		nrApp:         nrApp,
+		botUsername:   os.Getenv("TELEGRAM_BOT_USERNAME"),
+		gameShortName: gameShortName,
+		arenaBaseURL:  arenaBaseURL,
 	}
 }
 
@@ -89,9 +93,9 @@ func (h *MatchHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Up
 		txn.AddAttribute("match_id", match.ID)
 	}
 
-	// Check if Mini App is configured
-	if h.botUsername == "" {
-		slog.Warn("TELEGRAM_BOT_USERNAME not configured, arena Mini App unavailable", "chat_id", chatID)
+	// Check if Games API is configured
+	if h.gameShortName == "" {
+		slog.Warn("ARENA_GAME_SHORT_NAME not configured, Games API unavailable", "chat_id", chatID)
 		b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: chatID,
 			Text:   "The arena feature is not configured. Please contact the administrator.",
@@ -99,36 +103,26 @@ func (h *MatchHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Up
 		return
 	}
 
-	// Build Mini App URL using t.me direct link format (works in group chats)
-	// Format: https://t.me/<bot_username>/<app_short_name>?startapp=<chat_id>
-	miniAppURL := fmt.Sprintf("https://t.me/%s/arena?startapp=%d", h.botUsername, chatID)
-
-	// Create inline keyboard with URL button to Mini App
+	// Create inline keyboard with game callback buttons
+	// NOTE: CallbackGame button is REQUIRED for SendGame - it opens the game when clicked
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
 			{
-				{
-					Text: "🎮 Play Arena Match",
-					URL:  miniAppURL,
-				},
+				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
+				{Text: "➕ Join Game", CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
 			},
 		},
 	}
 
-	// Build creator mention using first name if available
-	creatorName := "You"
-	if update.Message.From.FirstName != "" {
-		creatorName = update.Message.From.FirstName
-	}
-
-	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:      chatID,
-		Text:        fmt.Sprintf("⚔️ *Arena Match Created*\n\nCreator: [%s](tg://user?id=%d)\nClick the button to join and play", creatorName, userID),
-		ParseMode:   models.ParseModeMarkdown,
-		ReplyMarkup: keyboard,
+	// Send game message using SendGame (Games API)
+	// Note: The library has a typo - it's GameShorName not GameShortName
+	_, err = b.SendGame(ctx, &bot.SendGameParams{
+		ChatID:       chatID,
+		GameShorName: h.gameShortName, // Note: typo in library field name
+		ReplyMarkup:  keyboard,
 	})
 	if err != nil {
-		slog.Error("failed to send game match message", "match_id", match.ID, "error", err)
+		slog.Error("failed to send game message", "match_id", match.ID, "error", err)
 		if txn != nil {
 			txn.NoticeError(err)
 		}

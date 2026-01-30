@@ -1013,6 +1013,38 @@ func (c *APIClient) ForceSubmitTeams(ctx context.Context, matchID string) (*Forc
 	return &result, nil
 }
 
+// GetUserActiveMatch retrieves the active match for a user in a specific chat
+func (c *APIClient) GetUserActiveMatch(ctx context.Context, chatID, userID int64) (*ArenaMatch, error) {
+	apiURL := fmt.Sprintf("%s/api/v1/arena/matches/active?chat_id=%d&user_id=%d", c.baseURL, chatID, userID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	c.addAuthHeader(req)
+
+	resp, err := c.doRequestWithSegment(ctx, req, apiURL, "GET")
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // No active match found
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var result ArenaMatch
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
 // =============================================================================
 // Ranked Tournament API Methods
 // =============================================================================

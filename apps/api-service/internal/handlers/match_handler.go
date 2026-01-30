@@ -46,6 +46,50 @@ func (h *ArenaHandler) HandleListMatches(w http.ResponseWriter, r *http.Request)
 	}, http.StatusOK)
 }
 
+// HandleGetUserActiveMatch retrieves a user's active match in a specific chat.
+// GET /api/v1/arena/matches/active?chat_id=X&user_id=Y
+func (h *ArenaHandler) HandleGetUserActiveMatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	setTransactionName(ctx, "api:arena:get-user-active-match")
+
+	claims, chatID, err := parseChatIDWithAuth(r, false)
+	if err != nil {
+		handleChatAccessError(w, err)
+		return
+	}
+
+	// Parse user_id from query params
+	userID, err := httputil.ParseInt64(r, "user_id")
+	if err != nil || userID == 0 {
+		httputil.RespondError(w, "user_id is required", http.StatusBadRequest)
+		return
+	}
+
+	// Verify the requesting user is querying their own active match
+	if claims.UserID != userID {
+		httputil.RespondError(w, "can only query your own active match", http.StatusForbidden)
+		return
+	}
+
+	addTransactionAttribute(ctx, "chat_id", chatID)
+	addTransactionAttribute(ctx, "user_id", userID)
+
+	match, err := h.service.GetUserActiveMatch(ctx, chatID, userID)
+	if err != nil {
+		logAndNoticeError(ctx, "failed to get user active match", err)
+		httputil.RespondError(w, "failed to get user active match", http.StatusInternalServerError)
+		return
+	}
+
+	// Return 404 if no active match found
+	if match == nil {
+		httputil.RespondError(w, "no active match found", http.StatusNotFound)
+		return
+	}
+
+	httputil.RespondJSON(w, match, http.StatusOK)
+}
+
 // HandleCreateMatch creates a new match.
 // POST /api/v1/mini-app/arena/match
 func (h *ArenaHandler) HandleCreateMatch(w http.ResponseWriter, r *http.Request) {
@@ -1040,4 +1084,48 @@ func (h *ArenaHandler) HandleBotGetShareData(w http.ResponseWriter, r *http.Requ
 		"winner_id":  match.WinnerUserID,
 		"match_type": match.MatchType,
 	}, http.StatusOK)
+}
+
+// HandleBotGetUserActiveMatch retrieves a user's active match in a specific chat.
+// GET /api/v1/arena/matches/active?chat_id=X&user_id=Y
+func (h *ArenaHandler) HandleBotGetUserActiveMatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		txn.SetName("api:arena:bot-get-user-active-match")
+	}
+
+	chatID, err := httputil.ParseInt64(r, "chat_id")
+	if err != nil || chatID == 0 {
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := httputil.ParseInt64(r, "user_id")
+	if err != nil || userID == 0 {
+		httputil.RespondError(w, "user_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if txn != nil {
+		txn.AddAttribute("chat_id", chatID)
+		txn.AddAttribute("user_id", userID)
+	}
+
+	match, err := h.service.GetUserActiveMatch(ctx, chatID, userID)
+	if err != nil {
+		slog.Error("failed to get user active match", "error", err, "chat_id", chatID, "user_id", userID)
+		if txn != nil {
+			txn.NoticeError(err)
+		}
+		httputil.RespondError(w, "failed to get user active match", http.StatusInternalServerError)
+		return
+	}
+
+	if match == nil {
+		httputil.RespondError(w, "no active match found", http.StatusNotFound)
+		return
+	}
+
+	httputil.RespondJSON(w, match, http.StatusOK)
 }

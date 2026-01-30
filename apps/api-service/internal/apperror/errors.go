@@ -61,6 +61,22 @@ var (
 )
 
 // =====================================================
+// GAMES API AUTHENTICATION ERRORS
+// =====================================================
+
+var (
+	ErrMissingGameSignature   = errors.New("missing signature")
+	ErrInvalidGameSignature   = errors.New("invalid game signature")
+	ErrExpiredGameTimestamp   = errors.New("game timestamp expired")
+	ErrMissingGameChatID      = errors.New("missing chat_id")
+	ErrMissingGameUserID      = errors.New("missing user_id")
+	ErrMissingGameMatchID     = errors.New("missing match_id")
+	ErrMissingGameTimestamp   = errors.New("missing timestamp")
+	ErrInvalidGameTimestamp   = errors.New("invalid timestamp format")
+	ErrFutureGameTimestamp    = errors.New("timestamp is in the future")
+)
+
+// =====================================================
 // CARD SERVICE ERRORS
 // =====================================================
 

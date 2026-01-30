@@ -109,6 +109,31 @@ func (r *MatchRepository) GetActiveMatches(ctx context.Context, chatID int64) ([
 	return matches, rows.Err()
 }
 
+// GetUserActiveMatch retrieves a user's active match in a specific chat
+func (r *MatchRepository) GetUserActiveMatch(ctx context.Context, chatID, userID int64) (*Match, error) {
+	defer r.startDBSegment(ctx, "get-user-active-match")()
+
+	// Use matchColumnsAliased to avoid ambiguous column references in JOIN
+	query := fmt.Sprintf(`
+		SELECT %s
+		FROM game_matches m
+		INNER JOIN game_match_participants p ON m.id = p.match_id
+		WHERE m.chat_id = $1 AND p.user_id = $2 AND m.status NOT IN ('completed', 'cancelled')
+		ORDER BY m.created_at DESC
+		LIMIT 1
+	`, matchColumnsAliased)
+
+	match, err := scanMatch(r.db.QueryRowContext(ctx, query, chatID, userID))
+	if err == sql.ErrNoRows {
+		return nil, nil // No active match found
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query user active match: %w", err)
+	}
+
+	return match, nil
+}
+
 // UpdateMatchStatus updates the status of a match
 func (r *MatchRepository) UpdateMatchStatus(ctx context.Context, matchID string, status MatchStatus) error {
 	defer nrutil.StartSegment(ctx, "db:update-match-status")()

@@ -294,6 +294,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		api.HandleFunc("/arena/match/{id}/leave", arenaHandler.HandleBotLeaveMatch).Methods("POST")
 		api.HandleFunc("/arena/match/{id}/start", arenaHandler.HandleBotStartMatch).Methods("POST")
 		api.HandleFunc("/arena/matches/pending", arenaHandler.HandleBotGetPendingMatches).Methods("GET")
+		api.HandleFunc("/arena/matches/active", arenaHandler.HandleBotGetUserActiveMatch).Methods("GET")
 		api.HandleFunc("/arena/match/{id}/auto-start", arenaHandler.HandleBotAutoStartMatch).Methods("POST")
 		api.HandleFunc("/arena/match/{id}/force-submit", arenaHandler.HandleBotForceSubmitTeams).Methods("POST")
 		api.HandleFunc("/arena/match/{id}/share-data", arenaHandler.HandleBotGetShareData).Methods("GET")
@@ -322,8 +323,9 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 			miniApp.Use(corsMiddleware.Handler)
 		}
 
-		// Auth endpoint - unauthenticated (validates Telegram init data)
+		// Auth endpoints - unauthenticated (validates Telegram init data / game signature)
 		miniApp.HandleFunc("/auth", miniAppHandler.HandleAuth).Methods("POST", "OPTIONS")
+		miniApp.HandleFunc("/auth/game", miniAppHandler.HandleGameAuth).Methods("POST", "OPTIONS")
 
 		// Protected endpoints - require JWT
 		protected := miniApp.PathPrefix("").Subrouter()
@@ -351,6 +353,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		if arenaHandler != nil {
 			protected.HandleFunc("/arena/constants", arenaHandler.HandleGetConstants).Methods("GET", "OPTIONS")
 			protected.HandleFunc("/arena/matches", arenaHandler.HandleListMatches).Methods("GET", "OPTIONS")
+			protected.HandleFunc("/arena/matches/active", arenaHandler.HandleGetUserActiveMatch).Methods("GET", "OPTIONS")
 			protected.HandleFunc("/arena/match", arenaHandler.HandleCreateMatch).Methods("POST", "OPTIONS")
 			protected.HandleFunc("/arena/match/{id}", arenaHandler.HandleGetMatch).Methods("GET", "OPTIONS")
 			protected.HandleFunc("/arena/match/{id}/join", arenaHandler.HandleJoinMatch).Methods("POST", "OPTIONS")

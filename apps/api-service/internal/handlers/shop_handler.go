@@ -29,6 +29,11 @@ func (h *ArenaHandler) HandleGetShop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
+		return
+	}
+
 	addTransactionAttribute(ctx, "match_id", matchID)
 	addTransactionAttribute(ctx, "user_id", claims.UserID)
 
@@ -55,6 +60,11 @@ func (h *ArenaHandler) HandleBuyCard(w http.ResponseWriter, r *http.Request) {
 	matchID, err := extractMatchIDFromURL(r)
 	if err != nil {
 		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
 		return
 	}
 
@@ -94,6 +104,11 @@ func (h *ArenaHandler) HandleReroll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
+		return
+	}
+
 	addTransactionAttribute(ctx, "match_id", matchID)
 	addTransactionAttribute(ctx, "user_id", claims.UserID)
 
@@ -120,6 +135,11 @@ func (h *ArenaHandler) HandleUpgrade(w http.ResponseWriter, r *http.Request) {
 	matchID, err := extractMatchIDFromURL(r)
 	if err != nil {
 		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
 		return
 	}
 
@@ -165,6 +185,11 @@ func (h *ArenaHandler) HandleSetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
+		return
+	}
+
 	var req SetOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
@@ -198,6 +223,11 @@ func (h *ArenaHandler) HandleSubmitTeam(w http.ResponseWriter, r *http.Request) 
 	matchID, err := extractMatchIDFromURL(r)
 	if err != nil {
 		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
 		return
 	}
 

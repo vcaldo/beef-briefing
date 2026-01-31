@@ -193,6 +193,11 @@ func (h *ArenaHandler) HandleJoinMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
+		return
+	}
+
 	addTransactionAttribute(ctx, "match_id", matchID)
 	addTransactionAttribute(ctx, "user_id", claims.UserID)
 
@@ -219,6 +224,11 @@ func (h *ArenaHandler) HandleLeaveMatch(w http.ResponseWriter, r *http.Request) 
 	matchID, err := extractMatchIDFromURL(r)
 	if err != nil {
 		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
 		return
 	}
 
@@ -251,6 +261,11 @@ func (h *ArenaHandler) HandleStartMatch(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
+		return
+	}
+
 	addTransactionAttribute(ctx, "match_id", matchID)
 	addTransactionAttribute(ctx, "user_id", claims.UserID)
 
@@ -277,6 +292,11 @@ func (h *ArenaHandler) HandleGetBattle(w http.ResponseWriter, r *http.Request) {
 	matchID, err := extractMatchIDFromURL(r)
 	if err != nil {
 		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
 		return
 	}
 
@@ -718,14 +738,9 @@ func (h *ArenaHandler) HandleShareResult(w http.ResponseWriter, r *http.Request)
 		txn.AddAttribute("user_id", claims.UserID)
 	}
 
-	// Get the match to verify access and status
-	match, err := h.service.GetMatch(ctx, matchID)
-	if err != nil {
-		slog.Error("failed to get match", "error", err)
-		if txn != nil {
-			txn.NoticeError(err)
-		}
-		httputil.RespondError(w, "match not found", http.StatusNotFound)
+	// Validate match belongs to user's chat
+	match := h.validateMatchChatAccess(ctx, w, matchID, claims)
+	if match == nil {
 		return
 	}
 

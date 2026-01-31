@@ -609,6 +609,16 @@ func (h *MiniAppHandler) HandleGalleryImageURL(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Verify chat access - the image must belong to the user's chat
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return
+	}
+	if *claims.ChatID != result.ChatID {
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
+		return
+	}
+
 	httputil.RespondJSON(w, result, http.StatusOK)
 }
 

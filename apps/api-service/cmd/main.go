@@ -248,7 +248,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		botWebhookAPIKey := os.Getenv("BOT_WEBHOOK_API_KEY")
 		// Also support reading from a secret file
 		if botWebhookAPIKey == "" {
-			if keyBytes, err := os.ReadFile("/app/secrets/bot_api_key"); err == nil {
+			if keyBytes, err := os.ReadFile("/app/bot_secret/api_key"); err == nil {
 				botWebhookAPIKey = strings.TrimSpace(string(keyBytes))
 			}
 		}

@@ -111,7 +111,7 @@ func (s *MatchScheduler) handleAutoStart(ctx context.Context, match client.Pendi
 		s.sendMatchStartedNotification(ctx, result.MatchID)
 	} else if result.Action == "cancelled" {
 		slog.Info("match cancelled", "match_id", result.MatchID, "reason", result.Reason)
-		s.sendMatchCancelledDM(ctx, result.MatchID, result.CreatorUserID)
+		s.handleMatchCancelled(ctx, result)
 	}
 }
 
@@ -215,10 +215,24 @@ func (s *MatchScheduler) sendBattleAutoAssignedDM(ctx context.Context, userID in
 	}
 }
 
-// sendMatchCancelledDM sends a DM to the match creator when match is cancelled
-func (s *MatchScheduler) sendMatchCancelledDM(ctx context.Context, matchID string, creatorUserID *int64) {
-	if creatorUserID == nil {
-		slog.Debug("no creator user ID, skipping match cancelled DM", "match_id", matchID)
+// handleMatchCancelled handles a cancelled match: deletes the group message and sends DM to creator
+func (s *MatchScheduler) handleMatchCancelled(ctx context.Context, result *client.AutoStartResult) {
+	// Delete the match message from the group
+	if result.TelegramMessageID != nil && *result.TelegramMessageID != 0 {
+		_, err := s.bot.DeleteMessage(ctx, &bot.DeleteMessageParams{
+			ChatID:    result.ChatID,
+			MessageID: int(*result.TelegramMessageID),
+		})
+		if err != nil {
+			slog.Debug("failed to delete match message", "chat_id", result.ChatID, "message_id", *result.TelegramMessageID, "error", err)
+		} else {
+			slog.Info("deleted match message", "chat_id", result.ChatID, "message_id", *result.TelegramMessageID, "match_id", result.MatchID)
+		}
+	}
+
+	// Send DM to the match creator
+	if result.CreatorUserID == nil {
+		slog.Debug("no creator user ID, skipping match cancelled DM", "match_id", result.MatchID)
 		return
 	}
 
@@ -227,14 +241,14 @@ func (s *MatchScheduler) sendMatchCancelledDM(ctx context.Context, matchID strin
 		"Try starting another match when more people are around!"
 
 	_, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:    *creatorUserID,
+		ChatID:    *result.CreatorUserID,
 		Text:      text,
 		ParseMode: "Markdown",
 	})
 
 	if err != nil {
-		slog.Debug("failed to send match cancelled DM", "user_id", *creatorUserID, "error", err)
+		slog.Debug("failed to send match cancelled DM", "user_id", *result.CreatorUserID, "error", err)
 	} else {
-		slog.Info("sent match cancelled DM", "user_id", *creatorUserID, "match_id", matchID)
+		slog.Info("sent match cancelled DM", "user_id", *result.CreatorUserID, "match_id", result.MatchID)
 	}
 }

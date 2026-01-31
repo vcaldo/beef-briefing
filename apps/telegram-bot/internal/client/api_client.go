@@ -686,12 +686,13 @@ type PendingMatch struct {
 
 // AutoStartResult represents the result of auto-starting a match
 type AutoStartResult struct {
-	MatchID       string `json:"match_id"`
-	ChatID        int64  `json:"chat_id"`
-	Action        string `json:"action"`
-	Reason        string `json:"reason"`
-	Participants  int    `json:"participants"`
-	CreatorUserID *int64 `json:"creator_user_id,omitempty"`
+	MatchID           string `json:"match_id"`
+	ChatID            int64  `json:"chat_id"`
+	Action            string `json:"action"`
+	Reason            string `json:"reason"`
+	Participants      int    `json:"participants"`
+	CreatorUserID     *int64 `json:"creator_user_id,omitempty"`
+	TelegramMessageID *int64 `json:"telegram_message_id,omitempty"`
 }
 
 // ForceSubmitResult represents the result of force-submitting teams

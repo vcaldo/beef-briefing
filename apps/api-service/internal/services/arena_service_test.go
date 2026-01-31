@@ -943,7 +943,7 @@ func TestCreateMatch_Success(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1009,7 +1009,7 @@ func TestCreateMatch_NotEnoughCards(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(5)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1045,7 +1045,7 @@ func TestCreateMatch_ActiveMatchExists(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1083,7 +1083,7 @@ func TestJoinMatch_Success(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1122,7 +1122,7 @@ func TestJoinMatch_NotOpen(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1163,7 +1163,7 @@ func TestStartMatch_Success(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1217,7 +1217,7 @@ func TestStartMatch_NotCreator(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1260,7 +1260,7 @@ func TestStartMatch_NotEnoughParticipants(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1302,7 +1302,7 @@ func TestGetShop_Success(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1441,7 +1441,7 @@ func TestGetShop_AfterTeamSubmitted(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1596,7 +1596,7 @@ func TestBuyCard_Success(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1738,7 +1738,7 @@ func TestBuyCard_NotEnoughCoins(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1837,7 +1837,7 @@ func TestBuyCard_TeamFull(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -1963,7 +1963,7 @@ func TestReroll_Success(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -2111,7 +2111,7 @@ func TestReroll_AfterPurchase(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -2270,7 +2270,7 @@ func TestSubmitTeam_Success(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -2497,7 +2497,7 @@ func TestExecuteBattle_1v1(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(15)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
@@ -2782,7 +2782,7 @@ func TestExecuteBattle_Arena(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(20)
 
-	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, &ArenaServiceDeps{
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,

@@ -15,7 +15,7 @@ import (
 func TestGetBattle_DamageSummary_PlayerA(t *testing.T) {
 	mockRepo := testutil.NewMockGameRepository()
 
-	svc := NewBattleService(nil, mockRepo, nil)
+	svc := NewBattleService(nil, mockRepo, nil, nil)
 	ctx := context.Background()
 
 	matchID := "test-match-123"
@@ -143,7 +143,7 @@ func TestGetBattle_DamageSummary_PlayerA(t *testing.T) {
 func TestGetBattle_DamageSummary_PlayerB(t *testing.T) {
 	mockRepo := testutil.NewMockGameRepository()
 
-	svc := NewBattleService(nil, mockRepo, nil)
+	svc := NewBattleService(nil, mockRepo, nil, nil)
 	ctx := context.Background()
 
 	matchID := "test-match-456"
@@ -271,7 +271,7 @@ func TestGetBattle_DamageSummary_PlayerB(t *testing.T) {
 func TestGetBattle_DamageSummary_NoRounds(t *testing.T) {
 	mockRepo := testutil.NewMockGameRepository()
 
-	svc := NewBattleService(nil, mockRepo, nil)
+	svc := NewBattleService(nil, mockRepo, nil, nil)
 	ctx := context.Background()
 
 	matchID := "test-match-no-rounds"
@@ -361,7 +361,7 @@ func TestGetBattle_DamageSummary_NoRounds(t *testing.T) {
 func TestGetBattle_DamageSummary_Draw(t *testing.T) {
 	mockRepo := testutil.NewMockGameRepository()
 
-	svc := NewBattleService(nil, mockRepo, nil)
+	svc := NewBattleService(nil, mockRepo, nil, nil)
 	ctx := context.Background()
 
 	matchID := "test-match-draw"

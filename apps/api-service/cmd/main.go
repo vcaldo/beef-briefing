@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	_ "time/tzdata" // Embed timezone database for Alpine containers
@@ -241,18 +242,25 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		miniAppHandler = handlers.NewMiniAppHandler(miniAppService, cardService, cfg)
 		jwtAuth = middleware.NewJWTAuth(cfg.JWTSecretKey)
 
-		// Arena game service and handler
-		arenaService := services.NewArenaService(db, minioClient, cardService, nrApp, nil)
-
 		// Initialize bot client for webhook notifications (optional)
 		var botClient *client.BotClient
 		botInternalURL := os.Getenv("BOT_INTERNAL_URL")
-		if botInternalURL != "" {
-			botClient = client.NewBotClient(botInternalURL, cfg.APIKey)
+		botWebhookAPIKey := os.Getenv("BOT_WEBHOOK_API_KEY")
+		// Also support reading from a secret file
+		if botWebhookAPIKey == "" {
+			if keyBytes, err := os.ReadFile("/app/bot_secret/api_key"); err == nil {
+				botWebhookAPIKey = strings.TrimSpace(string(keyBytes))
+			}
+		}
+		if botInternalURL != "" && botWebhookAPIKey != "" {
+			botClient = client.NewBotClient(botInternalURL, botWebhookAPIKey)
 			slog.Info("Bot webhook client configured", "bot_internal_url", botInternalURL)
 		} else {
-			slog.Debug("BOT_INTERNAL_URL not set, bot notifications disabled")
+			slog.Debug("BOT_INTERNAL_URL or BOT_WEBHOOK_API_KEY not set, bot notifications disabled")
 		}
+
+		// Arena game service and handler - now with botClient for battle completion notifications
+		arenaService := services.NewArenaService(db, minioClient, cardService, nrApp, botClient, nil)
 
 		arenaHandler = handlers.NewArenaHandler(arenaService, cfg, botClient)
 

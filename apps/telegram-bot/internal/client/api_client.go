@@ -667,6 +667,7 @@ type ArenaMatch struct {
 	Participants      []ArenaParticipant `json:"participants"`
 	CardCount         int                `json:"card_count"`
 	TelegramMessageID *int64             `json:"telegram_message_id,omitempty"`
+	WinnerUserID      *int64             `json:"winner_user_id,omitempty"`
 }
 
 // ArenaParticipant represents a participant in a match
@@ -686,11 +687,13 @@ type PendingMatch struct {
 
 // AutoStartResult represents the result of auto-starting a match
 type AutoStartResult struct {
-	MatchID      string `json:"match_id"`
-	ChatID       int64  `json:"chat_id"`
-	Action       string `json:"action"`
-	Reason       string `json:"reason"`
-	Participants int    `json:"participants"`
+	MatchID           string `json:"match_id"`
+	ChatID            int64  `json:"chat_id"`
+	Action            string `json:"action"`
+	Reason            string `json:"reason"`
+	Participants      int    `json:"participants"`
+	CreatorUserID     *int64 `json:"creator_user_id,omitempty"`
+	TelegramMessageID *int64 `json:"telegram_message_id,omitempty"`
 }
 
 // ForceSubmitResult represents the result of force-submitting teams

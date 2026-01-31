@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -107,12 +106,12 @@ func (s *MatchScheduler) handleAutoStart(ctx context.Context, match client.Pendi
 
 	slog.Info("auto-start result", "match_id", result.MatchID, "action", result.Action, "reason", result.Reason)
 
-	// Send notification to group
+	// Send DM notifications to participants
 	if result.Action == "started" {
-		s.sendMatchStartedNotification(ctx, result.ChatID, result.MatchID, result.Participants)
+		s.sendMatchStartedNotification(ctx, result.MatchID)
 	} else if result.Action == "cancelled" {
-		// Silent cancel - no notification
-		slog.Info("match cancelled silently", "match_id", result.MatchID, "reason", result.Reason)
+		slog.Info("match cancelled", "match_id", result.MatchID, "reason", result.Reason)
+		s.handleMatchCancelled(ctx, result)
 	}
 }
 
@@ -135,32 +134,15 @@ func (s *MatchScheduler) handleForceSubmit(ctx context.Context, match client.Pen
 		"battle_started", result.BattleStarted,
 	)
 
-	// Send notification about battle starting
+	// Send DM notifications to forced users
 	if result.BattleStarted {
-		s.sendBattleStartedNotification(ctx, result.ChatID, result.MatchID, result.ForcedUsers)
+		s.sendBattleStartedNotification(ctx, result.MatchID, result.ForcedUsers)
 	}
 }
 
-// sendMatchStartedNotification sends a notification when a match auto-starts
-func (s *MatchScheduler) sendMatchStartedNotification(ctx context.Context, chatID int64, matchID string, participantCount int) {
-	text := fmt.Sprintf(
-		"⚔️ *Arena Match Auto-Started!*\n\n"+
-			"The join window has closed.\n"+
-			"👥 %d participants are now in the shop phase.\n\n"+
-			"⏰ You have 3 minutes to build your team!",
-		participantCount,
-	)
-
-	_, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:    chatID,
-		Text:      text,
-		ParseMode: "Markdown",
-	})
-	if err != nil {
-		slog.Error("failed to send match started notification", "chat_id", chatID, "error", err)
-	}
-
-	// Send DM notifications to participants
+// sendMatchStartedNotification sends DM notifications when a match auto-starts
+func (s *MatchScheduler) sendMatchStartedNotification(ctx context.Context, matchID string) {
+	// Send DM notifications to participants - no group message
 	s.sendShopPhaseDMs(ctx, matchID)
 }
 
@@ -174,12 +156,12 @@ func (s *MatchScheduler) sendShopPhaseDMs(ctx context.Context, matchID string) {
 	}
 
 	for _, p := range match.Participants {
-		go s.sendShopPhaseDM(ctx, p.UserID, matchID, p.Name)
+		go s.sendShopPhaseDM(ctx, p.UserID, matchID)
 	}
 }
 
 // sendShopPhaseDM sends a DM to a single participant
-func (s *MatchScheduler) sendShopPhaseDM(ctx context.Context, userID int64, matchID string, userName string) {
+func (s *MatchScheduler) sendShopPhaseDM(ctx context.Context, userID int64, matchID string) {
 	text := "🎮 *Your match is starting!*\n\n" +
 		"Build your team now - you have 3 minutes.\n\n" +
 		"Open the Arena to pick your cards!"
@@ -198,25 +180,75 @@ func (s *MatchScheduler) sendShopPhaseDM(ctx context.Context, userID int64, matc
 	}
 }
 
-// sendBattleStartedNotification sends a notification when battle phase begins
-func (s *MatchScheduler) sendBattleStartedNotification(ctx context.Context, chatID int64, matchID string, forcedUsers []int64) {
-	text := "⚔️ *Battle Phase Started!*\n\n"
-
-	if len(forcedUsers) > 0 {
-		text += fmt.Sprintf(
-			"⏰ Time's up! %d player(s) had their teams auto-assigned.\n\n",
-			len(forcedUsers),
-		)
+// sendBattleStartedNotification sends DM notifications to forced users when battle phase begins
+func (s *MatchScheduler) sendBattleStartedNotification(ctx context.Context, matchID string, forcedUsers []int64) {
+	if len(forcedUsers) == 0 {
+		slog.Debug("no forced users, skipping battle started DMs", "match_id", matchID)
+		return
 	}
+	s.sendBattleAutoAssignedDMs(ctx, matchID, forcedUsers)
+}
 
-	text += "The battles are now being simulated. Results coming soon!"
+// sendBattleAutoAssignedDMs sends DM notifications to all forced users
+func (s *MatchScheduler) sendBattleAutoAssignedDMs(ctx context.Context, matchID string, forcedUsers []int64) {
+	for _, userID := range forcedUsers {
+		go s.sendBattleAutoAssignedDM(ctx, userID, matchID)
+	}
+}
+
+// sendBattleAutoAssignedDM sends a DM to a single forced user
+func (s *MatchScheduler) sendBattleAutoAssignedDM(ctx context.Context, userID int64, matchID string) {
+	text := "⏰ *Time's up!*\n\n" +
+		"Your team was auto-assigned because you didn't submit in time.\n\n" +
+		"The battle is now being simulated. Results coming soon!"
 
 	_, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:    chatID,
+		ChatID:    userID,
 		Text:      text,
 		ParseMode: "Markdown",
 	})
+
 	if err != nil {
-		slog.Error("failed to send battle started notification", "chat_id", chatID, "error", err)
+		slog.Debug("failed to send battle auto-assigned DM", "user_id", userID, "error", err)
+	} else {
+		slog.Info("sent battle auto-assigned DM", "user_id", userID, "match_id", matchID)
+	}
+}
+
+// handleMatchCancelled handles a cancelled match: deletes the group message and sends DM to creator
+func (s *MatchScheduler) handleMatchCancelled(ctx context.Context, result *client.AutoStartResult) {
+	// Delete the match message from the group
+	if result.TelegramMessageID != nil && *result.TelegramMessageID != 0 {
+		_, err := s.bot.DeleteMessage(ctx, &bot.DeleteMessageParams{
+			ChatID:    result.ChatID,
+			MessageID: int(*result.TelegramMessageID),
+		})
+		if err != nil {
+			slog.Debug("failed to delete match message", "chat_id", result.ChatID, "message_id", *result.TelegramMessageID, "error", err)
+		} else {
+			slog.Info("deleted match message", "chat_id", result.ChatID, "message_id", *result.TelegramMessageID, "match_id", result.MatchID)
+		}
+	}
+
+	// Send DM to the match creator
+	if result.CreatorUserID == nil {
+		slog.Debug("no creator user ID, skipping match cancelled DM", "match_id", result.MatchID)
+		return
+	}
+
+	text := "😕 *Match Cancelled*\n\n" +
+		"Your arena match was cancelled because not enough players joined.\n\n" +
+		"Try starting another match when more people are around!"
+
+	_, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:    *result.CreatorUserID,
+		Text:      text,
+		ParseMode: "Markdown",
+	})
+
+	if err != nil {
+		slog.Debug("failed to send match cancelled DM", "user_id", *result.CreatorUserID, "error", err)
+	} else {
+		slog.Info("sent match cancelled DM", "user_id", *result.CreatorUserID, "match_id", result.MatchID)
 	}
 }

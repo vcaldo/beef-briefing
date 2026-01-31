@@ -23,6 +23,12 @@ type BattleService struct {
 	gameRepo     repository.GameRepositoryInterface
 	nrApp        *newrelic.Application
 	matchMutexes sync.Map // map[string]*sync.Mutex for per-match locking
+	botClient    BotClientInterface
+}
+
+// BotClientInterface defines the interface for bot webhook notifications.
+type BotClientInterface interface {
+	NotifyParticipantChange(ctx context.Context, matchID string, chatID, telegramMessageID int64) error
 }
 
 // NewBattleService creates a new BattleService instance.
@@ -30,11 +36,13 @@ func NewBattleService(
 	db *sql.DB,
 	gameRepo repository.GameRepositoryInterface,
 	nrApp *newrelic.Application,
+	botClient BotClientInterface,
 ) *BattleService {
 	return &BattleService{
-		db:       db,
-		gameRepo: gameRepo,
-		nrApp:    nrApp,
+		db:        db,
+		gameRepo:  gameRepo,
+		nrApp:     nrApp,
+		botClient: botClient,
 	}
 }
 
@@ -272,6 +280,11 @@ func (s *BattleService) runBattle(ctx context.Context, matchID string, pA, pB *r
 	// Complete match for 1v1
 	s.gameRepo.CompleteMatch(ctx, matchID, result.WinnerID)
 
+	// Notify bot to update message with winner
+	if s.botClient != nil && match.TelegramMessageID != nil && *match.TelegramMessageID != 0 {
+		go s.botClient.NotifyParticipantChange(context.Background(), matchID, match.ChatID, *match.TelegramMessageID)
+	}
+
 	// Group events into combats
 	combats := battle.GroupEventsIntoCombats(result.Events, pA.UserID, pB.UserID)
 
@@ -353,6 +366,14 @@ func (s *BattleService) runArena(ctx context.Context, matchID string, participan
 	}
 
 	s.gameRepo.CompleteMatch(ctx, matchID, winnerID)
+
+	// Notify bot to update message with winner
+	if s.botClient != nil {
+		match, err := s.gameRepo.GetMatch(ctx, matchID)
+		if err == nil && match != nil && match.TelegramMessageID != nil && *match.TelegramMessageID != 0 {
+			go s.botClient.NotifyParticipantChange(context.Background(), matchID, match.ChatID, *match.TelegramMessageID)
+		}
+	}
 
 	// Record arena completion metric
 	recordBattleCompletion(s.nrApp, matchID, "arena", winnerID, false, roundNumber, 0, 0)

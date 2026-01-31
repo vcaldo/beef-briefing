@@ -435,6 +435,9 @@ secrets-card-renderer: | ensure-scripts-executable ## Generate card-renderer API
 secrets-jwt: | ensure-scripts-executable ## Generate JWT secret key for Mini App authentication
 	@$(SCRIPTS_DIR)/generate-jwt-secret.sh
 
+secrets-bot-api: | ensure-scripts-executable ## Generate API key for telegram-bot (used by api-service for webhook calls)
+	@$(SCRIPTS_DIR)/generate-api-service-key.sh "telegram-bot" "$(SECRETS_DIR)"
+
 # =============================================================================
 # TERRAFORM (tf-*)
 # =============================================================================
@@ -961,7 +964,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	go-build go-build-api go-build-bot go-build-import-cli go-build-import-cli-prod go-clean \
 	go-fmt go-fmt-check \
 	go-test go-test-v go-test-cover go-test-race go-lint go-vet \
-	secrets-traefik-password secrets-service-api secrets-card-renderer secrets-jwt \
+	secrets-traefik-password secrets-service-api secrets-card-renderer secrets-jwt secrets-bot-api \
 	tf-init tf-plan tf-apply tf-destroy tf-output tf-show tf-validate tf-refresh \
 	tf-fmt tf-fmt-check tf-state-list tf-state-show tf-unlock \
 	tf-ip tf-ssh tf-ssh-user-host tf-arch tf-root-pass \

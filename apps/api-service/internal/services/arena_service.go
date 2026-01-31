@@ -35,6 +35,7 @@ type ArenaService struct {
 	storageClient     MinIOClientInterface
 	cardService       CardServiceInterface
 	nrApp             *newrelic.Application
+	botClient         BotClientInterface
 }
 
 // ArenaServiceDeps holds the dependencies for ArenaService.
@@ -72,11 +73,13 @@ func NewArenaService(
 	storageClient MinIOClientInterface,
 	cardService CardServiceInterface,
 	nrApp *newrelic.Application,
+	botClient BotClientInterface,
 	deps *ArenaServiceDeps,
 ) *ArenaService {
 	svc := &ArenaService{
-		db:    db,
-		nrApp: nrApp,
+		db:        db,
+		nrApp:     nrApp,
+		botClient: botClient,
 	}
 
 	if deps != nil {
@@ -98,7 +101,7 @@ func NewArenaService(
 	svc.shopService = NewShopService(db, svc.gameRepo, svc.dealer, nrApp)
 
 	// Create battle service with the resolved dependencies
-	svc.battleService = NewBattleService(db, svc.gameRepo, nrApp)
+	svc.battleService = NewBattleService(db, svc.gameRepo, nrApp, botClient)
 
 	// Create tournament service with the resolved dependencies
 	svc.tournamentService = NewTournamentService(db, svc.gameRepo, svc.dealer, nrApp)
@@ -538,11 +541,13 @@ func (s *ArenaService) GetPendingMatches(ctx context.Context) ([]*PendingMatch, 
 
 // AutoStartResult represents the result of an auto-start attempt
 type AutoStartResult struct {
-	MatchID      string `json:"match_id"`
-	ChatID       int64  `json:"chat_id"`
-	Action       string `json:"action"` // "started" or "cancelled"
-	Reason       string `json:"reason"` // Explanation
-	Participants int    `json:"participants"`
+	MatchID           string `json:"match_id"`
+	ChatID            int64  `json:"chat_id"`
+	Action            string `json:"action"` // "started" or "cancelled"
+	Reason            string `json:"reason"` // Explanation
+	Participants      int    `json:"participants"`
+	CreatorUserID     *int64 `json:"creator_user_id,omitempty"`
+	TelegramMessageID *int64 `json:"telegram_message_id,omitempty"`
 }
 
 // AutoStartMatch handles expired join deadline - starts match if 2+ participants, otherwise cancels
@@ -572,11 +577,13 @@ func (s *ArenaService) AutoStartMatch(ctx context.Context, matchID string) (*Aut
 			return nil, fmt.Errorf("failed to cancel match: %w", err)
 		}
 		return &AutoStartResult{
-			MatchID:      matchID,
-			ChatID:       match.ChatID,
-			Action:       "cancelled",
-			Reason:       "not enough participants (minimum 2 required)",
-			Participants: participantCount,
+			MatchID:           matchID,
+			ChatID:            match.ChatID,
+			Action:            "cancelled",
+			Reason:            "not enough participants (minimum 2 required)",
+			Participants:      participantCount,
+			CreatorUserID:     match.CreatorUserID,
+			TelegramMessageID: match.TelegramMessageID,
 		}, nil
 	}
 

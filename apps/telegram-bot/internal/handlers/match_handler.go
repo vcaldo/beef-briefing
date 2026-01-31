@@ -169,8 +169,8 @@ func (h *MatchHandler) createNewMatch(ctx context.Context, b *bot.Bot, update *m
 		return
 	}
 
-	// Build keyboard using shared function with match participants
-	keyboard := BuildMatchKeyboard(match.ID, match.Participants)
+	// Build keyboard using shared function with match
+	keyboard := BuildMatchKeyboard(match.ID, match)
 
 	// Send game message using SendGame (Games API)
 	msg, err := b.SendGame(ctx, &bot.SendGameParams{
@@ -237,7 +237,7 @@ func (h *MatchHandler) joinExistingMatch(ctx context.Context, b *bot.Bot, update
 
 	// 3. Call updateMatchMessage to edit the game modal (if we have a message ID)
 	if updatedMatch.TelegramMessageID != nil && *updatedMatch.TelegramMessageID != 0 {
-		h.updateMatchMessage(ctx, b, updatedMatch.ChatID, int(*updatedMatch.TelegramMessageID), updatedMatch.Participants, updatedMatch.ID)
+		h.updateMatchMessage(ctx, b, updatedMatch.ChatID, int(*updatedMatch.TelegramMessageID), updatedMatch)
 	} else {
 		slog.Warn("no telegram message ID to update", "match_id", match.ID)
 	}
@@ -272,11 +272,11 @@ func (h *MatchHandler) joinExistingMatch(ctx context.Context, b *bot.Bot, update
 	}
 }
 
-// updateMatchMessage edits the game modal to update the participant list.
+// updateMatchMessage edits the game modal to update the participant list or winner.
 // This is a helper function for joinExistingMatch (task 6.4).
-func (h *MatchHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, participants []client.ArenaParticipant, matchID string) {
+func (h *MatchHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, match *client.ArenaMatch) {
 	// Build keyboard using shared function
-	keyboard := BuildMatchKeyboard(matchID, participants)
+	keyboard := BuildMatchKeyboard(match.ID, match)
 
 	// Edit the message's reply markup (inline keyboard)
 	_, err := b.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
@@ -288,7 +288,7 @@ func (h *MatchHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, chatI
 		// Log error but don't fail - the join notification provides the count anyway
 		slog.Warn("failed to update match message", "chat_id", chatID, "message_id", messageID, "error", err)
 	} else {
-		slog.Debug("updated match message keyboard", "chat_id", chatID, "message_id", messageID, "participant_count", len(participants))
+		slog.Debug("updated match message keyboard", "chat_id", chatID, "message_id", messageID, "participant_count", len(match.Participants))
 	}
 }
 
@@ -315,12 +315,49 @@ func FormatParticipantList(participants []client.ArenaParticipant) string {
 	return result
 }
 
-// BuildMatchKeyboard creates the inline keyboard for a match with 3 rows:
-// Row 1: Open Game button
-// Row 2: Join Game button with participant count
-// Row 3: Participant list
-func BuildMatchKeyboard(matchID string, participants []client.ArenaParticipant) *models.InlineKeyboardMarkup {
-	participantList := FormatParticipantList(participants)
+// BuildMatchKeyboard creates the inline keyboard for a match.
+// For active matches: 3 rows (Open, Join, Participants)
+// For completed matches: 2 rows (Open, Winner/Draw) - must keep CallbackGame button per Telegram Games API
+func BuildMatchKeyboard(matchID string, match *client.ArenaMatch) *models.InlineKeyboardMarkup {
+	// If match is completed, show Open button + winner/draw row (no Join button)
+	// IMPORTANT: Telegram's Games API requires game messages to always have at least one CallbackGame button
+	if match.Status == "completed" {
+		var resultText string
+		if match.WinnerUserID != nil {
+			// Find winner's name from participants
+			winnerName := ""
+			for _, p := range match.Participants {
+				if p.UserID == *match.WinnerUserID {
+					if p.Username != "" {
+						winnerName = "@" + p.Username
+					} else if p.Name != "" {
+						winnerName = p.Name
+					} else {
+						winnerName = fmt.Sprintf("User %d", p.UserID)
+					}
+					break
+				}
+			}
+			resultText = fmt.Sprintf("🏆 Winner: %s", winnerName)
+		} else {
+			// Draw - no winner
+			resultText = "🤝 Draw!"
+		}
+
+		return &models.InlineKeyboardMarkup{
+			InlineKeyboard: [][]models.InlineKeyboardButton{
+				{
+					{Text: "🎮 Open", CallbackGame: &models.CallbackGame{}},
+				},
+				{
+					{Text: resultText, CallbackData: "noop"},
+				},
+			},
+		}
+	}
+
+	// Active match - show full keyboard with Open, Join, and participants
+	participantText := fmt.Sprintf("👥 %s", FormatParticipantList(match.Participants))
 
 	return &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
@@ -328,10 +365,10 @@ func BuildMatchKeyboard(matchID string, participants []client.ArenaParticipant) 
 				{Text: "🎮 Open", CallbackGame: &models.CallbackGame{}},
 			},
 			{
-				{Text: fmt.Sprintf("➕ Join (%d)", len(participants)), CallbackData: fmt.Sprintf("join_match:%s", matchID)},
+				{Text: fmt.Sprintf("➕ Join (%d)", len(match.Participants)), CallbackData: fmt.Sprintf("join_match:%s", matchID)},
 			},
 			{
-				{Text: fmt.Sprintf("👥 %s", participantList), CallbackData: "noop"},
+				{Text: participantText, CallbackData: "noop"},
 			},
 		},
 	}

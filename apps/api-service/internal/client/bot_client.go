@@ -7,7 +7,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
+
+	"beef-briefing/apps/api-service/internal/nrutil"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 // BotClient is a client for calling the telegram-bot internal webhook
@@ -39,6 +44,9 @@ type UpdateMatchMessageRequest struct {
 // NotifyParticipantChange notifies the bot that a match participant has joined or left.
 // This triggers the bot to update the Telegram message with the new participant list.
 func (c *BotClient) NotifyParticipantChange(ctx context.Context, matchID string, chatID, telegramMessageID int64) error {
+	// Start segment for overall operation
+	defer nrutil.StartSegment(ctx, "bot-client:notify-participant-change")()
+
 	if c.baseURL == "" {
 		slog.Debug("bot client not configured, skipping participant change notification")
 		return nil
@@ -57,20 +65,51 @@ func (c *BotClient) NotifyParticipantChange(ctx context.Context, matchID string,
 
 	body, err := json.Marshal(req)
 	if err != nil {
+		nrutil.NoticeError(ctx, err)
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	url := c.baseURL + "/internal/update-match-message"
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	apiURL := c.baseURL + "/internal/update-match-message"
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
 	if err != nil {
+		nrutil.NoticeError(ctx, err)
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
 
+	// Track external HTTP call with detailed segment
+	txn := newrelic.FromContext(ctx)
+	var externalSegment *newrelic.ExternalSegment
+	if txn != nil {
+		parsedURL, _ := url.Parse(apiURL)
+		host := c.baseURL
+		if parsedURL != nil {
+			host = parsedURL.Host
+		}
+		externalSegment = &newrelic.ExternalSegment{
+			StartTime: txn.StartSegmentNow(),
+			URL:       apiURL,
+			Host:      host,
+			Procedure: "POST",
+			Library:   "net/http",
+		}
+		txn.AddAttribute("webhook_match_id", matchID)
+		txn.AddAttribute("webhook_chat_id", chatID)
+	}
+
 	resp, err := c.httpClient.Do(httpReq)
+
+	if externalSegment != nil {
+		if resp != nil {
+			externalSegment.Response = resp
+		}
+		externalSegment.End()
+	}
+
 	if err != nil {
+		nrutil.NoticeError(ctx, err)
 		// Log but don't fail - this is a best-effort notification
 		slog.Warn("failed to notify bot of participant change", "match_id", matchID, "error", err)
 		return nil

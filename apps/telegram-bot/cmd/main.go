@@ -140,7 +140,7 @@ func main() {
 	go tournamentScheduler.Start(ctx)
 
 	// Start internal webhook server for API service callbacks
-	webhookHandler := handlers.NewWebhookHandler(apiClient, b)
+	webhookHandler := handlers.NewWebhookHandler(apiClient, b, nrApp)
 	go startWebhookServer(ctx, webhookHandler, cfg.APIKey)
 
 	// Start bot with graceful shutdown

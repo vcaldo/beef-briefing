@@ -169,32 +169,8 @@ func (h *MatchHandler) createNewMatch(ctx context.Context, b *bot.Bot, update *m
 		return
 	}
 
-	// Get creator name for display
-	creatorName := ""
-	if update.Message != nil && update.Message.From != nil {
-		if update.Message.From.Username != "" {
-			creatorName = "@" + update.Message.From.Username
-		} else if update.Message.From.FirstName != "" {
-			creatorName = update.Message.From.FirstName
-		} else {
-			creatorName = fmt.Sprintf("User %d", userID)
-		}
-	} else {
-		creatorName = fmt.Sprintf("User %d", userID)
-	}
-
-	// Create inline keyboard with game callback buttons
-	keyboard := &models.InlineKeyboardMarkup{
-		InlineKeyboard: [][]models.InlineKeyboardButton{
-			{
-				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
-				{Text: "➕ Join Game (1)", CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
-			},
-			{
-				{Text: fmt.Sprintf("👥 %s", creatorName), CallbackData: "noop"},
-			},
-		},
-	}
+	// Build keyboard using shared function with match participants
+	keyboard := BuildMatchKeyboard(match.ID, match.Participants)
 
 	// Send game message using SendGame (Games API)
 	msg, err := b.SendGame(ctx, &bot.SendGameParams{
@@ -299,18 +275,8 @@ func (h *MatchHandler) joinExistingMatch(ctx context.Context, b *bot.Bot, update
 // updateMatchMessage edits the game modal to update the participant list.
 // This is a helper function for joinExistingMatch (task 6.4).
 func (h *MatchHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, participants []client.ArenaParticipant, matchID string) {
-	// Create updated inline keyboard with participant count and list
-	keyboard := &models.InlineKeyboardMarkup{
-		InlineKeyboard: [][]models.InlineKeyboardButton{
-			{
-				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
-				{Text: fmt.Sprintf("➕ Join Game (%d)", len(participants)), CallbackData: fmt.Sprintf("join_match:%s", matchID)},
-			},
-			{
-				{Text: fmt.Sprintf("👥 %s", FormatParticipantList(participants)), CallbackData: "noop"},
-			},
-		},
-	}
+	// Build keyboard using shared function
+	keyboard := BuildMatchKeyboard(matchID, participants)
 
 	// Edit the message's reply markup (inline keyboard)
 	_, err := b.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
@@ -347,4 +313,26 @@ func FormatParticipantList(participants []client.ArenaParticipant) string {
 		result += name
 	}
 	return result
+}
+
+// BuildMatchKeyboard creates the inline keyboard for a match with 3 rows:
+// Row 1: Open Game button
+// Row 2: Join Game button with participant count
+// Row 3: Participant list
+func BuildMatchKeyboard(matchID string, participants []client.ArenaParticipant) *models.InlineKeyboardMarkup {
+	participantList := FormatParticipantList(participants)
+
+	return &models.InlineKeyboardMarkup{
+		InlineKeyboard: [][]models.InlineKeyboardButton{
+			{
+				{Text: "🎮 Open", CallbackGame: &models.CallbackGame{}},
+			},
+			{
+				{Text: fmt.Sprintf("➕ Join (%d)", len(participants)), CallbackData: fmt.Sprintf("join_match:%s", matchID)},
+			},
+			{
+				{Text: fmt.Sprintf("👥 %s", participantList), CallbackData: "noop"},
+			},
+		},
+	}
 }

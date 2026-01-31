@@ -538,11 +538,12 @@ func (s *ArenaService) GetPendingMatches(ctx context.Context) ([]*PendingMatch, 
 
 // AutoStartResult represents the result of an auto-start attempt
 type AutoStartResult struct {
-	MatchID      string `json:"match_id"`
-	ChatID       int64  `json:"chat_id"`
-	Action       string `json:"action"` // "started" or "cancelled"
-	Reason       string `json:"reason"` // Explanation
-	Participants int    `json:"participants"`
+	MatchID       string `json:"match_id"`
+	ChatID        int64  `json:"chat_id"`
+	Action        string `json:"action"` // "started" or "cancelled"
+	Reason        string `json:"reason"` // Explanation
+	Participants  int    `json:"participants"`
+	CreatorUserID *int64 `json:"creator_user_id,omitempty"`
 }
 
 // AutoStartMatch handles expired join deadline - starts match if 2+ participants, otherwise cancels
@@ -572,11 +573,12 @@ func (s *ArenaService) AutoStartMatch(ctx context.Context, matchID string) (*Aut
 			return nil, fmt.Errorf("failed to cancel match: %w", err)
 		}
 		return &AutoStartResult{
-			MatchID:      matchID,
-			ChatID:       match.ChatID,
-			Action:       "cancelled",
-			Reason:       "not enough participants (minimum 2 required)",
-			Participants: participantCount,
+			MatchID:       matchID,
+			ChatID:        match.ChatID,
+			Action:        "cancelled",
+			Reason:        "not enough participants (minimum 2 required)",
+			Participants:  participantCount,
+			CreatorUserID: match.CreatorUserID,
 		}, nil
 	}
 

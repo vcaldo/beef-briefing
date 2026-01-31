@@ -110,8 +110,8 @@ func (s *MatchScheduler) handleAutoStart(ctx context.Context, match client.Pendi
 	if result.Action == "started" {
 		s.sendMatchStartedNotification(ctx, result.MatchID)
 	} else if result.Action == "cancelled" {
-		// Silent cancel - no notification
-		slog.Info("match cancelled silently", "match_id", result.MatchID, "reason", result.Reason)
+		slog.Info("match cancelled", "match_id", result.MatchID, "reason", result.Reason)
+		s.sendMatchCancelledDM(ctx, result.MatchID, result.CreatorUserID)
 	}
 }
 
@@ -212,5 +212,29 @@ func (s *MatchScheduler) sendBattleAutoAssignedDM(ctx context.Context, userID in
 		slog.Debug("failed to send battle auto-assigned DM", "user_id", userID, "error", err)
 	} else {
 		slog.Info("sent battle auto-assigned DM", "user_id", userID, "match_id", matchID)
+	}
+}
+
+// sendMatchCancelledDM sends a DM to the match creator when match is cancelled
+func (s *MatchScheduler) sendMatchCancelledDM(ctx context.Context, matchID string, creatorUserID *int64) {
+	if creatorUserID == nil {
+		slog.Debug("no creator user ID, skipping match cancelled DM", "match_id", matchID)
+		return
+	}
+
+	text := "😕 *Match Cancelled*\n\n" +
+		"Your arena match was cancelled because not enough players joined.\n\n" +
+		"Try starting another match when more people are around!"
+
+	_, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:    *creatorUserID,
+		Text:      text,
+		ParseMode: "Markdown",
+	})
+
+	if err != nil {
+		slog.Debug("failed to send match cancelled DM", "user_id", *creatorUserID, "error", err)
+	} else {
+		slog.Info("sent match cancelled DM", "user_id", *creatorUserID, "match_id", matchID)
 	}
 }

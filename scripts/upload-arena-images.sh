@@ -151,7 +151,8 @@ check_and_bump_version() {
         log_info "${var_name} stays at ${deployed_version}"
         echo "$deployed_version" > /tmp/arena_image_version
         echo "$local_hash" > /tmp/arena_image_hash
-        return 0
+        # Return 2 to signal "no upload needed"
+        return 2
     fi
 
     # Content changed - bump version
@@ -458,7 +459,17 @@ case "$ACTION" in
         fi
 
         # Check for content changes and auto-bump version if needed
+        # Returns 0 if content changed (proceed with upload)
+        # Returns 2 if content unchanged (skip upload)
         check_and_bump_version "$ENV_FILE_TO_UPDATE"
+        needs_upload=$?
+
+        if [[ $needs_upload -eq 2 ]]; then
+            log_success "Assets are up to date, skipping upload"
+            # Cleanup temp files
+            rm -f /tmp/arena_image_version /tmp/arena_image_hash
+            exit 0
+        fi
 
         # Upload image files
         upload_images

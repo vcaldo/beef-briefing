@@ -620,26 +620,36 @@ export function BattlePage({
       {/* Celebration cards flying to center */}
       {celebrationCards && (
         <div className="victory-celebration-overlay">
-          <div className="victory-cards-container">
-            {celebrationCards.map((card, index) => (
-              <div
-                key={card.card_id}
-                className="victory-flying-card"
-                style={{ '--card-index': index } as React.CSSProperties}
-              >
-                <CompactCard
-                  imageUrl={card.card_image_url || ''}
-                  positions={card.placeholder_positions}
-                  currentStats={{
-                    atk: card.atk,
-                    hp: card.max_hp,
-                    maxHp: card.max_hp,
-                  }}
-                  cardName={card.name}
-                  cardId={card.card_id}
-                />
-              </div>
-            ))}
+          {/* Player name banner */}
+          <div className="victory-player-banner">
+            {battleData.winner_id === battleData.player_a_id
+              ? battleData.player_a_name
+              : battleData.player_b_name} Wins!
+          </div>
+
+          {/* Stacked cards container */}
+          <div className="victory-cards-stack">
+            {celebrationCards.map((card, index) => {
+              const position = index === 1 ? 'center' : index === 0 ? 'left' : 'right'
+              return (
+                <div
+                  key={card.card_id}
+                  className={`victory-flying-card victory-flying-card--${position}`}
+                >
+                  <CompactCard
+                    imageUrl={card.card_image_url || ''}
+                    positions={card.placeholder_positions}
+                    currentStats={{
+                      atk: card.atk,
+                      hp: card.max_hp,
+                      maxHp: card.max_hp,
+                    }}
+                    cardName={card.name}
+                    cardId={card.card_id}
+                  />
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

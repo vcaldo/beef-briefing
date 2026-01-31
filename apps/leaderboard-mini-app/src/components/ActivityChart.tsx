@@ -8,7 +8,6 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { ActivityDataPoint } from '../types'
-import { apiClient } from '../api/client'
 
 interface ActivityChartProps {
   data: ActivityDataPoint[]
@@ -18,19 +17,19 @@ interface ActivityChartProps {
   title?: string
 }
 
-function formatDate(dateStr: string, timezone: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: timezone })
+function formatDate(dateStr: string): string {
+  const [, month, day] = dateStr.split('-').map(Number)
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `${months[month - 1]} ${day}`
 }
 
 export function ActivityChart({ data, loading, error, onRetry, title = 'Activity' }: ActivityChartProps) {
-  const timezone = apiClient.getTimezone()
   const chartData = useMemo(() => {
     return data.map((point) => ({
       ...point,
-      dateLabel: formatDate(point.date, timezone),
+      dateLabel: formatDate(point.date),
     }))
-  }, [data, timezone])
+  }, [data])
 
   if (loading) {
     return (

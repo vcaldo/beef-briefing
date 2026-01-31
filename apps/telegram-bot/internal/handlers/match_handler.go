@@ -315,14 +315,13 @@ func FormatParticipantList(participants []client.ArenaParticipant) string {
 	return result
 }
 
-// BuildMatchKeyboard creates the inline keyboard for a match with 3 rows:
-// Row 1: Open Game button
-// Row 2: Join Game button with participant count
-// Row 3: Participant list OR winner (after battle)
+// BuildMatchKeyboard creates the inline keyboard for a match.
+// For active matches: 3 rows (Open, Join, Participants)
+// For completed matches: 1 row (Winner or Draw)
 func BuildMatchKeyboard(matchID string, match *client.ArenaMatch) *models.InlineKeyboardMarkup {
-	// Determine third row text based on match status
-	var thirdRowText string
+	// If match is completed, show only the winner/draw row
 	if match.Status == "completed" {
+		var resultText string
 		if match.WinnerUserID != nil {
 			// Find winner's name from participants
 			winnerName := ""
@@ -338,14 +337,23 @@ func BuildMatchKeyboard(matchID string, match *client.ArenaMatch) *models.Inline
 					break
 				}
 			}
-			thirdRowText = fmt.Sprintf("🏆 Winner: %s", winnerName)
+			resultText = fmt.Sprintf("🏆 Winner: %s", winnerName)
 		} else {
 			// Draw - no winner
-			thirdRowText = "🤝 Draw!"
+			resultText = "🤝 Draw!"
 		}
-	} else {
-		thirdRowText = fmt.Sprintf("👥 %s", FormatParticipantList(match.Participants))
+
+		return &models.InlineKeyboardMarkup{
+			InlineKeyboard: [][]models.InlineKeyboardButton{
+				{
+					{Text: resultText, CallbackData: "noop"},
+				},
+			},
+		}
 	}
+
+	// Active match - show full keyboard with Open, Join, and participants
+	participantText := fmt.Sprintf("👥 %s", FormatParticipantList(match.Participants))
 
 	return &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
@@ -356,7 +364,7 @@ func BuildMatchKeyboard(matchID string, match *client.ArenaMatch) *models.Inline
 				{Text: fmt.Sprintf("➕ Join (%d)", len(match.Participants)), CallbackData: fmt.Sprintf("join_match:%s", matchID)},
 			},
 			{
-				{Text: thirdRowText, CallbackData: "noop"},
+				{Text: participantText, CallbackData: "noop"},
 			},
 		},
 	}

@@ -642,6 +642,7 @@ func TestGetGalleryImageURL_ExpiryBounds(t *testing.T) {
 	// Setup test data
 	galleryImage := &repository.GalleryImage{
 		ID:          imageID,
+		ChatID:      -1001234567890,
 		StoragePath: "cards/test.png",
 	}
 	mockRepo.AddGalleryImage(galleryImage)

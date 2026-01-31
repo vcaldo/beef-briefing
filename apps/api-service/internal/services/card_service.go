@@ -441,6 +441,7 @@ type GalleryImagesResponse struct {
 // GalleryImageURLResponse is the response for GetGalleryImageURL.
 type GalleryImageURLResponse struct {
 	ImageID   int64  `json:"image_id"`
+	ChatID    int64  `json:"chat_id"`
 	URL       string `json:"url"`
 	ExpiresIn int    `json:"expires_in"`
 }
@@ -528,6 +529,7 @@ func (s *CardService) GetGalleryImageURL(
 
 	return &GalleryImageURLResponse{
 		ImageID:   imageID,
+		ChatID:    image.ChatID,
 		URL:       url,
 		ExpiresIn: expirySeconds,
 	}, nil

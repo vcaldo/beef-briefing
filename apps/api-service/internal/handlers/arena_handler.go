@@ -220,6 +220,27 @@ func requireJWTClaims(ctx context.Context, w http.ResponseWriter) *middleware.Mi
 	return claims
 }
 
+// validateMatchChatAccess fetches a match and validates the user has access to its chat.
+// Returns the match if valid, or writes an error response and returns nil if invalid.
+func (h *ArenaHandler) validateMatchChatAccess(ctx context.Context, w http.ResponseWriter, matchID string, claims *middleware.MiniAppClaims) *services.MatchResponse {
+	match, err := h.service.GetMatch(ctx, matchID)
+	if err != nil {
+		handleServiceError(ctx, w, err, "get match")
+		return nil
+	}
+
+	if claims.ChatID == nil {
+		httputil.RespondError(w, "chat context required", http.StatusForbidden)
+		return nil
+	}
+	if *claims.ChatID != match.ChatID {
+		httputil.RespondError(w, "access denied to this chat", http.StatusForbidden)
+		return nil
+	}
+
+	return match
+}
+
 // setTransactionName sets the New Relic transaction name if a transaction exists.
 func setTransactionName(ctx context.Context, name string) {
 	if txn := newrelic.FromContext(ctx); txn != nil {

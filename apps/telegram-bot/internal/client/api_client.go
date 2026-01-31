@@ -667,6 +667,7 @@ type ArenaMatch struct {
 	Participants      []ArenaParticipant `json:"participants"`
 	CardCount         int                `json:"card_count"`
 	TelegramMessageID *int64             `json:"telegram_message_id,omitempty"`
+	WinnerUserID      *int64             `json:"winner_user_id,omitempty"`
 }
 
 // ArenaParticipant represents a participant in a match

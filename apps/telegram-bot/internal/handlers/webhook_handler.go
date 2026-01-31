@@ -99,7 +99,7 @@ func (h *WebhookHandler) HandleUpdateMatchMessage(w http.ResponseWriter, r *http
 	}
 
 	// Build keyboard using shared function and update the message
-	keyboard := BuildMatchKeyboard(match.ID, match.Participants)
+	keyboard := BuildMatchKeyboard(match.ID, match)
 
 	// Track bot update segment
 	var botSegment *newrelic.Segment

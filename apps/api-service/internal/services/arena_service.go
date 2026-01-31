@@ -35,6 +35,7 @@ type ArenaService struct {
 	storageClient     MinIOClientInterface
 	cardService       CardServiceInterface
 	nrApp             *newrelic.Application
+	botClient         BotClientInterface
 }
 
 // ArenaServiceDeps holds the dependencies for ArenaService.
@@ -72,11 +73,13 @@ func NewArenaService(
 	storageClient MinIOClientInterface,
 	cardService CardServiceInterface,
 	nrApp *newrelic.Application,
+	botClient BotClientInterface,
 	deps *ArenaServiceDeps,
 ) *ArenaService {
 	svc := &ArenaService{
-		db:    db,
-		nrApp: nrApp,
+		db:        db,
+		nrApp:     nrApp,
+		botClient: botClient,
 	}
 
 	if deps != nil {
@@ -98,7 +101,7 @@ func NewArenaService(
 	svc.shopService = NewShopService(db, svc.gameRepo, svc.dealer, nrApp)
 
 	// Create battle service with the resolved dependencies
-	svc.battleService = NewBattleService(db, svc.gameRepo, nrApp)
+	svc.battleService = NewBattleService(db, svc.gameRepo, nrApp, botClient)
 
 	// Create tournament service with the resolved dependencies
 	svc.tournamentService = NewTournamentService(db, svc.gameRepo, svc.dealer, nrApp)

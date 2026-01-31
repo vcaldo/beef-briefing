@@ -12,6 +12,7 @@ import (
 	"time"
 	_ "time/tzdata" // Embed timezone database for Alpine containers
 
+	"beef-briefing/apps/api-service/internal/client"
 	"beef-briefing/apps/api-service/internal/handlers"
 	"beef-briefing/apps/api-service/internal/middleware"
 	"beef-briefing/apps/api-service/internal/migrations"
@@ -242,7 +243,18 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 
 		// Arena game service and handler
 		arenaService := services.NewArenaService(db, minioClient, cardService, nrApp, nil)
-		arenaHandler = handlers.NewArenaHandler(arenaService, cfg)
+
+		// Initialize bot client for webhook notifications (optional)
+		var botClient *client.BotClient
+		botInternalURL := os.Getenv("BOT_INTERNAL_URL")
+		if botInternalURL != "" {
+			botClient = client.NewBotClient(botInternalURL, cfg.APIKey)
+			slog.Info("Bot webhook client configured", "bot_internal_url", botInternalURL)
+		} else {
+			slog.Debug("BOT_INTERNAL_URL not set, bot notifications disabled")
+		}
+
+		arenaHandler = handlers.NewArenaHandler(arenaService, cfg, botClient)
 
 		slog.Info("Mini App endpoints enabled")
 	} else {

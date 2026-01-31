@@ -46,6 +46,8 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       CORS_ORIGINS: https://leaderboard.${DOMAIN_NAME},https://deck.${DOMAIN_NAME},https://arena.${DOMAIN_NAME}
       ADMIN_USER_IDS: ${ADMIN_USER_IDS}
+      # Bot webhook for participant change notifications
+      BOT_INTERNAL_URL: http://telegram-bot:8081
     volumes:
       - ./secrets/apps/api-service:/app/secrets:ro
     depends_on:
@@ -88,6 +90,8 @@ services:
       # Games API Configuration
       ARENA_GAME_SHORT_NAME: ${ARENA_GAME_SHORT_NAME}
       ARENA_BASE_URL: ${ARENA_BASE_URL}
+      # Internal webhook server port
+      WEBHOOK_PORT: 8081
     volumes:
       - ./secrets/apps/telegram-bot:/app/secrets:ro
     depends_on:

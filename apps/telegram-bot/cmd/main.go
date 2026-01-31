@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -138,6 +139,10 @@ func main() {
 	tournamentScheduler := scheduler.NewTournamentScheduler(apiClient, b, nrApp, rankedEnabled)
 	go tournamentScheduler.Start(ctx)
 
+	// Start internal webhook server for API service callbacks
+	webhookHandler := handlers.NewWebhookHandler(apiClient, b, nrApp)
+	go startWebhookServer(ctx, webhookHandler, cfg.APIKey)
+
 	// Start bot with graceful shutdown
 	b.Start(ctx)
 
@@ -225,4 +230,59 @@ func getEnvBool(name string, defaultVal bool) bool {
 		return defaultVal
 	}
 	return b
+}
+
+// startWebhookServer starts the internal HTTP server for API service callbacks
+func startWebhookServer(ctx context.Context, webhookHandler *handlers.WebhookHandler, apiKey string) {
+	port := os.Getenv("WEBHOOK_PORT")
+	if port == "" {
+		port = "8081"
+	}
+
+	mux := http.NewServeMux()
+
+	// Wrap with API key authentication middleware
+	authHandler := func(w http.ResponseWriter, r *http.Request) {
+		// Verify API key from Authorization header
+		auth := r.Header.Get("Authorization")
+		expectedAuth := "Bearer " + apiKey
+		if auth != expectedAuth {
+			slog.Warn("unauthorized webhook request", "remote_addr", r.RemoteAddr)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		webhookHandler.HandleUpdateMatchMessage(w, r)
+	}
+
+	mux.HandleFunc("/internal/update-match-message", authHandler)
+
+	// Health check endpoint (no auth required)
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+
+	server := &http.Server{
+		Addr:    ":" + port,
+		Handler: mux,
+	}
+
+	slog.Info("starting internal webhook server", "port", port)
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("webhook server error", "error", err)
+		}
+	}()
+
+	// Wait for context cancellation for graceful shutdown
+	<-ctx.Done()
+	slog.Info("shutting down webhook server...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		slog.Error("webhook server shutdown error", "error", err)
+	}
 }

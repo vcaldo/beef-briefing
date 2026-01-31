@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -207,6 +208,11 @@ func (h *ArenaHandler) HandleJoinMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Notify bot to update Telegram message with new participant list
+	if h.botClient != nil && match.TelegramMessageID != nil {
+		go h.botClient.NotifyParticipantChange(context.Background(), match.ID, match.ChatID, *match.TelegramMessageID)
+	}
+
 	httputil.RespondJSON(w, match, http.StatusOK)
 }
 
@@ -227,8 +233,9 @@ func (h *ArenaHandler) HandleLeaveMatch(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Validate match belongs to user's chat
-	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
+	// Validate match belongs to user's chat and get match info for notification
+	match := h.validateMatchChatAccess(ctx, w, matchID, claims)
+	if match == nil {
 		return
 	}
 
@@ -239,6 +246,11 @@ func (h *ArenaHandler) HandleLeaveMatch(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		handleServiceError(ctx, w, err, "leave match")
 		return
+	}
+
+	// Notify bot to update Telegram message with new participant list
+	if h.botClient != nil && match.TelegramMessageID != nil {
+		go h.botClient.NotifyParticipantChange(context.Background(), match.ID, match.ChatID, *match.TelegramMessageID)
 	}
 
 	httputil.RespondOK(w)

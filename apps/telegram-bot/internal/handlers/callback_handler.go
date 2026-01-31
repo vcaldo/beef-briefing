@@ -236,17 +236,8 @@ func (h *CallbackHandler) handleStartMatch(ctx context.Context, b *bot.Bot, call
 // updateMatchMessage updates the match message buttons
 // Note: Game messages (from SendGame) don't have captions, so we only update the reply markup
 func (h *CallbackHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, chatID int64, messageID int, match *client.ArenaMatch) {
-	// Build participant count into button text so users see updated info
-	joinText := fmt.Sprintf("➕ Join Game (%d)", len(match.Participants))
-
-	keyboard := &models.InlineKeyboardMarkup{
-		InlineKeyboard: [][]models.InlineKeyboardButton{
-			{
-				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
-				{Text: joinText, CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
-			},
-		},
-	}
+	// Build keyboard using shared function
+	keyboard := BuildMatchKeyboard(match.ID, match.Participants)
 
 	_, err := b.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
 		ChatID:      chatID,
@@ -260,17 +251,8 @@ func (h *CallbackHandler) updateMatchMessage(ctx context.Context, b *bot.Bot, ch
 
 // updateMatchMessageByTelegramID updates the match message using the stored telegram_message_id
 func (h *CallbackHandler) updateMatchMessageByTelegramID(ctx context.Context, b *bot.Bot, chatID int64, telegramMessageID int, match *client.ArenaMatch) {
-	// Build participant count into button text so users see updated info
-	joinText := fmt.Sprintf("➕ Join Game (%d)", len(match.Participants))
-
-	keyboard := &models.InlineKeyboardMarkup{
-		InlineKeyboard: [][]models.InlineKeyboardButton{
-			{
-				{Text: "🎮 Open Game", CallbackGame: &models.CallbackGame{}},
-				{Text: joinText, CallbackData: fmt.Sprintf("join_match:%s", match.ID)},
-			},
-		},
-	}
+	// Build keyboard using shared function
+	keyboard := BuildMatchKeyboard(match.ID, match.Participants)
 
 	_, err := b.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
 		ChatID:      chatID,

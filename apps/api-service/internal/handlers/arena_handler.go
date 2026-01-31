@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"beef-briefing/apps/api-service/internal/apperror"
+	"beef-briefing/apps/api-service/internal/client"
 	"beef-briefing/apps/api-service/internal/game/shop"
 	"beef-briefing/apps/api-service/internal/httputil"
 	"beef-briefing/apps/api-service/internal/middleware"
@@ -20,15 +21,17 @@ import (
 
 // ArenaHandler handles HTTP requests for arena game endpoints.
 type ArenaHandler struct {
-	service *services.ArenaService
-	config  *config.Config
+	service   *services.ArenaService
+	config    *config.Config
+	botClient *client.BotClient
 }
 
 // NewArenaHandler creates a new ArenaHandler.
-func NewArenaHandler(service *services.ArenaService, cfg *config.Config) *ArenaHandler {
+func NewArenaHandler(service *services.ArenaService, cfg *config.Config, botClient *client.BotClient) *ArenaHandler {
 	return &ArenaHandler{
-		service: service,
-		config:  cfg,
+		service:   service,
+		config:    cfg,
+		botClient: botClient,
 	}
 }
 

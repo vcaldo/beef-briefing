@@ -283,7 +283,7 @@ func TestCreateMatch_Returns400OnMissingChatID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -321,7 +321,7 @@ func TestCreateMatch_Returns400OnBadRequest(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -365,7 +365,7 @@ func TestCreateMatch_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Create request WITHOUT JWT claims in context (simulating no auth middleware)
 	reqBody := CreateMatchRequest{ChatID: -1001234567890}
@@ -401,7 +401,7 @@ func TestCreateMatch_Returns403OnForbidden(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -449,7 +449,7 @@ func TestGetMatch_Returns404OnNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -502,7 +502,7 @@ func TestErrorResponse_JSONStructure(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -557,7 +557,7 @@ func TestListMatches_Returns200OnSuccess(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -598,7 +598,7 @@ func TestListMatches_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/matches?chat_id=-1001234567890", nil)
@@ -620,7 +620,7 @@ func TestListMatches_Returns400OnMissingChatID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -656,7 +656,7 @@ func TestJoinMatch_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	matchID := "00000000-0000-0000-0000-000000000001"
@@ -680,7 +680,7 @@ func TestJoinMatch_Returns400OnMissingMatchID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -713,7 +713,7 @@ func TestJoinMatch_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -750,7 +750,7 @@ func TestLeaveMatch_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	matchID := "00000000-0000-0000-0000-000000000001"
@@ -774,7 +774,7 @@ func TestLeaveMatch_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -811,7 +811,7 @@ func TestStartMatch_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	matchID := "00000000-0000-0000-0000-000000000001"
@@ -835,7 +835,7 @@ func TestStartMatch_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -872,7 +872,7 @@ func TestGetShop_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	matchID := "00000000-0000-0000-0000-000000000001"
@@ -896,7 +896,7 @@ func TestGetShop_Returns400OnMissingMatchID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -929,7 +929,7 @@ func TestGetShop_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -966,7 +966,7 @@ func TestBuyCard_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	matchID := "00000000-0000-0000-0000-000000000001"
@@ -993,7 +993,7 @@ func TestBuyCard_Returns400OnInvalidJSON(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1027,7 +1027,7 @@ func TestBuyCard_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1067,7 +1067,7 @@ func TestReroll_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	matchID := "00000000-0000-0000-0000-000000000001"
@@ -1091,7 +1091,7 @@ func TestReroll_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1128,7 +1128,7 @@ func TestUpgrade_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	matchID := "00000000-0000-0000-0000-000000000001"
@@ -1155,7 +1155,7 @@ func TestUpgrade_Returns400OnInvalidJSON(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1189,7 +1189,7 @@ func TestUpgrade_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1229,7 +1229,7 @@ func TestSetOrder_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	matchID := "00000000-0000-0000-0000-000000000001"
@@ -1256,7 +1256,7 @@ func TestSetOrder_Returns400OnInvalidJSON(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1294,7 +1294,7 @@ func TestSubmitTeam_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	matchID := "00000000-0000-0000-0000-000000000001"
@@ -1318,7 +1318,7 @@ func TestSubmitTeam_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1355,7 +1355,7 @@ func TestGetBattle_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	matchID := "00000000-0000-0000-0000-000000000001"
@@ -1379,7 +1379,7 @@ func TestGetBattle_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1413,7 +1413,7 @@ func TestHandleGetBattle_ReturnsDamageSummary(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Create test users directly in DB
 	playerAID := int64(9911)
@@ -1571,7 +1571,7 @@ func TestGetLeaderboard_Returns200OnSuccess(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1616,7 +1616,7 @@ func TestGetLeaderboard_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/leaderboard?chat_id=-1001234567890", nil)
@@ -1638,7 +1638,7 @@ func TestGetLeaderboard_UsesDefaultType(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1680,7 +1680,7 @@ func TestGetLeaderboard_Returns400OnMissingChatID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1725,7 +1725,7 @@ func TestGetLeaderboard_TypeRegular(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1765,7 +1765,7 @@ func TestGetLeaderboard_CustomPagination(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1811,7 +1811,7 @@ func TestGetLeaderboard_ResponseStructure(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1870,7 +1870,7 @@ func TestGetLeaderboard_AccessDenied(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1903,7 +1903,7 @@ func TestGetLeaderboard_EmptyLeaderboard(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1953,7 +1953,7 @@ func TestGetLeaderboard_LimitClamping(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -1999,7 +1999,7 @@ func TestGetConstants_Returns200OnSuccess(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/constants", nil)
 
@@ -2055,7 +2055,7 @@ func TestGetHistory_Returns200OnSuccess(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -2102,7 +2102,7 @@ func TestGetHistory_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/history?chat_id=-1001234567890", nil)
@@ -2128,7 +2128,7 @@ func TestGetProfile_Returns200OnSuccess(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -2170,7 +2170,7 @@ func TestGetProfile_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/profile?chat_id=-1001234567890", nil)
@@ -2196,7 +2196,7 @@ func TestGetH2H_Returns200OnSuccess(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -2238,7 +2238,7 @@ func TestGetH2H_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/arena/h2h?chat_id=-1001234567890&opponent_id=67890", nil)
@@ -2260,7 +2260,7 @@ func TestGetH2H_Returns400OnMissingOpponentID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -2296,7 +2296,7 @@ func TestShareResult_Returns401OnUnauthorized(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without JWT claims
 	matchID := "00000000-0000-0000-0000-000000000001"
@@ -2320,7 +2320,7 @@ func TestShareResult_Returns400OnMissingMatchID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -2353,7 +2353,7 @@ func TestShareResult_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	secretKey := "test-jwt-secret-key-for-testing"
 	jwtAuth := middleware.NewJWTAuth(secretKey)
@@ -2390,7 +2390,7 @@ func TestBotCreateMatch_Returns400OnMissingFields(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request with missing fields
 	reqBody := BotCreateMatchRequest{ChatID: 0, CreatorUserID: 0}
@@ -2415,7 +2415,7 @@ func TestBotCreateMatch_Returns400OnInvalidJSON(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/match", bytes.NewReader([]byte(`{invalid json`)))
 	req.Header.Set("Content-Type", "application/json")
@@ -2437,7 +2437,7 @@ func TestBotGetMatch_Returns400OnMissingMatchID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/match/", nil)
 	req = mux.SetURLVars(req, map[string]string{"id": ""})
@@ -2459,7 +2459,7 @@ func TestBotGetMatch_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	nonExistentMatchID := "00000000-0000-0000-0000-000000000012"
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/match/"+nonExistentMatchID, nil)
@@ -2482,7 +2482,7 @@ func TestBotJoinMatch_Returns400OnMissingUserID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	matchID := "00000000-0000-0000-0000-000000000001"
 	reqBody := BotJoinMatchRequest{UserID: 0}
@@ -2508,7 +2508,7 @@ func TestBotJoinMatch_Returns400OnInvalidJSON(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	matchID := "00000000-0000-0000-0000-000000000001"
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/match/"+matchID+"/join", bytes.NewReader([]byte(`{invalid json`)))
@@ -2532,7 +2532,7 @@ func TestBotLeaveMatch_Returns400OnMissingUserID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	matchID := "00000000-0000-0000-0000-000000000001"
 	reqBody := BotJoinMatchRequest{UserID: 0}
@@ -2558,7 +2558,7 @@ func TestBotStartMatch_Returns400OnMissingUserID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	matchID := "00000000-0000-0000-0000-000000000001"
 	reqBody := BotJoinMatchRequest{UserID: 0}
@@ -2584,7 +2584,7 @@ func TestBotGetPendingMatches_Returns200OnSuccess(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/matches/pending", nil)
 
@@ -2615,7 +2615,7 @@ func TestBotAutoStartMatch_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	nonExistentMatchID := "00000000-0000-0000-0000-000000000013"
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/match/"+nonExistentMatchID+"/auto-start", nil)
@@ -2638,7 +2638,7 @@ func TestBotForceSubmitTeams_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	nonExistentMatchID := "00000000-0000-0000-0000-000000000014"
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/match/"+nonExistentMatchID+"/force-submit", nil)
@@ -2661,7 +2661,7 @@ func TestBotGetShareData_Returns400OnMissingMatchID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/match//share-data", nil)
 	req = mux.SetURLVars(req, map[string]string{"id": ""})
@@ -2683,7 +2683,7 @@ func TestBotGetShareData_Returns404OnMatchNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	nonExistentMatchID := "00000000-0000-0000-0000-000000000015"
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/match/"+nonExistentMatchID+"/share-data", nil)
@@ -2710,7 +2710,7 @@ func TestBotGetTodayTournament_Returns400OnMissingChatID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without chat_id
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournament/today?date=2026-01-17", nil)
@@ -2740,7 +2740,7 @@ func TestBotGetTodayTournament_Returns400OnMissingDate(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request without date
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournament/today?chat_id=-1001234567890", nil)
@@ -2770,7 +2770,7 @@ func TestBotGetTodayTournament_Returns200OnNoTournament(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request for a chat with no tournament
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournament/today?chat_id=-1001234567890&date=2026-01-17", nil)
@@ -2800,7 +2800,7 @@ func TestBotGetTournament_Returns400OnInvalidID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournament/invalid", nil)
 	req = mux.SetURLVars(req, map[string]string{"id": "invalid"})
@@ -2822,7 +2822,7 @@ func TestBotGetTournament_Returns404OnNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournament/99999", nil)
 	req = mux.SetURLVars(req, map[string]string{"id": "99999"})
@@ -2844,7 +2844,7 @@ func TestBotGetPendingAnnouncements_Returns200(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournaments/pending-announcements", nil)
 
@@ -2873,7 +2873,7 @@ func TestBotAnnounceTournament_Returns400OnMissingFields(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request with missing fields
 	reqBody := TournamentAnnounceRequest{ChatID: 0, Date: ""}
@@ -2898,7 +2898,7 @@ func TestBotAnnounceTournament_Returns400OnInvalidJSON(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/announce", bytes.NewReader([]byte(`{invalid json`)))
 	req.Header.Set("Content-Type", "application/json")
@@ -2920,7 +2920,7 @@ func TestBotJoinTournament_Returns400OnMissingFields(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request with missing fields
 	reqBody := TournamentJoinRequest{ChatID: 0, UserID: 0}
@@ -2945,7 +2945,7 @@ func TestBotJoinTournament_Returns400OnInvalidJSON(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/join", bytes.NewReader([]byte(`{invalid json`)))
 	req.Header.Set("Content-Type", "application/json")
@@ -2967,7 +2967,7 @@ func TestBotJoinTournament_Returns404OnNoTournament(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request for a chat with no tournament
 	reqBody := TournamentJoinRequest{ChatID: -1001234567890, UserID: 12345}
@@ -2992,7 +2992,7 @@ func TestBotLeaveTournament_Returns400OnMissingFields(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request with missing fields
 	reqBody := TournamentJoinRequest{ChatID: 0, UserID: 0}
@@ -3017,7 +3017,7 @@ func TestBotLeaveTournament_Returns400OnInvalidJSON(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/leave", bytes.NewReader([]byte(`{invalid json`)))
 	req.Header.Set("Content-Type", "application/json")
@@ -3039,7 +3039,7 @@ func TestBotLeaveTournament_Returns404OnNoTournament(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Request for a chat with no tournament
 	reqBody := TournamentJoinRequest{ChatID: -1001234567890, UserID: 12345}
@@ -3064,7 +3064,7 @@ func TestBotGetPendingClose_Returns200(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournaments/pending-close", nil)
 
@@ -3093,7 +3093,7 @@ func TestBotCloseTournament_Returns400OnInvalidID(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/invalid/close", nil)
 	req = mux.SetURLVars(req, map[string]string{"id": "invalid"})
@@ -3115,7 +3115,7 @@ func TestBotCloseTournament_Returns404OnNotFound(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/arena/tournament/99999/close", nil)
 	req = mux.SetURLVars(req, map[string]string{"id": "99999"})
@@ -3137,7 +3137,7 @@ func TestBotGetPendingRounds_Returns200(t *testing.T) {
 	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil)
 
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/arena/tournaments/pending-rounds", nil)
 
@@ -3302,7 +3302,7 @@ func TestGetShop_IncludesPlaceholderPositions(t *testing.T) {
 
 	// Setup handler
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Create JWT token for user1
 	secretKey := "test-jwt-secret-key-for-testing"
@@ -3582,7 +3582,7 @@ func TestGetBattle_IncludesPlaceholderPositions(t *testing.T) {
 
 	// Setup handler
 	cfg := &config.Config{}
-	handler := NewArenaHandler(arenaService, cfg)
+	handler := NewArenaHandler(arenaService, cfg, nil)
 
 	// Create JWT token for user1
 	secretKey := "test-jwt-secret-key-for-testing"

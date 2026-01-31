@@ -48,9 +48,10 @@ const MEDIA_LABELS: Record<string, string> = {
   sticker: 'Stickers',
 }
 
-function formatDate(dateStr: string, timezone: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: timezone })
+function formatDate(dateStr: string): string {
+  const [, month, day] = dateStr.split('-').map(Number)
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `${months[month - 1]} ${day}`
 }
 
 interface MediaPageProps {
@@ -308,15 +309,13 @@ function MediaTimeline({ activity, loading, error, onRetry }: {
   error: string | null
   onRetry: () => void
 }) {
-  const timezone = apiClient.getTimezone()
-
   const chartData = useMemo(() =>
     activity.map((point) => ({
       date: point.date,
-      dateLabel: formatDate(point.date, timezone),
+      dateLabel: formatDate(point.date),
       media: point.count,
     })),
-  [activity, timezone])
+  [activity])
 
   if (loading) {
     return (

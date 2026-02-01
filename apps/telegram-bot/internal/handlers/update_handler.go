@@ -18,18 +18,20 @@ import (
 )
 
 type UpdateHandler struct {
-	apiClient  *client.APIClient
-	httpClient *http.Client
-	nrApp      *newrelic.Application
+	apiClient          *client.APIClient
+	httpClient         *http.Client
+	nrApp              *newrelic.Application
+	mediaUploadEnabled bool
 }
 
-func NewUpdateHandler(apiClient *client.APIClient, nrApp *newrelic.Application) *UpdateHandler {
+func NewUpdateHandler(apiClient *client.APIClient, nrApp *newrelic.Application, mediaUploadEnabled bool) *UpdateHandler {
 	return &UpdateHandler{
 		apiClient: apiClient,
 		httpClient: &http.Client{
 			Timeout: internal.FileDownloadTimeout,
 		},
-		nrApp: nrApp,
+		nrApp:              nrApp,
+		mediaUploadEnabled: mediaUploadEnabled,
 	}
 }
 
@@ -96,21 +98,29 @@ func (h *UpdateHandler) Handle(ctx context.Context, b *bot.Bot, update *models.U
 		}
 	}
 
-	// Extract file IDs from the update
-	var fileIDs []string
-	if txn != nil {
-		segment := txn.StartSegment("extract-file-ids")
-		fileIDs = h.extractFileIDs(update)
-		segment.End()
-		txn.AddAttribute("file_count", len(fileIDs))
-	} else {
-		fileIDs = h.extractFileIDs(update)
-	}
+	// Extract file IDs and download media files (if enabled)
+	var files map[string][]byte
+	if h.mediaUploadEnabled {
+		var fileIDs []string
+		if txn != nil {
+			segment := txn.StartSegment("extract-file-ids")
+			fileIDs = h.extractFileIDs(update)
+			segment.End()
+			txn.AddAttribute("file_count", len(fileIDs))
+		} else {
+			fileIDs = h.extractFileIDs(update)
+		}
 
-	// Download all media files concurrently
-	files := h.downloadFiles(ctx, b, fileIDs)
-	if txn != nil {
-		txn.AddAttribute("files_downloaded", len(files))
+		// Download all media files concurrently
+		files = h.downloadFiles(ctx, b, fileIDs)
+		if txn != nil {
+			txn.AddAttribute("files_downloaded", len(files))
+		}
+	} else {
+		if txn != nil {
+			txn.AddAttribute("media_upload_enabled", false)
+		}
+		slog.Debug("media upload disabled, skipping file downloads", "update_id", update.ID)
 	}
 
 	// Send update to API service

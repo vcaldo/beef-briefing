@@ -35,6 +35,7 @@ func main() {
 	slog.Info("starting telegram-bot",
 		"environment", cfg.Environment,
 		"api_service_url", cfg.APIServiceURL,
+		"media_upload_enabled", cfg.MediaUploadEnabled,
 	)
 
 	// Initialize New Relic APM (optional - continues without if fails)
@@ -66,7 +67,7 @@ func main() {
 	apiClient := client.NewAPIClient(cfg.APIServiceURL, cfg.APIKey, nrApp)
 
 	// Initialize handlers
-	updateHandler := handlers.NewUpdateHandler(apiClient, nrApp)
+	updateHandler := handlers.NewUpdateHandler(apiClient, nrApp, cfg.MediaUploadEnabled)
 	photoUpdateHandler := handlers.NewPhotoUpdateHandler(apiClient, cfg, nrApp)
 	meHandler := handlers.NewMeHandler(apiClient, nrApp)
 	criteriaHandler := handlers.NewCriteriaHandler(nrApp)

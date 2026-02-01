@@ -93,6 +93,8 @@ services:
       ARENA_BASE_URL: ${ARENA_BASE_URL}
       # Internal webhook server port
       WEBHOOK_PORT: 8081
+      # Media upload to object storage
+      MEDIA_UPLOAD_ENABLED: ${MEDIA_UPLOAD_ENABLED:-false}
     volumes:
       - ./secrets/apps/telegram-bot:/app/secrets:ro
     depends_on:

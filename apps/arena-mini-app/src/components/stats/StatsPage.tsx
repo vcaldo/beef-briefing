@@ -809,11 +809,11 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
     if (!showBattleLogModal) return null
 
     return (
-      <div className="rpg-battlelog-modal-backdrop" onClick={handleCloseBattleLogModal}>
-        <div className="rpg-battlelog-modal-wrapper" onClick={(e) => e.stopPropagation()}>
-          <RPGPanel variant="outer" className="rpg-battlelog-modal-outer">
+      <div className="rpg-modal-backdrop" onClick={handleCloseBattleLogModal}>
+        <div className="rpg-modal-wrapper" onClick={(e) => e.stopPropagation()}>
+          <RPGPanel variant="outer" className="rpg-modal-outer">
             {/* Close button */}
-            <div className="rpg-battlelog-close-wrapper">
+            <div className="rpg-modal-close-wrapper">
               <GameButton
                 variant="danger"
                 size="sm"
@@ -827,7 +827,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
             {/* Loading state */}
             {battleLogLoading && (
-              <div className="rpg-battlelog-loading">
+              <div className="rpg-modal-loading">
                 <LoadingSpinner message="Loading battle log..." />
               </div>
             )}

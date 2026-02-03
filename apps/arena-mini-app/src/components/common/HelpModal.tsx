@@ -21,11 +21,11 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
   if (!isOpen) return null
 
   return (
-    <div className="help-modal-backdrop" onClick={onClose}>
-      <div className="help-modal-wrapper" onClick={(e) => e.stopPropagation()}>
-        <RPGPanel variant="outer" className="help-modal-outer">
+    <div className="rpg-modal-backdrop" onClick={onClose}>
+      <div className="rpg-modal-wrapper" onClick={(e) => e.stopPropagation()}>
+        <RPGPanel variant="outer" className="rpg-modal-outer">
           {/* Close button */}
-          <div className="help-close-wrapper">
+          <div className="rpg-modal-close-wrapper">
             <GameButton variant="danger" size="sm" shape="square" onClick={onClose}>
               ×
             </GameButton>

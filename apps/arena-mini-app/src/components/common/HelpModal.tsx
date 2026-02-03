@@ -31,25 +31,27 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
             </GameButton>
           </div>
 
-          {/* Content */}
-          <div className="help-content">
-            {/* Language toggle */}
-            <div className="help-language-toggle">
-              <button
-                className={`lang-btn ${language === 'pt' ? 'active' : ''}`}
-                onClick={() => setLanguage('pt')}
-              >
-                🇵🇹
-              </button>
-              <button
-                className={`lang-btn ${language === 'en' ? 'active' : ''}`}
-                onClick={() => setLanguage('en')}
-              >
-                🇯🇲
-              </button>
+          {/* Content - wrapped in inner panel */}
+          <RPGPanel variant="inner" className="rpg-modal-inner">
+            <div className="help-content">
+              {/* Language toggle */}
+              <div className="help-language-toggle">
+                <button
+                  className={`lang-btn ${language === 'pt' ? 'active' : ''}`}
+                  onClick={() => setLanguage('pt')}
+                >
+                  🇵🇹
+                </button>
+                <button
+                  className={`lang-btn ${language === 'en' ? 'active' : ''}`}
+                  onClick={() => setLanguage('en')}
+                >
+                  🇯🇲
+                </button>
+              </div>
+              {language === 'en' ? <HelpContentEN /> : <HelpContentPT />}
             </div>
-            {language === 'en' ? <HelpContentEN /> : <HelpContentPT />}
-          </div>
+          </RPGPanel>
         </RPGPanel>
       </div>
     </div>

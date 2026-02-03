@@ -1,4 +1,4 @@
-import helpIconUrl from '../../../assets/images/icons/pentagon_question.png'
+import { useImages } from '../../hooks/useImages'
 import './HelpButton.css'
 
 interface HelpButtonProps {
@@ -6,6 +6,8 @@ interface HelpButtonProps {
 }
 
 export function HelpButton({ onClick }: HelpButtonProps) {
+  const { getUrlById } = useImages()
+
   return (
     <button
       className="help-button"
@@ -13,7 +15,7 @@ export function HelpButton({ onClick }: HelpButtonProps) {
       aria-label="Help"
       title="Game Help"
     >
-      <img src={helpIconUrl} alt="?" className="help-icon" />
+      <img src={getUrlById('pentagon_question')} alt="?" className="help-icon" />
     </button>
   )
 }

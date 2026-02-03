@@ -1,17 +1,21 @@
 .help-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+  backdrop-filter: blur(4px);
 }
 
 .help-modal-wrapper {
-  max-width: 90vw;
+  width: 100%;
+  max-width: 400px;
   max-height: 80vh;
-  width: 400px;
+  animation: slideUp 0.3s ease-out;
 }
 
 .help-modal-outer {
@@ -25,8 +29,7 @@
   display: flex;
   justify-content: center;
   gap: 1rem;
-  padding: 0.75rem;
-  border-bottom: 1px solid var(--rpg-border-color, #4a4a6a);
+  padding: 0.5rem 0 0.75rem;
 }
 
 .lang-btn {

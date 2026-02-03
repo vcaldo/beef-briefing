@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"sort"
 	"sync"
 
 	"beef-briefing/apps/api-service/internal/apperror"
+	"beef-briefing/apps/api-service/internal/client"
 	"beef-briefing/apps/api-service/internal/game/battle"
 	"beef-briefing/apps/api-service/internal/jsonutil"
 	"beef-briefing/apps/api-service/internal/nrutil"
@@ -29,6 +31,7 @@ type BattleService struct {
 // BotClientInterface defines the interface for bot webhook notifications.
 type BotClientInterface interface {
 	NotifyParticipantChange(ctx context.Context, matchID string, chatID, telegramMessageID int64) error
+	NotifyBattleComplete(ctx context.Context, notification *client.BattleResultNotification) error
 }
 
 // NewBattleService creates a new BattleService instance.
@@ -285,6 +288,25 @@ func (s *BattleService) runBattle(ctx context.Context, matchID string, pA, pB *r
 		go s.botClient.NotifyParticipantChange(context.Background(), matchID, match.ChatID, *match.TelegramMessageID)
 	}
 
+	// Notify players via DM with battle results
+	if s.botClient != nil {
+		go s.botClient.NotifyBattleComplete(context.Background(), &client.BattleResultNotification{
+			MatchID:     matchID,
+			ChatID:      match.ChatID,
+			MatchType:   string(match.MatchType),
+			Format:      "1v1",
+			PlayerAID:   pA.UserID,
+			PlayerBID:   pB.UserID,
+			PlayerAName: ownerNameA,
+			PlayerBName: ownerNameB,
+			WinnerID:    result.WinnerID,
+			IsDraw:      result.IsDraw,
+			TeamADamage: result.TeamADamage,
+			TeamBDamage: result.TeamBDamage,
+			NumRounds:   result.NumRounds,
+		})
+	}
+
 	// Group events into combats
 	combats := battle.GroupEventsIntoCombats(result.Events, pA.UserID, pB.UserID)
 
@@ -368,10 +390,46 @@ func (s *BattleService) runArena(ctx context.Context, matchID string, participan
 	s.gameRepo.CompleteMatch(ctx, matchID, winnerID)
 
 	// Notify bot to update message with winner
+	match, err := s.gameRepo.GetMatch(ctx, matchID)
 	if s.botClient != nil {
-		match, err := s.gameRepo.GetMatch(ctx, matchID)
 		if err == nil && match != nil && match.TelegramMessageID != nil && *match.TelegramMessageID != 0 {
 			go s.botClient.NotifyParticipantChange(context.Background(), matchID, match.ChatID, *match.TelegramMessageID)
+		}
+
+		// Notify all participants via DM with tournament results
+		if err == nil && match != nil {
+			// Build ranked participant results
+			participantResults := make([]client.BattleParticipantResult, len(participants))
+			// Sort by wins desc, then damage desc, then user_id asc for ranking
+			sorted := make([]*repository.ParticipantWithUser, len(participants))
+			copy(sorted, participants)
+			sort.Slice(sorted, func(i, j int) bool {
+				if sorted[i].Wins != sorted[j].Wins {
+					return sorted[i].Wins > sorted[j].Wins
+				}
+				if sorted[i].TotalDamageDealt != sorted[j].TotalDamageDealt {
+					return sorted[i].TotalDamageDealt > sorted[j].TotalDamageDealt
+				}
+				return sorted[i].UserID < sorted[j].UserID
+			})
+			for i, p := range sorted {
+				participantResults[i] = client.BattleParticipantResult{
+					UserID:      p.UserID,
+					Name:        p.FirstName,
+					Wins:        p.Wins,
+					TotalDamage: p.TotalDamageDealt,
+					Rank:        i + 1,
+				}
+			}
+			go s.botClient.NotifyBattleComplete(context.Background(), &client.BattleResultNotification{
+				MatchID:      matchID,
+				ChatID:       match.ChatID,
+				MatchType:    string(match.MatchType),
+				Format:       "arena",
+				WinnerID:     winnerID,
+				NumRounds:    roundNumber,
+				Participants: participantResults,
+			})
 		}
 	}
 

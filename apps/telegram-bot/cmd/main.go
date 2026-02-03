@@ -242,20 +242,22 @@ func startWebhookServer(ctx context.Context, webhookHandler *handlers.WebhookHan
 
 	mux := http.NewServeMux()
 
-	// Wrap with API key authentication middleware
-	authHandler := func(w http.ResponseWriter, r *http.Request) {
-		// Verify API key from Authorization header
-		auth := r.Header.Get("Authorization")
-		expectedAuth := "Bearer " + apiKey
-		if auth != expectedAuth {
-			slog.Warn("unauthorized webhook request", "remote_addr", r.RemoteAddr)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
+	// Auth middleware factory
+	withAuth := func(handler func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			auth := r.Header.Get("Authorization")
+			expectedAuth := "Bearer " + apiKey
+			if auth != expectedAuth {
+				slog.Warn("unauthorized webhook request", "remote_addr", r.RemoteAddr, "path", r.URL.Path)
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			handler(w, r)
 		}
-		webhookHandler.HandleUpdateMatchMessage(w, r)
 	}
 
-	mux.HandleFunc("/internal/update-match-message", authHandler)
+	mux.HandleFunc("/internal/update-match-message", withAuth(webhookHandler.HandleUpdateMatchMessage))
+	mux.HandleFunc("/internal/notify-battle-result", withAuth(webhookHandler.HandleBattleResultNotification))
 
 	// Health check endpoint (no auth required)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

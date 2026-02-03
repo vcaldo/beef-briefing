@@ -1,29 +1,5 @@
-.help-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 16px;
-  animation: fadeIn 0.2s ease-out;
-  backdrop-filter: blur(4px);
-}
-
-.help-modal-wrapper {
-  width: 100%;
-  max-width: 400px;
-  max-height: 80vh;
-  animation: slideUp 0.3s ease-out;
-}
-
-.help-modal-outer {
-  position: relative;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-}
+/* Help Modal - Content-specific styles */
+/* Modal backdrop/wrapper/outer/close styles are in global.css (.rpg-modal-*) */
 
 .help-language-toggle {
   display: flex;
@@ -47,16 +23,11 @@
   background: rgba(255, 215, 0, 0.1);
 }
 
-.help-close-wrapper {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-}
-
 .help-content {
   padding: 1rem;
   overflow-y: auto;
   max-height: calc(80vh - 80px);
+  color: #5a4a3a;
 }
 
 .help-section {
@@ -66,10 +37,18 @@
 .help-section h3 {
   margin: 0 0 0.5rem 0;
   font-size: 1.1rem;
+  color: #4a3a2a;
+  font-weight: 700;
 }
 
 .help-section p {
   margin: 0.25rem 0;
   font-size: 0.9rem;
   line-height: 1.4;
+  color: #5a4a3a;
+}
+
+.help-section strong {
+  color: #3a2a1a;
+  font-weight: 600;
 }

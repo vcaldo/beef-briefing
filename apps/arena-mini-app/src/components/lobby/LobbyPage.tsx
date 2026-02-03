@@ -13,7 +13,7 @@ import { useState, useCallback, useRef } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { Avatar } from '@beef-briefing/shared-mini-app/components'
-import { LoadingSpinner, CountdownTimer, ErrorBanner, HelpButton, HelpModal } from '../common'
+import { LoadingSpinner, CountdownTimer, ErrorBanner } from '../common'
 import { GameButton, RPGPanel } from '../ui'
 import { usePolling, useErrorBanner, usePageBackground } from '../../hooks'
 import { useSoundContext } from '../../contexts'
@@ -50,7 +50,6 @@ export function LobbyPage({
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null) // 'join' | 'leave' | 'start'
-  const [showHelp, setShowHelp] = useState(false)
 
   // Error banner with auto-dismiss
   const { error, showError, clearError } = useErrorBanner()
@@ -369,9 +368,6 @@ export function LobbyPage({
 
   return (
     <div className="lobby-page rpg-lobby-page page-bg page-bg--splash">
-      {/* Help button */}
-      <HelpButton onClick={() => setShowHelp(true)} />
-
       {/* Error banner */}
       {error && (
         <ErrorBanner
@@ -585,8 +581,6 @@ export function LobbyPage({
         </section>
       )}
 
-      {/* Help modal */}
-      {showHelp && <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />}
     </div>
   )
 }

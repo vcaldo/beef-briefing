@@ -4648,10 +4648,10 @@ a:focus:not(:focus-visible),
 }
 
 /* =============================================================================
-   Battle Log Modal (History View)
+   Generic RPG Modal (used for Help, Battle Log, etc.)
    ============================================================================= */
 
-.rpg-battlelog-modal-backdrop {
+.rpg-modal-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.8);
@@ -4664,33 +4664,37 @@ a:focus:not(:focus-visible),
   backdrop-filter: blur(4px);
 }
 
-.rpg-battlelog-modal-wrapper {
+.rpg-modal-wrapper {
   width: 100%;
   max-width: 400px;
   max-height: 80vh;
   animation: slideUp 0.3s ease-out;
 }
 
-.rpg-battlelog-modal-outer {
+.rpg-modal-outer {
   position: relative;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
 }
 
-.rpg-battlelog-close-wrapper {
+.rpg-modal-close-wrapper {
   position: absolute;
   top: 8px;
   right: 8px;
   z-index: 10;
 }
 
-.rpg-battlelog-loading {
+.rpg-modal-loading {
   padding: 48px 20px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
+/* =============================================================================
+   Battle Log Modal (content-specific styles)
+   ============================================================================= */
 
 /* Static battle log - all events visible, no animation */
 .rpg-battlelog-static {

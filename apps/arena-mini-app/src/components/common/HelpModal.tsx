@@ -21,35 +21,37 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
   if (!isOpen) return null
 
   return (
-    <div className="help-modal-backdrop" onClick={onClose}>
-      <div className="help-modal-wrapper" onClick={(e) => e.stopPropagation()}>
-        <RPGPanel variant="outer" className="help-modal-outer">
+    <div className="rpg-modal-backdrop" onClick={onClose}>
+      <div className="rpg-modal-wrapper" onClick={(e) => e.stopPropagation()}>
+        <RPGPanel variant="outer" className="rpg-modal-outer">
           {/* Close button */}
-          <div className="help-close-wrapper">
+          <div className="rpg-modal-close-wrapper">
             <GameButton variant="danger" size="sm" shape="square" onClick={onClose}>
               ×
             </GameButton>
           </div>
 
-          {/* Content */}
-          <div className="help-content">
-            {/* Language toggle */}
-            <div className="help-language-toggle">
-              <button
-                className={`lang-btn ${language === 'pt' ? 'active' : ''}`}
-                onClick={() => setLanguage('pt')}
-              >
-                🇵🇹
-              </button>
-              <button
-                className={`lang-btn ${language === 'en' ? 'active' : ''}`}
-                onClick={() => setLanguage('en')}
-              >
-                🇯🇲
-              </button>
+          {/* Content - wrapped in inner panel */}
+          <RPGPanel variant="inner" className="rpg-modal-inner">
+            <div className="help-content">
+              {/* Language toggle */}
+              <div className="help-language-toggle">
+                <button
+                  className={`lang-btn ${language === 'pt' ? 'active' : ''}`}
+                  onClick={() => setLanguage('pt')}
+                >
+                  🇵🇹
+                </button>
+                <button
+                  className={`lang-btn ${language === 'en' ? 'active' : ''}`}
+                  onClick={() => setLanguage('en')}
+                >
+                  🇯🇲
+                </button>
+              </div>
+              {language === 'en' ? <HelpContentEN /> : <HelpContentPT />}
             </div>
-            {language === 'en' ? <HelpContentEN /> : <HelpContentPT />}
-          </div>
+          </RPGPanel>
         </RPGPanel>
       </div>
     </div>

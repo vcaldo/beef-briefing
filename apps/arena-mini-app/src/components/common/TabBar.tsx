@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import type { TabId } from '../../types'
 import { SoundSettings } from './SoundSettings'
 import { PlaybackControls } from './PlaybackControls'
+import { HelpModal } from './HelpModal'
 import { GameButton } from '../ui/GameButton'
 
 interface Tab {
@@ -95,6 +97,24 @@ const StatsIcon = () => (
   </svg>
 )
 
+const HelpIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {/* Question mark in circle icon */}
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+)
+
 /**
  * Tab configuration for arena mini-app navigation
  * 2 tabs: Lobby, Stats
@@ -138,6 +158,8 @@ interface TabBarProps {
  * Uses CSS classes from global.css for styling.
  */
 export function TabBar({ activeTab, onTabChange, battlePlayback }: TabBarProps) {
+  const [showHelp, setShowHelp] = useState(false)
+
   const handleTabClick = (tabId: TabId) => {
     onTabChange(tabId)
   }
@@ -147,39 +169,55 @@ export function TabBar({ activeTab, onTabChange, battlePlayback }: TabBarProps) 
   const isLobbyDisabled = Boolean(battlePlayback && battlePlayback.canNavigateAway !== true)
 
   return (
-    <nav className="tab-bar" role="navigation" aria-label="Main navigation">
-      {TABS.map((tab) => {
-        const isActive = activeTab === tab.id
-        const isDisabled = tab.id === 'lobby' && isLobbyDisabled
+    <>
+      <nav className="tab-bar" role="navigation" aria-label="Main navigation">
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.id
+          const isDisabled = tab.id === 'lobby' && isLobbyDisabled
 
-        return (
-          <GameButton
-            key={tab.id}
-            variant={isActive ? 'primary' : 'neutral'}
-            shape="square"
-            size="lg"
-            className={`tab-item-game ${isActive ? 'active' : ''}`}
-            onClick={() => handleTabClick(tab.id)}
-            disabled={isDisabled}
-            aria-current={isActive ? 'page' : undefined}
-            aria-label={tab.label}
-          >
-            <span className="tab-icon">{tab.icon}</span>
-            <span className="tab-label">{tab.label}</span>
-          </GameButton>
-        )
-      })}
-      {battlePlayback && (
-        <PlaybackControls
-          isPlaying={battlePlayback.isPlaying}
-          onPlayPause={battlePlayback.onPlayPause}
-          speedIndex={battlePlayback.speedIndex}
-          onCycleSpeed={battlePlayback.onCycleSpeed}
-          isComplete={battlePlayback.isComplete}
-          onReplay={battlePlayback.onReplay}
-        />
-      )}
-      <SoundSettings />
-    </nav>
+          return (
+            <GameButton
+              key={tab.id}
+              variant={isActive ? 'primary' : 'neutral'}
+              shape="square"
+              size="lg"
+              className={`tab-item-game ${isActive ? 'active' : ''}`}
+              onClick={() => handleTabClick(tab.id)}
+              disabled={isDisabled}
+              aria-current={isActive ? 'page' : undefined}
+              aria-label={tab.label}
+            >
+              <span className="tab-icon">{tab.icon}</span>
+              <span className="tab-label">{tab.label}</span>
+            </GameButton>
+          )
+        })}
+        {/* Help button */}
+        <GameButton
+          variant="neutral"
+          shape="square"
+          size="lg"
+          className="tab-item-game"
+          onClick={() => setShowHelp(true)}
+          aria-label="Help"
+        >
+          <span className="tab-icon"><HelpIcon /></span>
+          <span className="tab-label">Help</span>
+        </GameButton>
+        {battlePlayback && (
+          <PlaybackControls
+            isPlaying={battlePlayback.isPlaying}
+            onPlayPause={battlePlayback.onPlayPause}
+            speedIndex={battlePlayback.speedIndex}
+            onCycleSpeed={battlePlayback.onCycleSpeed}
+            isComplete={battlePlayback.isComplete}
+            onReplay={battlePlayback.onReplay}
+          />
+        )}
+        <SoundSettings />
+      </nav>
+      {/* Help modal */}
+      {showHelp && <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />}
+    </>
   )
 }

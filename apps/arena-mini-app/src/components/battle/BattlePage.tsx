@@ -13,7 +13,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction } from '@beef-briefing/shared-mini-app/monitoring'
-import { LoadingSpinner, ErrorDisplay } from '../common'
+import { LoadingSpinner, ErrorDisplay, HelpButton, HelpModal } from '../common'
 import { RPGPanel, GameButton } from '../ui'
 import { CompactCard } from '../common/CompactCard'
 import { BattleEffect } from './BattleEffect'
@@ -77,6 +77,9 @@ export function BattlePage({
   const [showVictory, setShowVictory] = useState(false)
   // Track if user has manually dismissed the victory modal (prevents auto-reopen)
   const [victoryDismissed, setVictoryDismissed] = useState(false)
+
+  // Help modal state
+  const [showHelp, setShowHelp] = useState(false)
 
   // Sound context for battle audio
   const { play: playSound, preloadCategory } = useSoundContext()
@@ -465,6 +468,9 @@ export function BattlePage({
         '--arena-transition-duration': `${(PLAYBACK_SPEEDS[speedIndex].value / 1000) * 400}ms`,
       } as React.CSSProperties}
     >
+      {/* Help button - only show when battle is complete */}
+      {(isComplete || showVictory) && <HelpButton onClick={() => setShowHelp(true)} />}
+
       {/* Team B Deck - Upper Left */}
       <div
         ref={deckRefB}
@@ -726,6 +732,9 @@ export function BattlePage({
           </RPGPanel>
         </div>
       )}
+
+      {/* Help modal */}
+      {showHelp && <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />}
     </div>
   )
 }

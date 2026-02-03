@@ -49,7 +49,7 @@ export function LobbyPage({
   // Local state
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState<string | null>(null) // 'create' | 'join' | 'leave' | 'start'
+  const [actionLoading, setActionLoading] = useState<string | null>(null) // 'join' | 'leave' | 'start'
   const [showHelp, setShowHelp] = useState(false)
 
   // Error banner with auto-dismiss
@@ -279,27 +279,6 @@ export function LobbyPage({
     onError: handleMatchDetailsError,
   })
 
-  // Create new match
-  const handleCreateMatch = useCallback(async () => {
-    ensureAudioUnlocked()
-    setActionLoading('create')
-    try {
-      const match = await apiClient.createMatch(chatId)
-      play('arena_lobby_create')
-      addPageAction('match_created', { match_id: match.id })
-      onMatchChange(match)
-      // usePolling will automatically refresh the list on next interval
-    } catch (err) {
-      console.error('Failed to create match:', err)
-      showError(err, 'Failed to create match')
-      if (err instanceof Error) {
-        noticeError(err, { context: 'create_match' })
-      }
-    } finally {
-      setActionLoading(null)
-    }
-  }, [chatId, onMatchChange, showError, ensureAudioUnlocked, play])
-
   // Join match
   const handleJoinMatch = useCallback(
     async (matchId: string) => {
@@ -511,20 +490,15 @@ export function LobbyPage({
                     <p className="rpg-lobby-subtitle">Welcome, {firstName}</p>
                     <img src={logoUrl} alt="Arena" className="rpg-empty-icon" />
                     <h3 className="rpg-empty-title">No Active Matches</h3>
-                    <p className="rpg-empty-hint">Create a new match to challenge your friends!</p>
+                    <p className="rpg-empty-hint">
+                      To create a new casual match, use the <code>/match</code> command in the chat.
+                    </p>
+                    <p className="rpg-empty-hint" style={{ marginTop: '4px' }}>
+                      You can join matches from this lobby once they're created.
+                    </p>
                   </div>
                 </RPGPanel>
               </RPGPanel>
-              <div className="rpg-match-card-actions">
-                <GameButton
-                  variant="primary"
-                  size="lg"
-                  onClick={handleCreateMatch}
-                  disabled={actionLoading !== null}
-                >
-                  {actionLoading === 'create' ? <LoadingSpinner size="sm" inline /> : 'Create Match'}
-                </GameButton>
-              </div>
             </>
           ) : (
             <div className="match-list">

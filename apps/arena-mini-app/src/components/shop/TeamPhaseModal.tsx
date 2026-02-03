@@ -20,7 +20,7 @@ import type {
   GameConstants,
   UpgradeType,
 } from '../../types'
-import { CountdownTimer, LoadingSpinner } from '../common'
+import { CountdownTimer, LoadingSpinner, HelpButton, HelpModal } from '../common'
 import { CompactCard } from '../common/CompactCard'
 import { apiClient } from '../../api/client'
 import { usePolling } from '../../hooks'
@@ -48,6 +48,8 @@ export function TeamPhaseModal({
   // Sound context
   const { play, playSequence } = useSoundContext()
 
+  // Help modal state
+  const [showHelp, setShowHelp] = useState(false)
 
   // Derived state
   const coins = shopData?.coins ?? 0
@@ -213,6 +215,7 @@ export function TeamPhaseModal({
 
   return (
     <div className="team-phase-page rpg-team-page">
+      <HelpButton onClick={() => setShowHelp(true)} />
       <RPGPanel variant="outer" className="rpg-team-modal-outer">
         {/* Header with button, timer, and coins */}
         <RPGPanel variant="inner" className="rpg-team-modal-header">
@@ -357,6 +360,7 @@ export function TeamPhaseModal({
             )}
         </RPGPanel>
       </RPGPanel>
+      {showHelp && <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />}
     </div>
   )
 }

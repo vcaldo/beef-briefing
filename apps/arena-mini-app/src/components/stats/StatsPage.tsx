@@ -15,7 +15,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiClient } from '../../api/client'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
 import { Avatar } from '@beef-briefing/shared-mini-app/components'
-import { LoadingSpinner } from '../common'
+import { LoadingSpinner, HelpButton, HelpModal } from '../common'
 import { RPGPanel, GameButton } from '../ui'
 import { BattleLog } from '../battle/BattleLog'
 import { usePageBackground } from '../../hooks'
@@ -42,6 +42,9 @@ interface StatsPageProps {
 export function StatsPage({ chatId, userId }: StatsPageProps) {
   // Sub-tab state
   const [activeSubTab, setActiveSubTab] = useState<StatsSubTab>('leaderboard')
+
+  // Help modal state
+  const [showHelp, setShowHelp] = useState(false)
 
   // Leaderboard state
   const [leaderboardType, setLeaderboardType] = useState<'ranked' | 'regular'>('regular')
@@ -865,6 +868,7 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
   return (
     <div className="stats-page rpg-stats-page page-bg page-bg--splash">
+      <HelpButton onClick={() => setShowHelp(true)} />
       {/* Sub-tabs */}
       <nav className="stats-tabs-rpg" role="tablist">
         <GameButton
@@ -920,6 +924,9 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
       {/* Battle Log Modal */}
       {renderBattleLogModal()}
+
+      {/* Help Modal */}
+      {showHelp && <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />}
     </div>
   )
 }

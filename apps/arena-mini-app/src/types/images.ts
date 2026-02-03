@@ -42,6 +42,8 @@ export type IconImageId =
   | 'arrow_right_board'
   // Battle UI icons
   | 'vs'
+  // Help icon
+  | 'pentagon_question'
 
 // Effect image IDs (including explosion frames)
 export type EffectImageId =
@@ -128,6 +130,8 @@ export const IMAGE_CONFIGS: Record<ImageId, ImageConfig> = {
   arrow_right_board: { category: 'icons', filename: 'arrow_right_board', width: 64, height: 64 },
   // Battle UI icons
   vs: { category: 'icons', filename: 'vs', width: 64, height: 64 },
+  // Help icon
+  pentagon_question: { category: 'icons', filename: 'pentagon_question', width: 64, height: 64 },
 
   // Effects (flame and magic - 512x512 pixels)
   flame_01: { category: 'effects', filename: 'flame_01', width: 512, height: 512 },

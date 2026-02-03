@@ -2,37 +2,31 @@ export function HelpContentEN() {
   return (
     <>
       <section className="help-section">
-        <h3>🎮 Game Basics</h3>
-        <p><strong>Rounds:</strong> In each round, all cards from both teams attack simultaneously.</p>
-        <p><strong>Attack:</strong> Each card deals damage equal to its ATK stat to the opposing card.</p>
+        <h3>🎯 How to Play</h3>
+        <p>The game has two phases: <strong>Shop</strong> then <strong>Battle</strong>.</p>
+        <p>You start with <strong>10 coins</strong>. Build a team of 3 cards, then fight!</p>
       </section>
 
       <section className="help-section">
         <h3>🛒 Shop Phase</h3>
-        <p><strong>Buying:</strong> Spend coins to add cards to your team (max 3 cards).</p>
-        <p><strong>Re-roll:</strong> Refresh the shop for new cards (costs coins, free on first roll).</p>
-        <p><strong>Upgrades:</strong> Boost a card's ATK or HP permanently.</p>
-      </section>
-
-      <section className="help-section">
-        <h3>⚔️ Team Formation</h3>
-        <p><strong>Composition:</strong> Build a team of 3 cards.</p>
-        <p><strong>Order:</strong> Set the order your cards will fight in combat.</p>
+        <p><strong>Buy cards:</strong> 3 coins each. You need exactly 3 cards to battle.</p>
+        <p><strong>Upgrades:</strong> 1 coin for +1 ATK or +3 HP.</p>
+        <p><strong>Reroll:</strong> 1 coin to refresh shop. Only once per match!</p>
+        <p><strong>Card order:</strong> Drag to set the order they'll fight.</p>
       </section>
 
       <section className="help-section">
         <h3>🏟️ Battle Phase</h3>
-        <p><strong>Resolution:</strong> Cards fight 1v1 in order until one team is eliminated.</p>
-        <p><strong>Simultaneous:</strong> Both cards attack at the same time each round.</p>
-        <p><strong>Victory:</strong> Win by eliminating all opponent cards.</p>
-        <p><strong>Draw:</strong> If both final cards die simultaneously.</p>
+        <p><strong>1v1 combat:</strong> Cards fight in order. Both attack simultaneously each round.</p>
+        <p><strong>Survivor:</strong> The winning card faces the next opponent.</p>
+        <p><strong>Victory:</strong> Eliminate all 3 enemy cards to win.</p>
+        <p><strong>Draw:</strong> If both final cards die together.</p>
       </section>
 
       <section className="help-section">
         <h3>🏆 Ranked Matches</h3>
-        <p><strong>Differences:</strong> Ranked matches affect your global ranking.</p>
-        <p><strong>Rating:</strong> Win to climb the leaderboard, lose to drop.</p>
-        <p><strong>Tournaments:</strong> Special ranked events with prizes.</p>
+        <p><strong>Daily tournaments:</strong> Ranked matches start at 18:00.</p>
+        <p><strong>Leaderboard:</strong> Wins affect your global ranking.</p>
       </section>
     </>
   )
@@ -42,37 +36,31 @@ export function HelpContentPT() {
   return (
     <>
       <section className="help-section">
-        <h3>🎮 Básico do Jogo</h3>
-        <p><strong>Rodadas:</strong> Em cada rodada, todas as cartas de ambos os times atacam simultaneamente.</p>
-        <p><strong>Ataque:</strong> Cada carta causa dano igual ao seu ATK na carta adversária.</p>
+        <h3>🎯 Como Jogar</h3>
+        <p>O jogo tem duas fases: <strong>Loja</strong> e depois <strong>Batalha</strong>.</p>
+        <p>Você começa com <strong>10 moedas</strong>. Monte um time de 3 cartas e lute!</p>
       </section>
 
       <section className="help-section">
         <h3>🛒 Fase de Loja</h3>
-        <p><strong>Compras:</strong> Gaste moedas para adicionar cartas ao seu time (máximo 3).</p>
-        <p><strong>Re-roll:</strong> Atualize a loja para novas cartas (custa moedas, grátis na primeira).</p>
-        <p><strong>Upgrades:</strong> Aumente o ATK ou HP de uma carta permanentemente.</p>
-      </section>
-
-      <section className="help-section">
-        <h3>⚔️ Formação do Time</h3>
-        <p><strong>Composição:</strong> Monte um time de 3 cartas.</p>
-        <p><strong>Ordem:</strong> Defina a ordem em que suas cartas lutarão.</p>
+        <p><strong>Comprar cartas:</strong> 3 moedas cada. Você precisa de exatamente 3 cartas.</p>
+        <p><strong>Upgrades:</strong> 1 moeda para +1 ATK ou +3 HP.</p>
+        <p><strong>Reroll:</strong> 1 moeda para atualizar a loja. Só uma vez por partida!</p>
+        <p><strong>Ordem das cartas:</strong> Arraste para definir a ordem de luta.</p>
       </section>
 
       <section className="help-section">
         <h3>🏟️ Fase de Batalha</h3>
-        <p><strong>Resolução:</strong> Cartas lutam 1v1 em ordem até um time ser eliminado.</p>
-        <p><strong>Simultâneo:</strong> Ambas as cartas atacam ao mesmo tempo em cada rodada.</p>
-        <p><strong>Vitória:</strong> Vença eliminando todas as cartas adversárias.</p>
-        <p><strong>Empate:</strong> Se ambas as cartas finais morrerem simultaneamente.</p>
+        <p><strong>Combate 1v1:</strong> Cartas lutam em ordem. Ambas atacam simultaneamente.</p>
+        <p><strong>Sobrevivente:</strong> A carta vencedora enfrenta o próximo oponente.</p>
+        <p><strong>Vitória:</strong> Elimine todas as 3 cartas inimigas para vencer.</p>
+        <p><strong>Empate:</strong> Se ambas as cartas finais morrerem juntas.</p>
       </section>
 
       <section className="help-section">
         <h3>🏆 Partidas Ranqueadas</h3>
-        <p><strong>Diferenças:</strong> Partidas ranqueadas afetam seu ranking global.</p>
-        <p><strong>Rating:</strong> Vença para subir no ranking, perca para descer.</p>
-        <p><strong>Torneios:</strong> Eventos especiais com prêmios.</p>
+        <p><strong>Torneios diários:</strong> Partidas ranqueadas começam às 18:00.</p>
+        <p><strong>Placar:</strong> Vitórias afetam seu ranking global.</p>
       </section>
     </>
   )

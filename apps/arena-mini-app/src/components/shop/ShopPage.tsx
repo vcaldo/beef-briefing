@@ -14,7 +14,7 @@ import { apiClient } from '../../api/client'
 import { preloadBattleAssets } from '../../utils/assetPreloader'
 import { useSoundContext } from '../../contexts'
 import { addPageAction, noticeError } from '@beef-briefing/shared-mini-app/monitoring'
-import { LoadingSpinner, CountdownTimer, ErrorBanner, CompactCard } from '../common'
+import { LoadingSpinner, CountdownTimer, ErrorBanner, CompactCard, HelpButton, HelpModal } from '../common'
 import { GameButton, CoinDisplay, CardSlot, RPGPanel } from '../ui'
 import { usePolling, useErrorBanner, usePageBackground } from '../../hooks'
 import TeamPhaseModal from './TeamPhaseModal'
@@ -66,6 +66,7 @@ export function ShopPage({
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null) // 'buy' | 'reroll'
   const [isTeamPhase, setIsTeamPhase] = useState(false) // Team phase modal state
+  const [showHelp, setShowHelp] = useState(false)
 
   // Error banner with auto-dismiss
   const { error, showError, clearError } = useErrorBanner()
@@ -318,6 +319,7 @@ export function ShopPage({
 
   return (
     <div className="shop-page rpg-shop-page page-bg page-bg--splash">
+      <HelpButton onClick={() => setShowHelp(true)} />
       <RPGPanel variant="outer" className="rpg-shop-outer">
         {/* Header with button, timer, and coins */}
         <RPGPanel variant="inner" className="rpg-shop-header">
@@ -495,6 +497,7 @@ export function ShopPage({
         )}
 
       </RPGPanel>
+      {showHelp && <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />}
     </div>
   )
 }

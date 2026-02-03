@@ -27,6 +27,7 @@
   padding: 1rem;
   overflow-y: auto;
   max-height: calc(80vh - 80px);
+  color: #5a4a3a;
 }
 
 .help-section {
@@ -36,10 +37,18 @@
 .help-section h3 {
   margin: 0 0 0.5rem 0;
   font-size: 1.1rem;
+  color: #4a3a2a;
+  font-weight: 700;
 }
 
 .help-section p {
   margin: 0.25rem 0;
   font-size: 0.9rem;
   line-height: 1.4;
+  color: #5a4a3a;
+}
+
+.help-section strong {
+  color: #3a2a1a;
+  font-weight: 600;
 }

@@ -164,16 +164,16 @@ export function TabBar({ activeTab, onTabChange, battlePlayback }: TabBarProps) 
     onTabChange(tabId)
   }
 
-  // Disable Lobby tab during battle until battle has played through once
+  // Disable Lobby and Stats tabs during battle until battle has played through once
   // Use explicit check for `!== true` to safely handle undefined values
-  const isLobbyDisabled = Boolean(battlePlayback && battlePlayback.canNavigateAway !== true)
+  const isBattleNavigationDisabled = Boolean(battlePlayback && battlePlayback.canNavigateAway !== true)
 
   return (
     <>
       <nav className="tab-bar" role="navigation" aria-label="Main navigation">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id
-          const isDisabled = tab.id === 'lobby' && isLobbyDisabled
+          const isDisabled = (tab.id === 'lobby' || tab.id === 'stats') && isBattleNavigationDisabled
 
           return (
             <GameButton
@@ -204,6 +204,7 @@ export function TabBar({ activeTab, onTabChange, battlePlayback }: TabBarProps) 
           <span className="tab-icon"><HelpIcon /></span>
           <span className="tab-label">Help</span>
         </GameButton>
+        <SoundSettings />
         {battlePlayback && (
           <PlaybackControls
             isPlaying={battlePlayback.isPlaying}
@@ -214,7 +215,6 @@ export function TabBar({ activeTab, onTabChange, battlePlayback }: TabBarProps) 
             onReplay={battlePlayback.onReplay}
           />
         )}
-        <SoundSettings />
       </nav>
       {/* Help modal */}
       {showHelp && <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />}

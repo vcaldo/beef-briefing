@@ -84,6 +84,18 @@ export function PlaybackControls({
 
   return (
     <div className="playback-controls">
+      <GameButton
+        variant="neutral"
+        shape="square"
+        size="lg"
+        className="tab-item-game playback-btn"
+        onClick={onCycleSpeed}
+        aria-label={`Speed: ${SPEED_LABELS[speedIndex]}`}
+      >
+        <span className="tab-icon speed-icon">{SPEED_LABELS[speedIndex]}</span>
+        <span className="tab-label">Speed</span>
+      </GameButton>
+
       {showReplay ? (
         <GameButton
           variant="primary"
@@ -113,18 +125,6 @@ export function PlaybackControls({
           <span className="tab-label">{isPlaying ? 'Pause' : 'Play'}</span>
         </GameButton>
       )}
-
-      <GameButton
-        variant="neutral"
-        shape="square"
-        size="lg"
-        className="tab-item-game playback-btn"
-        onClick={onCycleSpeed}
-        aria-label={`Speed: ${SPEED_LABELS[speedIndex]}`}
-      >
-        <span className="tab-icon speed-icon">{SPEED_LABELS[speedIndex]}</span>
-        <span className="tab-label">Speed</span>
-      </GameButton>
     </div>
   )
 }

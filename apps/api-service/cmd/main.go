@@ -388,6 +388,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 			protected.HandleFunc("/arena/match/{id}/order", arenaHandler.HandleSetOrder).Methods("POST", "OPTIONS")
 			protected.HandleFunc("/arena/match/{id}/team", arenaHandler.HandleSubmitTeam).Methods("POST", "OPTIONS")
 			protected.HandleFunc("/arena/match/{id}/battle", arenaHandler.HandleGetBattle).Methods("GET", "OPTIONS")
+			protected.HandleFunc("/arena/match/{id}/battle/round/{round_number}", arenaHandler.HandleGetRoundBattle).Methods("GET", "OPTIONS")
 			protected.HandleFunc("/arena/match/{id}/share", arenaHandler.HandleShareResult).Methods("POST", "OPTIONS")
 			protected.HandleFunc("/arena/leaderboard", arenaHandler.HandleGetLeaderboard).Methods("GET", "OPTIONS")
 			protected.HandleFunc("/arena/history", arenaHandler.HandleGetHistory).Methods("GET", "OPTIONS")

@@ -153,8 +153,10 @@ const (
 type MatchFormat string
 
 const (
-	MatchFormat1v1   MatchFormat = "1v1"
-	MatchFormatArena MatchFormat = "arena"
+	MatchFormat1v1       MatchFormat = "1v1"
+	MatchFormatArena     MatchFormat = "arena"
+	MatchFormatBracket   MatchFormat = "bracket"
+	MatchFormatFreeForAll MatchFormat = "free_for_all"
 )
 
 // MatchStatus enum

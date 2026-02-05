@@ -316,6 +316,16 @@ class ArenaApiClient extends BaseApiClient {
   }
 
   /**
+   * Get battle data for a specific round (for animated replay).
+   * GET /api/v1/mini-app/arena/match/{id}/battle/round/{round_number}
+   */
+  async getRoundBattle(matchId: string, roundNumber: number): Promise<BattleResult> {
+    return this.request<BattleResult>(
+      `/api/v1/mini-app/arena/match/${matchId}/battle/round/${roundNumber}`
+    )
+  }
+
+  /**
    * Get leaderboard for a chat.
    * GET /api/v1/mini-app/arena/leaderboard?chat_id=X&type=ranked&limit=50&offset=0
    */

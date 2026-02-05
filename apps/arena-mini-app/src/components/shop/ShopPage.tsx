@@ -381,7 +381,7 @@ export function ShopPage({
             {/* Reroll row with hint text and button */}
             <div className="rpg-shop-reroll-row">
               <span className="rpg-shop-reroll-hint">
-                You can only reroll once
+                💡Once per round, before purchases only. Costs coins needed for upgrades!
               </span>
               <GameButton
                 variant="primary"

@@ -11,7 +11,7 @@ export function HelpContentEN() {
         <h3>🛒 Shop Phase</h3>
         <p><strong>Buy cards:</strong> 3 coins each. You need exactly 3 cards to battle.</p>
         <p><strong>Upgrades:</strong> 1 coin for +1 ATK or +3 HP.</p>
-        <p><strong>Reroll:</strong> 1 coin to refresh shop. Only once per match!</p>
+        <p><strong>💡Reroll:</strong> Once per round, before purchases only. Costs coins needed for upgrades!</p>
         <p><strong>Card order:</strong> Drag to set the order they'll fight.</p>
       </section>
 
@@ -45,7 +45,7 @@ export function HelpContentPT() {
         <h3>🛒 Fase de Loja</h3>
         <p><strong>Comprar cartas:</strong> 3 moedas cada. Você precisa de exatamente 3 cartas.</p>
         <p><strong>Upgrades:</strong> 1 moeda para +1 ATK ou +3 HP.</p>
-        <p><strong>Reroll:</strong> 1 moeda para atualizar a loja. Só uma vez por partida!</p>
+        <p><strong>💡Reroll:</strong> Once per round, before purchases only. Costs coins needed for upgrades!</p>
         <p><strong>Ordem das cartas:</strong> Arraste para definir a ordem de luta.</p>
       </section>
 

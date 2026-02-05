@@ -5756,11 +5756,9 @@ button,
   gap: 12px;
 }
 
-.rpg-shop-reroll-hint {
-  font-size: 12px;
-  font-weight: 600;
-  font-style: italic;
-  color: #5a6a3a;
+.rpg-shop-reroll-strategy-hint {
+  margin-top: 0;
+  margin-bottom: 8px;
 }
 
 .rpg-shop-section-header {

@@ -378,11 +378,14 @@ export function ShopPage({
         {/* Shop cards grid - only show if not submitted */}
         {!isSubmitted && (
           <RPGPanel variant="inner" className="rpg-shop-cards-panel">
-            {/* Reroll row with hint text and button */}
+            {/* Reroll hint */}
+            <div className="rpg-team-strategy-hint rpg-shop-reroll-strategy-hint">
+              <span className="rpg-team-strategy-hint-icon">💡</span>
+              <span>Reroll: Once per round, before purchases only. Costs coins needed for upgrades!</span>
+            </div>
+
+            {/* Reroll row with button */}
             <div className="rpg-shop-reroll-row">
-              <span className="rpg-shop-reroll-hint">
-                You can only reroll once
-              </span>
               <GameButton
                 variant="primary"
                 shape="square"

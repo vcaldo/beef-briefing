@@ -415,7 +415,11 @@ func (s *ArenaService) StartMatch(ctx context.Context, matchID string, userID in
 	// Determine format based on participant count
 	format := repository.MatchFormat1v1
 	if count > 2 {
-		format = repository.MatchFormatArena
+		if count%2 == 0 {
+			format = repository.MatchFormatBracket
+		} else {
+			format = repository.MatchFormatFreeForAll
+		}
 	}
 
 	// Start shop phase (also sets format)
@@ -590,7 +594,11 @@ func (s *ArenaService) AutoStartMatch(ctx context.Context, matchID string) (*Aut
 	// Start the match - determine format based on participant count
 	format := repository.MatchFormat1v1
 	if participantCount > 2 {
-		format = repository.MatchFormatArena
+		if participantCount%2 == 0 {
+			format = repository.MatchFormatBracket
+		} else {
+			format = repository.MatchFormatFreeForAll
+		}
 	}
 
 	// Start shop phase

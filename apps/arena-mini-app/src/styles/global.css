@@ -6694,6 +6694,46 @@ button,
   text-align: center;
 }
 
+/* FFA replay result overlay (shown after battle animation completes) */
+.ffa-replay-result {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 200;
+  animation: fade-in 0.3s ease-out;
+}
+
+.ffa-replay-result-panel {
+  max-width: 320px;
+  width: 90%;
+  text-align: center;
+}
+
+.ffa-replay-result-content {
+  padding: 8px 0;
+}
+
+.ffa-replay-result-icon {
+  font-size: 36px;
+  margin-bottom: 4px;
+}
+
+.ffa-replay-result-content h3 {
+  font-size: 20px;
+  color: #f5e6d3;
+  margin: 4px 0;
+}
+
+.ffa-replay-result-stats {
+  font-size: 14px;
+  color: #c4a882;
+  margin: 4px 0 0;
+}
+
 /* App container */
 .app {
   min-height: 100vh;

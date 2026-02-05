@@ -6483,6 +6483,217 @@ button,
   margin: 4px 0 0;
 }
 
+/* ─── Free-For-All Page ──────────────────────────────────────────────────── */
+
+.ffa-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 8px;
+  padding-bottom: calc(var(--tab-bar-height) + 8px);
+  overflow-y: auto;
+  gap: 4px;
+}
+
+.ffa-page-header {
+  text-align: center;
+  padding: 8px 12px;
+}
+
+.ffa-page-header h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: #4a3a2a;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ffa-page-header p {
+  font-size: 12px;
+  color: #6a5a4a;
+  margin: 4px 0 0;
+}
+
+/* FFA round container */
+.ffa-round {
+  margin-bottom: 2px;
+}
+
+/* Individual FFA round card */
+.ffa-round-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+}
+
+.ffa-round-card-header {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4a3a2a;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ffa-round-card-players {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a3a2a;
+}
+
+.ffa-round-card-vs {
+  font-size: 11px;
+  font-weight: 700;
+  color: #8a7a6a;
+  text-transform: uppercase;
+}
+
+.ffa-round-card-player {
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.ffa-round-card-player.is-winner {
+  color: #3a6a2a;
+}
+
+.ffa-round-card-player.is-loser {
+  color: #8a7a6a;
+  opacity: 0.7;
+}
+
+.ffa-round-card-locked {
+  text-align: center;
+  font-size: 13px;
+  color: #8a7a6a;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.ffa-round-card-lock-icon {
+  margin-right: 4px;
+  font-size: 12px;
+}
+
+.ffa-round-card-result {
+  text-align: center;
+  font-size: 11px;
+  color: #6a5a4a;
+}
+
+.ffa-round-card-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* FFA champion celebration banner */
+.ffa-champion {
+  text-align: center;
+  padding: 12px;
+}
+
+.ffa-champion-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+  animation: bounce 0.6s ease infinite alternate;
+}
+
+.ffa-champion-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: #4a3a2a;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.ffa-champion-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #3a6a2a;
+  margin: 4px 0 0;
+}
+
+/* FFA standings table */
+.ffa-standings {
+  padding: 8px;
+}
+
+.ffa-standings-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #4a3a2a;
+  text-align: center;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.ffa-standing-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  font-size: 13px;
+  color: #4a3a2a;
+}
+
+.ffa-standing-row + .ffa-standing-row {
+  border-top: 1px solid rgba(90, 74, 58, 0.1);
+}
+
+.ffa-standing-rank {
+  font-weight: 700;
+  min-width: 28px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.ffa-standing-rank.rank-1 {
+  color: #DAA520;
+}
+
+.ffa-standing-rank.rank-2 {
+  color: #8a8a8a;
+}
+
+.ffa-standing-rank.rank-3 {
+  color: #CD7F32;
+}
+
+.ffa-standing-name {
+  flex: 1;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ffa-standing-stats {
+  font-size: 11px;
+  color: #6a5a4a;
+  white-space: nowrap;
+}
+
+.ffa-actions {
+  padding: 8px;
+  text-align: center;
+}
+
 /* App container */
 .app {
   min-height: 100vh;

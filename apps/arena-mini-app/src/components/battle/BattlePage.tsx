@@ -18,6 +18,8 @@ import { RPGPanel, GameButton } from '../ui'
 import { CompactCard } from '../common/CompactCard'
 import { BattleEffect } from './BattleEffect'
 import type { EffectPosition } from './BattleEffect'
+import { BracketBattlePage } from './BracketBattlePage'
+import { FreeForAllBattlePage } from './FreeForAllBattlePage'
 import { useBattleAnimation, getCardKey, usePageBackground, useVictoryParticles } from '../../hooks'
 import { useSoundContext } from '../../contexts'
 import { ANIMATION_DURATIONS } from '../../types'
@@ -388,6 +390,35 @@ export function BattlePage({
       </div>
     )
   }
+
+  // Branch by format — bracket and free_for_all get their own page components
+  if (battleData.format === 'bracket') {
+    return (
+      <BracketBattlePage
+        userId={userId}
+        activeMatch={activeMatch}
+        battleData={battleData}
+        gameConstants={_gameConstants}
+        onNavigateToLobby={onNavigateToLobby}
+        onMatchChange={onMatchChange}
+      />
+    )
+  }
+
+  if (battleData.format === 'free_for_all') {
+    return (
+      <FreeForAllBattlePage
+        userId={userId}
+        activeMatch={activeMatch}
+        battleData={battleData}
+        gameConstants={_gameConstants}
+        onNavigateToLobby={onNavigateToLobby}
+        onMatchChange={onMatchChange}
+      />
+    )
+  }
+
+  // 1v1 format — existing rendering below
 
   // Determine if current user is player A or B
   const isPlayerA = userId === battleData.player_a_id

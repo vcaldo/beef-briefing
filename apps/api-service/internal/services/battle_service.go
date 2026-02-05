@@ -126,8 +126,8 @@ func (s *BattleService) StartBattle(ctx context.Context, matchID string) (*Battl
 		return s.runBattle(ctx, matchID, participants[0], participants[1], 1)
 	}
 
-	// For arena format, run tournament bracket (simplified: round-robin for now)
-	return s.runArena(ctx, matchID, participants)
+	// For free-for-all format, run round-robin tournament
+	return s.runFreeForAll(ctx, matchID, participants)
 }
 
 // normalizeTeamOrder ensures the team order array matches the team size.
@@ -360,114 +360,195 @@ func (s *BattleService) runBattle(ctx context.Context, matchID string, pA, pB *r
 	}, nil
 }
 
-// runArena executes arena format with round-robin tournament bracket.
+// playerStats tracks in-memory stats for each participant during a free-for-all tournament.
+// This avoids reading from DB stats that may not be initialized yet (Bug 2 fix).
+type playerStats struct {
+	wins             int
+	losses           int
+	draws            int
+	totalDamageDealt int
+}
+
+// runFreeForAll executes free-for-all format with round-robin tournament.
 // Each participant faces every other participant. Winner is determined by:
 // 1. Most wins across all battles
 // 2. Total damage dealt (as tiebreaker if wins are equal)
 // 3. Lower user_id (deterministic tiebreaker if damage is tied)
-// Completes the match with the tournament winner.
-func (s *BattleService) runArena(ctx context.Context, matchID string, participants []*repository.ParticipantWithUser) (*BattleResponse, error) {
-	defer nrutil.StartSegment(ctx, "service:battle:run-arena")()
+//
+// Fixes over the previous runArena implementation:
+// - Bug 1 fix: Uses runSingleFight instead of runBattle, so CompleteMatch and
+//   leaderboard updates are not called prematurely after each round.
+// - Bug 2 fix: Tracks wins/losses/damage in-memory instead of reading from
+//   uninitialized DB stats.
+func (s *BattleService) runFreeForAll(ctx context.Context, matchID string, participants []*repository.ParticipantWithUser) (*BattleResponse, error) {
+	defer nrutil.StartSegment(ctx, "service:battle:run-free-for-all")()
+
+	// Build name lookup and in-memory stats tracking
+	nameMap := make(map[int64]string)
+	stats := make(map[int64]*playerStats)
+	for _, p := range participants {
+		name := p.FirstName
+		if name == "" {
+			name = p.Username
+		}
+		nameMap[p.UserID] = name
+		stats[p.UserID] = &playerStats{}
+	}
 
 	roundNumber := 0
+	var ffaRounds []FfaRoundSummary
 
-	// Round-robin: each player fights each other player
+	// Round-robin: each player fights each other player using runSingleFight (Bug 1 fix)
 	for i := 0; i < len(participants); i++ {
 		for j := i + 1; j < len(participants); j++ {
 			roundNumber++
-			_, err := s.runBattle(ctx, matchID, participants[i], participants[j], roundNumber)
+			fight, err := s.runSingleFight(ctx, matchID, participants[i], participants[j], roundNumber)
 			if err != nil {
 				return nil, err
 			}
+			result := fight.result
+
+			// Track stats in-memory (Bug 2 fix)
+			if result.WinnerID != nil {
+				if *result.WinnerID == fight.playerAID {
+					stats[fight.playerAID].wins++
+					stats[fight.playerBID].losses++
+				} else {
+					stats[fight.playerBID].wins++
+					stats[fight.playerAID].losses++
+				}
+			} else if result.IsDraw {
+				stats[fight.playerAID].draws++
+				stats[fight.playerBID].draws++
+			}
+			stats[fight.playerAID].totalDamageDealt += result.TeamADamage
+			stats[fight.playerBID].totalDamageDealt += result.TeamBDamage
+
+			// Build round summary for response
+			ffaRounds = append(ffaRounds, FfaRoundSummary{
+				RoundNumber: roundNumber,
+				PlayerAID:   fight.playerAID,
+				PlayerAName: fight.ownerNameA,
+				PlayerBID:   fight.playerBID,
+				PlayerBName: fight.ownerNameB,
+				WinnerID:    result.WinnerID,
+				IsDraw:      result.IsDraw,
+				PlayerADmg:  result.TeamADamage,
+				PlayerBDmg:  result.TeamBDamage,
+				NumRounds:   result.NumRounds,
+			})
 		}
 	}
 
-	// Determine winner by most wins, then total damage, then user_id (deterministic tiebreaker)
-	participants, _ = s.gameRepo.GetMatchParticipants(ctx, matchID)
-	var winner *repository.ParticipantWithUser
-	maxWins := -1
-	var maxDamage int
-	var tieBreakID int64 = 9223372036854775807 // math.MaxInt64
+	// Determine winner from in-memory stats (same priority: wins > damage > lower user_id)
+	type rankedPlayer struct {
+		userID           int64
+		wins             int
+		losses           int
+		draws            int
+		totalDamageDealt int
+	}
 
+	ranked := make([]rankedPlayer, 0, len(participants))
 	for _, p := range participants {
-		isNewLeader := false
+		s := stats[p.UserID]
+		ranked = append(ranked, rankedPlayer{
+			userID:           p.UserID,
+			wins:             s.wins,
+			losses:           s.losses,
+			draws:            s.draws,
+			totalDamageDealt: s.totalDamageDealt,
+		})
+	}
 
-		if p.Wins > maxWins {
-			// More wins always takes priority
-			isNewLeader = true
-		} else if p.Wins == maxWins {
-			// If tied on wins, check total damage
-			if p.TotalDamageDealt > maxDamage {
-				isNewLeader = true
-			} else if p.TotalDamageDealt == maxDamage && p.UserID < tieBreakID {
-				// If still tied on damage, use lower user_id (deterministic)
-				isNewLeader = true
+	// Sort by wins desc, then damage desc, then user_id asc
+	sort.Slice(ranked, func(i, j int) bool {
+		if ranked[i].wins != ranked[j].wins {
+			return ranked[i].wins > ranked[j].wins
+		}
+		if ranked[i].totalDamageDealt != ranked[j].totalDamageDealt {
+			return ranked[i].totalDamageDealt > ranked[j].totalDamageDealt
+		}
+		return ranked[i].userID < ranked[j].userID
+	})
+
+	// Build standings
+	standings := make([]ArenaStanding, len(ranked))
+	for i, r := range ranked {
+		photoURL := ""
+		for _, p := range participants {
+			if p.UserID == r.userID && p.PhotoURL != nil {
+				photoURL = *p.PhotoURL
+				break
 			}
 		}
-
-		if isNewLeader {
-			maxWins = p.Wins
-			maxDamage = p.TotalDamageDealt
-			tieBreakID = p.UserID
-			winner = p
+		standings[i] = ArenaStanding{
+			UserID:           r.userID,
+			Name:             nameMap[r.userID],
+			PhotoURL:         photoURL,
+			Rank:             i + 1,
+			Wins:             r.wins,
+			Losses:           r.losses,
+			Draws:            r.draws,
+			TotalDamageDealt: r.totalDamageDealt,
 		}
 	}
 
+	// Champion is the first in ranked order
 	var winnerID *int64
-	if winner != nil {
-		winnerID = &winner.UserID
+	if len(ranked) > 0 {
+		winnerID = &ranked[0].userID
 	}
 
+	// Update leaderboard ONCE per participant: champion=win, all others=loss
+	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match for leaderboard update: %w", err)
+	}
+	if match == nil {
+		return nil, fmt.Errorf("match not found for leaderboard update: %s", matchID)
+	}
+
+	for _, p := range participants {
+		isWin := winnerID != nil && p.UserID == *winnerID
+		s.gameRepo.UpdateLeaderboard(ctx, p.UserID, match.ChatID, match.MatchType, isWin, nil, false, false)
+	}
+
+	// Complete match ONCE with champion
 	s.gameRepo.CompleteMatch(ctx, matchID, winnerID)
 
 	// Notify bot to update message with winner
-	match, err := s.gameRepo.GetMatch(ctx, matchID)
 	if s.botClient != nil {
-		if err == nil && match != nil && match.TelegramMessageID != nil && *match.TelegramMessageID != 0 {
+		if match.TelegramMessageID != nil && *match.TelegramMessageID != 0 {
 			go s.botClient.NotifyParticipantChange(context.Background(), matchID, match.ChatID, *match.TelegramMessageID)
 		}
 
 		// Notify all participants via DM with tournament results
-		if err == nil && match != nil {
-			// Build ranked participant results
-			participantResults := make([]client.BattleParticipantResult, len(participants))
-			// Sort by wins desc, then damage desc, then user_id asc for ranking
-			sorted := make([]*repository.ParticipantWithUser, len(participants))
-			copy(sorted, participants)
-			sort.Slice(sorted, func(i, j int) bool {
-				if sorted[i].Wins != sorted[j].Wins {
-					return sorted[i].Wins > sorted[j].Wins
-				}
-				if sorted[i].TotalDamageDealt != sorted[j].TotalDamageDealt {
-					return sorted[i].TotalDamageDealt > sorted[j].TotalDamageDealt
-				}
-				return sorted[i].UserID < sorted[j].UserID
-			})
-			for i, p := range sorted {
-				participantResults[i] = client.BattleParticipantResult{
-					UserID:      p.UserID,
-					Name:        p.FirstName,
-					Wins:        p.Wins,
-					TotalDamage: p.TotalDamageDealt,
-					Rank:        i + 1,
-				}
+		participantResults := make([]client.BattleParticipantResult, len(ranked))
+		for i, r := range ranked {
+			participantResults[i] = client.BattleParticipantResult{
+				UserID:      r.userID,
+				Name:        nameMap[r.userID],
+				Wins:        r.wins,
+				TotalDamage: r.totalDamageDealt,
+				Rank:        i + 1,
 			}
-			go s.botClient.NotifyBattleComplete(context.Background(), &client.BattleResultNotification{
-				MatchID:      matchID,
-				ChatID:       match.ChatID,
-				MatchType:    string(match.MatchType),
-				Format:       "arena",
-				WinnerID:     winnerID,
-				NumRounds:    roundNumber,
-				Participants: participantResults,
-			})
 		}
+		go s.botClient.NotifyBattleComplete(context.Background(), &client.BattleResultNotification{
+			MatchID:      matchID,
+			ChatID:       match.ChatID,
+			MatchType:    string(match.MatchType),
+			Format:       "free_for_all",
+			WinnerID:     winnerID,
+			NumRounds:    roundNumber,
+			Participants: participantResults,
+		})
 	}
 
-	// Record arena completion metric
-	recordBattleCompletion(s.nrApp, matchID, "arena", winnerID, false, roundNumber, 0, 0)
+	// Record free-for-all completion metric
+	recordBattleCompletion(s.nrApp, matchID, "free_for_all", winnerID, false, roundNumber, 0, 0)
 
-	// Arena format returns summary response (no detailed battle events for replay)
+	// Free-for-all format returns summary response with standings and round summaries
 	return &BattleResponse{
 		MatchID:    matchID,
 		WinnerID:   winnerID,
@@ -476,6 +557,9 @@ func (s *BattleService) runArena(ctx context.Context, matchID string, participan
 		Events:     []battle.BattleEvent{},
 		NumCombats: 0,
 		NumRounds:  roundNumber,
+		Format:     "free_for_all",
+		Standings:  standings,
+		FfaRounds:  ffaRounds,
 	}, nil
 }
 

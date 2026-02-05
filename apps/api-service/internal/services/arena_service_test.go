@@ -2999,9 +2999,7 @@ func TestExecuteBattle_Arena(t *testing.T) {
 
 	// === Phase 8: Verify GetBattle works for arena participants ===
 
-	// GetBattle should work for all 3 participants
-	// Note: GetBattle returns the first round's result, not the overall match winner.
-	// Individual rounds can be draws even if the match has an overall winner.
+	// GetBattle should work for all 3 participants and return free_for_all summary
 	for _, userID := range []int64{testCreatorUserID, testJoinerUserID, testUser3ID} {
 		battleResp, err := svc.GetBattle(ctx, matchID, userID)
 		if err != nil {
@@ -3016,20 +3014,26 @@ func TestExecuteBattle_Arena(t *testing.T) {
 			t.Errorf("expected match_id %s for user %d, got %s", matchID, userID, battleResp.MatchID)
 		}
 
-		// GetBattle returns the first round's winner, which may be nil (draw)
-		// Verify that we got valid battle data (events, teams, etc.)
-		if len(battleResp.Events) == 0 {
-			t.Errorf("expected battle events for user %d", userID)
+		// Free-for-all GetBattle returns summary with standings and ffa_rounds
+		if battleResp.Format != "free_for_all" {
+			t.Errorf("expected format 'free_for_all' for user %d, got %q", userID, battleResp.Format)
 		}
-		if battleResp.NumRounds <= 0 {
-			t.Errorf("expected positive NumRounds for user %d, got %d", userID, battleResp.NumRounds)
+		if battleResp.NumRounds != len(rounds) {
+			t.Errorf("expected NumRounds=%d for user %d, got %d", len(rounds), userID, battleResp.NumRounds)
 		}
-
-		// Log round result for debugging
+		// Events/Combats are empty for summary response; individual rounds fetched via GetRoundBattle
+		if len(battleResp.Events) != 0 {
+			t.Errorf("expected empty Events for free_for_all summary for user %d, got %d", userID, len(battleResp.Events))
+		}
+		if len(battleResp.FfaRounds) != len(rounds) {
+			t.Errorf("expected %d ffa_rounds for user %d, got %d", len(rounds), userID, len(battleResp.FfaRounds))
+		}
+		if len(battleResp.Standings) != 3 {
+			t.Errorf("expected 3 standings for user %d, got %d", userID, len(battleResp.Standings))
+		}
+		// Winner should match the match winner
 		if battleResp.WinnerID != nil {
-			t.Logf("GetBattle for user %d: round winner %d", userID, *battleResp.WinnerID)
-		} else {
-			t.Logf("GetBattle for user %d: round was a draw", userID)
+			t.Logf("GetBattle for user %d: match winner %d", userID, *battleResp.WinnerID)
 		}
 	}
 

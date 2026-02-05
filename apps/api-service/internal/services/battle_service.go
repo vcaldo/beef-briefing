@@ -830,9 +830,45 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 		}, nil
 	}
 
-	// Get the first round (for 1v1 matches, there's only one round)
-	round := rounds[0]
+	// Get participant names and photo URLs
+	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participants: %w", err)
+	}
 
+	nameMap := make(map[int64]string)
+	photoMap := make(map[int64]string)
+	for _, p := range participants {
+		name := p.FirstName
+		if name == "" {
+			name = p.Username
+		}
+		nameMap[p.UserID] = name
+		if p.PhotoURL != nil {
+			photoMap[p.UserID] = *p.PhotoURL
+		}
+	}
+
+	// Determine format from match record
+	format := "1v1"
+	if match.Format != nil {
+		format = string(*match.Format)
+	}
+
+	// Branch by format
+	switch format {
+	case string(repository.MatchFormatBracket):
+		return s.getBattleBracket(ctx, matchID, match, rounds, nameMap, photoMap)
+	case string(repository.MatchFormatFreeForAll):
+		return s.getBattleFreeForAll(ctx, matchID, match, rounds, nameMap, photoMap)
+	default:
+		// 1v1 and legacy arena: use first round with full events/combats
+		return s.getBattle1v1(ctx, matchID, rounds[0], nameMap, userID)
+	}
+}
+
+// getBattle1v1 builds a BattleResponse for a 1v1 or legacy arena match from a single round.
+func (s *BattleService) getBattle1v1(ctx context.Context, matchID string, round *repository.MatchRound, nameMap map[int64]string, userID int64) (*BattleResponse, error) {
 	// Parse teams from stored JSON
 	var teamACards, teamBCards []*battle.Card
 	if err := jsonutil.Unmarshal(round.PlayerATeam, &teamACards); err != nil {
@@ -851,22 +887,6 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 	// Group events into combats
 	combats := battle.GroupEventsIntoCombats(events, round.PlayerAID, round.PlayerBID)
 
-	// Get participant names
-	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get participants: %w", err)
-	}
-
-	// Build name lookup map
-	nameMap := make(map[int64]string)
-	for _, p := range participants {
-		name := p.FirstName
-		if name == "" {
-			name = p.Username
-		}
-		nameMap[p.UserID] = name
-	}
-
 	// Build teams with owner info
 	teamAFinal := &battle.Team{
 		OwnerID:   round.PlayerAID,
@@ -882,11 +902,9 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 	// Calculate player-relative damage summary
 	var damageDealt, damageTaken int
 	if userID == round.PlayerAID {
-		// User is Player A
 		damageDealt = round.PlayerADmg
 		damageTaken = round.PlayerBDmg
 	} else {
-		// User is Player B
 		damageDealt = round.PlayerBDmg
 		damageTaken = round.PlayerADmg
 	}
@@ -916,5 +934,193 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 		PlayerBName: nameMap[round.PlayerBID],
 		DamageDealt: damageDealt,
 		DamageTaken: damageTaken,
+		Format:      "1v1",
 	}, nil
+}
+
+// getBattleBracket builds a BattleResponse for a bracket tournament from all rounds.
+// Reconstructs the bracket structure by grouping rounds into elimination rounds
+// based on how runBracket creates them (sequential pairing with winner advancement).
+func (s *BattleService) getBattleBracket(_ context.Context, matchID string, match *repository.Match, rounds []*repository.MatchRound, nameMap map[int64]string, photoMap map[int64]string) (*BattleResponse, error) {
+	// Track stats from each round to build standings
+	stats := make(map[int64]*playerStats)
+	for id := range nameMap {
+		stats[id] = &playerStats{}
+	}
+
+	// Reconstruct bracket rounds from flat round list.
+	// Bracket rounds are stored sequentially: for N participants, first round has N/2 matches,
+	// next has N/4, etc. We reconstruct by consuming rounds in decreasing match counts.
+	totalParticipants := len(nameMap)
+	var bracketRounds []BracketRound
+	roundIdx := 0
+	matchesInRound := totalParticipants / 2
+
+	for matchesInRound >= 1 && roundIdx < len(rounds) {
+		roundName := bracketRoundName(matchesInRound)
+		matches := make([]BracketMatch, 0, matchesInRound)
+
+		for m := 0; m < matchesInRound && roundIdx < len(rounds); m++ {
+			r := rounds[roundIdx]
+			roundIdx++
+
+			// Track stats
+			if r.WinnerID != nil {
+				if *r.WinnerID == r.PlayerAID {
+					stats[r.PlayerAID].wins++
+					stats[r.PlayerBID].losses++
+				} else {
+					stats[r.PlayerBID].wins++
+					stats[r.PlayerAID].losses++
+				}
+			} else if r.IsDraw {
+				stats[r.PlayerAID].draws++
+				stats[r.PlayerBID].draws++
+			}
+			stats[r.PlayerAID].totalDamageDealt += r.PlayerADmg
+			stats[r.PlayerBID].totalDamageDealt += r.PlayerBDmg
+
+			matches = append(matches, BracketMatch{
+				MatchNumber: r.RoundNumber,
+				PlayerAID:   r.PlayerAID,
+				PlayerAName: nameMap[r.PlayerAID],
+				PlayerBID:   r.PlayerBID,
+				PlayerBName: nameMap[r.PlayerBID],
+				WinnerID:    r.WinnerID,
+				IsDraw:      r.IsDraw,
+				PlayerADmg:  r.PlayerADmg,
+				PlayerBDmg:  r.PlayerBDmg,
+				NumRounds:   r.TotalRounds,
+			})
+		}
+
+		bracketRounds = append(bracketRounds, BracketRound{
+			Name:    roundName,
+			Matches: matches,
+		})
+
+		matchesInRound /= 2
+	}
+
+	// Build standings sorted by: wins desc, damage desc, user_id asc
+	standings := buildStandings(stats, nameMap, photoMap)
+
+	return &BattleResponse{
+		MatchID:       matchID,
+		WinnerID:      match.WinnerUserID,
+		IsDraw:        false,
+		Combats:       []battle.Combat{},
+		Events:        []battle.BattleEvent{},
+		NumCombats:    0,
+		NumRounds:     len(rounds),
+		Format:        "bracket",
+		BracketRounds: bracketRounds,
+		Standings:     standings,
+	}, nil
+}
+
+// getBattleFreeForAll builds a BattleResponse for a free-for-all tournament from all rounds.
+// Each round is a fight between two participants in the round-robin.
+func (s *BattleService) getBattleFreeForAll(_ context.Context, matchID string, match *repository.Match, rounds []*repository.MatchRound, nameMap map[int64]string, photoMap map[int64]string) (*BattleResponse, error) {
+	stats := make(map[int64]*playerStats)
+	for id := range nameMap {
+		stats[id] = &playerStats{}
+	}
+
+	ffaRounds := make([]FfaRoundSummary, 0, len(rounds))
+	for _, r := range rounds {
+		// Track stats
+		if r.WinnerID != nil {
+			if *r.WinnerID == r.PlayerAID {
+				stats[r.PlayerAID].wins++
+				stats[r.PlayerBID].losses++
+			} else {
+				stats[r.PlayerBID].wins++
+				stats[r.PlayerAID].losses++
+			}
+		} else if r.IsDraw {
+			stats[r.PlayerAID].draws++
+			stats[r.PlayerBID].draws++
+		}
+		stats[r.PlayerAID].totalDamageDealt += r.PlayerADmg
+		stats[r.PlayerBID].totalDamageDealt += r.PlayerBDmg
+
+		ffaRounds = append(ffaRounds, FfaRoundSummary{
+			RoundNumber: r.RoundNumber,
+			PlayerAID:   r.PlayerAID,
+			PlayerAName: nameMap[r.PlayerAID],
+			PlayerBID:   r.PlayerBID,
+			PlayerBName: nameMap[r.PlayerBID],
+			WinnerID:    r.WinnerID,
+			IsDraw:      r.IsDraw,
+			PlayerADmg:  r.PlayerADmg,
+			PlayerBDmg:  r.PlayerBDmg,
+			NumRounds:   r.TotalRounds,
+		})
+	}
+
+	// Build standings sorted by: wins desc, damage desc, user_id asc
+	standings := buildStandings(stats, nameMap, photoMap)
+
+	return &BattleResponse{
+		MatchID:    matchID,
+		WinnerID:   match.WinnerUserID,
+		IsDraw:     false,
+		Combats:    []battle.Combat{},
+		Events:     []battle.BattleEvent{},
+		NumCombats: 0,
+		NumRounds:  len(rounds),
+		Format:     "free_for_all",
+		Standings:  standings,
+		FfaRounds:  ffaRounds,
+	}, nil
+}
+
+// buildStandings creates sorted ArenaStanding slice from in-memory stats.
+// Sorted by: wins desc, damage desc, user_id asc.
+func buildStandings(stats map[int64]*playerStats, nameMap map[int64]string, photoMap map[int64]string) []ArenaStanding {
+	type rankedPlayer struct {
+		userID           int64
+		wins             int
+		losses           int
+		draws            int
+		totalDamageDealt int
+	}
+
+	ranked := make([]rankedPlayer, 0, len(stats))
+	for id, s := range stats {
+		ranked = append(ranked, rankedPlayer{
+			userID:           id,
+			wins:             s.wins,
+			losses:           s.losses,
+			draws:            s.draws,
+			totalDamageDealt: s.totalDamageDealt,
+		})
+	}
+
+	sort.Slice(ranked, func(i, j int) bool {
+		if ranked[i].wins != ranked[j].wins {
+			return ranked[i].wins > ranked[j].wins
+		}
+		if ranked[i].totalDamageDealt != ranked[j].totalDamageDealt {
+			return ranked[i].totalDamageDealt > ranked[j].totalDamageDealt
+		}
+		return ranked[i].userID < ranked[j].userID
+	})
+
+	standings := make([]ArenaStanding, len(ranked))
+	for i, r := range ranked {
+		standings[i] = ArenaStanding{
+			UserID:           r.userID,
+			Name:             nameMap[r.userID],
+			PhotoURL:         photoMap[r.userID],
+			Rank:             i + 1,
+			Wins:             r.wins,
+			Losses:           r.losses,
+			Draws:            r.draws,
+			TotalDamageDealt: r.totalDamageDealt,
+		}
+	}
+
+	return standings
 }

@@ -71,9 +71,11 @@ export type MatchType = 'ranked' | 'regular'
  * Match format defining the battle structure.
  *
  * - `1v1`: Direct head-to-head battle between two players
- * - `arena`: Multi-player arena format (future support)
+ * - `arena`: Multi-player arena format (legacy)
+ * - `bracket`: Bracket elimination tournament (even player counts)
+ * - `free_for_all`: Round-robin free-for-all (odd player counts)
  */
-export type MatchFormat = '1v1' | 'arena'
+export type MatchFormat = '1v1' | 'arena' | 'bracket' | 'free_for_all'
 
 /**
  * Participant status within a match.
@@ -701,6 +703,115 @@ export interface BattleResult {
   player_a_name: string
   /** Display name of player B */
   player_b_name: string
+  /** Battle format: 1v1, bracket, or free_for_all */
+  format: '1v1' | 'bracket' | 'free_for_all'
+  /** Bracket rounds with elimination matches (bracket format only) */
+  bracket_rounds?: BracketRound[]
+  /** Player standings sorted by rank (bracket and free_for_all formats) */
+  standings?: ArenaStanding[]
+  /** Round-robin fight summaries (free_for_all format only) */
+  ffa_rounds?: FfaRoundSummary[]
+}
+
+/**
+ * A round in a bracket elimination tournament.
+ *
+ * Contains a named round (e.g., "Semifinals", "Final") and its matches.
+ *
+ * @see {@link BracketMatch} Individual match within a round
+ * @see {@link BattleResult} Parent response containing bracket_rounds
+ */
+export interface BracketRound {
+  /** Display name of the round (e.g., "Semifinals", "Final", "Quarterfinals") */
+  name: string
+  /** Matches played in this round */
+  matches: BracketMatch[]
+}
+
+/**
+ * A single match within a bracket round.
+ *
+ * Contains the two players, result, and damage dealt.
+ *
+ * @see {@link BracketRound} Parent round containing matches
+ */
+export interface BracketMatch {
+  /** 1-indexed match number within the round */
+  match_number: number
+  /** User ID of player A */
+  player_a_id: number
+  /** Display name of player A */
+  player_a_name: string
+  /** User ID of player B */
+  player_b_id: number
+  /** Display name of player B */
+  player_b_name: string
+  /** User ID of the winner (null if draw) */
+  winner_id?: number | null
+  /** Whether this match ended in a draw */
+  is_draw: boolean
+  /** Total damage dealt by player A */
+  player_a_damage: number
+  /** Total damage dealt by player B */
+  player_b_damage: number
+  /** Number of combat rounds in this match */
+  num_rounds: number
+}
+
+/**
+ * A player's standing in a free-for-all or bracket tournament.
+ *
+ * Sorted by rank (1 = champion). Used for final standings display.
+ *
+ * @see {@link BattleResult} Parent response containing standings
+ */
+export interface ArenaStanding {
+  /** Telegram user ID */
+  user_id: number
+  /** Display name */
+  name: string
+  /** Profile photo URL */
+  photo_url?: string
+  /** Final rank position (1 = champion) */
+  rank: number
+  /** Total wins in the tournament */
+  wins: number
+  /** Total losses in the tournament */
+  losses: number
+  /** Total draws in the tournament */
+  draws: number
+  /** Total damage dealt across all rounds */
+  total_damage_dealt: number
+}
+
+/**
+ * Summary of a single round in a free-for-all tournament.
+ *
+ * Each round represents one fight in the round-robin format.
+ *
+ * @see {@link BattleResult} Parent response containing ffa_rounds
+ */
+export interface FfaRoundSummary {
+  /** 1-indexed round number */
+  round_number: number
+  /** User ID of player A */
+  player_a_id: number
+  /** Display name of player A */
+  player_a_name: string
+  /** User ID of player B */
+  player_b_id: number
+  /** Display name of player B */
+  player_b_name: string
+  /** User ID of the winner (null if draw) */
+  winner_id?: number | null
+  /** Whether this round ended in a draw */
+  is_draw: boolean
+  /** Total damage dealt by player A */
+  player_a_damage: number
+  /** Total damage dealt by player B */
+  player_b_damage: number
+  /** Number of combat rounds in this fight */
+  num_rounds: number
 }
 
 // =============================================================================

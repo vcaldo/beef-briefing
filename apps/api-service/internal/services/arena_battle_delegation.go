@@ -20,3 +20,8 @@ func (s *ArenaService) StartBattle(ctx context.Context, matchID string) (*Battle
 func (s *ArenaService) GetBattle(ctx context.Context, matchID string, userID int64) (*BattleResponse, error) {
 	return s.battleService.GetBattle(ctx, matchID, userID)
 }
+
+// GetRoundBattle retrieves battle results for a specific round within a multi-round match.
+func (s *ArenaService) GetRoundBattle(ctx context.Context, matchID string, roundNumber int, userID int64) (*BattleResponse, error) {
+	return s.battleService.GetRoundBattle(ctx, matchID, roundNumber, userID)
+}

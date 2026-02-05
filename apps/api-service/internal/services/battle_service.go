@@ -867,6 +867,64 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 	}
 }
 
+// GetRoundBattle retrieves battle results for a specific round within a multi-round match.
+// Returns a full BattleResponse with events/combats for animated replay of that round.
+func (s *BattleService) GetRoundBattle(ctx context.Context, matchID string, roundNumber int, userID int64) (*BattleResponse, error) {
+	defer nrutil.StartSegment(ctx, "service:battle:get-round-battle")()
+
+	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match: %w", err)
+	}
+	if match == nil {
+		return nil, apperror.ErrMatchNotFound
+	}
+
+	// Verify participant
+	participant, err := s.gameRepo.GetParticipant(ctx, matchID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participant: %w", err)
+	}
+	if participant == nil {
+		return nil, apperror.ErrNotParticipant
+	}
+
+	rounds, err := s.gameRepo.GetMatchRounds(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rounds: %w", err)
+	}
+
+	// Find the round matching roundNumber
+	var round *repository.MatchRound
+	for _, r := range rounds {
+		if r.RoundNumber == roundNumber {
+			round = r
+			break
+		}
+	}
+	if round == nil {
+		return nil, apperror.ErrRoundNotFound
+	}
+
+	// Get participant names
+	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	nameMap := make(map[int64]string)
+	for _, p := range participants {
+		name := p.FirstName
+		if name == "" {
+			name = p.Username
+		}
+		nameMap[p.UserID] = name
+	}
+
+	// Reuse getBattle1v1 to build full response with events/combats
+	return s.getBattle1v1(ctx, matchID, round, nameMap, userID)
+}
+
 // getBattle1v1 builds a BattleResponse for a 1v1 or legacy arena match from a single round.
 func (s *BattleService) getBattle1v1(ctx context.Context, matchID string, round *repository.MatchRound, nameMap map[int64]string, userID int64) (*BattleResponse, error) {
 	// Parse teams from stored JSON

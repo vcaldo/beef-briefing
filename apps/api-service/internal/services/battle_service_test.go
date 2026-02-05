@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/game/battle"
 	"beef-briefing/apps/api-service/internal/repository"
 	"beef-briefing/apps/api-service/internal/testutil"
@@ -793,5 +794,233 @@ func TestGetBattle_1v1Format(t *testing.T) {
 	}
 	if len(resp.FfaRounds) != 0 {
 		t.Errorf("expected no ffa_rounds for 1v1, got %d", len(resp.FfaRounds))
+	}
+}
+
+// TestGetRoundBattle verifies that GetRoundBattle returns full events/combats
+// for a specific round within a multi-round (free_for_all) match.
+func TestGetRoundBattle(t *testing.T) {
+	mockRepo := testutil.NewMockGameRepository()
+	svc := NewBattleService(nil, mockRepo, nil, nil)
+	ctx := context.Background()
+
+	matchID := "test-round-battle"
+	playerA := int64(8001)
+	playerB := int64(8002)
+	playerC := int64(8003)
+	chatID := int64(-1003280306634)
+	format := repository.MatchFormatFreeForAll
+
+	match := &repository.Match{
+		ID:     matchID,
+		ChatID: chatID,
+		Format: &format,
+		Status: repository.MatchStatusCompleted,
+	}
+	mockRepo.Matches[matchID] = match
+
+	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
+		playerA: {MatchID: matchID, UserID: playerA},
+		playerB: {MatchID: matchID, UserID: playerB},
+		playerC: {MatchID: matchID, UserID: playerC},
+	}
+	mockRepo.ParticipantsWithUser[matchID] = map[int64]*repository.ParticipantWithUser{
+		playerA: {Participant: repository.Participant{MatchID: matchID, UserID: playerA}, FirstName: "Alice"},
+		playerB: {Participant: repository.Participant{MatchID: matchID, UserID: playerB}, FirstName: "Bob"},
+		playerC: {Participant: repository.Participant{MatchID: matchID, UserID: playerC}, FirstName: "Charlie"},
+	}
+
+	teamJSON, _ := json.Marshal([]*battle.Card{{CardID: 1, ATK: 10, HP: 10}})
+	eventsJSON, _ := json.Marshal([]battle.BattleEvent{
+		{Type: "attack", Message: "Alice attacks Bob"},
+		{Type: "attack", Message: "Bob attacks Alice"},
+	})
+
+	mockRepo.Rounds[matchID] = []*repository.MatchRound{
+		{ID: 1, MatchID: matchID, RoundNumber: 1, PlayerAID: playerA, PlayerBID: playerB,
+			PlayerATeam: teamJSON, PlayerBTeam: teamJSON, BattleLog: eventsJSON,
+			WinnerID: &playerA, PlayerADmg: 30, PlayerBDmg: 20, TotalRounds: 5},
+		{ID: 2, MatchID: matchID, RoundNumber: 2, PlayerAID: playerA, PlayerBID: playerC,
+			PlayerATeam: teamJSON, PlayerBTeam: teamJSON, BattleLog: eventsJSON,
+			WinnerID: &playerA, PlayerADmg: 25, PlayerBDmg: 15, TotalRounds: 4},
+		{ID: 3, MatchID: matchID, RoundNumber: 3, PlayerAID: playerB, PlayerBID: playerC,
+			PlayerATeam: teamJSON, PlayerBTeam: teamJSON, BattleLog: eventsJSON,
+			WinnerID: &playerB, PlayerADmg: 20, PlayerBDmg: 10, TotalRounds: 3},
+	}
+
+	// Get round 2 as playerA (who is player A in round 2)
+	resp, err := svc.GetRoundBattle(ctx, matchID, 2, playerA)
+	if err != nil {
+		t.Fatalf("GetRoundBattle failed: %v", err)
+	}
+
+	// Should have full events for animated replay
+	if len(resp.Events) != 2 {
+		t.Errorf("expected 2 events, got %d", len(resp.Events))
+	}
+
+	// Should have combats
+	if len(resp.Combats) == 0 {
+		t.Error("expected non-empty combats for round replay")
+	}
+
+	// Verify player info from round 2 (A vs C)
+	if resp.PlayerAID != playerA {
+		t.Errorf("expected PlayerAID=%d, got %d", playerA, resp.PlayerAID)
+	}
+	if resp.PlayerBID != playerC {
+		t.Errorf("expected PlayerBID=%d, got %d", playerC, resp.PlayerBID)
+	}
+	if resp.PlayerAName != "Alice" {
+		t.Errorf("expected PlayerAName='Alice', got %q", resp.PlayerAName)
+	}
+	if resp.PlayerBName != "Charlie" {
+		t.Errorf("expected PlayerBName='Charlie', got %q", resp.PlayerBName)
+	}
+
+	// Player-relative damage (playerA is player A in this round)
+	if resp.DamageDealt != 25 {
+		t.Errorf("expected DamageDealt=25, got %d", resp.DamageDealt)
+	}
+	if resp.DamageTaken != 15 {
+		t.Errorf("expected DamageTaken=15, got %d", resp.DamageTaken)
+	}
+
+	// Verify round damage values
+	if resp.TeamADamage != 25 {
+		t.Errorf("expected TeamADamage=25, got %d", resp.TeamADamage)
+	}
+	if resp.TeamBDamage != 15 {
+		t.Errorf("expected TeamBDamage=15, got %d", resp.TeamBDamage)
+	}
+
+	// Winner
+	if resp.WinnerID == nil || *resp.WinnerID != playerA {
+		t.Errorf("expected winner=%d, got %v", playerA, resp.WinnerID)
+	}
+
+	// NumRounds should be the round's internal battle round count
+	if resp.NumRounds != 4 {
+		t.Errorf("expected NumRounds=4, got %d", resp.NumRounds)
+	}
+}
+
+// TestGetRoundBattle_PlayerBPerspective verifies that damage is swapped
+// when the requesting user is player B in the round.
+func TestGetRoundBattle_PlayerBPerspective(t *testing.T) {
+	mockRepo := testutil.NewMockGameRepository()
+	svc := NewBattleService(nil, mockRepo, nil, nil)
+	ctx := context.Background()
+
+	matchID := "test-round-battle-b"
+	playerA := int64(8001)
+	playerB := int64(8002)
+	playerC := int64(8003)
+	chatID := int64(-1003280306634)
+	format := repository.MatchFormatFreeForAll
+
+	match := &repository.Match{
+		ID:     matchID,
+		ChatID: chatID,
+		Format: &format,
+		Status: repository.MatchStatusCompleted,
+	}
+	mockRepo.Matches[matchID] = match
+
+	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
+		playerA: {MatchID: matchID, UserID: playerA},
+		playerB: {MatchID: matchID, UserID: playerB},
+		playerC: {MatchID: matchID, UserID: playerC},
+	}
+	mockRepo.ParticipantsWithUser[matchID] = map[int64]*repository.ParticipantWithUser{
+		playerA: {Participant: repository.Participant{MatchID: matchID, UserID: playerA}, FirstName: "Alice"},
+		playerB: {Participant: repository.Participant{MatchID: matchID, UserID: playerB}, FirstName: "Bob"},
+		playerC: {Participant: repository.Participant{MatchID: matchID, UserID: playerC}, FirstName: "Charlie"},
+	}
+
+	teamJSON, _ := json.Marshal([]*battle.Card{{CardID: 1, ATK: 10, HP: 10}})
+	eventsJSON, _ := json.Marshal([]battle.BattleEvent{{Type: "attack", Message: "test"}})
+
+	mockRepo.Rounds[matchID] = []*repository.MatchRound{
+		{ID: 1, MatchID: matchID, RoundNumber: 1, PlayerAID: playerA, PlayerBID: playerB,
+			PlayerATeam: teamJSON, PlayerBTeam: teamJSON, BattleLog: eventsJSON,
+			WinnerID: &playerA, PlayerADmg: 30, PlayerBDmg: 20, TotalRounds: 5},
+	}
+
+	// Get round 1 as playerB (who is player B in this round)
+	resp, err := svc.GetRoundBattle(ctx, matchID, 1, playerB)
+	if err != nil {
+		t.Fatalf("GetRoundBattle failed: %v", err)
+	}
+
+	// Player-relative damage should be swapped for player B
+	if resp.DamageDealt != 20 {
+		t.Errorf("expected DamageDealt=20 (player B's damage), got %d", resp.DamageDealt)
+	}
+	if resp.DamageTaken != 30 {
+		t.Errorf("expected DamageTaken=30 (player A's damage), got %d", resp.DamageTaken)
+	}
+}
+
+// TestGetRoundBattle_RoundNotFound verifies that requesting a non-existent round
+// returns ErrRoundNotFound.
+func TestGetRoundBattle_RoundNotFound(t *testing.T) {
+	mockRepo := testutil.NewMockGameRepository()
+	svc := NewBattleService(nil, mockRepo, nil, nil)
+	ctx := context.Background()
+
+	matchID := "test-round-notfound"
+	playerA := int64(8001)
+	chatID := int64(-1003280306634)
+	format := repository.MatchFormatFreeForAll
+
+	match := &repository.Match{
+		ID:     matchID,
+		ChatID: chatID,
+		Format: &format,
+		Status: repository.MatchStatusCompleted,
+	}
+	mockRepo.Matches[matchID] = match
+
+	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
+		playerA: {MatchID: matchID, UserID: playerA},
+	}
+
+	mockRepo.Rounds[matchID] = []*repository.MatchRound{} // No rounds
+
+	_, err := svc.GetRoundBattle(ctx, matchID, 99, playerA)
+	if err != apperror.ErrRoundNotFound {
+		t.Errorf("expected ErrRoundNotFound, got %v", err)
+	}
+}
+
+// TestGetRoundBattle_NotParticipant verifies that a non-participant
+// cannot access round battle data.
+func TestGetRoundBattle_NotParticipant(t *testing.T) {
+	mockRepo := testutil.NewMockGameRepository()
+	svc := NewBattleService(nil, mockRepo, nil, nil)
+	ctx := context.Background()
+
+	matchID := "test-round-noparticipant"
+	playerA := int64(8001)
+	outsider := int64(9999)
+	chatID := int64(-1003280306634)
+	format := repository.MatchFormatFreeForAll
+
+	match := &repository.Match{
+		ID:     matchID,
+		ChatID: chatID,
+		Format: &format,
+		Status: repository.MatchStatusCompleted,
+	}
+	mockRepo.Matches[matchID] = match
+
+	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
+		playerA: {MatchID: matchID, UserID: playerA},
+	}
+
+	_, err := svc.GetRoundBattle(ctx, matchID, 1, outsider)
+	if err != apperror.ErrNotParticipant {
+		t.Errorf("expected ErrNotParticipant, got %v", err)
 	}
 }

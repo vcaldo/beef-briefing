@@ -2826,9 +2826,9 @@ func TestExecuteBattle_Arena(t *testing.T) {
 		t.Fatalf("StartMatch failed: %v", err)
 	}
 
-	// Verify format is arena (3 participants)
-	if startResp.Match.Format == nil || *startResp.Match.Format != repository.MatchFormatArena {
-		t.Fatalf("expected format 'arena' for 3 players, got %v", startResp.Match.Format)
+	// Verify format is free_for_all (3 participants, odd count)
+	if startResp.Match.Format == nil || *startResp.Match.Format != repository.MatchFormatFreeForAll {
+		t.Fatalf("expected format 'free_for_all' for 3 players, got %v", startResp.Match.Format)
 	}
 
 	// === Phase 2: Shop Phase - All players build teams ===

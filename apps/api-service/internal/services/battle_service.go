@@ -145,12 +145,21 @@ func normalizeTeamOrder(order []int64, teamSize int) []int64 {
 	return normalized
 }
 
-// runBattle executes a single 1v1 battle between two participants and records the results.
-// It handles team parsing, team order normalization, battle simulation, round persistence,
-// and leaderboard updates. Returns a BattleResponse with the outcome and auto-completes
-// the match for 1v1 format battles.
-func (s *BattleService) runBattle(ctx context.Context, matchID string, pA, pB *repository.ParticipantWithUser, roundNumber int) (*BattleResponse, error) {
-	defer nrutil.StartSegment(ctx, "service:battle:run-battle")()
+// fightResult holds the outcome of a single fight simulation between two participants.
+// It contains the battle result plus metadata needed by callers (player names and IDs).
+type fightResult struct {
+	result     *battle.Result
+	ownerNameA string
+	ownerNameB string
+	playerAID  int64
+	playerBID  int64
+}
+
+// runSingleFight executes a single fight between two participants: team parsing,
+// team order normalization, battle simulation, and round persistence.
+// It does NOT update the leaderboard, complete the match, or send bot notifications.
+func (s *BattleService) runSingleFight(ctx context.Context, matchID string, pA, pB *repository.ParticipantWithUser, roundNumber int) (*fightResult, error) {
+	defer nrutil.StartSegment(ctx, "service:battle:run-single-fight")()
 
 	// Parse teams
 	var teamACards, teamBCards []*battle.Card
@@ -231,9 +240,6 @@ func (s *BattleService) runBattle(ctx context.Context, matchID string, pA, pB *r
 	// Run battle simulation
 	result := battle.Simulate(teamA, teamB)
 
-	// Record battle completion metric
-	recordBattleCompletion(s.nrApp, matchID, "1v1", result.WinnerID, result.IsDraw, result.NumRounds, result.TeamADamage, result.TeamBDamage)
-
 	// Save round (use teamA.Cards/teamB.Cards to preserve correct Position values set by NewTeam)
 	teamAJSON, err := jsonutil.Marshal(teamA.Cards)
 	if err != nil {
@@ -256,6 +262,30 @@ func (s *BattleService) runBattle(ctx context.Context, matchID string, pA, pB *r
 	if err != nil {
 		return nil, fmt.Errorf("failed to save round: %w", err)
 	}
+
+	return &fightResult{
+		result:     result,
+		ownerNameA: ownerNameA,
+		ownerNameB: ownerNameB,
+		playerAID:  pA.UserID,
+		playerBID:  pB.UserID,
+	}, nil
+}
+
+// runBattle executes a single 1v1 battle between two participants and records the results.
+// It calls runSingleFight for the core simulation, then handles leaderboard updates,
+// match completion, and bot notifications. Returns a BattleResponse with the outcome.
+func (s *BattleService) runBattle(ctx context.Context, matchID string, pA, pB *repository.ParticipantWithUser, roundNumber int) (*BattleResponse, error) {
+	defer nrutil.StartSegment(ctx, "service:battle:run-battle")()
+
+	fight, err := s.runSingleFight(ctx, matchID, pA, pB, roundNumber)
+	if err != nil {
+		return nil, err
+	}
+	result := fight.result
+
+	// Record battle completion metric
+	recordBattleCompletion(s.nrApp, matchID, "1v1", result.WinnerID, result.IsDraw, result.NumRounds, result.TeamADamage, result.TeamBDamage)
 
 	// Update leaderboard
 	match, err := s.gameRepo.GetMatch(ctx, matchID)
@@ -297,8 +327,8 @@ func (s *BattleService) runBattle(ctx context.Context, matchID string, pA, pB *r
 			Format:      "1v1",
 			PlayerAID:   pA.UserID,
 			PlayerBID:   pB.UserID,
-			PlayerAName: ownerNameA,
-			PlayerBName: ownerNameB,
+			PlayerAName: fight.ownerNameA,
+			PlayerBName: fight.ownerNameB,
 			WinnerID:    result.WinnerID,
 			IsDraw:      result.IsDraw,
 			TeamADamage: result.TeamADamage,
@@ -324,8 +354,9 @@ func (s *BattleService) runBattle(ctx context.Context, matchID string, pA, pB *r
 		TeamBFinal:  result.TeamBFinal,
 		PlayerAID:   pA.UserID,
 		PlayerBID:   pB.UserID,
-		PlayerAName: ownerNameA,
-		PlayerBName: ownerNameB,
+		PlayerAName: fight.ownerNameA,
+		PlayerBName: fight.ownerNameB,
+		Format:      "1v1",
 	}, nil
 }
 

@@ -445,6 +445,8 @@ func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) 
 	type MatchHistoryResponse struct {
 		MatchID      string  `json:"match_id"`
 		MatchType    string  `json:"match_type"`
+		Format       string  `json:"format"`
+		PlayerCount  int     `json:"player_count"`
 		YourPhotoURL *string `json:"your_photo_url,omitempty"`
 		Opponent     struct {
 			UserID    int64   `json:"user_id"`
@@ -463,6 +465,8 @@ func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) 
 		m := MatchHistoryResponse{
 			MatchID:      e.MatchID,
 			MatchType:    string(e.MatchType),
+			Format:       e.Format,
+			PlayerCount:  e.PlayerCount,
 			Result:       e.Result,
 			YourTeam:     e.YourTeam,
 			OpponentTeam: e.OpponentTeam,

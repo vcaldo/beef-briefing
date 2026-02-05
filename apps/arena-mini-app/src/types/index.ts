@@ -921,9 +921,13 @@ export interface MatchHistoryEntry {
   match_id: string
   /** Whether match was ranked or casual */
   match_type: MatchType
+  /** Match format: 1v1, bracket, or free_for_all */
+  format: '1v1' | 'bracket' | 'free_for_all'
+  /** Number of participants in the match */
+  player_count: number
   /** Current user's profile photo URL */
   your_photo_url?: string
-  /** Opponent information */
+  /** Opponent information (first opponent for multi-player matches) */
   opponent: {
     /** Opponent's user ID */
     user_id: number

@@ -126,7 +126,10 @@ func (s *BattleService) StartBattle(ctx context.Context, matchID string) (*Battl
 		return s.runBattle(ctx, matchID, participants[0], participants[1], 1)
 	}
 
-	// For free-for-all format, run round-robin tournament
+	// For 3+ participants, dispatch by match format
+	if match.Format != nil && *match.Format == repository.MatchFormatBracket {
+		return s.runBracket(ctx, matchID, participants)
+	}
 	return s.runFreeForAll(ctx, matchID, participants)
 }
 
@@ -560,6 +563,232 @@ func (s *BattleService) runFreeForAll(ctx context.Context, matchID string, parti
 		Format:     "free_for_all",
 		Standings:  standings,
 		FfaRounds:  ffaRounds,
+	}, nil
+}
+
+// bracketRoundName returns the display name for a bracket round based on the number of matches.
+func bracketRoundName(numMatches int) string {
+	switch numMatches {
+	case 1:
+		return "Final"
+	case 2:
+		return "Semifinals"
+	case 4:
+		return "Quarterfinals"
+	default:
+		return fmt.Sprintf("Round of %d", numMatches*2)
+	}
+}
+
+// runBracket executes bracket tournament format for even player counts.
+// Participants are paired sequentially: [P1,P2], [P3,P4], ...
+// Winners advance to the next round until one champion remains.
+//
+// Round naming: 1 match = "Final", 2 = "Semifinals", 4 = "Quarterfinals", etc.
+// Leaderboard is updated ONCE per participant (champion=win, others=loss).
+// CompleteMatch is called ONCE with the champion.
+func (s *BattleService) runBracket(ctx context.Context, matchID string, participants []*repository.ParticipantWithUser) (*BattleResponse, error) {
+	defer nrutil.StartSegment(ctx, "service:battle:run-bracket")()
+
+	// Build name and photo lookup maps
+	nameMap := make(map[int64]string)
+	photoMap := make(map[int64]string)
+	for _, p := range participants {
+		name := p.FirstName
+		if name == "" {
+			name = p.Username
+		}
+		nameMap[p.UserID] = name
+		if p.PhotoURL != nil {
+			photoMap[p.UserID] = *p.PhotoURL
+		}
+	}
+
+	// Build participant lookup by UserID for winner advancement
+	participantMap := make(map[int64]*repository.ParticipantWithUser)
+	for _, p := range participants {
+		participantMap[p.UserID] = p
+	}
+
+	// Track stats in-memory for standings
+	stats := make(map[int64]*playerStats)
+	for _, p := range participants {
+		stats[p.UserID] = &playerStats{}
+	}
+
+	var bracketRounds []BracketRound
+	roundNumber := 0         // sequential round number for DB persistence
+	currentRound := participants // players in current bracket round
+
+	for len(currentRound) > 1 {
+		numMatches := len(currentRound) / 2
+		roundName := bracketRoundName(numMatches)
+
+		var matches []BracketMatch
+		var winners []*repository.ParticipantWithUser
+
+		for i := 0; i < len(currentRound); i += 2 {
+			roundNumber++
+			pA := currentRound[i]
+			pB := currentRound[i+1]
+
+			fight, err := s.runSingleFight(ctx, matchID, pA, pB, roundNumber)
+			if err != nil {
+				return nil, err
+			}
+			result := fight.result
+
+			// Track stats
+			if result.WinnerID != nil {
+				if *result.WinnerID == fight.playerAID {
+					stats[fight.playerAID].wins++
+					stats[fight.playerBID].losses++
+					winners = append(winners, pA)
+				} else {
+					stats[fight.playerBID].wins++
+					stats[fight.playerAID].losses++
+					winners = append(winners, pB)
+				}
+			} else {
+				// Draw: advance player A by default (lower index = higher seed)
+				stats[fight.playerAID].draws++
+				stats[fight.playerBID].draws++
+				winners = append(winners, pA)
+			}
+			stats[fight.playerAID].totalDamageDealt += result.TeamADamage
+			stats[fight.playerBID].totalDamageDealt += result.TeamBDamage
+
+			matches = append(matches, BracketMatch{
+				MatchNumber: roundNumber,
+				PlayerAID:   fight.playerAID,
+				PlayerAName: fight.ownerNameA,
+				PlayerBID:   fight.playerBID,
+				PlayerBName: fight.ownerNameB,
+				WinnerID:    result.WinnerID,
+				IsDraw:      result.IsDraw,
+				PlayerADmg:  result.TeamADamage,
+				PlayerBDmg:  result.TeamBDamage,
+				NumRounds:   result.NumRounds,
+			})
+		}
+
+		bracketRounds = append(bracketRounds, BracketRound{
+			Name:    roundName,
+			Matches: matches,
+		})
+
+		currentRound = winners
+	}
+
+	// Champion is the last remaining player
+	var winnerID *int64
+	if len(currentRound) == 1 {
+		winnerID = &currentRound[0].UserID
+	}
+
+	// Build standings sorted by: wins desc, damage desc, user_id asc
+	type rankedPlayer struct {
+		userID           int64
+		wins             int
+		losses           int
+		draws            int
+		totalDamageDealt int
+	}
+
+	ranked := make([]rankedPlayer, 0, len(participants))
+	for _, p := range participants {
+		s := stats[p.UserID]
+		ranked = append(ranked, rankedPlayer{
+			userID:           p.UserID,
+			wins:             s.wins,
+			losses:           s.losses,
+			draws:            s.draws,
+			totalDamageDealt: s.totalDamageDealt,
+		})
+	}
+
+	sort.Slice(ranked, func(i, j int) bool {
+		if ranked[i].wins != ranked[j].wins {
+			return ranked[i].wins > ranked[j].wins
+		}
+		if ranked[i].totalDamageDealt != ranked[j].totalDamageDealt {
+			return ranked[i].totalDamageDealt > ranked[j].totalDamageDealt
+		}
+		return ranked[i].userID < ranked[j].userID
+	})
+
+	standings := make([]ArenaStanding, len(ranked))
+	for i, r := range ranked {
+		standings[i] = ArenaStanding{
+			UserID:           r.userID,
+			Name:             nameMap[r.userID],
+			PhotoURL:         photoMap[r.userID],
+			Rank:             i + 1,
+			Wins:             r.wins,
+			Losses:           r.losses,
+			Draws:            r.draws,
+			TotalDamageDealt: r.totalDamageDealt,
+		}
+	}
+
+	// Update leaderboard ONCE per participant: champion=win, others=loss
+	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match for leaderboard update: %w", err)
+	}
+	if match == nil {
+		return nil, fmt.Errorf("match not found for leaderboard update: %s", matchID)
+	}
+
+	for _, p := range participants {
+		isWin := winnerID != nil && p.UserID == *winnerID
+		s.gameRepo.UpdateLeaderboard(ctx, p.UserID, match.ChatID, match.MatchType, isWin, nil, false, false)
+	}
+
+	// Complete match ONCE with champion
+	s.gameRepo.CompleteMatch(ctx, matchID, winnerID)
+
+	// Bot notifications
+	if s.botClient != nil {
+		if match.TelegramMessageID != nil && *match.TelegramMessageID != 0 {
+			go s.botClient.NotifyParticipantChange(context.Background(), matchID, match.ChatID, *match.TelegramMessageID)
+		}
+
+		participantResults := make([]client.BattleParticipantResult, len(ranked))
+		for i, r := range ranked {
+			participantResults[i] = client.BattleParticipantResult{
+				UserID:      r.userID,
+				Name:        nameMap[r.userID],
+				Wins:        r.wins,
+				TotalDamage: r.totalDamageDealt,
+				Rank:        i + 1,
+			}
+		}
+		go s.botClient.NotifyBattleComplete(context.Background(), &client.BattleResultNotification{
+			MatchID:      matchID,
+			ChatID:       match.ChatID,
+			MatchType:    string(match.MatchType),
+			Format:       "bracket",
+			WinnerID:     winnerID,
+			NumRounds:    roundNumber,
+			Participants: participantResults,
+		})
+	}
+
+	// Record bracket completion metric
+	recordBattleCompletion(s.nrApp, matchID, "bracket", winnerID, false, roundNumber, 0, 0)
+
+	return &BattleResponse{
+		MatchID:       matchID,
+		WinnerID:      winnerID,
+		IsDraw:        false,
+		Combats:       []battle.Combat{},
+		Events:        []battle.BattleEvent{},
+		NumCombats:    0,
+		NumRounds:     roundNumber,
+		Format:        "bracket",
+		BracketRounds: bracketRounds,
+		Standings:     standings,
 	}, nil
 }
 

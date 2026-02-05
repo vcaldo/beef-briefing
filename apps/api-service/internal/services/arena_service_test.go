@@ -775,6 +775,7 @@ const testChatID = int64(-1009999000001)
 var testCreatorUserID = int64(900000001)
 var testJoinerUserID = int64(900000002)
 var testUser3ID = int64(900000003)
+var testUser4ID = int64(900000004)
 
 // setupArenaTestDB sets up a test database with required test data for arena tests.
 // Creates users and cards required for match creation.
@@ -811,7 +812,7 @@ func setupArenaTestDB(t *testing.T) *testutil.TestDB {
 	}
 
 	// Create test users
-	for i, userID := range []int64{testCreatorUserID, testJoinerUserID, testUser3ID} {
+	for i, userID := range []int64{testCreatorUserID, testJoinerUserID, testUser3ID, testUser4ID} {
 		_, err := tdb.DB.ExecContext(ctx, `
 			INSERT INTO users (id, first_name, username, is_bot)
 			VALUES ($1, $2, $3, false)
@@ -3034,5 +3035,223 @@ func TestExecuteBattle_Arena(t *testing.T) {
 
 	// Log arena summary
 	t.Logf("Arena battle completed: %d rounds, winner: user %d",
+		len(rounds), *match.WinnerUserID)
+}
+
+// TestExecuteBattle_Bracket tests bracket tournament format with 4 players.
+// 4 players → bracket format (even count): 2 semifinals + 1 final = 3 rounds total.
+func TestExecuteBattle_Bracket(t *testing.T) {
+	tdb := setupArenaTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
+
+	// Seed 25 cards (enough for 4 players with different card pools)
+	seedTestCards(t, tdb, 25)
+	defer cleanupArenaTestData(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	mockRepo := newMockGameRepository()
+	mockCards := newMockCardService(25)
+
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
+		GameRepo:      mockRepo,
+		StorageClient: mockMinIO,
+		CardService:   mockCards,
+	})
+
+	ctx := context.Background()
+
+	// === Phase 1: Setup - Create match with 4 participants ===
+
+	createResp, err := svc.CreateMatch(ctx, testChatID, testCreatorUserID)
+	if err != nil {
+		t.Fatalf("CreateMatch failed: %v", err)
+	}
+	matchID := createResp.Match.ID
+
+	_, err = svc.JoinMatch(ctx, matchID, testJoinerUserID)
+	if err != nil {
+		t.Fatalf("JoinMatch (player 2) failed: %v", err)
+	}
+
+	_, err = svc.JoinMatch(ctx, matchID, testUser3ID)
+	if err != nil {
+		t.Fatalf("JoinMatch (player 3) failed: %v", err)
+	}
+
+	_, err = svc.JoinMatch(ctx, matchID, testUser4ID)
+	if err != nil {
+		t.Fatalf("JoinMatch (player 4) failed: %v", err)
+	}
+
+	// Verify 4 participants
+	participants, err := mockRepo.GetMatchParticipants(ctx, matchID)
+	if err != nil {
+		t.Fatalf("GetMatchParticipants failed: %v", err)
+	}
+	if len(participants) != 4 {
+		t.Fatalf("expected 4 participants, got %d", len(participants))
+	}
+
+	// Start match - should transition to shop phase with bracket format
+	startResp, err := svc.StartMatch(ctx, matchID, testCreatorUserID)
+	if err != nil {
+		t.Fatalf("StartMatch failed: %v", err)
+	}
+
+	// Verify format is bracket (4 participants, even count)
+	if startResp.Match.Format == nil || *startResp.Match.Format != repository.MatchFormatBracket {
+		t.Fatalf("expected format 'bracket' for 4 players, got %v", startResp.Match.Format)
+	}
+
+	// === Phase 2: Shop Phase - All players build teams ===
+
+	for _, userID := range []int64{testCreatorUserID, testJoinerUserID, testUser3ID, testUser4ID} {
+		for i := 0; i < 3; i++ {
+			_, err = svc.BuyCard(ctx, matchID, userID, i)
+			if err != nil {
+				t.Fatalf("User %d BuyCard %d failed: %v", userID, i, err)
+			}
+		}
+	}
+
+	// === Phase 3: Submit teams ===
+
+	for _, userID := range []int64{testCreatorUserID, testJoinerUserID, testUser3ID} {
+		_, err = svc.SubmitTeam(ctx, matchID, userID)
+		if err != nil {
+			t.Fatalf("User %d SubmitTeam failed: %v", userID, err)
+		}
+	}
+
+	// Verify match is still in shop_phase (player 4 hasn't submitted)
+	match, err := mockRepo.GetMatch(ctx, matchID)
+	if err != nil {
+		t.Fatalf("GetMatch failed: %v", err)
+	}
+	if match.Status != repository.MatchStatusShopPhase {
+		t.Errorf("expected status 'shop_phase' with 3/4 submitted, got %s", match.Status)
+	}
+
+	// Player 4 submits - this triggers battle since all players ready
+	_, err = svc.SubmitTeam(ctx, matchID, testUser4ID)
+	if err != nil {
+		t.Fatalf("Player 4 SubmitTeam failed: %v", err)
+	}
+
+	// === Phase 4: Wait for async battle to complete ===
+
+	time.Sleep(300 * time.Millisecond)
+
+	// === Phase 5: Verify battle execution ===
+
+	match, err = mockRepo.GetMatch(ctx, matchID)
+	if err != nil {
+		t.Fatalf("GetMatch after battle failed: %v", err)
+	}
+
+	if match.Status != repository.MatchStatusCompleted {
+		if match.Status == repository.MatchStatusBattlePhase {
+			time.Sleep(200 * time.Millisecond)
+			match, err = mockRepo.GetMatch(ctx, matchID)
+			if err != nil {
+				t.Fatalf("GetMatch retry failed: %v", err)
+			}
+		}
+		if match.Status != repository.MatchStatusCompleted {
+			t.Errorf("expected match status 'completed' for bracket, got %s", match.Status)
+		}
+	}
+
+	// Verify repository calls
+	if mockRepo.startBattlePhaseCalls < 1 {
+		t.Errorf("expected at least 1 StartBattlePhase call, got %d", mockRepo.startBattlePhaseCalls)
+	}
+	if mockRepo.completeMatchCalls < 1 {
+		t.Errorf("expected at least 1 CompleteMatch call, got %d", mockRepo.completeMatchCalls)
+	}
+
+	// Bracket: 4 players = 2 semifinals + 1 final = 3 rounds
+	expectedRounds := 3
+	if mockRepo.createRoundCalls < expectedRounds {
+		t.Errorf("expected at least %d CreateRound calls for bracket, got %d", expectedRounds, mockRepo.createRoundCalls)
+	}
+
+	// === Phase 6: Verify match has a winner ===
+
+	if match.WinnerUserID == nil {
+		t.Error("expected match to have a winner")
+	} else {
+		winnerID := *match.WinnerUserID
+		validWinner := winnerID == testCreatorUserID || winnerID == testJoinerUserID || winnerID == testUser3ID || winnerID == testUser4ID
+		if !validWinner {
+			t.Errorf("winner ID %d should be one of the 4 participants", winnerID)
+		}
+		t.Logf("Bracket battle winner: user %d", winnerID)
+	}
+
+	// === Phase 7: Verify rounds were created ===
+
+	rounds, err := mockRepo.GetMatchRounds(ctx, matchID)
+	if err != nil {
+		t.Fatalf("GetMatchRounds failed: %v", err)
+	}
+
+	if len(rounds) < expectedRounds {
+		t.Errorf("expected at least %d rounds, got %d", expectedRounds, len(rounds))
+	}
+
+	// Verify each round has two different players
+	for _, round := range rounds {
+		if round.PlayerAID == round.PlayerBID {
+			t.Errorf("round %d has same player on both sides: %d", round.RoundNumber, round.PlayerAID)
+		}
+	}
+
+	// Verify all rounds have battle data
+	for _, round := range rounds {
+		if len(round.BattleLog) == 0 {
+			t.Errorf("round %d has empty battle log", round.RoundNumber)
+		}
+		if len(round.PlayerATeam) == 0 {
+			t.Errorf("round %d has empty player A team", round.RoundNumber)
+		}
+		if len(round.PlayerBTeam) == 0 {
+			t.Errorf("round %d has empty player B team", round.RoundNumber)
+		}
+		if round.TotalRounds <= 0 {
+			t.Errorf("round %d has invalid total_rounds: %d", round.RoundNumber, round.TotalRounds)
+		}
+	}
+
+	// === Phase 8: Verify bracket structure (semis + final) ===
+
+	// The final round should have players that won their semifinal
+	if len(rounds) >= 3 {
+		semi1 := rounds[0]
+		semi2 := rounds[1]
+		final := rounds[2]
+
+		// Final players should be winners of semis (or player A for draws)
+		semi1Winner := semi1.PlayerAID
+		if semi1.WinnerID != nil {
+			semi1Winner = *semi1.WinnerID
+		}
+		semi2Winner := semi2.PlayerAID
+		if semi2.WinnerID != nil {
+			semi2Winner = *semi2.WinnerID
+		}
+
+		finalPlayers := map[int64]bool{final.PlayerAID: true, final.PlayerBID: true}
+		if !finalPlayers[semi1Winner] {
+			t.Errorf("semi 1 winner %d not in final (players: %d vs %d)", semi1Winner, final.PlayerAID, final.PlayerBID)
+		}
+		if !finalPlayers[semi2Winner] {
+			t.Errorf("semi 2 winner %d not in final (players: %d vs %d)", semi2Winner, final.PlayerAID, final.PlayerBID)
+		}
+	}
+
+	// Log bracket summary
+	t.Logf("Bracket battle completed: %d rounds, winner: user %d",
 		len(rounds), *match.WinnerUserID)
 }

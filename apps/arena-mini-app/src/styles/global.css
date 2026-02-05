@@ -5757,8 +5757,9 @@ button,
 }
 
 .rpg-shop-reroll-strategy-hint {
+  flex: 1;
   margin-top: 0;
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 
 .rpg-shop-section-header {

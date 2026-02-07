@@ -17,6 +17,7 @@ import { LoadingSpinner, ErrorDisplay } from '../common'
 import { RPGPanel, GameButton } from '../ui'
 import { CompactCard } from '../common/CompactCard'
 import { BattleEffect } from './BattleEffect'
+import { BattleLog } from './BattleLog'
 import type { EffectPosition } from './BattleEffect'
 import { BracketBattlePage } from './BracketBattlePage'
 import { FreeForAllBattlePage } from './FreeForAllBattlePage'
@@ -79,6 +80,8 @@ export function BattlePage({
   const [showVictory, setShowVictory] = useState(false)
   // Track if user has manually dismissed the victory modal (prevents auto-reopen)
   const [victoryDismissed, setVictoryDismissed] = useState(false)
+  // Battle log modal visibility
+  const [showBattleLog, setShowBattleLog] = useState(false)
 
   // Sound context for battle audio
   const { play: playSound, preloadCategory } = useSoundContext()
@@ -335,6 +338,14 @@ export function BattlePage({
   const dismissVictory = useCallback(() => {
     setShowVictory(false)
     setVictoryDismissed(true)
+  }, [])
+
+  const openBattleLog = useCallback(() => {
+    setShowBattleLog(true)
+  }, [])
+
+  const closeBattleLog = useCallback(() => {
+    setShowBattleLog(false)
   }, [])
 
   // Reset playback wrapper (hides victory screen and allows it to reopen)
@@ -745,6 +756,15 @@ export function BattlePage({
                 </div>
               </div>
               <GameButton
+                variant="secondary"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openBattleLog()
+                }}
+              >
+                View Battle Log
+              </GameButton>
+              <GameButton
                 variant="primary"
                 onClick={(e) => {
                   e.stopPropagation()
@@ -755,6 +775,32 @@ export function BattlePage({
               </GameButton>
             </RPGPanel>
           </RPGPanel>
+        </div>
+      )}
+
+      {/* Battle Log Modal */}
+      {showBattleLog && battleData && (
+        <div className="rpg-modal-backdrop" onClick={closeBattleLog}>
+          <div className="rpg-modal-wrapper" onClick={(e) => e.stopPropagation()}>
+            <RPGPanel variant="outer" className="rpg-modal-outer">
+              <div className="rpg-modal-close-wrapper">
+                <GameButton variant="danger" size="sm" shape="square" onClick={closeBattleLog} aria-label="Close">
+                  ×
+                </GameButton>
+              </div>
+              <BattleLog
+                className="rpg-battlelog-static"
+                combats={battleData.combats}
+                events={battleData.events}
+                animated={false}
+                playerAId={battleData.player_a_id}
+                playerBId={battleData.player_b_id}
+                playerAName={battleData.player_a_name}
+                playerBName={battleData.player_b_name}
+                currentUserId={userId}
+              />
+            </RPGPanel>
+          </div>
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ import (
 	"beef-briefing/apps/api-service/internal/httputil"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
@@ -46,6 +47,9 @@ func (a *JWTAuth) CreateToken(userID int64, chatID *int64, username *string, fir
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "beef-briefing-api",
+			Audience:  jwt.ClaimStrings{"beef-briefing-mini-app"},
+			ID:        uuid.New().String(),
 		},
 	}
 
@@ -60,7 +64,10 @@ func (a *JWTAuth) ValidateToken(tokenString string) (*MiniAppClaims, error) {
 			return nil, jwt.ErrSignatureInvalid
 		}
 		return a.secretKey, nil
-	})
+	},
+		jwt.WithIssuer("beef-briefing-api"),
+		jwt.WithAudience("beef-briefing-mini-app"),
+	)
 
 	if err != nil {
 		return nil, err

@@ -276,6 +276,21 @@ func TestAuthenticate_CreatesJWT(t *testing.T) {
 	if claims.ChatID == nil || *claims.ChatID != chatID {
 		t.Errorf("expected JWT claims chat_id %d, got %v", chatID, claims.ChatID)
 	}
+
+	// Verify standard JWT claims (iss, aud, jti)
+	if claims.Issuer != "beef-briefing-api" {
+		t.Errorf("expected issuer 'beef-briefing-api', got '%s'", claims.Issuer)
+	}
+	audiences, err := claims.GetAudience()
+	if err != nil {
+		t.Fatalf("failed to get audience: %v", err)
+	}
+	if len(audiences) != 1 || audiences[0] != "beef-briefing-mini-app" {
+		t.Errorf("expected audience ['beef-briefing-mini-app'], got %v", audiences)
+	}
+	if claims.ID == "" {
+		t.Error("expected non-empty jti claim")
+	}
 }
 
 // TestGetOverviewStats_ValidPeriod verifies that GetOverviewStats returns
@@ -963,7 +978,7 @@ func TestValidateGameSignature_InvalidSignature(t *testing.T) {
 }
 
 // TestValidateGameSignature_ExpiredTimestamp verifies that ValidateGameSignature
-// returns ErrExpiredGameTimestamp when the timestamp is older than 24 hours.
+// returns ErrExpiredGameTimestamp when the timestamp is older than 5 minutes.
 func TestValidateGameSignature_ExpiredTimestamp(t *testing.T) {
 	botToken := "test-bot-token-123456"
 	svc := newTestMiniAppService(testutil.NewMockMiniAppRepository(), nil, "test-jwt-secret", botToken)
@@ -971,7 +986,7 @@ func TestValidateGameSignature_ExpiredTimestamp(t *testing.T) {
 	chatID := int64(-1002345678901)
 	userID := int64(12345)
 	matchID := "match-abc123"
-	ts := time.Now().Unix() - 86401 // 24 hours + 1 second old
+	ts := time.Now().Unix() - 301 // 5 minutes + 1 second old
 	sig := generateValidGameSignature(botToken, chatID, userID, matchID, ts)
 
 	// Execute
@@ -1041,7 +1056,7 @@ func TestValidateGameSignature_TamperedParams(t *testing.T) {
 			chatID:      chatID,
 			userID:      userID,
 			matchID:     matchID,
-			ts:          ts + 100, // Different timestamp
+			ts:          ts - 100, // Different timestamp (still within valid window)
 			sig:         sig,
 			expectedErr: apperror.ErrInvalidGameSignature,
 		},
@@ -1060,5 +1075,44 @@ func TestValidateGameSignature_TamperedParams(t *testing.T) {
 				t.Errorf("expected %v for %s, got %v", tc.expectedErr, tc.name, err)
 			}
 		})
+	}
+}
+
+// TestValidateGameSignature_ValidWithin5Minutes verifies that a signature
+// with a 4-minute-old timestamp is accepted.
+func TestValidateGameSignature_ValidWithin5Minutes(t *testing.T) {
+	botToken := "test-bot-token-123456"
+	svc := newTestMiniAppService(testutil.NewMockMiniAppRepository(), nil, "test-jwt-secret", botToken)
+
+	chatID := int64(-1002345678901)
+	userID := int64(12345)
+	matchID := "match-abc123"
+	ts := time.Now().Unix() - 240 // 4 minutes old
+	sig := generateValidGameSignature(botToken, chatID, userID, matchID, ts)
+
+	err := svc.ValidateGameSignature(chatID, userID, matchID, ts, sig)
+	if err != nil {
+		t.Fatalf("expected no error for 4-minute-old signature, got %v", err)
+	}
+}
+
+// TestValidateGameSignature_ExpiredAfter5Minutes verifies that a signature
+// with a 5min+1s-old timestamp is rejected.
+func TestValidateGameSignature_ExpiredAfter5Minutes(t *testing.T) {
+	botToken := "test-bot-token-123456"
+	svc := newTestMiniAppService(testutil.NewMockMiniAppRepository(), nil, "test-jwt-secret", botToken)
+
+	chatID := int64(-1002345678901)
+	userID := int64(12345)
+	matchID := "match-abc123"
+	ts := time.Now().Unix() - 301 // 5 minutes + 1 second old
+	sig := generateValidGameSignature(botToken, chatID, userID, matchID, ts)
+
+	err := svc.ValidateGameSignature(chatID, userID, matchID, ts, sig)
+	if err == nil {
+		t.Fatal("expected error for 5min+1s-old signature, got nil")
+	}
+	if err != apperror.ErrExpiredGameTimestamp {
+		t.Errorf("expected ErrExpiredGameTimestamp, got %v", err)
 	}
 }

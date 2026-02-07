@@ -355,7 +355,7 @@ func TestHandleGameAuth_ExpiredTimestamp(t *testing.T) {
 		"chat_id":  int64(-1003280306634),
 		"user_id":  int64(12345),
 		"match_id": "match-abc-123",
-		"ts":       time.Now().Add(-25 * time.Hour).Unix(), // Expired timestamp
+		"ts":       time.Now().Add(-6 * time.Minute).Unix(), // Expired timestamp
 		"sig":      "some-signature",
 	}
 	bodyJSON, _ := json.Marshal(body)

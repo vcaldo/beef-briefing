@@ -24,6 +24,16 @@ import (
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
+const (
+	// gameSignatureMaxAge is the maximum age in seconds for game URL signatures (5 minutes).
+	// Game URLs are generated on-demand when a user clicks the arena button,
+	// so a short window is sufficient.
+	gameSignatureMaxAge = 300
+
+	// initDataMaxAge is the maximum age in seconds for Telegram Mini App init data (24 hours).
+	initDataMaxAge = 86400
+)
+
 // InitDataUser represents user data from Telegram init data
 type InitDataUser struct {
 	ID        int64   `json:"id"`
@@ -224,7 +234,7 @@ func (s *MiniAppService) ValidateInitData(initData string, maxAgeSeconds int64) 
 // ValidateGameSignature validates a Games API signature for arena authentication.
 // The signature is an HMAC-SHA256 hash of the data string using the bot token as the key.
 // Data format: "chat_id=%d&match_id=%s&ts=%d&user_id=%d" (alphabetically sorted keys)
-// Timestamp must be within 24 hours of current time.
+// Timestamp must be within 5 minutes of current time.
 func (s *MiniAppService) ValidateGameSignature(chatID, userID int64, matchID string, ts int64, sig string) error {
 	// Validate required parameters
 	if chatID == 0 {
@@ -249,7 +259,7 @@ func (s *MiniAppService) ValidateGameSignature(chatID, userID int64, matchID str
 	if timeDiff < 0 {
 		return apperror.ErrFutureGameTimestamp
 	}
-	if timeDiff > 86400 { // 24 hours in seconds
+	if timeDiff > gameSignatureMaxAge {
 		return apperror.ErrExpiredGameTimestamp
 	}
 
@@ -274,7 +284,7 @@ func (s *MiniAppService) ValidateGameSignature(chatID, userID int64, matchID str
 func (s *MiniAppService) Authenticate(ctx context.Context, initData string) (*AuthResponse, error) {
 	defer nrutil.StartSegment(ctx, "service:mini-app:authenticate")()
 
-	validated, err := s.ValidateInitData(initData, 86400) // 24 hours max age
+	validated, err := s.ValidateInitData(initData, initDataMaxAge)
 	if err != nil {
 		return nil, err
 	}

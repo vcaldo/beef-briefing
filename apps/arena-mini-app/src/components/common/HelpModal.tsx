@@ -40,13 +40,13 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
                   className={`lang-btn ${language === 'pt' ? 'active' : ''}`}
                   onClick={() => setLanguage('pt')}
                 >
-                  🇵🇹
+                  <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f1f5-1f1f9.png" alt="PT" className="flag-emoji" />
                 </button>
                 <button
                   className={`lang-btn ${language === 'en' ? 'active' : ''}`}
                   onClick={() => setLanguage('en')}
                 >
-                  🇯🇲
+                  <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f1ef-1f1f2.png" alt="JM" className="flag-emoji" />
                 </button>
               </div>
               {language === 'en' ? <HelpContentEN /> : <HelpContentPT />}

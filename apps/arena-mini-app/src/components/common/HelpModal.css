@@ -18,6 +18,12 @@
   transition: border-color 0.2s, background 0.2s;
 }
 
+.flag-emoji {
+  width: 1.5em;
+  height: 1.5em;
+  vertical-align: middle;
+}
+
 .lang-btn.active {
   border-color: var(--rpg-accent-color, #ffd700);
   background: rgba(255, 215, 0, 0.1);

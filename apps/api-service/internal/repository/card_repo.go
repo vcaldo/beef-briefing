@@ -494,6 +494,7 @@ func (r *CardRepository) GetGalleryImages(
 		  AND i.week_start = COALESCE($2, (SELECT MAX(week_start) FROM ml_user_card_images WHERE chat_id = $1))
 		  AND ($3::bigint IS NULL OR i.user_id = $3)
 		  AND ($4::text IS NULL OR i.theme = $4)
+		  AND ($4::text IS NOT NULL OR i.theme NOT LIKE '%\_compact' ESCAPE '\')
 		ORDER BY (c.stats->'overall'->>'score')::float DESC NULLS LAST
 	`
 

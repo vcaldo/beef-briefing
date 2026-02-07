@@ -111,7 +111,7 @@ func (h *WebhookHandler) HandleUpdateMatchMessage(w http.ResponseWriter, r *http
 		spoilerKeyboard := &models.InlineKeyboardMarkup{
 			InlineKeyboard: [][]models.InlineKeyboardButton{
 				{
-					{Text: "🎮 Open", CallbackGame: &models.CallbackGame{}},
+					{Text: "📺 Watch Battle", CallbackGame: &models.CallbackGame{}},
 				},
 				{
 					{Text: "⚔️ Battle in progress...", CallbackData: "noop"},

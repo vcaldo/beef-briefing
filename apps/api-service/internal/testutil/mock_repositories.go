@@ -378,6 +378,19 @@ func (m *MockGameRepository) GetChatOpenMatch(ctx context.Context, chatID int64)
 	return nil, nil // No open match found
 }
 
+// GetMatchByTelegramMessageID retrieves a match by chat_id and telegram_message_id.
+func (m *MockGameRepository) GetMatchByTelegramMessageID(ctx context.Context, chatID, telegramMessageID int64) (*repository.Match, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, match := range m.Matches {
+		if match.ChatID == chatID && match.TelegramMessageID != nil && *match.TelegramMessageID == telegramMessageID {
+			return copyMatch(match), nil
+		}
+	}
+	return nil, nil
+}
+
 // SetTelegramMessageID updates the telegram message ID for a match.
 func (m *MockGameRepository) SetTelegramMessageID(ctx context.Context, matchID string, messageID int64) error {
 	m.mu.Lock()

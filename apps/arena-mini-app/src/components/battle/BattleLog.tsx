@@ -154,6 +154,8 @@ interface BattleLogCombatProps {
   playerBLabel: string
   /** Whether current user is Player A */
   isCurrentUserPlayerA: boolean
+  /** Whether current user is Player B */
+  isCurrentUserPlayerB: boolean
 }
 
 /**
@@ -171,6 +173,7 @@ function BattleLogCombat({
   playerALabel,
   playerBLabel,
   isCurrentUserPlayerA,
+  isCurrentUserPlayerB,
 }: BattleLogCombatProps) {
   const classes = [
     'battle-log-combat',
@@ -198,7 +201,7 @@ function BattleLogCombat({
               {playerALabel}
             </span>
             <span className="vs">vs</span>
-            <span className={`card-name ${!isCurrentUserPlayerA ? 'is-you' : ''}`}>
+            <span className={`card-name ${isCurrentUserPlayerB ? 'is-you' : ''}`}>
               {playerBLabel}
             </span>
           </div>
@@ -213,7 +216,7 @@ function BattleLogCombat({
                   {matchup.leftName}
                 </span>
                 <span className="vs">vs</span>
-                <span className={`card-name ${!isCurrentUserPlayerA ? 'is-you' : ''}`}>
+                <span className={`card-name ${isCurrentUserPlayerB ? 'is-you' : ''}`}>
                   {matchup.rightName}
                 </span>
               </>
@@ -252,7 +255,7 @@ export const BattleLog = ({
   animated = true,
   className = '',
   playerAId,
-  playerBId: _playerBId,
+  playerBId,
   playerAName = 'Player A',
   playerBName = 'Player B',
   currentUserId,
@@ -261,13 +264,14 @@ export const BattleLog = ({
   const { getUrlById } = useImages()
 
   /**
-   * Compute player labels - show "You" for current user
+   * Compute player labels - show "You" for current user, real names for spectators
    */
   const isCurrentUserPlayerA =
     currentUserId !== undefined && currentUserId === playerAId
+  const isCurrentUserPlayerB =
+    currentUserId !== undefined && currentUserId === playerBId
   const playerALabel = isCurrentUserPlayerA ? 'You' : playerAName
-  const playerBLabel =
-    !isCurrentUserPlayerA && currentUserId !== undefined ? 'You' : playerBName
+  const playerBLabel = isCurrentUserPlayerB ? 'You' : playerBName
 
   /**
    * Derived state: Is the current event still animating?
@@ -399,6 +403,7 @@ export const BattleLog = ({
                   playerALabel={playerALabel}
                   playerBLabel={playerBLabel}
                   isCurrentUserPlayerA={isCurrentUserPlayerA}
+                  isCurrentUserPlayerB={isCurrentUserPlayerB}
                 />
               )
             }

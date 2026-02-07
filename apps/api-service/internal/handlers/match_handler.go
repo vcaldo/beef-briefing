@@ -325,6 +325,40 @@ func (h *ArenaHandler) HandleGetBattle(w http.ResponseWriter, r *http.Request) {
 	httputil.RespondJSON(w, battle, http.StatusOK)
 }
 
+// HandleGetBattleReplay retrieves battle results for any user in the same chat (spectator replay).
+// GET /api/v1/mini-app/arena/match/{id}/replay
+func (h *ArenaHandler) HandleGetBattleReplay(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	setTransactionName(ctx, "api:arena:get-battle-replay")
+
+	claims := requireJWTClaims(ctx, w)
+	if claims == nil {
+		return
+	}
+
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
+		return
+	}
+
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
+
+	battle, err := h.service.GetBattleReplay(ctx, matchID, claims.UserID)
+	if err != nil {
+		handleServiceError(ctx, w, err, "get battle replay")
+		return
+	}
+
+	httputil.RespondJSON(w, battle, http.StatusOK)
+}
+
 // HandleGetRoundBattle retrieves battle results for a specific round within a multi-round match.
 // GET /api/v1/mini-app/arena/match/{id}/battle/round/{round_number}
 func (h *ArenaHandler) HandleGetRoundBattle(w http.ResponseWriter, r *http.Request) {
@@ -991,6 +1025,42 @@ func (h *ArenaHandler) HandleBotStartMatch(w http.ResponseWriter, r *http.Reques
 	match, err := h.startMatchInternal(ctx, matchID, req.UserID)
 	if err != nil {
 		handleServiceError(ctx, w, err, "start match")
+		return
+	}
+
+	httputil.RespondJSON(w, match, http.StatusOK)
+}
+
+// HandleGetMatchByMessage retrieves a match by its chat_id and telegram_message_id.
+// GET /api/v1/arena/matches/by-message?chat_id=X&message_id=Y
+func (h *ArenaHandler) HandleGetMatchByMessage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	setTransactionName(ctx, "api:arena:get-match-by-message")
+
+	chatID, err := httputil.ParseInt64(r, "chat_id")
+	if err != nil || chatID == 0 {
+		httputil.RespondError(w, "chat_id is required", http.StatusBadRequest)
+		return
+	}
+
+	messageID, err := httputil.ParseInt64(r, "message_id")
+	if err != nil || messageID == 0 {
+		httputil.RespondError(w, "message_id is required", http.StatusBadRequest)
+		return
+	}
+
+	addTransactionAttribute(ctx, "chat_id", chatID)
+	addTransactionAttribute(ctx, "message_id", messageID)
+
+	match, err := h.service.GetMatchByTelegramMessage(ctx, chatID, messageID)
+	if err != nil {
+		logAndNoticeError(ctx, "failed to get match by message", err)
+		httputil.RespondError(w, "failed to get match by message", http.StatusInternalServerError)
+		return
+	}
+
+	if match == nil {
+		httputil.RespondError(w, "no match found for this message", http.StatusNotFound)
 		return
 	}
 

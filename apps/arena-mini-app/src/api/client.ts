@@ -316,6 +316,16 @@ class ArenaApiClient extends BaseApiClient {
   }
 
   /**
+   * Get battle replay for a match (spectator-friendly, no participant check).
+   * GET /api/v1/mini-app/arena/match/{id}/replay
+   */
+  async getBattleReplay(matchId: string): Promise<BattleResult> {
+    return this.request<BattleResult>(
+      `/api/v1/mini-app/arena/match/${matchId}/replay`
+    )
+  }
+
+  /**
    * Get battle data for a specific round (for animated replay).
    * GET /api/v1/mini-app/arena/match/{id}/battle/round/{round_number}
    */

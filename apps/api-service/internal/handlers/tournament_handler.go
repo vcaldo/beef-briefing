@@ -7,6 +7,8 @@ import (
 
 	"beef-briefing/apps/api-service/internal/apperror"
 	"beef-briefing/apps/api-service/internal/httputil"
+	"beef-briefing/apps/api-service/internal/repository"
+	"beef-briefing/apps/api-service/internal/services"
 
 	"github.com/gorilla/mux"
 	"github.com/newrelic/go-agent/v3/newrelic"
@@ -121,8 +123,11 @@ func (h *ArenaHandler) HandleBotGetPendingAnnouncements(w http.ResponseWriter, r
 		return
 	}
 
+	// Filter out non-beta groups from ranked tournament announcements
+	filtered := filterBetaGroupTournaments(tournaments, h.service)
+
 	httputil.RespondJSON(w, map[string]interface{}{
-		"tournaments": tournaments,
+		"tournaments": filtered,
 	}, http.StatusOK)
 }
 
@@ -331,8 +336,11 @@ func (h *ArenaHandler) HandleBotGetPendingClose(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// Filter out non-beta groups from ranked tournament close
+	filtered := filterBetaGroupTournaments(tournaments, h.service)
+
 	httputil.RespondJSON(w, map[string]interface{}{
-		"tournaments": tournaments,
+		"tournaments": filtered,
 	}, http.StatusOK)
 }
 
@@ -400,4 +408,17 @@ func (h *ArenaHandler) HandleBotGetPendingRounds(w http.ResponseWriter, r *http.
 	httputil.RespondJSON(w, map[string]interface{}{
 		"tournaments": tournaments,
 	}, http.StatusOK)
+}
+
+// filterBetaGroupTournaments removes tournaments for non-beta groups
+func filterBetaGroupTournaments(tournaments []*repository.TournamentInfo, svc *services.ArenaService) []*repository.TournamentInfo {
+	filtered := make([]*repository.TournamentInfo, 0, len(tournaments))
+	for _, t := range tournaments {
+		if svc.IsBetaGroup(t.ChatID) {
+			filtered = append(filtered, t)
+		} else {
+			slog.Debug("skipping tournament for non-beta group", "chat_id", t.ChatID, "tournament_id", t.TournamentID)
+		}
+	}
+	return filtered
 }

@@ -47,6 +47,7 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       CORS_ORIGINS: http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:6175
       ADMIN_USER_IDS: ${ADMIN_USER_IDS}
+      BETA_GROUPS: ${BETA_GROUPS:-}
       # Bot webhook for participant change notifications
       BOT_INTERNAL_URL: http://telegram-bot:8081
     ports:
@@ -111,6 +112,7 @@ services:
       WEBHOOK_PORT: 8081
       # Media upload to object storage
       MEDIA_UPLOAD_ENABLED: ${MEDIA_UPLOAD_ENABLED:-false}
+      BETA_GROUPS: ${BETA_GROUPS:-}
     volumes:
       - ./secrets/apps/telegram-bot:/app/secrets:ro
     depends_on:

@@ -90,6 +90,7 @@ const mockGameConstants = {
     warning: 30,
     colors: { safe: '#22c55e', warning: '#eab308', urgent: '#ef4444' },
   },
+  is_beta_group: false,
 }
 
 describe('Auth Flow', () => {

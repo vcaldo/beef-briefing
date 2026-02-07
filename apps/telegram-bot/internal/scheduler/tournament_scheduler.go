@@ -27,15 +27,17 @@ type TournamentScheduler struct {
 	bot           *bot.Bot
 	nrApp         *newrelic.Application
 	rankedEnabled bool
+	betaGroups    map[int64]bool
 }
 
 // NewTournamentScheduler creates a new tournament scheduler
-func NewTournamentScheduler(apiClient *client.APIClient, b *bot.Bot, nrApp *newrelic.Application, rankedEnabled bool) *TournamentScheduler {
+func NewTournamentScheduler(apiClient *client.APIClient, b *bot.Bot, nrApp *newrelic.Application, rankedEnabled bool, betaGroups map[int64]bool) *TournamentScheduler {
 	return &TournamentScheduler{
 		apiClient:     apiClient,
 		bot:           b,
 		nrApp:         nrApp,
 		rankedEnabled: rankedEnabled,
+		betaGroups:    betaGroups,
 	}
 }
 
@@ -104,6 +106,10 @@ func (s *TournamentScheduler) processAnnouncements(ctx context.Context, txn *new
 	}
 
 	for _, t := range tournaments {
+		if !s.betaGroups[t.ChatID] {
+			slog.Debug("skipping tournament announcement for non-beta group", "chat_id", t.ChatID)
+			continue
+		}
 		s.sendTournamentAnnouncement(ctx, t, txn)
 	}
 }
@@ -192,6 +198,10 @@ func (s *TournamentScheduler) processRegistrationClose(ctx context.Context, txn 
 	}
 
 	for _, t := range tournaments {
+		if !s.betaGroups[t.ChatID] {
+			slog.Debug("skipping tournament close for non-beta group", "chat_id", t.ChatID)
+			continue
+		}
 		s.closeTournament(ctx, t, txn)
 	}
 }

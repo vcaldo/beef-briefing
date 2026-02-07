@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -137,7 +138,11 @@ func main() {
 	if !rankedEnabled {
 		slog.Warn("ranked tournaments are globally disabled")
 	}
-	tournamentScheduler := scheduler.NewTournamentScheduler(apiClient, b, nrApp, rankedEnabled)
+	betaGroups := parseBetaGroups(os.Getenv("BETA_GROUPS"))
+	if len(betaGroups) > 0 {
+		slog.Info("beta groups configured", "count", len(betaGroups))
+	}
+	tournamentScheduler := scheduler.NewTournamentScheduler(apiClient, b, nrApp, rankedEnabled, betaGroups)
 	go tournamentScheduler.Start(ctx)
 
 	// Start internal webhook server for API service callbacks
@@ -231,6 +236,21 @@ func getEnvBool(name string, defaultVal bool) bool {
 		return defaultVal
 	}
 	return b
+}
+
+// parseBetaGroups parses a comma-separated string of chat IDs into a map
+func parseBetaGroups(s string) map[int64]bool {
+	result := make(map[int64]bool)
+	if s == "" {
+		return result
+	}
+	for _, idStr := range strings.Split(s, ",") {
+		idStr = strings.TrimSpace(idStr)
+		if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
+			result[id] = true
+		}
+	}
+	return result
 }
 
 // startWebhookServer starts the internal HTTP server for API service callbacks

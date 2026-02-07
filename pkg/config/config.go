@@ -66,8 +66,11 @@ type Config struct {
 	CORSOrigins string `envconfig:"CORS_ORIGINS"`
 
 	// Games API / Arena Configuration
-	ArenaBaseURL     string `envconfig:"ARENA_BASE_URL" default:"http://localhost:5175"`
+	ArenaBaseURL       string `envconfig:"ARENA_BASE_URL" default:"http://localhost:5175"`
 	ArenaGameShortName string `envconfig:"ARENA_GAME_SHORT_NAME" default:"arena"`
+
+	// Beta Groups Configuration
+	BetaGroups string `envconfig:"BETA_GROUPS"` // Comma-separated list of chat IDs with beta features
 }
 
 // DSN returns PostgreSQL connection string
@@ -99,6 +102,35 @@ func (c *Config) IsAdmin(userID int64) bool {
 	for _, idStr := range strings.Split(c.AdminUserIDs, ",") {
 		idStr = strings.TrimSpace(idStr)
 		if id, err := strconv.ParseInt(idStr, 10, 64); err == nil && id == userID {
+			return true
+		}
+	}
+	return false
+}
+
+// ParseBetaGroups parses the BetaGroups comma-separated string into a map
+func (c *Config) ParseBetaGroups() map[int64]bool {
+	result := make(map[int64]bool)
+	if c.BetaGroups == "" {
+		return result
+	}
+	for _, idStr := range strings.Split(c.BetaGroups, ",") {
+		idStr = strings.TrimSpace(idStr)
+		if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
+			result[id] = true
+		}
+	}
+	return result
+}
+
+// IsBetaGroup checks if the given chat ID is in the beta groups list
+func (c *Config) IsBetaGroup(chatID int64) bool {
+	if c.BetaGroups == "" {
+		return false
+	}
+	for _, idStr := range strings.Split(c.BetaGroups, ",") {
+		idStr = strings.TrimSpace(idStr)
+		if id, err := strconv.ParseInt(idStr, 10, 64); err == nil && id == chatID {
 			return true
 		}
 	}

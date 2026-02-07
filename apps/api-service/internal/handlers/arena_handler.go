@@ -212,6 +212,10 @@ func handleServiceError(ctx context.Context, w http.ResponseWriter, err error, e
 	case apperror.ErrActiveMatchExists:
 		httputil.RespondError(w, "an active match already exists. Please wait for it to complete before creating a new one.", http.StatusBadRequest)
 
+	// Beta group restriction
+	case apperror.ErrMatchFullNonBeta:
+		httputil.RespondError(w, "this group is limited to 1v1 matches", http.StatusForbidden)
+
 	// Default: unknown error
 	default:
 		httputil.RespondError(w, fmt.Sprintf("failed to %s", errOperationName), http.StatusInternalServerError)
@@ -327,7 +331,13 @@ func (h *ArenaHandler) HandleGetConstants(w http.ResponseWriter, r *http.Request
 		txn.SetName("api:arena:constants")
 	}
 
-	// Just return the constants - no auth validation needed beyond JWT which is enforced by middleware
+	// Determine if this is a beta group from JWT claims
+	isBetaGroup := false
+	claims := middleware.GetClaimsFromContext(ctx)
+	if claims != nil && claims.ChatID != nil {
+		isBetaGroup = h.service.IsBetaGroup(*claims.ChatID)
+	}
+
 	constants := map[string]interface{}{
 		"costs": map[string]int{
 			"card":    shop.CardCost,
@@ -364,6 +374,7 @@ func (h *ArenaHandler) HandleGetConstants(w http.ResponseWriter, r *http.Request
 				"urgent":  "#ef4444",
 			},
 		},
+		"is_beta_group": isBetaGroup,
 	}
 
 	httputil.RespondJSON(w, constants, http.StatusOK)

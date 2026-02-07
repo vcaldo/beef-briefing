@@ -18,6 +18,7 @@ var (
 	ErrNotCreator        = errors.New("only the match creator can perform this action")
 	ErrActiveMatchExists = errors.New("an active match already exists; please wait for it to complete before creating a new one")
 	ErrRoundNotFound     = errors.New("round not found")
+	ErrMatchFullNonBeta  = errors.New("this group is limited to 1v1 matches")
 )
 
 // Card and deck errors

@@ -31,6 +31,8 @@ type ArenaServiceInterface interface {
 	LeaveMatch(ctx context.Context, matchID string, userID int64) error
 	StartMatch(ctx context.Context, matchID string, userID int64) (*MatchResponse, error)
 
+	GetMatchByTelegramMessage(ctx context.Context, chatID, messageID int64) (*MatchResponse, error)
+
 	// Shop Phase Methods
 	GetShop(ctx context.Context, matchID string, userID int64) (*EnhancedShopResponse, error)
 	BuyCard(ctx context.Context, matchID string, userID int64, cardIndex int) (*EnhancedShopResponse, error)
@@ -42,6 +44,7 @@ type ArenaServiceInterface interface {
 	// Battle Methods
 	StartBattle(ctx context.Context, matchID string) (*BattleResponse, error)
 	GetBattle(ctx context.Context, matchID string, userID int64) (*BattleResponse, error)
+	GetBattleReplay(ctx context.Context, matchID string, userID int64) (*BattleResponse, error)
 
 	// Automation Methods (for scheduler)
 	GetPendingMatches(ctx context.Context) ([]*PendingMatch, error)

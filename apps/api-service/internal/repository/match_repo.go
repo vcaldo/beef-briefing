@@ -245,6 +245,23 @@ func (r *MatchRepository) CancelMatch(ctx context.Context, matchID string) error
 	return err
 }
 
+// GetMatchByTelegramMessageID retrieves a match by its chat_id and telegram_message_id
+func (r *MatchRepository) GetMatchByTelegramMessageID(ctx context.Context, chatID, telegramMessageID int64) (*Match, error) {
+	defer r.startDBSegment(ctx, "get-match-by-telegram-message-id")()
+
+	query := fmt.Sprintf(`SELECT %s FROM game_matches WHERE chat_id = $1 AND telegram_message_id = $2`, matchColumns)
+
+	match, err := scanMatch(r.db.QueryRowContext(ctx, query, chatID, telegramMessageID))
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match by telegram message id: %w", err)
+	}
+
+	return match, nil
+}
+
 // GetMatchesByStatus returns all matches with a given status
 func (r *MatchRepository) GetMatchesByStatus(ctx context.Context, status MatchStatus) ([]*Match, error) {
 	defer r.startDBSegment(ctx, "get-matches-by-status")()

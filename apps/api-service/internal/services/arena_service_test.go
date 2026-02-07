@@ -686,6 +686,18 @@ func (m *mockGameRepository) GetChatOpenMatch(ctx context.Context, chatID int64)
 	return latestMatch, nil
 }
 
+func (m *mockGameRepository) GetMatchByTelegramMessageID(ctx context.Context, chatID, telegramMessageID int64) (*repository.Match, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, match := range m.matches {
+		if match.ChatID == chatID && match.TelegramMessageID != nil && *match.TelegramMessageID == telegramMessageID {
+			return match, nil
+		}
+	}
+	return nil, nil
+}
+
 func (m *mockGameRepository) SetTelegramMessageID(ctx context.Context, matchID string, messageID int64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

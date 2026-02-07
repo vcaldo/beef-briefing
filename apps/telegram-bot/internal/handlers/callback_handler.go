@@ -319,10 +319,15 @@ func (h *CallbackHandler) handleGameCallback(ctx context.Context, b *bot.Bot, ca
 		return
 	}
 
-	// If no active match, still allow access to lobby (match_id will be empty)
+	// If no active match, try to find by telegram_message_id (for completed match replay)
 	matchID := ""
 	if match != nil {
 		matchID = match.ID
+	} else {
+		msgID := int64(callback.Message.Message.ID)
+		if msgMatch, err := h.apiClient.GetMatchByTelegramMessage(ctx, chatID, msgID); err == nil && msgMatch != nil {
+			matchID = msgMatch.ID
+		}
 	}
 
 	// Generate timestamp and signature for Games API authentication

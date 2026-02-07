@@ -21,6 +21,11 @@ func (s *ArenaService) GetBattle(ctx context.Context, matchID string, userID int
 	return s.battleService.GetBattle(ctx, matchID, userID)
 }
 
+// GetBattleReplay retrieves battle results for any user in the same chat (no participant check).
+func (s *ArenaService) GetBattleReplay(ctx context.Context, matchID string, userID int64) (*BattleResponse, error) {
+	return s.battleService.GetBattleReplay(ctx, matchID, userID)
+}
+
 // GetRoundBattle retrieves battle results for a specific round within a multi-round match.
 func (s *ArenaService) GetRoundBattle(ctx context.Context, matchID string, roundNumber int, userID int64) (*BattleResponse, error) {
 	return s.battleService.GetRoundBattle(ctx, matchID, roundNumber, userID)

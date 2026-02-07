@@ -872,6 +872,73 @@ func (s *BattleService) GetBattle(ctx context.Context, matchID string, userID in
 	}
 }
 
+// GetBattleReplay retrieves battle results for any user in the same chat (no participant check).
+// Used for spectator replays. The userID is still used for player-relative damage calculation.
+func (s *BattleService) GetBattleReplay(ctx context.Context, matchID string, userID int64) (*BattleResponse, error) {
+	defer nrutil.StartSegment(ctx, "service:battle:get-battle-replay")()
+
+	match, err := s.gameRepo.GetMatch(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match: %w", err)
+	}
+	if match == nil {
+		return nil, apperror.ErrMatchNotFound
+	}
+
+	rounds, err := s.gameRepo.GetMatchRounds(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rounds: %w", err)
+	}
+
+	// No rounds yet - return minimal response
+	if len(rounds) == 0 {
+		return &BattleResponse{
+			MatchID:     matchID,
+			Combats:     []battle.Combat{},
+			Events:      []battle.BattleEvent{},
+			NumCombats:  0,
+			DamageDealt: 0,
+			DamageTaken: 0,
+		}, nil
+	}
+
+	// Get participant names and photo URLs
+	participants, err := s.gameRepo.GetMatchParticipants(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	nameMap := make(map[int64]string)
+	photoMap := make(map[int64]string)
+	for _, p := range participants {
+		name := p.FirstName
+		if name == "" {
+			name = p.Username
+		}
+		nameMap[p.UserID] = name
+		if p.PhotoURL != nil {
+			photoMap[p.UserID] = *p.PhotoURL
+		}
+	}
+
+	// Determine format from match record
+	format := "1v1"
+	if match.Format != nil {
+		format = string(*match.Format)
+	}
+
+	// Branch by format
+	switch format {
+	case string(repository.MatchFormatBracket):
+		return s.getBattleBracket(ctx, matchID, match, rounds, nameMap, photoMap)
+	case string(repository.MatchFormatFreeForAll):
+		return s.getBattleFreeForAll(ctx, matchID, match, rounds, nameMap, photoMap)
+	default:
+		// 1v1 and legacy arena: use first round with full events/combats
+		return s.getBattle1v1(ctx, matchID, rounds[0], nameMap, userID)
+	}
+}
+
 // GetRoundBattle retrieves battle results for a specific round within a multi-round match.
 // Returns a full BattleResponse with events/combats for animated replay of that round.
 func (s *BattleService) GetRoundBattle(ctx context.Context, matchID string, roundNumber int, userID int64) (*BattleResponse, error) {

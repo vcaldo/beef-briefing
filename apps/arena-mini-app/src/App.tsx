@@ -36,6 +36,10 @@ function App() {
   const [activeMatch, setActiveMatch] = useState<Match | null>(null)
   const [gameConstants, setGameConstants] = useState<GameConstants | null>(null)
 
+  // Replay mode state (for spectators opening via match_id link)
+  const [replayMatchId, setReplayMatchId] = useState<string | null>(null)
+  const [isReplayMode, setIsReplayMode] = useState(false)
+
   // Battle playback state (lifted for TabBar access)
   const [isPlaying, setIsPlaying] = useState(false)
   const [speedIndex, setSpeedIndex] = useState(0) // 0=1x, 1=2x
@@ -126,6 +130,36 @@ function App() {
         })
 
         setAppState('authenticated')
+
+        // If opened with a match_id, check if it's a completed match for replay
+        if (matchId) {
+          try {
+            const match = await apiClient.getMatch(matchId)
+            if (match.status === 'completed') {
+              // Completed match: enter replay mode (works for participants and spectators)
+              setReplayMatchId(matchId)
+              setIsReplayMode(true)
+              setActiveTab('battle')
+              addPageAction('replay_auto_navigate', { match_id: matchId })
+            } else {
+              // Active match: check if user is a participant
+              const isParticipant = match.participants?.some(
+                (p: { user_id: number }) => p.user_id === auth.user_id
+              )
+              if (isParticipant) {
+                setActiveMatch(match)
+                if (match.status === 'shop_phase') {
+                  setActiveTab('shop')
+                } else if (match.status === 'battle_phase') {
+                  setActiveTab('battle')
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Failed to fetch match for auto-navigation:', err)
+            // Non-fatal: user stays on lobby
+          }
+        }
 
         // Prefetch game constants (requires auth token)
         // Note: Asset preloading happens earlier via preloadAllDuringSplash on mount
@@ -280,6 +314,8 @@ function App() {
             speedIndex={speedIndex}
             onCompleteChange={handleBattleCompleteChange}
             replayTrigger={replayTrigger}
+            replayMatchId={replayMatchId}
+            isReplayMode={isReplayMode}
           />
         )
       case 'stats':

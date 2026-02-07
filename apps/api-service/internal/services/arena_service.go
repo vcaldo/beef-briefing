@@ -961,6 +961,31 @@ func (s *ArenaService) GetChatOpenMatch(ctx context.Context, chatID int64) (*rep
 	return s.gameRepo.GetChatOpenMatch(ctx, chatID)
 }
 
+// GetMatchByTelegramMessage retrieves a match by chat_id and telegram_message_id
+func (s *ArenaService) GetMatchByTelegramMessage(ctx context.Context, chatID, messageID int64) (*MatchResponse, error) {
+	defer nrutil.StartSegment(ctx, "service:arena:get-match-by-telegram-message")()
+
+	match, err := s.gameRepo.GetMatchByTelegramMessageID(ctx, chatID, messageID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match by telegram message: %w", err)
+	}
+	if match == nil {
+		return nil, nil
+	}
+
+	participants, err := s.gameRepo.GetMatchParticipants(ctx, match.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match participants: %w", err)
+	}
+
+	s.populateParticipantPhotoURLs(ctx, participants)
+
+	return &MatchResponse{
+		Match:        match,
+		Participants: participants,
+	}, nil
+}
+
 // SetTelegramMessageID updates the telegram_message_id for a match
 func (s *ArenaService) SetTelegramMessageID(ctx context.Context, matchID string, messageID int64) error {
 	defer nrutil.StartSegment(ctx, "service:arena:set-telegram-message-id")()

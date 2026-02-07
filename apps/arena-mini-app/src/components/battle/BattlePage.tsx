@@ -56,6 +56,10 @@ interface BattlePageProps {
   onCompleteChange?: (complete: boolean) => void
   /** Counter that increments when replay is requested from TabBar */
   replayTrigger?: number
+  /** Match ID for spectator replay (overrides activeMatch.id) */
+  replayMatchId?: string | null
+  /** Whether this is a spectator replay (uses replay endpoint) */
+  isReplayMode?: boolean
 }
 
 export function BattlePage({
@@ -70,6 +74,8 @@ export function BattlePage({
   speedIndex,
   onCompleteChange,
   replayTrigger,
+  replayMatchId,
+  isReplayMode,
 }: BattlePageProps) {
   // Battle data state
   const [battleData, setBattleData] = useState<BattleResult | null>(null)
@@ -231,8 +237,8 @@ export function BattlePage({
     onPlayingChange(hookIsPlaying)
   }, [hookIsPlaying, onPlayingChange])
 
-  // Get match ID
-  const matchId = activeMatch?.id
+  // Get match ID (replay mode uses replayMatchId, otherwise activeMatch)
+  const matchId = replayMatchId ?? activeMatch?.id
 
   // Fetch battle data (card state initialization is handled by the hook)
   const fetchBattle = useCallback(async () => {
@@ -246,7 +252,9 @@ export function BattlePage({
       setLoading(true)
       setError(null)
 
-      const data = await apiClient.getBattle(matchId)
+      const data = isReplayMode
+        ? await apiClient.getBattleReplay(matchId)
+        : await apiClient.getBattle(matchId)
 
       // Validate required data is present
       if (!data.team_a_final?.cards || !data.team_b_final?.cards) {
@@ -271,7 +279,7 @@ export function BattlePage({
     } finally {
       setLoading(false)
     }
-  }, [matchId])
+  }, [matchId, isReplayMode])
 
   // Fetch on mount
   useEffect(() => {
@@ -309,12 +317,16 @@ export function BattlePage({
 
       // Play win/lose/draw sound based on battle outcome
       if (battleData) {
+        const isUserParticipant = userId === battleData.player_a_id || userId === battleData.player_b_id
         const isDraw = battleData.is_draw
         if (isDraw) {
           playSound('arena_battle_draw')
-        } else {
+        } else if (isUserParticipant) {
           const isUserWinner = battleData.winner_id === userId
           playSound(isUserWinner ? 'arena_battle_win' : 'arena_battle_lose')
+        } else {
+          // Spectators hear the win sound
+          playSound('arena_battle_win')
         }
       }
     }
@@ -431,16 +443,19 @@ export function BattlePage({
 
   // 1v1 format — existing rendering below
 
-  // Determine if current user is player A or B
+  // Determine if current user is a participant or spectator
+  const isParticipant = userId === battleData.player_a_id || userId === battleData.player_b_id
   const isPlayerA = userId === battleData.player_a_id
   const isWinner =
     battleData.winner_id === userId ||
     (battleData.is_draw && false) // No winner on draw
   const isDraw = battleData.is_draw
 
-  // Player labels
-  const playerALabel = userId === battleData.player_a_id ? 'You' : battleData.player_a_name
-  const playerBLabel = userId === battleData.player_b_id ? 'You' : battleData.player_b_name
+  // Player labels - spectators see real names for both sides
+  const playerALabel = !isParticipant ? battleData.player_a_name
+    : userId === battleData.player_a_id ? 'You' : battleData.player_a_name
+  const playerBLabel = !isParticipant ? battleData.player_b_name
+    : userId === battleData.player_b_id ? 'You' : battleData.player_b_name
 
   // Check if a card is currently in the arena
   const isCardInArena = (cardId: number, teamOwnerId: number): boolean => {
@@ -717,39 +732,58 @@ export function BattlePage({
             {/* Box 1: Emoji announcement */}
             <RPGPanel variant="inner" className="rpg-victory-announcement">
               <div className="victory-icon">
-                {isDraw ? '🤝' : isWinner ? '🏆' : '💀'}
+                {isDraw ? '🤝' : !isParticipant ? '⚔️' : isWinner ? '🏆' : '💀'}
               </div>
               <h2 className="victory-title">
                 {isDraw
                   ? 'Draw!'
-                  : isWinner
-                    ? 'Victory!'
-                    : 'Defeat'}
+                  : !isParticipant
+                    ? `${battleData.winner_id === battleData.player_a_id ? battleData.player_a_name : battleData.player_b_name} Wins!`
+                    : isWinner
+                      ? 'Victory!'
+                      : 'Defeat'}
               </h2>
               <p className="victory-subtitle">
                 {isDraw
                   ? 'Both players fought to a standstill'
-                  : isWinner
-                    ? 'You won the battle!'
-                    : `${battleData.winner_id === battleData.player_a_id ? battleData.player_a_name : battleData.player_b_name} wins!`}
+                  : !isParticipant
+                    ? `${battleData.player_a_name} vs ${battleData.player_b_name}`
+                    : isWinner
+                      ? 'You won the battle!'
+                      : `${battleData.winner_id === battleData.player_a_id ? battleData.player_a_name : battleData.player_b_name} wins!`}
               </p>
             </RPGPanel>
 
             {/* Box 2: Stats */}
             <RPGPanel variant="inner" className="rpg-victory-stats">
               <div className="rpg-stats-grid">
-                <div className="rpg-stat-card">
-                  <span className="rpg-stat-value">
-                    {isPlayerA ? battleData.team_a_damage : battleData.team_b_damage}
-                  </span>
-                  <span className="rpg-stat-label">Damage Dealt</span>
-                </div>
-                <div className="rpg-stat-card">
-                  <span className="rpg-stat-value">
-                    {isPlayerA ? battleData.team_b_damage : battleData.team_a_damage}
-                  </span>
-                  <span className="rpg-stat-label">Damage Taken</span>
-                </div>
+                {isParticipant ? (
+                  <>
+                    <div className="rpg-stat-card">
+                      <span className="rpg-stat-value">
+                        {isPlayerA ? battleData.team_a_damage : battleData.team_b_damage}
+                      </span>
+                      <span className="rpg-stat-label">Damage Dealt</span>
+                    </div>
+                    <div className="rpg-stat-card">
+                      <span className="rpg-stat-value">
+                        {isPlayerA ? battleData.team_b_damage : battleData.team_a_damage}
+                      </span>
+                      <span className="rpg-stat-label">Damage Taken</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="rpg-stat-card">
+                      <span className="rpg-stat-value">{battleData.team_a_damage}</span>
+                      <span className="rpg-stat-label">{battleData.player_a_name}</span>
+                    </div>
+                    <div className="rpg-stat-card">
+                      <span className="rpg-stat-value">{battleData.team_b_damage}</span>
+                      <span className="rpg-stat-label">{battleData.player_b_name}</span>
+                    </div>
+                  </>
+                )}
                 <div className="rpg-stat-card">
                   <span className="rpg-stat-value">{battleData.num_rounds}</span>
                   <span className="rpg-stat-label">Rounds</span>

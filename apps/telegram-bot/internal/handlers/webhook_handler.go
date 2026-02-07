@@ -6,12 +6,18 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"beef-briefing/apps/telegram-bot/internal/client"
 
 	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
+
+// winnerRevealDelay is the grace period before revealing the battle winner
+// in the group message, allowing users to open the mini-app first.
+const winnerRevealDelay = 30 * time.Second
 
 // WebhookHandler handles internal webhook requests for updating match messages
 type WebhookHandler struct {
@@ -100,30 +106,66 @@ func (h *WebhookHandler) HandleUpdateMatchMessage(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Build keyboard using shared function and update the message
-	keyboard := BuildMatchKeyboard(match.ID, match)
-
-	// Track bot update segment
-	var botSegment *newrelic.Segment
-	if txn != nil {
-		botSegment = txn.StartSegment("webhook:edit-message")
-	}
-	_, err = h.bot.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
-		ChatID:      req.ChatID,
-		MessageID:   int(req.TelegramMessageID),
-		ReplyMarkup: keyboard,
-	})
-	if botSegment != nil {
-		botSegment.End()
-	}
-	if err != nil {
-		if txn != nil {
-			txn.NoticeError(err)
+	// For completed matches, show a spoiler keyboard first, then reveal the winner after a delay
+	if match.Status == "completed" {
+		spoilerKeyboard := &models.InlineKeyboardMarkup{
+			InlineKeyboard: [][]models.InlineKeyboardButton{
+				{
+					{Text: "🎮 Open", CallbackGame: &models.CallbackGame{}},
+				},
+				{
+					{Text: "⚔️ Battle Finished! Winner: ???", CallbackData: "noop"},
+				},
+			},
 		}
-		slog.Error("failed to update match message via webhook", "match_id", req.MatchID, "chat_id", req.ChatID, "telegram_message_id", req.TelegramMessageID, "error", err)
-		// Don't return error - the update attempt was made
+
+		var botSegment *newrelic.Segment
+		if txn != nil {
+			botSegment = txn.StartSegment("webhook:edit-message-spoiler")
+		}
+		_, err = h.bot.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
+			ChatID:      req.ChatID,
+			MessageID:   int(req.TelegramMessageID),
+			ReplyMarkup: spoilerKeyboard,
+		})
+		if botSegment != nil {
+			botSegment.End()
+		}
+		if err != nil {
+			if txn != nil {
+				txn.NoticeError(err)
+			}
+			slog.Error("failed to update match message with spoiler", "match_id", req.MatchID, "chat_id", req.ChatID, "error", err)
+		} else {
+			slog.Info("updated match message with spoiler", "match_id", req.MatchID, "chat_id", req.ChatID)
+		}
+
+		// Reveal the real winner after a delay
+		go h.revealWinner(match, req.ChatID, req.TelegramMessageID)
 	} else {
-		slog.Info("updated match message via webhook", "match_id", req.MatchID, "chat_id", req.ChatID, "participant_count", len(match.Participants))
+		// Non-completed match: update keyboard normally
+		keyboard := BuildMatchKeyboard(match.ID, match)
+
+		var botSegment *newrelic.Segment
+		if txn != nil {
+			botSegment = txn.StartSegment("webhook:edit-message")
+		}
+		_, err = h.bot.EditMessageReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
+			ChatID:      req.ChatID,
+			MessageID:   int(req.TelegramMessageID),
+			ReplyMarkup: keyboard,
+		})
+		if botSegment != nil {
+			botSegment.End()
+		}
+		if err != nil {
+			if txn != nil {
+				txn.NoticeError(err)
+			}
+			slog.Error("failed to update match message via webhook", "match_id", req.MatchID, "chat_id", req.ChatID, "telegram_message_id", req.TelegramMessageID, "error", err)
+		} else {
+			slog.Info("updated match message via webhook", "match_id", req.MatchID, "chat_id", req.ChatID, "participant_count", len(match.Participants))
+		}
 	}
 
 	// Add success attribute
@@ -133,6 +175,25 @@ func (h *WebhookHandler) HandleUpdateMatchMessage(w http.ResponseWriter, r *http
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok"}`))
+}
+
+// revealWinner waits for the grace period then updates the match message
+// with the actual winner, replacing the "???" spoiler.
+func (h *WebhookHandler) revealWinner(match *client.ArenaMatch, chatID int64, telegramMessageID int64) {
+	time.Sleep(winnerRevealDelay)
+
+	keyboard := BuildMatchKeyboard(match.ID, match)
+
+	_, err := h.bot.EditMessageReplyMarkup(context.Background(), &bot.EditMessageReplyMarkupParams{
+		ChatID:      chatID,
+		MessageID:   int(telegramMessageID),
+		ReplyMarkup: keyboard,
+	})
+	if err != nil {
+		slog.Error("failed to reveal winner on match message", "match_id", match.ID, "chat_id", chatID, "error", err)
+	} else {
+		slog.Info("revealed winner on match message", "match_id", match.ID, "chat_id", chatID)
+	}
 }
 
 // BattleResultRequest is the request body for battle result DM notifications

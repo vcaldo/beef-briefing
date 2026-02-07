@@ -434,13 +434,6 @@ func (s *ShopService) BuyCard(ctx context.Context, matchID string, userID int64,
 		return nil, fmt.Errorf("failed to save shop state: %w", err)
 	}
 
-	// Disable reroll after first purchase (reroll is only allowed before any cards are bought)
-	if err := s.gameRepo.SetParticipantRerolled(ctx, matchID, userID); err != nil {
-		if txn := newrelic.FromContext(ctx); txn != nil {
-			txn.NoticeError(err)
-		}
-	}
-
 	// Record card transaction metric
 	recordCardTransaction(s.nrApp, "buy", matchID, userID, shop.CardCost, newCard.ATK, newCard.HP)
 

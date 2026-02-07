@@ -1109,7 +1109,8 @@ func TestHandleGalleryImageURL_ValidRequest(t *testing.T) {
 			t.Errorf("unexpected image_id: %d", imageID)
 		}
 		return &services.GalleryImageURLResponse{
-			URL: "https://storage.example.com/presigned/image.png",
+			ChatID: chatID,
+			URL:    "https://storage.example.com/presigned/image.png",
 		}, nil
 	}
 

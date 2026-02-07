@@ -1681,8 +1681,8 @@ func TestBuyCard_Success(t *testing.T) {
 	if !buyResp.Affordability.CanBuy {
 		t.Error("expected CanBuy to be true with 7 coins remaining")
 	}
-	if buyResp.Affordability.CanReroll {
-		t.Error("expected CanReroll to be false after first purchase")
+	if !buyResp.Affordability.CanReroll {
+		t.Error("expected CanReroll to be true after first purchase (reroll is once per match, not tied to purchases)")
 	}
 	if buyResp.Affordability.CanSubmit {
 		t.Error("expected CanSubmit to be false with only 1 card (need 3)")

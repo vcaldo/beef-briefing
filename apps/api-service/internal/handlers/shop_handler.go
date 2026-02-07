@@ -63,14 +63,14 @@ func (h *ArenaHandler) HandleBuyCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate match belongs to user's chat
-	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
-		return
-	}
-
 	var req BuyCardRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
 		return
 	}
 
@@ -138,14 +138,14 @@ func (h *ArenaHandler) HandleUpgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate match belongs to user's chat
-	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
-		return
-	}
-
 	var req UpgradeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
 		return
 	}
 
@@ -185,14 +185,14 @@ func (h *ArenaHandler) HandleSetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate match belongs to user's chat
-	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
-		return
-	}
-
 	var req SetOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.RespondError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
 		return
 	}
 

@@ -347,7 +347,7 @@ func BuildMatchKeyboard(matchID string, match *client.ArenaMatch) *models.Inline
 		return &models.InlineKeyboardMarkup{
 			InlineKeyboard: [][]models.InlineKeyboardButton{
 				{
-					{Text: "🎮 Open", CallbackGame: &models.CallbackGame{}},
+					{Text: "📺 Watch Battle", CallbackGame: &models.CallbackGame{}},
 				},
 				{
 					{Text: resultText, CallbackData: "noop"},

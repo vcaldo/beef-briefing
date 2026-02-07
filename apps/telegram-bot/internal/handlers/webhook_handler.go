@@ -114,7 +114,7 @@ func (h *WebhookHandler) HandleUpdateMatchMessage(w http.ResponseWriter, r *http
 					{Text: "🎮 Open", CallbackGame: &models.CallbackGame{}},
 				},
 				{
-					{Text: "⚔️ Battle Finished! Winner: ???", CallbackData: "noop"},
+					{Text: "⚔️ Battle in progress...", CallbackData: "noop"},
 				},
 			},
 		}

@@ -23,7 +23,6 @@ const (
 	JoinWindowDuration   = 5 * time.Minute
 )
 
-
 // ArenaService handles arena game logic
 type ArenaService struct {
 	db                *sql.DB
@@ -36,6 +35,7 @@ type ArenaService struct {
 	cardService       CardServiceInterface
 	nrApp             *newrelic.Application
 	botClient         BotClientInterface
+	betaGroups        map[int64]bool
 }
 
 // ArenaServiceDeps holds the dependencies for ArenaService.
@@ -46,7 +46,6 @@ type ArenaServiceDeps struct {
 	CardService   CardServiceInterface
 }
 
-
 // recordMatchEvent records a custom event for match lifecycle events.
 // eventType should be "created", "started", "completed", etc.
 func recordMatchEvent(nrApp *newrelic.Application, eventType string, matchID string, chatID int64, creatorID int64, matchType string) {
@@ -55,11 +54,11 @@ func recordMatchEvent(nrApp *newrelic.Application, eventType string, matchID str
 	}
 
 	params := map[string]interface{}{
-		"event_type":  eventType,
-		"match_id":    matchID,
-		"chat_id":     chatID,
-		"creator_id":  creatorID,
-		"match_type":  matchType,
+		"event_type": eventType,
+		"match_id":   matchID,
+		"chat_id":    chatID,
+		"creator_id": creatorID,
+		"match_type": matchType,
 	}
 
 	nrApp.RecordCustomEvent("arena.match.event", params)
@@ -75,11 +74,13 @@ func NewArenaService(
 	nrApp *newrelic.Application,
 	botClient BotClientInterface,
 	deps *ArenaServiceDeps,
+	betaGroups map[int64]bool,
 ) *ArenaService {
 	svc := &ArenaService{
-		db:        db,
-		nrApp:     nrApp,
-		botClient: botClient,
+		db:         db,
+		nrApp:      nrApp,
+		botClient:  botClient,
+		betaGroups: betaGroups,
 	}
 
 	if deps != nil {
@@ -109,6 +110,11 @@ func NewArenaService(
 	return svc
 }
 
+// IsBetaGroup checks if a chat ID is in the beta groups list
+func (s *ArenaService) IsBetaGroup(chatID int64) bool {
+	return s.betaGroups[chatID]
+}
+
 // MatchResponse represents a match with participant info
 type MatchResponse struct {
 	*repository.Match
@@ -118,14 +124,14 @@ type MatchResponse struct {
 
 // ShopAffordability represents what actions a player can afford
 type ShopAffordability struct {
-	CanBuy               bool    `json:"can_buy"`
-	CanReroll            bool    `json:"can_reroll"`
-	CanUpgrade           bool    `json:"can_upgrade"`
-	CanSubmit            bool    `json:"can_submit"`
-	BuyDisabledReason    *string `json:"buy_disabled_reason"`
-	RerollDisabledReason *string `json:"reroll_disabled_reason"`
+	CanBuy                bool    `json:"can_buy"`
+	CanReroll             bool    `json:"can_reroll"`
+	CanUpgrade            bool    `json:"can_upgrade"`
+	CanSubmit             bool    `json:"can_submit"`
+	BuyDisabledReason     *string `json:"buy_disabled_reason"`
+	RerollDisabledReason  *string `json:"reroll_disabled_reason"`
 	UpgradeDisabledReason *string `json:"upgrade_disabled_reason"`
-	SubmitDisabledReason *string `json:"submit_disabled_reason"`
+	SubmitDisabledReason  *string `json:"submit_disabled_reason"`
 }
 
 // EnhancedShopCard wraps ShopCard with affordability info
@@ -138,54 +144,54 @@ type EnhancedShopCard struct {
 // EnhancedTeamCard wraps Card with upgrade preview info
 type EnhancedTeamCard struct {
 	*battle.Card
-	CanUpgradeATK         bool    `json:"can_upgrade_atk"`
-	CanUpgradeHP          bool    `json:"can_upgrade_hp"`
+	CanUpgradeATK            bool    `json:"can_upgrade_atk"`
+	CanUpgradeHP             bool    `json:"can_upgrade_hp"`
 	UpgradeATKDisabledReason *string `json:"upgrade_atk_disabled_reason"`
 	UpgradeHPDisabledReason  *string `json:"upgrade_hp_disabled_reason"`
-	ATKIfUpgraded         int     `json:"atk_if_upgraded"`
-	HPIfUpgraded          int     `json:"hp_if_upgraded"`
-	MaxHPIfUpgraded       int     `json:"max_hp_if_upgraded"`
+	ATKIfUpgraded            int     `json:"atk_if_upgraded"`
+	HPIfUpgraded             int     `json:"hp_if_upgraded"`
+	MaxHPIfUpgraded          int     `json:"max_hp_if_upgraded"`
 }
 
 // EnhancedShopResponse is the full shop response with affordability and upgrade previews
 type EnhancedShopResponse struct {
-	MatchID              string                `json:"match_id"`
-	Status               string                `json:"status"`
-	Coins                int                   `json:"coins"`
-	Cards                []*EnhancedShopCard   `json:"cards"`
-	Team                 []*EnhancedTeamCard   `json:"team"`
-	TeamOrder            []int                 `json:"team_order"`
-	IsReady              bool                  `json:"is_ready"`
-	TeamSubmitted        bool                  `json:"team_submitted"`
-	Deadline             *time.Time            `json:"deadline,omitempty"`
-	TimeRemaining        int                   `json:"time_remaining_seconds"`
-	CanReroll            bool                  `json:"can_reroll"`
-	Affordability        ShopAffordability     `json:"affordability"`
+	MatchID       string              `json:"match_id"`
+	Status        string              `json:"status"`
+	Coins         int                 `json:"coins"`
+	Cards         []*EnhancedShopCard `json:"cards"`
+	Team          []*EnhancedTeamCard `json:"team"`
+	TeamOrder     []int               `json:"team_order"`
+	IsReady       bool                `json:"is_ready"`
+	TeamSubmitted bool                `json:"team_submitted"`
+	Deadline      *time.Time          `json:"deadline,omitempty"`
+	TimeRemaining int                 `json:"time_remaining_seconds"`
+	CanReroll     bool                `json:"can_reroll"`
+	Affordability ShopAffordability   `json:"affordability"`
 }
 
 // BattleResponse represents battle results in the format the frontend expects
 type BattleResponse struct {
-	MatchID     string               `json:"match_id"`
-	WinnerID    *int64               `json:"winner_id,omitempty"`
-	IsDraw      bool                 `json:"is_draw"`
-	Combats     []battle.Combat      `json:"combats"`
-	Events      []battle.BattleEvent `json:"events"`
-	NumCombats  int                  `json:"num_combats"`
-	NumRounds   int                  `json:"num_rounds"`
-	TeamADamage int                  `json:"team_a_damage"`
-	TeamBDamage int                  `json:"team_b_damage"`
-	DamageDealt int                  `json:"damage_dealt"`
-	DamageTaken int                  `json:"damage_taken"`
-	TeamAFinal  *battle.Team         `json:"team_a_final"`
-	TeamBFinal  *battle.Team         `json:"team_b_final"`
-	PlayerAID   int64                `json:"player_a_id"`
-	PlayerBID   int64                `json:"player_b_id"`
-	PlayerAName string               `json:"player_a_name"`
-	PlayerBName string               `json:"player_b_name"`
-	Format        string             `json:"format"`
-	BracketRounds []BracketRound     `json:"bracket_rounds,omitempty"`
-	Standings     []ArenaStanding    `json:"standings,omitempty"`
-	FfaRounds     []FfaRoundSummary  `json:"ffa_rounds,omitempty"`
+	MatchID       string               `json:"match_id"`
+	WinnerID      *int64               `json:"winner_id,omitempty"`
+	IsDraw        bool                 `json:"is_draw"`
+	Combats       []battle.Combat      `json:"combats"`
+	Events        []battle.BattleEvent `json:"events"`
+	NumCombats    int                  `json:"num_combats"`
+	NumRounds     int                  `json:"num_rounds"`
+	TeamADamage   int                  `json:"team_a_damage"`
+	TeamBDamage   int                  `json:"team_b_damage"`
+	DamageDealt   int                  `json:"damage_dealt"`
+	DamageTaken   int                  `json:"damage_taken"`
+	TeamAFinal    *battle.Team         `json:"team_a_final"`
+	TeamBFinal    *battle.Team         `json:"team_b_final"`
+	PlayerAID     int64                `json:"player_a_id"`
+	PlayerBID     int64                `json:"player_b_id"`
+	PlayerAName   string               `json:"player_a_name"`
+	PlayerBName   string               `json:"player_b_name"`
+	Format        string               `json:"format"`
+	BracketRounds []BracketRound       `json:"bracket_rounds,omitempty"`
+	Standings     []ArenaStanding      `json:"standings,omitempty"`
+	FfaRounds     []FfaRoundSummary    `json:"ffa_rounds,omitempty"`
 }
 
 // BracketRound represents a single round in a bracket tournament (e.g., "Semifinals", "Final")
@@ -398,6 +404,17 @@ func (s *ArenaService) JoinMatch(ctx context.Context, matchID string, userID int
 	// Check join deadline for regular matches
 	if match.JoinDeadline != nil && time.Now().After(*match.JoinDeadline) {
 		return nil, apperror.ErrMatchNotOpen
+	}
+
+	// Non-beta groups are limited to 1v1 matches
+	if !s.IsBetaGroup(match.ChatID) {
+		count, err := s.gameRepo.GetParticipantCount(ctx, matchID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get participant count: %w", err)
+		}
+		if count >= 2 {
+			return nil, apperror.ErrMatchFullNonBeta
+		}
 	}
 
 	// Add participant

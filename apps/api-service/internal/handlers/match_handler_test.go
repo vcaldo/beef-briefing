@@ -22,7 +22,7 @@ func setupMatchTestHandler(t *testing.T) (*ArenaHandler, func()) {
 	tdb := testutil.SetupTestDB(t)
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
 	return handler, func() { testutil.TeardownTestDB(t, tdb) }

@@ -948,7 +948,7 @@ func TestCreateMatch_Success(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1014,7 +1014,7 @@ func TestCreateMatch_NotEnoughCards(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1050,7 +1050,7 @@ func TestCreateMatch_ActiveMatchExists(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1088,7 +1088,7 @@ func TestJoinMatch_Success(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1127,7 +1127,7 @@ func TestJoinMatch_NotOpen(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1168,7 +1168,7 @@ func TestStartMatch_Success(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1222,7 +1222,7 @@ func TestStartMatch_NotCreator(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1265,7 +1265,7 @@ func TestStartMatch_NotEnoughParticipants(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1307,7 +1307,7 @@ func TestGetShop_Success(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1446,7 +1446,7 @@ func TestGetShop_AfterTeamSubmitted(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1601,7 +1601,7 @@ func TestBuyCard_Success(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1743,7 +1743,7 @@ func TestBuyCard_NotEnoughCoins(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1842,7 +1842,7 @@ func TestBuyCard_TeamFull(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -1968,7 +1968,7 @@ func TestReroll_Success(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -2115,7 +2115,7 @@ func TestReroll_AfterPurchase(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -2205,7 +2205,7 @@ func TestSubmitTeam_Success(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -2432,7 +2432,7 @@ func TestExecuteBattle_1v1(t *testing.T) {
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, nil)
 
 	ctx := context.Background()
 
@@ -2713,11 +2713,12 @@ func TestExecuteBattle_Arena(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(20)
 
+	// Beta group required for 3+ player matches
 	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, map[int64]bool{testChatID: true})
 
 	ctx := context.Background()
 
@@ -2987,11 +2988,12 @@ func TestExecuteBattle_Bracket(t *testing.T) {
 	mockRepo := newMockGameRepository()
 	mockCards := newMockCardService(25)
 
+	// Beta group required for 3+ player matches
 	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
 		GameRepo:      mockRepo,
 		StorageClient: mockMinIO,
 		CardService:   mockCards,
-	})
+	}, map[int64]bool{testChatID: true})
 
 	ctx := context.Background()
 
@@ -3188,4 +3190,122 @@ func TestExecuteBattle_Bracket(t *testing.T) {
 	// Log bracket summary
 	t.Logf("Bracket battle completed: %d rounds, winner: user %d",
 		len(rounds), *match.WinnerUserID)
+}
+
+// TestJoinMatch_NonBetaGroupRejects3rdPlayer tests that non-beta groups cannot have 3+ players
+func TestJoinMatch_NonBetaGroupRejects3rdPlayer(t *testing.T) {
+	tdb := setupArenaTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
+
+	seedTestCards(t, tdb, 15)
+	defer cleanupArenaTestData(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	mockRepo := newMockGameRepository()
+	mockCards := newMockCardService(15)
+
+	// No beta groups - empty map
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
+		GameRepo:      mockRepo,
+		StorageClient: mockMinIO,
+		CardService:   mockCards,
+	}, map[int64]bool{})
+
+	ctx := context.Background()
+
+	// Create match (creator auto-joins = 1 participant)
+	createResp, err := svc.CreateMatch(ctx, testChatID, testCreatorUserID)
+	if err != nil {
+		t.Fatalf("CreateMatch failed: %v", err)
+	}
+
+	// Join as 2nd player - should succeed
+	_, err = svc.JoinMatch(ctx, createResp.Match.ID, testJoinerUserID)
+	if err != nil {
+		t.Fatalf("JoinMatch (2nd player) failed: %v", err)
+	}
+
+	// Join as 3rd player - should fail for non-beta group
+	thirdUserID := int64(900000003)
+	_, err = svc.JoinMatch(ctx, createResp.Match.ID, thirdUserID)
+	if err == nil {
+		t.Fatal("expected error for 3rd player in non-beta group, got nil")
+	}
+
+	if !errors.Is(err, apperror.ErrMatchFullNonBeta) {
+		t.Errorf("expected apperror.ErrMatchFullNonBeta, got %v", err)
+	}
+}
+
+// TestJoinMatch_BetaGroupAllows3rdPlayer tests that beta groups can have 3+ players
+func TestJoinMatch_BetaGroupAllows3rdPlayer(t *testing.T) {
+	tdb := setupArenaTestDB(t)
+	defer testutil.TeardownTestDB(t, tdb)
+	defer cleanupArenaTables(t, tdb)
+
+	seedTestCards(t, tdb, 15)
+	defer cleanupArenaTestData(t, tdb)
+
+	mockMinIO := testutil.NewMockMinIOClient()
+	mockRepo := newMockGameRepository()
+	mockCards := newMockCardService(15)
+
+	// testChatID is in beta groups
+	betaGroups := map[int64]bool{testChatID: true}
+	svc := NewArenaService(tdb.DB, mockMinIO, mockCards, nil, nil, &ArenaServiceDeps{
+		GameRepo:      mockRepo,
+		StorageClient: mockMinIO,
+		CardService:   mockCards,
+	}, betaGroups)
+
+	ctx := context.Background()
+
+	// Create match (creator auto-joins = 1 participant)
+	createResp, err := svc.CreateMatch(ctx, testChatID, testCreatorUserID)
+	if err != nil {
+		t.Fatalf("CreateMatch failed: %v", err)
+	}
+
+	// Join as 2nd player
+	_, err = svc.JoinMatch(ctx, createResp.Match.ID, testJoinerUserID)
+	if err != nil {
+		t.Fatalf("JoinMatch (2nd player) failed: %v", err)
+	}
+
+	// Join as 3rd player - should succeed for beta group
+	thirdUserID := int64(900000003)
+	joinResp, err := svc.JoinMatch(ctx, createResp.Match.ID, thirdUserID)
+	if err != nil {
+		t.Fatalf("JoinMatch (3rd player) in beta group failed: %v", err)
+	}
+
+	if len(joinResp.Participants) != 3 {
+		t.Errorf("expected 3 participants, got %d", len(joinResp.Participants))
+	}
+}
+
+// TestIsBetaGroup tests the IsBetaGroup method
+func TestIsBetaGroup(t *testing.T) {
+	mockMinIO := testutil.NewMockMinIOClient()
+	mockCards := newMockCardService(0)
+
+	betaGroups := map[int64]bool{-1001234567890: true, -1009876543210: true}
+	svc := NewArenaService(nil, mockMinIO, mockCards, nil, nil, nil, betaGroups)
+
+	if !svc.IsBetaGroup(-1001234567890) {
+		t.Error("expected true for listed group")
+	}
+	if !svc.IsBetaGroup(-1009876543210) {
+		t.Error("expected true for listed group")
+	}
+	if svc.IsBetaGroup(-1005555555555) {
+		t.Error("expected false for unlisted group")
+	}
+
+	// nil beta groups
+	svc2 := NewArenaService(nil, mockMinIO, mockCards, nil, nil, nil, nil)
+	if svc2.IsBetaGroup(-1001234567890) {
+		t.Error("expected false for nil beta groups")
+	}
 }

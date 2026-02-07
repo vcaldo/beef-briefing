@@ -280,7 +280,7 @@ func TestCreateMatch_Returns400OnMissingChatID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -318,7 +318,7 @@ func TestCreateMatch_Returns400OnBadRequest(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -362,7 +362,7 @@ func TestCreateMatch_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -398,7 +398,7 @@ func TestCreateMatch_Returns403OnForbidden(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -446,7 +446,7 @@ func TestGetMatch_Returns404OnNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -499,7 +499,7 @@ func TestErrorResponse_JSONStructure(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -554,7 +554,7 @@ func TestListMatches_Returns200OnSuccess(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -595,7 +595,7 @@ func TestListMatches_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -617,7 +617,7 @@ func TestListMatches_Returns400OnMissingChatID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -653,7 +653,7 @@ func TestJoinMatch_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -677,7 +677,7 @@ func TestJoinMatch_Returns400OnMissingMatchID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -710,7 +710,7 @@ func TestJoinMatch_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -747,7 +747,7 @@ func TestLeaveMatch_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -771,7 +771,7 @@ func TestLeaveMatch_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -808,7 +808,7 @@ func TestStartMatch_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -832,7 +832,7 @@ func TestStartMatch_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -869,7 +869,7 @@ func TestGetShop_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -893,7 +893,7 @@ func TestGetShop_Returns400OnMissingMatchID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -926,7 +926,7 @@ func TestGetShop_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -963,7 +963,7 @@ func TestBuyCard_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -990,7 +990,7 @@ func TestBuyCard_Returns400OnInvalidJSON(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1024,7 +1024,7 @@ func TestBuyCard_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1064,7 +1064,7 @@ func TestReroll_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1088,7 +1088,7 @@ func TestReroll_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1125,7 +1125,7 @@ func TestUpgrade_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1152,7 +1152,7 @@ func TestUpgrade_Returns400OnInvalidJSON(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1186,7 +1186,7 @@ func TestUpgrade_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1226,7 +1226,7 @@ func TestSetOrder_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1253,7 +1253,7 @@ func TestSetOrder_Returns400OnInvalidJSON(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1291,7 +1291,7 @@ func TestSubmitTeam_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1315,7 +1315,7 @@ func TestSubmitTeam_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1352,7 +1352,7 @@ func TestGetBattle_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1376,7 +1376,7 @@ func TestGetBattle_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1410,7 +1410,7 @@ func TestHandleGetBattle_ReturnsDamageSummary(t *testing.T) {
 	// Setup services
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1568,7 +1568,7 @@ func TestGetLeaderboard_Returns200OnSuccess(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1613,7 +1613,7 @@ func TestGetLeaderboard_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1635,7 +1635,7 @@ func TestGetLeaderboard_UsesDefaultType(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1677,7 +1677,7 @@ func TestGetLeaderboard_Returns400OnMissingChatID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1722,7 +1722,7 @@ func TestGetLeaderboard_TypeRegular(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1762,7 +1762,7 @@ func TestGetLeaderboard_CustomPagination(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1808,7 +1808,7 @@ func TestGetLeaderboard_ResponseStructure(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1867,7 +1867,7 @@ func TestGetLeaderboard_AccessDenied(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1900,7 +1900,7 @@ func TestGetLeaderboard_EmptyLeaderboard(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1950,7 +1950,7 @@ func TestGetLeaderboard_LimitClamping(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -1996,7 +1996,7 @@ func TestGetConstants_Returns200OnSuccess(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2052,7 +2052,7 @@ func TestGetHistory_Returns200OnSuccess(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2099,7 +2099,7 @@ func TestGetHistory_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2125,7 +2125,7 @@ func TestGetProfile_Returns200OnSuccess(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2167,7 +2167,7 @@ func TestGetProfile_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2193,7 +2193,7 @@ func TestGetH2H_Returns200OnSuccess(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2235,7 +2235,7 @@ func TestGetH2H_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2257,7 +2257,7 @@ func TestGetH2H_Returns400OnMissingOpponentID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2293,7 +2293,7 @@ func TestShareResult_Returns401OnUnauthorized(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2317,7 +2317,7 @@ func TestShareResult_Returns400OnMissingMatchID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2350,7 +2350,7 @@ func TestShareResult_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2387,7 +2387,7 @@ func TestBotCreateMatch_Returns400OnMissingFields(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2412,7 +2412,7 @@ func TestBotCreateMatch_Returns400OnInvalidJSON(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2434,7 +2434,7 @@ func TestBotGetMatch_Returns400OnMissingMatchID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2456,7 +2456,7 @@ func TestBotGetMatch_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2479,7 +2479,7 @@ func TestBotJoinMatch_Returns400OnMissingUserID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2505,7 +2505,7 @@ func TestBotJoinMatch_Returns400OnInvalidJSON(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2529,7 +2529,7 @@ func TestBotLeaveMatch_Returns400OnMissingUserID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2555,7 +2555,7 @@ func TestBotStartMatch_Returns400OnMissingUserID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2581,7 +2581,7 @@ func TestBotGetPendingMatches_Returns200OnSuccess(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2612,7 +2612,7 @@ func TestBotAutoStartMatch_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2635,7 +2635,7 @@ func TestBotForceSubmitTeams_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2658,7 +2658,7 @@ func TestBotGetShareData_Returns400OnMissingMatchID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2680,7 +2680,7 @@ func TestBotGetShareData_Returns404OnMatchNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2707,7 +2707,7 @@ func TestBotGetTodayTournament_Returns400OnMissingChatID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2737,7 +2737,7 @@ func TestBotGetTodayTournament_Returns400OnMissingDate(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2767,7 +2767,7 @@ func TestBotGetTodayTournament_Returns200OnNoTournament(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2797,7 +2797,7 @@ func TestBotGetTournament_Returns400OnInvalidID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2819,7 +2819,7 @@ func TestBotGetTournament_Returns404OnNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2841,7 +2841,7 @@ func TestBotGetPendingAnnouncements_Returns200(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2870,7 +2870,7 @@ func TestBotAnnounceTournament_Returns400OnMissingFields(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2895,7 +2895,7 @@ func TestBotAnnounceTournament_Returns400OnInvalidJSON(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2917,7 +2917,7 @@ func TestBotJoinTournament_Returns400OnMissingFields(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2942,7 +2942,7 @@ func TestBotJoinTournament_Returns400OnInvalidJSON(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2964,7 +2964,7 @@ func TestBotJoinTournament_Returns404OnNoTournament(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -2989,7 +2989,7 @@ func TestBotLeaveTournament_Returns400OnMissingFields(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -3014,7 +3014,7 @@ func TestBotLeaveTournament_Returns400OnInvalidJSON(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -3036,7 +3036,7 @@ func TestBotLeaveTournament_Returns404OnNoTournament(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -3061,7 +3061,7 @@ func TestBotGetPendingClose_Returns200(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -3090,7 +3090,7 @@ func TestBotCloseTournament_Returns400OnInvalidID(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -3112,7 +3112,7 @@ func TestBotCloseTournament_Returns404OnNotFound(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -3134,7 +3134,7 @@ func TestBotGetPendingRounds_Returns200(t *testing.T) {
 
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	cfg := &config.Config{}
 	handler := NewArenaHandler(arenaService, cfg, nil)
@@ -3245,7 +3245,7 @@ func TestGetShop_IncludesPlaceholderPositions(t *testing.T) {
 	// Setup services
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	// Create a match
 	match, err := arenaService.CreateMatch(context.Background(), chatID, user1ID)
@@ -3452,7 +3452,7 @@ func TestGetBattle_IncludesPlaceholderPositions(t *testing.T) {
 	// Setup services
 	mockMinIO := testutil.NewMockMinIOClient()
 	cardService := services.NewCardService(tdb.DB, mockMinIO, nil, nil)
-	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil)
+	arenaService := services.NewArenaService(tdb.DB, mockMinIO, cardService, nil, nil, nil, nil)
 
 	// Create a match
 	match, err := arenaService.CreateMatch(context.Background(), chatID, user1ID)

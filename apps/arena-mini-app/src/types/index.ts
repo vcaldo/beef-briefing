@@ -1203,6 +1203,8 @@ export interface GameConstants {
   hp_bar_thresholds: HpBarThresholds
   /** Countdown timer urgency thresholds */
   timer_thresholds: TimerThresholds
+  /** Whether this group has beta features (tournament mode, ranked matches) */
+  is_beta_group: boolean
 }
 
 // =============================================================================

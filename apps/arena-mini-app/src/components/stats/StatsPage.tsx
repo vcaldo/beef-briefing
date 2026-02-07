@@ -37,9 +37,10 @@ const PAGE_SIZE = 20
 interface StatsPageProps {
   chatId: number
   userId: number
+  isBetaGroup: boolean
 }
 
-export function StatsPage({ chatId, userId }: StatsPageProps) {
+export function StatsPage({ chatId, userId, isBetaGroup }: StatsPageProps) {
   // Sub-tab state
   const [activeSubTab, setActiveSubTab] = useState<StatsSubTab>('leaderboard')
 
@@ -388,23 +389,25 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
 
     return (
       <>
-        {/* Type toggle - outside the panel */}
-        <div className="rpg-type-toggle">
-          <GameButton
-            variant={leaderboardType === 'regular' ? 'primary' : 'neutral'}
-            size="sm"
-            onClick={() => handleLeaderboardTypeChange('regular')}
-          >
-            Casual
-          </GameButton>
-          <GameButton
-            variant={leaderboardType === 'ranked' ? 'primary' : 'neutral'}
-            size="sm"
-            onClick={() => handleLeaderboardTypeChange('ranked')}
-          >
-            Ranked
-          </GameButton>
-        </div>
+        {/* Type toggle - outside the panel (only show ranked option for beta groups) */}
+        {isBetaGroup && (
+          <div className="rpg-type-toggle">
+            <GameButton
+              variant={leaderboardType === 'regular' ? 'primary' : 'neutral'}
+              size="sm"
+              onClick={() => handleLeaderboardTypeChange('regular')}
+            >
+              Casual
+            </GameButton>
+            <GameButton
+              variant={leaderboardType === 'ranked' ? 'primary' : 'neutral'}
+              size="sm"
+              onClick={() => handleLeaderboardTypeChange('ranked')}
+            >
+              Ranked
+            </GameButton>
+          </div>
+        )}
 
         <RPGPanel variant="outer" className="stats-outer-panel">
           {/* Leaderboard list */}

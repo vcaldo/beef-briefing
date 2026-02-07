@@ -428,7 +428,7 @@ export function LobbyPage({
                   ))}
                 </div>
                 <span className="participants-count">
-                  {activeMatch.participants?.length || 0} / {activeMatch.format === '1v1' ? '2' : '∞'}
+                  {activeMatch.participants?.length || 0} / {gameConstants?.is_beta_group ? '∞' : '2'}
                 </span>
               </div>
 
@@ -549,7 +549,7 @@ export function LobbyPage({
                               ))}
                             </div>
                             <span className="participants-count">
-                              {participantCount} / {match.format === '1v1' ? '2' : '∞'}
+                              {participantCount} / {gameConstants?.is_beta_group ? '∞' : '2'}
                             </span>
                           </div>
 

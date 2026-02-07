@@ -38,9 +38,13 @@ func main() {
 	// Setup logger
 	setupLogger(cfg)
 
+	// Parse beta groups
+	betaGroups := cfg.ParseBetaGroups()
+
 	slog.Info("starting api-service",
 		"environment", cfg.Environment,
 		"api_port", cfg.APIPort,
+		"beta_groups_count", len(betaGroups),
 	)
 
 	// Initialize New Relic APM (optional - continues without if not configured)
@@ -101,7 +105,7 @@ func main() {
 	}
 
 	// Setup HTTP router
-	router := setupRouter(db, minioClient, cfg, nrApp)
+	router := setupRouter(db, minioClient, cfg, nrApp, betaGroups)
 
 	// Create HTTP server
 	server := &http.Server{
@@ -185,7 +189,7 @@ func initDatabase(cfg *config.Config) (*sql.DB, error) {
 	return db, nil
 }
 
-func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Config, nrApp *newrelic.Application) *mux.Router {
+func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Config, nrApp *newrelic.Application, betaGroups map[int64]bool) *mux.Router {
 	router := mux.NewRouter()
 
 	// Health check endpoint - MUST be registered BEFORE auth middleware (unauthenticated)
@@ -260,7 +264,7 @@ func setupRouter(db *sql.DB, minioClient *storage.MinIOClient, cfg *config.Confi
 		}
 
 		// Arena game service and handler - now with botClient for battle completion notifications
-		arenaService := services.NewArenaService(db, minioClient, cardService, nrApp, botClient, nil)
+		arenaService := services.NewArenaService(db, minioClient, cardService, nrApp, botClient, nil, betaGroups)
 
 		arenaHandler = handlers.NewArenaHandler(arenaService, cfg, botClient)
 

@@ -287,6 +287,7 @@ function App() {
           <StatsPage
             chatId={chatId}
             userId={userId}
+            isBetaGroup={gameConstants?.is_beta_group ?? false}
           />
         )
       default:

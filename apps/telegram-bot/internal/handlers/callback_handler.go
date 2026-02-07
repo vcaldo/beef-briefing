@@ -302,7 +302,8 @@ func (h *CallbackHandler) answerCallback(ctx context.Context, b *bot.Bot, callba
 	}
 }
 
-// handleMatchStats handles the match_stats callback - opens the game directly to stats view
+// handleMatchStats handles the match_stats callback - sends a message with a URL button to open stats.
+// Note: AnswerCallbackQuery with URL only works for CallbackGame buttons, so we send a message instead.
 func (h *CallbackHandler) handleMatchStats(ctx context.Context, b *bot.Bot, callback *models.CallbackQuery, matchID string, userID, chatID int64) {
 	// Generate timestamp and signature for Games API authentication
 	ts := time.Now().Unix()
@@ -319,17 +320,34 @@ func (h *CallbackHandler) handleMatchStats(ctx context.Context, b *bot.Bot, call
 		sig,
 	)
 
-	// Answer callback query with game URL - this opens the URL in browser/webview
-	_, err := b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
-		CallbackQueryID: callback.ID,
-		URL:             gameURL,
+	// Answer callback to dismiss loading indicator
+	h.answerCallback(ctx, b, callback.ID, "")
+
+	// Build display name
+	name := callback.From.FirstName
+	if callback.From.Username != "" {
+		name = "@" + callback.From.Username
+	}
+
+	// Send message with URL button to open stats
+	keyboard := &models.InlineKeyboardMarkup{
+		InlineKeyboard: [][]models.InlineKeyboardButton{
+			{{Text: "📊 Open Stats", URL: gameURL}},
+		},
+	}
+
+	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:      chatID,
+		Text:        fmt.Sprintf("%s, here are your match stats:", name),
+		ParseMode:   models.ParseModeMarkdown,
+		ReplyMarkup: keyboard,
 	})
 	if err != nil {
-		slog.Error("failed to answer match stats callback", "error", err)
+		slog.Error("failed to send stats link message", "error", err)
 		return
 	}
 
-	slog.Info("match stats callback answered", "user_id", userID, "chat_id", chatID, "match_id", matchID)
+	slog.Info("match stats link sent", "user_id", userID, "chat_id", chatID, "match_id", matchID)
 }
 
 // handleGameCallback processes game button clicks

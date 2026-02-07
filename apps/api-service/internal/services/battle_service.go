@@ -590,6 +590,11 @@ func bracketRoundName(numMatches int) string {
 func (s *BattleService) runBracket(ctx context.Context, matchID string, participants []*repository.ParticipantWithUser) (*BattleResponse, error) {
 	defer nrutil.StartSegment(ctx, "service:battle:run-bracket")()
 
+	// Validate even participant count
+	if len(participants)%2 != 0 {
+		return nil, fmt.Errorf("bracket format requires even participant count, got %d", len(participants))
+	}
+
 	// Build name and photo lookup maps
 	nameMap := make(map[int64]string)
 	photoMap := make(map[int64]string)

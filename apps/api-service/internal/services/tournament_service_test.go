@@ -539,8 +539,8 @@ func TestCloseAndStartTournament_TwoParticipants_1v1Format(t *testing.T) {
 	}
 }
 
-// TestCloseAndStartTournament_ThreeOrMoreParticipants_ArenaFormat verifies arena format.
-func TestCloseAndStartTournament_ThreeOrMoreParticipants_ArenaFormat(t *testing.T) {
+// TestCloseAndStartTournament_OddParticipants_FreeForAllFormat verifies odd participants get free-for-all format.
+func TestCloseAndStartTournament_OddParticipants_FreeForAllFormat(t *testing.T) {
 	ctx := context.Background()
 	mockRepo := testutil.NewMockGameRepository()
 	mockDealer := testutil.NewMockDealer()
@@ -550,7 +550,7 @@ func TestCloseAndStartTournament_ThreeOrMoreParticipants_ArenaFormat(t *testing.
 	tournamentID := int64(1)
 	mockDealer.SetCardCount(15)
 
-	// Setup open tournament with 3 participants
+	// Setup open tournament with 3 participants (odd)
 	tournament := newOpenTournament(tournamentID, chatID, "2025-01-17")
 	mockRepo.AddTournament(tournament)
 	_ = mockRepo.AddTournamentParticipant(ctx, tournamentID, 1)
@@ -570,11 +570,51 @@ func TestCloseAndStartTournament_ThreeOrMoreParticipants_ArenaFormat(t *testing.
 	if result.Skipped {
 		t.Error("expected tournament not skipped")
 	}
-	if result.Format != repository.MatchFormatArena {
-		t.Errorf("expected format Arena, got %s", result.Format)
+	if result.Format != repository.MatchFormatFreeForAll {
+		t.Errorf("expected format free_for_all, got %s", result.Format)
 	}
 	if result.ParticipantCount != 3 {
 		t.Errorf("expected 3 participants, got %d", result.ParticipantCount)
+	}
+}
+
+// TestCloseAndStartTournament_EvenParticipants_BracketFormat verifies even participants get bracket format.
+func TestCloseAndStartTournament_EvenParticipants_BracketFormat(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := testutil.NewMockGameRepository()
+	mockDealer := testutil.NewMockDealer()
+	svc := newTestTournamentService(mockRepo, mockDealer)
+
+	chatID := int64(-100123)
+	tournamentID := int64(1)
+	mockDealer.SetCardCount(15)
+
+	// Setup open tournament with 4 participants (even)
+	tournament := newOpenTournament(tournamentID, chatID, "2025-01-17")
+	mockRepo.AddTournament(tournament)
+	_ = mockRepo.AddTournamentParticipant(ctx, tournamentID, 1)
+	_ = mockRepo.AddTournamentParticipant(ctx, tournamentID, 2)
+	_ = mockRepo.AddTournamentParticipant(ctx, tournamentID, 3)
+	_ = mockRepo.AddTournamentParticipant(ctx, tournamentID, 4)
+
+	// Execute
+	result, err := svc.CloseAndStartTournament(ctx, tournamentID)
+
+	// Verify
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Skipped {
+		t.Error("expected tournament not skipped")
+	}
+	if result.Format != repository.MatchFormatBracket {
+		t.Errorf("expected format bracket, got %s", result.Format)
+	}
+	if result.ParticipantCount != 4 {
+		t.Errorf("expected 4 participants, got %d", result.ParticipantCount)
 	}
 }
 

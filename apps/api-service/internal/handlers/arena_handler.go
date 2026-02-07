@@ -179,6 +179,8 @@ func handleServiceError(ctx context.Context, w http.ResponseWriter, err error, e
 		httputil.RespondError(w, "only the match creator can perform this action", http.StatusForbidden)
 	case apperror.ErrAlreadyJoined:
 		httputil.RespondError(w, "already joined this match", http.StatusBadRequest)
+	case apperror.ErrRoundNotFound:
+		httputil.RespondError(w, "round not found", http.StatusNotFound)
 
 	// Match state errors
 	case apperror.ErrMatchNotInShopPhase:

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"beef-briefing/apps/api-service/internal/apperror"
@@ -290,9 +291,17 @@ func (s *TournamentService) CloseAndStartTournament(ctx context.Context, tournam
 	var format repository.MatchFormat
 	if len(participants) == 2 {
 		format = repository.MatchFormat1v1
+	} else if len(participants)%2 == 0 {
+		format = repository.MatchFormatBracket
 	} else {
-		format = repository.MatchFormatArena
+		format = repository.MatchFormatFreeForAll
 	}
+
+	slog.Info("tournament format determined",
+		"tournament_id", tournamentID,
+		"participant_count", len(participants),
+		"format", string(format),
+	)
 
 	// Create ranked match
 	tournamentDate := tournament.TournamentDate

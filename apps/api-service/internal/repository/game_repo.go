@@ -153,8 +153,10 @@ const (
 type MatchFormat string
 
 const (
-	MatchFormat1v1   MatchFormat = "1v1"
-	MatchFormatArena MatchFormat = "arena"
+	MatchFormat1v1       MatchFormat = "1v1"
+	MatchFormatArena     MatchFormat = "arena"
+	MatchFormatBracket   MatchFormat = "bracket"
+	MatchFormatFreeForAll MatchFormat = "free_for_all"
 )
 
 // MatchStatus enum
@@ -331,6 +333,8 @@ type TournamentInfo struct {
 type MatchHistoryEntry struct {
 	MatchID          string    `json:"match_id"`
 	MatchType        MatchType `json:"match_type"`
+	Format           string    `json:"format"`       // "1v1", "bracket", "free_for_all"
+	PlayerCount      int       `json:"player_count"` // number of participants
 	OpponentID       int64     `json:"opponent_id"`
 	OpponentName     string    `json:"opponent_name"`
 	OpponentUser     string    `json:"opponent_username,omitempty"`

@@ -666,7 +666,11 @@ export function StatsPage({ chatId, userId }: StatsPageProps) {
                     size="small"
                   />
                   <div className="rpg-history-details">
-                    <div className="rpg-history-opponent">vs {match.opponent.first_name}</div>
+                    <div className="rpg-history-opponent">
+                      {match.player_count > 2
+                        ? `${match.format === 'bracket' ? 'Bracket' : 'FFA'} (${match.player_count}P)`
+                        : `vs ${match.opponent.first_name}`}
+                    </div>
                     <div className="rpg-history-meta">
                       <span className="rpg-history-type">
                         {match.match_type === 'ranked' ? '🏆' : '⚔️'}

@@ -419,50 +419,70 @@ func (r *MatchRepository) UpdateLeaderboard(ctx context.Context, userID, chatID 
 func (r *MatchRepository) GetMatchHistory(ctx context.Context, chatID, userID int64, limit, offset int) ([]*MatchHistoryEntry, int, error) {
 	defer nrutil.StartSegment(ctx, "db:get-match-history")()
 
-	// Count total matches
+	// Count total matches (one row per match via game_match_participants)
 	var total int
 	countQuery := `
 		SELECT COUNT(*)
-		FROM game_match_rounds r
-		JOIN game_matches m ON r.match_id = m.id
+		FROM game_matches m
+		JOIN game_match_participants p ON p.match_id = m.id AND p.user_id = $2
 		WHERE m.chat_id = $1
 		  AND m.status = 'completed'
-		  AND (r.player_a_id = $2 OR r.player_b_id = $2)
 	`
 	if err := r.db.QueryRowContext(ctx, countQuery, chatID, userID).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("failed to count match history: %w", err)
 	}
 
-	// Get match history with user profile photos
+	// Get match history — one row per match.
+	// Uses game_matches as primary table to avoid duplicates from multi-round formats.
+	// A lateral join fetches one representative round for opponent/team data.
 	query := `
 		SELECT
 			m.id, m.match_type, m.completed_at,
-			CASE WHEN r.player_a_id = $2 THEN r.player_b_id ELSE r.player_a_id END as opponent_id,
+			COALESCE(m.format::text, '1v1') as format,
+			pcnt.player_count,
+			r.opponent_id,
 			u.first_name as opponent_name, COALESCE(u.username, '') as opponent_username,
 			CASE
-				WHEN r.is_draw THEN 'draw'
-				WHEN r.winner_id = $2 THEN 'win'
+				WHEN m.winner_user_id IS NULL THEN 'draw'
+				WHEN m.winner_user_id = $2 THEN 'win'
 				ELSE 'loss'
 			END as result,
-			CASE WHEN r.player_a_id = $2 THEN r.player_a_team ELSE r.player_b_team END as your_team,
-			CASE WHEN r.player_a_id = $2 THEN r.player_b_team ELSE r.player_a_team END as opponent_team,
+			r.your_team,
+			r.opponent_team,
 			your_photo.minio_object_key as your_photo_key,
 			opp_photo.minio_object_key as opponent_photo_key
-		FROM game_match_rounds r
-		JOIN game_matches m ON r.match_id = m.id
-		JOIN users u ON u.id = CASE WHEN r.player_a_id = $2 THEN r.player_b_id ELSE r.player_a_id END
+		FROM game_matches m
+		JOIN game_match_participants p ON p.match_id = m.id AND p.user_id = $2
+		-- Count participants per match
+		JOIN LATERAL (
+			SELECT COUNT(*)::int as player_count
+			FROM game_match_participants
+			WHERE match_id = m.id
+		) pcnt ON true
+		-- Get one representative round for opponent/team info
+		JOIN LATERAL (
+			SELECT
+				CASE WHEN rd.player_a_id = $2 THEN rd.player_b_id ELSE rd.player_a_id END as opponent_id,
+				CASE WHEN rd.player_a_id = $2 THEN rd.player_a_team ELSE rd.player_b_team END as your_team,
+				CASE WHEN rd.player_a_id = $2 THEN rd.player_b_team ELSE rd.player_a_team END as opponent_team
+			FROM game_match_rounds rd
+			WHERE rd.match_id = m.id
+			  AND (rd.player_a_id = $2 OR rd.player_b_id = $2)
+			ORDER BY rd.round_number ASC
+			LIMIT 1
+		) r ON true
+		JOIN users u ON u.id = r.opponent_id
 		LEFT JOIN LATERAL (
 			SELECT minio_object_key FROM user_profile_photos
 			WHERE user_id = $2 ORDER BY width DESC LIMIT 1
 		) your_photo ON true
 		LEFT JOIN LATERAL (
 			SELECT minio_object_key FROM user_profile_photos
-			WHERE user_id = CASE WHEN r.player_a_id = $2 THEN r.player_b_id ELSE r.player_a_id END
+			WHERE user_id = r.opponent_id
 			ORDER BY width DESC LIMIT 1
 		) opp_photo ON true
 		WHERE m.chat_id = $1
 		  AND m.status = 'completed'
-		  AND (r.player_a_id = $2 OR r.player_b_id = $2)
 		ORDER BY m.completed_at DESC
 		LIMIT $3 OFFSET $4
 	`
@@ -478,6 +498,7 @@ func (r *MatchRepository) GetMatchHistory(ctx context.Context, chatID, userID in
 		e := &MatchHistoryEntry{}
 		err := rows.Scan(
 			&e.MatchID, &e.MatchType, &e.CompletedAt,
+			&e.Format, &e.PlayerCount,
 			&e.OpponentID, &e.OpponentName, &e.OpponentUser,
 			&e.Result, &e.YourTeam, &e.OpponentTeam,
 			&e.YourPhotoKey, &e.OpponentPhotoKey,
@@ -554,6 +575,8 @@ func (r *MatchRepository) GetRecentMatchesVsOpponent(ctx context.Context, chatID
 	query := `
 		SELECT
 			m.id, m.match_type, m.completed_at,
+			COALESCE(m.format::text, '1v1') as format,
+			pcnt.player_count,
 			$3::bigint as opponent_id,
 			u.first_name as opponent_name, COALESCE(u.username, '') as opponent_username,
 			CASE
@@ -566,6 +589,11 @@ func (r *MatchRepository) GetRecentMatchesVsOpponent(ctx context.Context, chatID
 		FROM game_match_rounds r
 		JOIN game_matches m ON r.match_id = m.id
 		JOIN users u ON u.id = $3
+		JOIN LATERAL (
+			SELECT COUNT(*)::int as player_count
+			FROM game_match_participants
+			WHERE match_id = m.id
+		) pcnt ON true
 		WHERE m.chat_id = $1
 		  AND m.status = 'completed'
 		  AND ((r.player_a_id = $2 AND r.player_b_id = $3) OR (r.player_a_id = $3 AND r.player_b_id = $2))
@@ -584,6 +612,7 @@ func (r *MatchRepository) GetRecentMatchesVsOpponent(ctx context.Context, chatID
 		e := &MatchHistoryEntry{}
 		err := rows.Scan(
 			&e.MatchID, &e.MatchType, &e.CompletedAt,
+			&e.Format, &e.PlayerCount,
 			&e.OpponentID, &e.OpponentName, &e.OpponentUser,
 			&e.Result, &e.YourTeam, &e.OpponentTeam,
 		)

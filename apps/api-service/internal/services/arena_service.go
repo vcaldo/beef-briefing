@@ -182,6 +182,56 @@ type BattleResponse struct {
 	PlayerBID   int64                `json:"player_b_id"`
 	PlayerAName string               `json:"player_a_name"`
 	PlayerBName string               `json:"player_b_name"`
+	Format        string             `json:"format"`
+	BracketRounds []BracketRound     `json:"bracket_rounds,omitempty"`
+	Standings     []ArenaStanding    `json:"standings,omitempty"`
+	FfaRounds     []FfaRoundSummary  `json:"ffa_rounds,omitempty"`
+}
+
+// BracketRound represents a single round in a bracket tournament (e.g., "Semifinals", "Final")
+type BracketRound struct {
+	Name    string         `json:"name"`
+	Matches []BracketMatch `json:"matches"`
+}
+
+// BracketMatch represents a single match within a bracket round
+type BracketMatch struct {
+	MatchNumber int    `json:"match_number"`
+	PlayerAID   int64  `json:"player_a_id"`
+	PlayerAName string `json:"player_a_name"`
+	PlayerBID   int64  `json:"player_b_id"`
+	PlayerBName string `json:"player_b_name"`
+	WinnerID    *int64 `json:"winner_id,omitempty"`
+	IsDraw      bool   `json:"is_draw"`
+	PlayerADmg  int    `json:"player_a_damage"`
+	PlayerBDmg  int    `json:"player_b_damage"`
+	NumRounds   int    `json:"num_rounds"`
+}
+
+// ArenaStanding represents a player's standing in a free-for-all or bracket tournament
+type ArenaStanding struct {
+	UserID           int64  `json:"user_id"`
+	Name             string `json:"name"`
+	PhotoURL         string `json:"photo_url,omitempty"`
+	Rank             int    `json:"rank"`
+	Wins             int    `json:"wins"`
+	Losses           int    `json:"losses"`
+	Draws            int    `json:"draws"`
+	TotalDamageDealt int    `json:"total_damage_dealt"`
+}
+
+// FfaRoundSummary represents a summary of a single round in a free-for-all tournament
+type FfaRoundSummary struct {
+	RoundNumber int    `json:"round_number"`
+	PlayerAID   int64  `json:"player_a_id"`
+	PlayerAName string `json:"player_a_name"`
+	PlayerBID   int64  `json:"player_b_id"`
+	PlayerBName string `json:"player_b_name"`
+	WinnerID    *int64 `json:"winner_id,omitempty"`
+	IsDraw      bool   `json:"is_draw"`
+	PlayerADmg  int    `json:"player_a_damage"`
+	PlayerBDmg  int    `json:"player_b_damage"`
+	NumRounds   int    `json:"num_rounds"`
 }
 
 // CreateMatch creates a new regular match
@@ -415,7 +465,11 @@ func (s *ArenaService) StartMatch(ctx context.Context, matchID string, userID in
 	// Determine format based on participant count
 	format := repository.MatchFormat1v1
 	if count > 2 {
-		format = repository.MatchFormatArena
+		if count%2 == 0 {
+			format = repository.MatchFormatBracket
+		} else {
+			format = repository.MatchFormatFreeForAll
+		}
 	}
 
 	// Start shop phase (also sets format)
@@ -590,7 +644,11 @@ func (s *ArenaService) AutoStartMatch(ctx context.Context, matchID string) (*Aut
 	// Start the match - determine format based on participant count
 	format := repository.MatchFormat1v1
 	if participantCount > 2 {
-		format = repository.MatchFormatArena
+		if participantCount%2 == 0 {
+			format = repository.MatchFormatBracket
+		} else {
+			format = repository.MatchFormatFreeForAll
+		}
 	}
 
 	// Start shop phase

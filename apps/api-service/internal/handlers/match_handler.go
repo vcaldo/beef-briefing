@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"beef-briefing/apps/api-service/internal/apperror"
@@ -324,6 +325,54 @@ func (h *ArenaHandler) HandleGetBattle(w http.ResponseWriter, r *http.Request) {
 	httputil.RespondJSON(w, battle, http.StatusOK)
 }
 
+// HandleGetRoundBattle retrieves battle results for a specific round within a multi-round match.
+// GET /api/v1/mini-app/arena/match/{id}/battle/round/{round_number}
+func (h *ArenaHandler) HandleGetRoundBattle(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	setTransactionName(ctx, "api:arena:get-round-battle")
+
+	claims := requireJWTClaims(ctx, w)
+	if claims == nil {
+		return
+	}
+
+	matchID, err := extractMatchIDFromURL(r)
+	if err != nil {
+		httputil.RespondError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Extract round_number from URL path
+	vars := mux.Vars(r)
+	roundNumberStr := vars["round_number"]
+	if roundNumberStr == "" {
+		httputil.RespondError(w, "round_number is required", http.StatusBadRequest)
+		return
+	}
+	roundNumber, err := strconv.Atoi(roundNumberStr)
+	if err != nil {
+		httputil.RespondError(w, "round_number must be an integer", http.StatusBadRequest)
+		return
+	}
+
+	// Validate match belongs to user's chat
+	if h.validateMatchChatAccess(ctx, w, matchID, claims) == nil {
+		return
+	}
+
+	addTransactionAttribute(ctx, "match_id", matchID)
+	addTransactionAttribute(ctx, "user_id", claims.UserID)
+	addTransactionAttribute(ctx, "round_number", roundNumber)
+
+	battle, err := h.service.GetRoundBattle(ctx, matchID, roundNumber, claims.UserID)
+	if err != nil {
+		handleServiceError(ctx, w, err, "get round battle")
+		return
+	}
+
+	httputil.RespondJSON(w, battle, http.StatusOK)
+}
+
 // HandleGetLeaderboard retrieves the game leaderboard.
 // GET /api/v1/mini-app/arena/leaderboard?chat_id=X&type=ranked
 func (h *ArenaHandler) HandleGetLeaderboard(w http.ResponseWriter, r *http.Request) {
@@ -396,6 +445,8 @@ func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) 
 	type MatchHistoryResponse struct {
 		MatchID      string  `json:"match_id"`
 		MatchType    string  `json:"match_type"`
+		Format       string  `json:"format"`
+		PlayerCount  int     `json:"player_count"`
 		YourPhotoURL *string `json:"your_photo_url,omitempty"`
 		Opponent     struct {
 			UserID    int64   `json:"user_id"`
@@ -414,6 +465,8 @@ func (h *ArenaHandler) HandleGetHistory(w http.ResponseWriter, r *http.Request) 
 		m := MatchHistoryResponse{
 			MatchID:      e.MatchID,
 			MatchType:    string(e.MatchType),
+			Format:       e.Format,
+			PlayerCount:  e.PlayerCount,
 			Result:       e.Result,
 			YourTeam:     e.YourTeam,
 			OpponentTeam: e.OpponentTeam,

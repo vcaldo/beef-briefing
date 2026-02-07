@@ -317,9 +317,9 @@ func FormatParticipantList(participants []client.ArenaParticipant) string {
 
 // BuildMatchKeyboard creates the inline keyboard for a match.
 // For active matches: 3 rows (Open, Join, Participants)
-// For completed matches: 2 rows (Open, Winner/Draw) - must keep CallbackGame button per Telegram Games API
+// For completed matches: 2 rows (Open, Winner/Draw + Stats) - must keep CallbackGame button per Telegram Games API
 func BuildMatchKeyboard(matchID string, match *client.ArenaMatch) *models.InlineKeyboardMarkup {
-	// If match is completed, show Open button + winner/draw row (no Join button)
+	// If match is completed, show Open button + winner/draw row with stats button (no Join button)
 	// IMPORTANT: Telegram's Games API requires game messages to always have at least one CallbackGame button
 	if match.Status == "completed" {
 		var resultText string
@@ -351,6 +351,7 @@ func BuildMatchKeyboard(matchID string, match *client.ArenaMatch) *models.Inline
 				},
 				{
 					{Text: resultText, CallbackData: "noop"},
+					{Text: "📊 Stats", CallbackData: fmt.Sprintf("match_stats:%s", matchID)},
 				},
 			},
 		}

@@ -93,7 +93,7 @@ function App() {
           return
         }
 
-        const { chatId, userId, matchId, ts, sig } = parseResult.params
+        const { chatId, userId, matchId, ts, sig, view } = parseResult.params
 
         // Authenticate using Games API
         const auth = await apiClient.authenticateGame({
@@ -131,8 +131,13 @@ function App() {
 
         setAppState('authenticated')
 
-        // If opened with a match_id, check if it's a completed match for replay
-        if (matchId) {
+        // If opened with view=stats, navigate directly to stats tab
+        if (view === 'stats') {
+          setActiveTab('stats')
+          addPageAction('stats_auto_navigate', { view })
+        }
+        // If opened with a match_id (and not going to stats), check if it's a completed match for replay
+        else if (matchId) {
           try {
             const match = await apiClient.getMatch(matchId)
             if (match.status === 'completed') {

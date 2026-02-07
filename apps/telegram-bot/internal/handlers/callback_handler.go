@@ -97,6 +97,8 @@ func (h *CallbackHandler) Handle(ctx context.Context, b *bot.Bot, update *models
 		h.handleLeaveMatch(ctx, b, update.CallbackQuery, matchID, userID, chatID, messageID, txn)
 	case "start_match":
 		h.handleStartMatch(ctx, b, update.CallbackQuery, matchID, userID, chatID, messageID, txn)
+	case "match_stats":
+		h.handleMatchStats(ctx, b, update.CallbackQuery, matchID, userID, chatID)
 	case "ranked_join":
 		h.handleJoinTournament(ctx, b, update.CallbackQuery, matchID, userID, chatID, messageID, txn)
 	case "ranked_leave":
@@ -298,6 +300,36 @@ func (h *CallbackHandler) answerCallback(ctx context.Context, b *bot.Bot, callba
 	if err != nil {
 		slog.Error("failed to answer callback query", "error", err)
 	}
+}
+
+// handleMatchStats handles the match_stats callback - opens the game directly to stats view
+func (h *CallbackHandler) handleMatchStats(ctx context.Context, b *bot.Bot, callback *models.CallbackQuery, matchID string, userID, chatID int64) {
+	// Generate timestamp and signature for Games API authentication
+	ts := time.Now().Unix()
+	sig := signGameURL(h.botToken, chatID, userID, matchID, ts)
+
+	// Build signed game URL with view=stats to open stats tab directly
+	gameURL := fmt.Sprintf(
+		"%s?chat_id=%d&user_id=%d&match_id=%s&ts=%d&sig=%s&view=stats",
+		h.arenaBaseURL,
+		chatID,
+		userID,
+		matchID,
+		ts,
+		sig,
+	)
+
+	// Answer callback query with game URL - this opens the URL in browser/webview
+	_, err := b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: callback.ID,
+		URL:             gameURL,
+	})
+	if err != nil {
+		slog.Error("failed to answer match stats callback", "error", err)
+		return
+	}
+
+	slog.Info("match stats callback answered", "user_id", userID, "chat_id", chatID, "match_id", matchID)
 }
 
 // handleGameCallback processes game button clicks

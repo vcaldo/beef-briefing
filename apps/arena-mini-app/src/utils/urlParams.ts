@@ -8,6 +8,7 @@ export interface GameAuthParams {
   matchId: string
   ts: number
   sig: string
+  view?: string
 }
 
 export interface ParseResult {
@@ -37,6 +38,7 @@ export function parseGameUrlParams(search: string): ParseUrlParamsResult {
   const matchId = urlParams.get('match_id') || ''
   const tsStr = urlParams.get('ts')
   const sig = urlParams.get('sig')
+  const view = urlParams.get('view') || undefined
 
   // Validate required signature parameter
   if (!sig) {
@@ -77,6 +79,7 @@ export function parseGameUrlParams(search: string): ParseUrlParamsResult {
       matchId,
       ts,
       sig,
+      view,
     },
   }
 }

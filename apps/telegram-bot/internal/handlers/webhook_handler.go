@@ -17,7 +17,7 @@ import (
 
 // winnerRevealDelay is the grace period before revealing the battle winner
 // in the group message, allowing users to open the mini-app first.
-const winnerRevealDelay = 30 * time.Second
+const winnerRevealDelay = 45 * time.Second
 
 // WebhookHandler handles internal webhook requests for updating match messages
 type WebhookHandler struct {

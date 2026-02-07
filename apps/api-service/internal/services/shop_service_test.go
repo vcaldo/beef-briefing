@@ -543,7 +543,7 @@ func TestReroll_DisabledAfterFirstReroll(t *testing.T) {
 		{Index: 0, CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, IsPurchased: false},
 		{Index: 1, CardID: 2, UserID: 102, Name: "Bob", ATK: 12, HP: 28, IsPurchased: false},
 	}
-	team := []*battle.Card{} // Empty team (reroll doesn't depend on team now)
+	team := []*battle.Card{}                                                    // Empty team (reroll doesn't depend on team now)
 	participant := newTestParticipantWithShop(matchID, userID, cards, team, 10) // Enough coins
 	participant.HasRerolled = true                                              // Already used reroll
 
@@ -555,12 +555,8 @@ func TestReroll_DisabledAfterFirstReroll(t *testing.T) {
 	// Attempt reroll (should fail because already rerolled)
 	_, err := svc.Reroll(ctx, matchID, userID)
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	expectedMsg := "reroll already used"
-	if err.Error() != expectedMsg {
-		t.Errorf("expected error %q, got %q", expectedMsg, err.Error())
+	if err != apperror.ErrRerollAlreadyUsed {
+		t.Errorf("expected ErrRerollAlreadyUsed, got %v", err)
 	}
 }
 
@@ -588,7 +584,7 @@ func TestReroll_InsufficientCoins(t *testing.T) {
 		{Index: 0, CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, IsPurchased: false},
 		{Index: 1, CardID: 2, UserID: 102, Name: "Bob", ATK: 12, HP: 28, IsPurchased: false},
 	}
-	team := []*battle.Card{} // Empty team
+	team := []*battle.Card{}                                                   // Empty team
 	participant := newTestParticipantWithShop(matchID, userID, cards, team, 5) // Only 5 coins (need 10 total)
 
 	mockRepo.Matches[matchID] = match
@@ -737,5 +733,85 @@ func TestSubmitTeam_WrongSize(t *testing.T) {
 
 	if err != shop.ErrTeamIncomplete {
 		t.Errorf("expected ErrTeamIncomplete, got %v", err)
+	}
+}
+
+// TestReroll_DisabledAfterPurchase verifies that reroll fails after buying a card.
+func TestReroll_DisabledAfterPurchase(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := testutil.NewMockGameRepository()
+	svc := newTestShopService(mockRepo)
+
+	matchID := "match-1"
+	userID := int64(1)
+
+	match := newTestMatch(matchID, repository.MatchStatusShopPhase)
+
+	// Create participant with one purchased card (non-empty team)
+	cards := []*battle.ShopCard{
+		{Index: 0, CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, IsPurchased: true},
+		{Index: 1, CardID: 2, UserID: 102, Name: "Bob", ATK: 12, HP: 28, IsPurchased: false},
+	}
+	team := []*battle.Card{
+		{CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, MaxHP: 30, Position: 0},
+	}
+	participant := newTestParticipantWithShop(matchID, userID, cards, team, 10) // Enough coins
+
+	mockRepo.Matches[matchID] = match
+	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
+		userID: participant,
+	}
+
+	// Attempt reroll (should fail because cards have been purchased)
+	_, err := svc.Reroll(ctx, matchID, userID)
+
+	if err != apperror.ErrRerollAfterPurchase {
+		t.Errorf("expected ErrRerollAfterPurchase, got %v", err)
+	}
+}
+
+// TestGetShop_CanRerollFalseAfterPurchase verifies that GetShop returns can_reroll=false with correct reason after purchase.
+func TestGetShop_CanRerollFalseAfterPurchase(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := testutil.NewMockGameRepository()
+	svc := newTestShopService(mockRepo)
+
+	matchID := "match-1"
+	userID := int64(1)
+
+	match := newTestMatch(matchID, repository.MatchStatusShopPhase)
+
+	// Create participant with one purchased card (non-empty team)
+	cards := []*battle.ShopCard{
+		{Index: 0, CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, IsPurchased: true},
+		{Index: 1, CardID: 2, UserID: 102, Name: "Bob", ATK: 12, HP: 28, IsPurchased: false},
+	}
+	team := []*battle.Card{
+		{CardID: 1, UserID: 101, Name: "Alice", ATK: 10, HP: 30, MaxHP: 30, Position: 0},
+	}
+	participant := newTestParticipantWithShop(matchID, userID, cards, team, 10) // Enough coins
+
+	mockRepo.Matches[matchID] = match
+	mockRepo.Participants[matchID] = map[int64]*repository.Participant{
+		userID: participant,
+	}
+
+	resp, err := svc.GetShop(ctx, matchID, userID)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if resp.CanReroll {
+		t.Error("expected CanReroll to be false after purchase")
+	}
+	if !resp.Affordability.CanReroll {
+		// Verify the disabled reason
+		if resp.Affordability.RerollDisabledReason == nil {
+			t.Error("expected RerollDisabledReason to be set")
+		} else if *resp.Affordability.RerollDisabledReason != "cannot reroll after purchasing cards" {
+			t.Errorf("expected reason %q, got %q", "cannot reroll after purchasing cards", *resp.Affordability.RerollDisabledReason)
+		}
+	} else {
+		t.Error("expected Affordability.CanReroll to be false after purchase")
 	}
 }

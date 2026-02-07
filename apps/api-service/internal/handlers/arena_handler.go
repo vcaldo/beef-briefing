@@ -203,6 +203,10 @@ func handleServiceError(ctx context.Context, w http.ResponseWriter, err error, e
 		httputil.RespondError(w, "card already purchased", http.StatusBadRequest)
 	case apperror.ErrNotEnoughCoins:
 		httputil.RespondError(w, "not enough coins", http.StatusBadRequest)
+	case apperror.ErrRerollAlreadyUsed:
+		httputil.RespondError(w, "reroll already used", http.StatusBadRequest)
+	case apperror.ErrRerollAfterPurchase:
+		httputil.RespondError(w, "cannot reroll after purchasing cards", http.StatusBadRequest)
 	case apperror.ErrNotEnoughCards:
 		httputil.RespondError(w, "not enough cards in group (minimum 10 required)", http.StatusBadRequest)
 	case apperror.ErrActiveMatchExists:
@@ -343,8 +347,8 @@ func (h *ArenaHandler) HandleGetConstants(w http.ResponseWriter, r *http.Request
 			"join_window_duration": 300,
 		},
 		"hp_bar_thresholds": map[string]interface{}{
-			"high":        66,
-			"medium":      33,
+			"high":   66,
+			"medium": 33,
 			"colors": map[string]string{
 				"high":   "#22c55e",
 				"medium": "#eab308",

@@ -1681,8 +1681,8 @@ func TestBuyCard_Success(t *testing.T) {
 	if !buyResp.Affordability.CanBuy {
 		t.Error("expected CanBuy to be true with 7 coins remaining")
 	}
-	if !buyResp.Affordability.CanReroll {
-		t.Error("expected CanReroll to be true after first purchase (reroll is once per match, not tied to purchases)")
+	if buyResp.Affordability.CanReroll {
+		t.Error("expected CanReroll to be false after purchase (reroll disabled after buying cards)")
 	}
 	if buyResp.Affordability.CanSubmit {
 		t.Error("expected CanSubmit to be false with only 1 card (need 3)")
@@ -2098,8 +2098,7 @@ func TestReroll_Success(t *testing.T) {
 	}
 }
 
-// TestReroll_AfterPurchase verifies that reroll is still available after purchasing cards.
-// The reroll is limited to one use per match, not by purchase status.
+// TestReroll_AfterPurchase verifies that reroll is blocked after purchasing cards.
 func TestReroll_AfterPurchase(t *testing.T) {
 	tdb := setupArenaTestDB(t)
 	defer testutil.TeardownTestDB(t, tdb)
@@ -2167,94 +2166,25 @@ func TestReroll_AfterPurchase(t *testing.T) {
 		t.Errorf("expected 1 card in team, got %d", len(buyResp.Team))
 	}
 
-	// Verify the purchased card is marked correctly (should be at index 0)
-	if len(buyResp.Cards) != 4 {
-		t.Fatalf("expected 4 shop cards after purchase, got %d", len(buyResp.Cards))
+	// Verify CanReroll is false after purchase (reroll disabled after buying cards)
+	if buyResp.Affordability.CanReroll {
+		t.Error("expected CanReroll to be false after purchase")
 	}
-	if !buyResp.Cards[0].IsPurchased {
-		t.Fatal("expected card at index 0 to be marked as purchased")
-	}
-
-	// Verify other cards are not purchased (indices 1, 2, 3)
-	for i := 1; i < 4; i++ {
-		if buyResp.Cards[i].IsPurchased {
-			t.Errorf("card at index %d should not be purchased", i)
-		}
+	if buyResp.CanReroll {
+		t.Error("expected CanReroll flag to be false after purchase")
 	}
 
-	// Verify CanReroll is still true after purchase (reroll is once per match, not tied to purchases)
-	if !buyResp.Affordability.CanReroll {
-		t.Error("expected CanReroll to be true after first purchase (reroll not yet used)")
-	}
-	if !buyResp.CanReroll {
-		t.Error("expected CanReroll flag to be true after first purchase (reroll not yet used)")
-	}
-
-	// Record card IDs before reroll
-	cardIDsBefore := make([]int64, 0)
-	for _, card := range buyResp.Cards {
-		if !card.IsPurchased {
-			cardIDsBefore = append(cardIDsBefore, card.CardID)
-		}
+	// Verify correct disabled reason
+	if buyResp.Affordability.RerollDisabledReason == nil {
+		t.Error("expected RerollDisabledReason to be set")
+	} else if *buyResp.Affordability.RerollDisabledReason != "cannot reroll after purchasing cards" {
+		t.Errorf("expected reason %q, got %q", "cannot reroll after purchasing cards", *buyResp.Affordability.RerollDisabledReason)
 	}
 
-	// Reroll should succeed even after purchase (first reroll of the match)
-	rerollResp, err := svc.Reroll(ctx, matchID, testCreatorUserID)
-	if err != nil {
-		t.Fatalf("Reroll failed after purchase: %v", err)
-	}
-
-	// Verify coins decreased by 1 (7 - 1 = 6)
-	if rerollResp.Coins != 6 {
-		t.Errorf("expected 6 coins after reroll, got %d", rerollResp.Coins)
-	}
-
-	// Verify team still has 1 card (reroll doesn't affect team)
-	if len(rerollResp.Team) != 1 {
-		t.Errorf("expected 1 card in team after reroll, got %d", len(rerollResp.Team))
-	}
-
-	// Verify purchased card is still purchased
-	if !rerollResp.Cards[0].IsPurchased {
-		t.Error("expected purchased card to remain purchased after reroll")
-	}
-
-	// Verify unpurchased cards were refreshed
-	cardIDsAfter := make([]int64, 0)
-	for _, card := range rerollResp.Cards {
-		if !card.IsPurchased {
-			cardIDsAfter = append(cardIDsAfter, card.CardID)
-		}
-	}
-
-	// At least some cards should have changed
-	allSame := len(cardIDsBefore) == len(cardIDsAfter)
-	if allSame {
-		for i := range cardIDsBefore {
-			if cardIDsBefore[i] != cardIDsAfter[i] {
-				allSame = false
-				break
-			}
-		}
-	}
-	if allSame && len(cardIDsBefore) > 0 {
-		t.Error("expected unpurchased cards to change after reroll")
-	}
-
-	// After reroll, CanReroll should be false (one reroll per match)
-	if rerollResp.Affordability.CanReroll {
-		t.Error("expected CanReroll to be false after reroll")
-	}
-	if rerollResp.CanReroll {
-		t.Error("expected CanReroll flag to be false after reroll")
-	}
-
-	// Second reroll should fail
+	// Reroll should fail after purchase
 	_, err = svc.Reroll(ctx, matchID, testCreatorUserID)
-	if err == nil {
-		t.Error("expected second reroll to fail")
-	} else if err.Error() != "reroll already used" {
-		t.Errorf("expected 'reroll already used' error, got %v", err)
+	if err != apperror.ErrRerollAfterPurchase {
+		t.Errorf("expected ErrRerollAfterPurchase, got %v", err)
 	}
 }
 

@@ -34,6 +34,8 @@ var (
 	ErrNotEnoughCoins       = errors.New("not enough coins")
 	ErrTeamFull             = errors.New("team is full (max 3 cards)")
 	ErrCardAlreadyPurchased = errors.New("card already purchased")
+	ErrRerollAlreadyUsed    = errors.New("reroll already used")
+	ErrRerollAfterPurchase  = errors.New("cannot reroll after purchasing cards")
 )
 
 // =====================================================
@@ -66,15 +68,15 @@ var (
 // =====================================================
 
 var (
-	ErrMissingGameSignature   = errors.New("missing signature")
-	ErrInvalidGameSignature   = errors.New("invalid game signature")
-	ErrExpiredGameTimestamp   = errors.New("game timestamp expired")
-	ErrMissingGameChatID      = errors.New("missing chat_id")
-	ErrMissingGameUserID      = errors.New("missing user_id")
-	ErrMissingGameMatchID     = errors.New("missing match_id")
-	ErrMissingGameTimestamp   = errors.New("missing timestamp")
-	ErrInvalidGameTimestamp   = errors.New("invalid timestamp format")
-	ErrFutureGameTimestamp    = errors.New("timestamp is in the future")
+	ErrMissingGameSignature = errors.New("missing signature")
+	ErrInvalidGameSignature = errors.New("invalid game signature")
+	ErrExpiredGameTimestamp = errors.New("game timestamp expired")
+	ErrMissingGameChatID    = errors.New("missing chat_id")
+	ErrMissingGameUserID    = errors.New("missing user_id")
+	ErrMissingGameMatchID   = errors.New("missing match_id")
+	ErrMissingGameTimestamp = errors.New("missing timestamp")
+	ErrInvalidGameTimestamp = errors.New("invalid timestamp format")
+	ErrFutureGameTimestamp  = errors.New("timestamp is in the future")
 )
 
 // =====================================================

@@ -147,7 +147,8 @@ func (s *ShopService) computeShopAffordability(coins int, teamSize int, isReady 
 	coinsNeededForCards := remainingCards * shop.CardCost
 
 	canBuy := coins >= shop.CardCost && teamSize < shop.TeamSize
-	canReroll := !hasRerolled && coins >= shop.RerollCost
+	hasPurchased := teamSize > 0
+	canReroll := !hasRerolled && !hasPurchased && coins >= shop.RerollCost
 	canUpgrade := coins >= (shop.UpgradeCost + coinsNeededForCards)
 	canSubmit := teamSize == shop.TeamSize && !isReady
 
@@ -172,6 +173,8 @@ func (s *ShopService) computeShopAffordability(coins int, teamSize int, isReady 
 		var reason string
 		if hasRerolled {
 			reason = "already rerolled"
+		} else if hasPurchased {
+			reason = "cannot reroll after purchasing cards"
 		} else {
 			reason = fmt.Sprintf("need %d coins", shop.RerollCost)
 		}
@@ -452,7 +455,7 @@ func (s *ShopService) Reroll(ctx context.Context, matchID string, userID int64) 
 
 	// Reroll is only allowed once per match
 	if participant.HasRerolled {
-		return nil, fmt.Errorf("reroll already used")
+		return nil, apperror.ErrRerollAlreadyUsed
 	}
 
 	if participant.CoinsRemaining < shop.RerollCost {
@@ -465,6 +468,11 @@ func (s *ShopService) Reroll(ctx context.Context, matchID string, userID int64) 
 		if err := jsonutil.Unmarshal(*participant.Team, &currentTeam); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal team: %w", err)
 		}
+	}
+
+	// Reroll is not allowed after purchasing cards
+	if len(currentTeam) > 0 {
+		return nil, apperror.ErrRerollAfterPurchase
 	}
 
 	// Calculate coins needed to complete team

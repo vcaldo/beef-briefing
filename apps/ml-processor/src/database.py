@@ -130,6 +130,53 @@ class MLQueries:
 
         return self._execute_many(query, params)
 
+    @function_trace(name="get_chat_ids_with_unprocessed", group="Database")
+    def get_chat_ids_with_unprocessed(
+        self,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> list[dict]:
+        """
+        Discover all chats that have unprocessed messages.
+
+        Uses the same WHERE clause as get_unprocessed_messages for consistency.
+
+        Args:
+            from_date: Only count messages from this date (inclusive)
+            to_date: Only count messages until this date (exclusive)
+
+        Returns:
+            List of dicts with chat_id, chat_title, unprocessed_count,
+            ordered by biggest backlog first.
+        """
+        date_filters = ""
+        if from_date:
+            date_filters += " AND m.date >= :from_date"
+        if to_date:
+            date_filters += " AND m.date < :to_date"
+
+        query = f"""
+            SELECT
+                m.chat_id,
+                c.title AS chat_title,
+                COUNT(*) AS unprocessed_count
+            FROM messages m
+            LEFT JOIN ml_processing_state mps ON mps.message_id = m.id
+            LEFT JOIN chats c ON c.id = m.chat_id
+            WHERE mps.message_id IS NULL
+                AND (m.text IS NOT NULL OR m.caption IS NOT NULL)
+                {date_filters}
+            GROUP BY m.chat_id, c.title
+            ORDER BY COUNT(*) DESC
+        """
+        params: dict[str, Any] = {}
+        if from_date:
+            params["from_date"] = from_date
+        if to_date:
+            params["to_date"] = to_date
+
+        return self._execute_many(query, params)
+
     @function_trace(name="get_processing_status", group="Database")
     def get_processing_status(self, chat_id: int) -> dict:
         """

@@ -602,6 +602,28 @@ ml-run-once-prod: | ensure-scripts-executable ## Run single batch (prod)
 ml-run-continuous-prod: | ensure-scripts-executable ## Run continuous processing (prod)
 	./scripts/ml-processor.sh --prod continuous $(ML_ARGS)
 
+ml-run-all: | ensure-scripts-executable ## Run ml-processor for ALL chats (dev)
+	./scripts/ml-processor.sh process-all $(ML_ARGS)
+
+ml-run-all-prod: | ensure-scripts-executable ## Run ml-processor for ALL chats (prod)
+	./scripts/ml-processor.sh --prod process-all $(ML_ARGS)
+
+ml-run-chat: | ensure-scripts-executable ## Run ml-processor for a single chat (dev). CHAT_ID required
+	@if [ -z "$(CHAT_ID)" ]; then \
+		echo "Error: CHAT_ID is required"; \
+		echo "Usage: make ml-run-chat CHAT_ID=-1003280306634 [ML_ARGS='--limit 100']"; \
+		exit 1; \
+	fi
+	./scripts/ml-processor.sh process --chat-id $(CHAT_ID) $(ML_ARGS)
+
+ml-run-chat-prod: | ensure-scripts-executable ## Run ml-processor for a single chat (prod). CHAT_ID required
+	@if [ -z "$(CHAT_ID)" ]; then \
+		echo "Error: CHAT_ID is required"; \
+		echo "Usage: make ml-run-chat-prod CHAT_ID=-1003280306634 [ML_ARGS='--limit 100']"; \
+		exit 1; \
+	fi
+	./scripts/ml-processor.sh --prod process --chat-id $(CHAT_ID) $(ML_ARGS)
+
 ml-run-cards-prod: | ensure-scripts-executable ## Generate weekly user cards (prod)
 	./scripts/ml-processor.sh --prod cards $(ML_ARGS)
 
@@ -972,6 +994,7 @@ mc-setup-prod: ## Configure MinIO Client alias for production
 	tf-connect tf-setup tf-sync-object-storage tf-update-ssh-config tf-docs tf-deploy-check \
 	ml-run ml-run-status ml-run-once ml-run-continuous ml-run-cards ml-run-render \
 	ml-run-render-regular ml-run-render-compact ml-run-render-all \
+	ml-run-all ml-run-all-prod ml-run-chat ml-run-chat-prod \
 	ml-run-prod ml-run-status-prod ml-run-once-prod ml-run-continuous-prod ml-run-cards-prod ml-run-render-prod \
 	ml-run-render-regular-prod ml-run-render-compact-prod ml-run-render-all-prod \
 	ml-shell ml-clean-dev ml-clean-prod ml-clean-cards-dev ml-clean-cards-prod \

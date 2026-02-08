@@ -5,6 +5,7 @@ ML Processor - Analyzes Portuguese chat messages using local ML models.
 Usage:
     python main.py process --chat-id -1003280306634 [--limit N] [--batch-size N]
     python main.py process --chat-id -1003280306634 --from-date 2024-11-01 --to-date 2024-12-01
+    python main.py process-all [--dry-run] [--limit N] [--batch-size N]
     python main.py status --chat-id -1003280306634
     python main.py continuous --chat-id -1003280306634
 """
@@ -30,6 +31,7 @@ if _config.new_relic_enabled():
 # Now import everything else
 import argparse
 import logging
+import time
 from datetime import datetime
 
 from sqlalchemy import create_engine, text
@@ -182,6 +184,121 @@ def run_process(args, config):
         record_custom_metric("Custom/MLProcessor/TotalProcessed", total_processed)
         logger.info(f"Processing complete: {total_processed} total messages processed")
         return total_processed
+
+    finally:
+        processor.cleanup()
+
+
+def run_process_all(args, config):
+    """Run batch processing for all chats with unprocessed messages."""
+    logger.info("Discovering chats with unprocessed messages...")
+
+    batch_size = args.batch_size if args.batch_size is not None else config.batch_size
+    from_date = parse_date(getattr(args, "from_date", None))
+    to_date = parse_date(getattr(args, "to_date", None))
+
+    add_custom_attributes(
+        {
+            "command": "process-all",
+            "batch_size": batch_size,
+            "limit": args.limit,
+            "dry_run": args.dry_run,
+            "from_date": str(from_date.date()) if from_date else None,
+            "to_date": str(to_date.date()) if to_date else None,
+        }
+    )
+
+    # Create processor once (loads GPU models, connects to Qdrant)
+    processor = create_processor(config)
+    processor.setup()
+
+    try:
+        # Discover chats
+        chats = processor.queries.get_chat_ids_with_unprocessed(
+            from_date=from_date,
+            to_date=to_date,
+        )
+
+        if not chats:
+            logger.info("No chats with unprocessed messages found")
+            print("\nNo chats with unprocessed messages.")
+            return 0
+
+        # Print discovery results
+        total_unprocessed = sum(c["unprocessed_count"] for c in chats)
+        print(f"\nFound {len(chats)} chat(s) with {total_unprocessed:,} unprocessed messages:\n")
+        for i, chat in enumerate(chats, 1):
+            title = chat["chat_title"] or "Unknown"
+            print(f"  {i}. {chat['chat_id']} ({title}): {chat['unprocessed_count']:,} messages")
+
+        if args.dry_run:
+            print("\n--dry-run: exiting without processing.")
+            return 0
+
+        # Log configured providers
+        logger.info(f"Sentiment provider: {config.sentiment_provider}")
+        logger.info(f"Toxicity provider: {config.toxicity_provider}")
+        logger.info(f"Topics provider: {config.topics_provider}")
+        logger.info(f"NER provider: {config.ner_provider}")
+
+        # Process each chat
+        print(f"\nProcessing {len(chats)} chat(s)...\n")
+        all_start = time.time()
+        successful = 0
+        failed = 0
+        grand_total = 0
+
+        for i, chat in enumerate(chats, 1):
+            chat_id = chat["chat_id"]
+            title = chat["chat_title"] or "Unknown"
+            chat_start = time.time()
+
+            try:
+                total_processed = 0
+                remaining = args.limit
+
+                while True:
+                    current_batch = batch_size
+                    if remaining is not None:
+                        current_batch = min(batch_size, remaining)
+                        if current_batch <= 0:
+                            break
+
+                    count = processor.process_batch(
+                        chat_id,
+                        limit=current_batch,
+                        from_date=from_date,
+                        to_date=to_date,
+                    )
+                    total_processed += count
+
+                    record_custom_metric("Custom/MLProcessor/BatchSize", count)
+
+                    if remaining is not None:
+                        remaining -= count
+
+                    if count < current_batch:
+                        break
+
+                elapsed = time.time() - chat_start
+                grand_total += total_processed
+                successful += 1
+                print(f"  [{i}/{len(chats)}] Chat {chat_id} ({title}): {total_processed:,} messages ({elapsed:.1f}s)")
+
+            except Exception as e:
+                elapsed = time.time() - chat_start
+                failed += 1
+                logger.error(f"Error processing chat {chat_id}: {e}", exc_info=True)
+                print(f"  [{i}/{len(chats)}] Chat {chat_id} ({title}): FAILED ({elapsed:.1f}s) - {e}")
+
+        # Summary
+        total_elapsed = time.time() - all_start
+        record_custom_metric("Custom/MLProcessor/TotalProcessed", grand_total)
+
+        print(f"\nDone! {successful}/{len(chats)} chats processed, {failed} failed")
+        print(f"Total messages: {grand_total:,} in {total_elapsed:.1f}s")
+
+        return grand_total
 
     finally:
         processor.cleanup()
@@ -497,6 +614,41 @@ def main():
         help="Process messages until this date (YYYY-MM-DD)",
     )
 
+    # process-all command
+    process_all_parser = subparsers.add_parser(
+        "process-all",
+        help="Process all chats with unprocessed messages",
+    )
+    process_all_parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        help=f"Messages per batch (default: {_config.batch_size} from config)",
+    )
+    process_all_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Max messages to process per chat (default: unlimited)",
+    )
+    process_all_parser.add_argument(
+        "--from-date",
+        type=str,
+        default=None,
+        help="Process messages from this date (YYYY-MM-DD)",
+    )
+    process_all_parser.add_argument(
+        "--to-date",
+        type=str,
+        default=None,
+        help="Process messages until this date (YYYY-MM-DD)",
+    )
+    process_all_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="List chats and counts without processing",
+    )
+
     # status command
     status_parser = subparsers.add_parser(
         "status",
@@ -661,6 +813,10 @@ def main():
     try:
         if args.command == "process":
             result = run_process(args, config)
+            sys.exit(0 if result >= 0 else 1)
+
+        elif args.command == "process-all":
+            result = run_process_all(args, config)
             sys.exit(0 if result >= 0 else 1)
 
         elif args.command == "status":

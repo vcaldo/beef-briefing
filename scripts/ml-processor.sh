@@ -38,7 +38,8 @@ Environment:
                   Also uses external card-renderer URL for render command
 
 Commands:
-  process      Run batch processing
+  process      Run batch processing (single chat)
+  process-all  Process ALL chats with unprocessed messages
   status       Show processing status
   continuous   Run continuous processing (daemon mode)
   cards        Generate weekly user cards
@@ -59,6 +60,7 @@ Options (passed through to main.py):
   --theme T              Theme for card images (default: gaming)
   --card-type T          Card type for render (regular or compact, default: regular)
   --force                Force regenerate card images
+  --dry-run              List chats without processing (process-all only)
 
 Examples:
   $0 process --limit 100                    # Dev: local postgres
@@ -69,6 +71,9 @@ Examples:
   $0 render --week 2025-01-06               # Render regular card images (dev)
   $0 render --card-type compact             # Render compact card images
   $0 render --force                         # Force re-render images
+  $0 process-all --dry-run                   # List chats with unprocessed messages
+  $0 process-all --limit 100                 # Process all chats (max 100 msgs each)
+  $0 --prod process-all                      # Process all chats (prod)
   $0 cards --chat-id -1009876543 --source-chat-id -1001234567 --timezone UTC  # Impersonation mode
   $0 shell                                  # Open shell
 EOF
@@ -141,6 +146,10 @@ main() {
             else
                 docker_exec python main.py process "$@"
             fi
+            ;;
+
+        process-all)
+            docker_exec python main.py process-all "$@"
             ;;
 
         status)

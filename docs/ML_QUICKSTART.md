@@ -49,13 +49,22 @@ This shows:
 Process all unprocessed messages through the ML pipeline (sentiment, humor, toxicity, NER, topics, embeddings):
 
 ```bash
-# Process all messages (may take a while depending on volume)
+# Process ALL chats at once (auto-discovers unprocessed)
+make ml-run-all
+
+# Dry run first to see what would be processed
+make ml-run-all ML_ARGS="--dry-run"
+
+# Process a specific chat only
+make ml-run-chat CHAT_ID=-1003280306634
+
+# Or use ml-run with the default chat from scripts/ml-processor.sh
 make ml-run
 
-# Or process with a limit first to test
+# Process with a limit first to test
 make ml-run ML_ARGS="--limit 100"
 
-# Or process a specific date range
+# Process a specific date range
 make ml-run ML_ARGS="--from-date 2024-12-01 --to-date 2024-12-31"
 ```
 
@@ -140,9 +149,9 @@ THEMES="gaming clean sticker meme vaporwave blueprint mythic noir_luxury"
 echo "=== Current Status ==="
 make ml-run-status
 
-# 2. Process all messages
+# 2. Process all messages (auto-discovers all chats)
 echo "=== Processing Messages ==="
-make ml-run
+make ml-run-all
 
 # 3. Generate cards
 echo "=== Generating Cards ==="
@@ -180,6 +189,8 @@ make ml-clean-cards-dev ML_ARGS="--force"
 |---------|-------------|
 | `make ml-run-status` | Show processing status |
 | `make ml-run` | Process messages through ML pipeline |
+| `make ml-run-all` | Process ALL chats (auto-discovers unprocessed) |
+| `make ml-run-chat CHAT_ID=X` | Process a specific chat |
 | `make ml-run-once` | Process single batch (for testing) |
 | `make ml-run-cards` | Generate weekly user cards |
 | `make ml-cards-impersonate` | Generate cards with impersonation mode (dev) |
@@ -195,6 +206,11 @@ make ml-clean-cards-dev ML_ARGS="--force"
 By default, commands use the chat ID configured in `scripts/ml-processor.sh`. To use a different chat:
 
 ```bash
+# Preferred: use ml-run-chat shortcut
+make ml-run-chat CHAT_ID=-1003280306634
+make ml-run-chat CHAT_ID=-1003280306634 ML_ARGS="--limit 100"
+
+# Or pass --chat-id via ML_ARGS (works with any command)
 make ml-run ML_ARGS="--chat-id -1003280306634 --limit 100"
 make ml-run-cards ML_ARGS="--chat-id -1003280306634 --week 2024-12-16 --timezone America/Sao_Paulo"
 make ml-run-render ML_ARGS="--chat-id -1003280306634 --week 2024-12-16"

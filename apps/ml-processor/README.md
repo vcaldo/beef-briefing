@@ -23,6 +23,12 @@ make up-build
 # Run batch processing (development)
 make ml-run
 
+# Process ALL chats (auto-discovers unprocessed)
+make ml-run-all
+
+# Dry run (list chats without processing)
+make ml-run-all ML_ARGS="--dry-run"
+
 # Check status
 make ml-run-status
 
@@ -93,10 +99,14 @@ Each analysis type can use a different provider:
 | Command | Description |
 |---------|-------------|
 | `make ml-run` | Run batch processing |
+| `make ml-run-all` | Process all chats with unprocessed messages |
+| `make ml-run-chat CHAT_ID=X` | Process a specific chat |
 | `make ml-run-once` | Process single batch |
 | `make ml-run-status` | Check processing status |
 | `make ml-run-continuous` | Run daemon mode |
 | `make ml-run-cards` | Generate weekly cards |
+| `make ml-run-all-prod` | Process all chats (prod, via SSH tunnel) |
+| `make ml-run-chat-prod CHAT_ID=X` | Process a specific chat (prod) |
 | `make ml-shell` | Open shell in container |
 
 ### Command Options
@@ -108,6 +118,7 @@ Each analysis type can use a different provider:
 --batch-size N            # Messages per batch
 --from-date D             # Process from date (YYYY-MM-DD)
 --to-date D               # Process until date (YYYY-MM-DD)
+--dry-run                 # List chats without processing (process-all only)
 
 # Cards options
 --timezone TZ             # IANA timezone (REQUIRED)
@@ -128,6 +139,16 @@ make ml-run ML_ARGS="--from-date 2025-01-01 --to-date 2025-01-07"
 
 # Generate cards for specific week
 make ml-run-cards ML_ARGS="--timezone America/Sao_Paulo --week 2025-01-06"
+
+# Dry run: see which chats have unprocessed messages
+make ml-run-all ML_ARGS="--dry-run"
+
+# Process all chats, max 500 messages each
+make ml-run-all ML_ARGS="--limit 500"
+
+# Process specific chat (shortcut — no need for ML_ARGS)
+make ml-run-chat CHAT_ID=-1003280306634
+make ml-run-chat CHAT_ID=-1003280306634 ML_ARGS="--limit 100"
 
 # Impersonation mode: read messages from dev group (-1001234567),
 # generate cards for production group (-1009876543)

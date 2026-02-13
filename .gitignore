@@ -187,3 +187,4 @@ assets/*
 apps/arena-mini-app/assets/candidates/*
 
 scripts/weekly-cards.sh
+scripts/cleanup-object-storage.sh

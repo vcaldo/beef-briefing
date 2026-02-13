@@ -64,6 +64,10 @@ env/
 Thumbs.db
 *.log
 
+# Logs directory (keep directory, ignore log files)
+logs/*.log
+logs/*.txt
+
 # Docker
 .dockerignore
 docker-compose.override.yml
@@ -181,3 +185,5 @@ pnpm-lock.yaml
 assets/*
 
 apps/arena-mini-app/assets/candidates/*
+
+scripts/weekly-cards.sh

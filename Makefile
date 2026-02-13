@@ -727,6 +727,16 @@ ml-dashboard-shell: ## Open shell in ML Dashboard backend container
 	$(DC) exec ml-dashboard-backend /bin/bash
 
 # =============================================================================
+# WEEKLY CARDS AUTOMATION (weekly-cards-*)
+# =============================================================================
+
+weekly-cards: | ensure-scripts-executable ## Run weekly card generation for all chats
+	./scripts/weekly-cards.sh $(WEEKLY_ARGS)
+
+weekly-cards-dry: | ensure-scripts-executable ## Preview weekly card generation (dry run)
+	./scripts/weekly-cards.sh --dry-run $(WEEKLY_ARGS)
+
+# =============================================================================
 # RANKED TOURNAMENTS (ranked-*)
 # =============================================================================
 # Development targets (default) - use local docker-compose postgres

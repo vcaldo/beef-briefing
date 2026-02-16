@@ -205,7 +205,7 @@ get_env_value() {
 
     local value
     if [[ -f "$env_file" ]]; then
-        value=$(grep "^${key}=" "$env_file" 2>/dev/null | cut -d'=' -f2- | tr -d '\n\r' | sed 's/^"//' | sed 's/"$//')
+        value=$(grep "^${key}=" "$env_file" 2>/dev/null | cut -d'=' -f2- | tr -d '\n\r' | sed 's/^"//' | sed 's/"$//' | sed 's/ *#.*//')
     fi
 
     echo "${value:-$default}"

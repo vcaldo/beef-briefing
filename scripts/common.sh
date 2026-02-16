@@ -54,15 +54,15 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 log_info() {
-    echo -e "${BLUE}ℹ${NC}  $1"
+    echo -e "${BLUE}ℹ${NC}  $1" >&2
 }
 
 log_success() {
-    echo -e "${GREEN}✓${NC}  $1"
+    echo -e "${GREEN}✓${NC}  $1" >&2
 }
 
 log_warn() {
-    echo -e "${YELLOW}⚠${NC}  $1"
+    echo -e "${YELLOW}⚠${NC}  $1" >&2
 }
 
 log_error() {
@@ -70,7 +70,7 @@ log_error() {
 }
 
 log_step() {
-    echo -e "\n${BLUE}▶${NC}  ${YELLOW}$1${NC}"
+    echo -e "\n${BLUE}▶${NC}  ${YELLOW}$1${NC}" >&2
 }
 
 # =============================================================================

@@ -44,7 +44,6 @@ function initNewRelic(): BrowserAgent | null {
         distributed_tracing: { enabled: true },
         privacy: { cookies_enabled: true },
         ajax: { deny_list: ['bam.eu01.nr-data.net'] },
-        spa: { enabled: true },
         session_replay: {
           enabled: true,
           block_selector: '',

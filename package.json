@@ -1,0 +1,28 @@
+{
+  "name": "beef-briefing-mini-apps",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/leaderboard-mini-app",
+    "apps/deck-mini-app",
+    "apps/arena-mini-app",
+    "apps/shared-mini-app"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev:leaderboard": "npm run dev --workspace=apps/leaderboard-mini-app",
+    "dev:deck": "npm run dev --workspace=apps/deck-mini-app",
+    "dev:arena": "npm run dev --workspace=apps/arena-mini-app",
+    "build:leaderboard": "npm run build --workspace=apps/leaderboard-mini-app",
+    "build:deck": "npm run build --workspace=apps/deck-mini-app",
+    "build:arena": "npm run build --workspace=apps/arena-mini-app"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

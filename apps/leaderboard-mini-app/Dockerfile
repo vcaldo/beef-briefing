@@ -2,12 +2,12 @@
 FROM node:22-alpine AS builder
 
 # Install pnpm which properly supports workspace: protocol
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10
 
 WORKDIR /app
 
 # Copy root and workspace package files
-COPY package*.json pnpm-workspace.yaml ./
+COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/leaderboard-mini-app/ ./apps/leaderboard-mini-app/
 COPY apps/shared-mini-app/ ./apps/shared-mini-app/
 

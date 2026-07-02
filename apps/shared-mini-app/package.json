@@ -1,0 +1,29 @@
+{
+  "name": "@beef-briefing/shared-mini-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./components": "./src/components/index.ts",
+    "./monitoring": "./src/monitoring/index.ts",
+    "./initialization": "./src/initialization/index.ts",
+    "./api": "./src/api/index.ts",
+    "./types": "./src/types/index.ts",
+    "./styles": "./src/styles/index.css",
+    "./utils": "./src/utils/index.ts"
+  },
+  "peerDependencies": {
+    "@newrelic/browser-agent": "^1.306.0",
+    "@telegram-apps/sdk-react": "^2.0.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.6.3"
+  }
+}
